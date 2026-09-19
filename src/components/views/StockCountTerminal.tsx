@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Check, Plus, Minus, Trash2, CheckCircle2, Download, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, ShieldCheck, Lock, Unlock, ListTodo, Zap, Copy, MessageSquare, CheckCheck, FileWarning, Store, Camera, Cloud, Loader2, Printer, Building2 } from 'lucide-react';
+import { X, Check, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2 } from 'lucide-react';
 import { StockCountSession, StockCountEntry, InventoryItem, InventoryCampaign } from '../../types';
 import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorage, saveStockCountSessionsToStorageDebounced, loadCampaignsFromStorage, saveCampaignsToStorage, getActiveCampaignId, setActiveCampaignId, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
 import { saveAuditRowsToDedicatedSheet, syncCampaignsWithCloud } from '../../lib/sheets';
@@ -9,6 +9,8 @@ import { MobileCameraBarcodeScanner } from './MobileCameraBarcodeScanner';
 import { MobileErpSnapshotView } from './MobileErpSnapshotView';
 import { StockCountReconciliationView } from './StockCountReconciliationView';
 import { StockCountSessionsListView, NewSessionConfig } from './StockCountSessionsListView';
+import { CountNumpad } from './CountNumpad';
+import { MobileReadingsList } from './MobileReadingsList';
 import { buildMasterCatalogIndex } from '../../utils/referenceResolver';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { copyTextToClipboard } from '../../utils/exportUtils';
@@ -1888,100 +1890,16 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
 
                         {/* On-Screen Industrial Numeric Keypad (PDA Touch-Optimized) */}
                         {mobileEntryMode === 'NUMPAD' && (
-                          <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-200 dark:border-slate-700">
-                            {/* Row 1 */}
-                            {['7', '8', '9'].map(d => (
-                              <button
-                                key={d}
-                                type="button"
-                                onClick={() => handleNumpadDigit(d)}
-                                className="h-12 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 font-mono font-black text-xl rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs active:bg-blue-50 dark:active:bg-blue-950/60 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-                              >
-                                {d}
-                              </button>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={handleNumpadClear}
-                              className="h-12 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-black text-sm rounded-xl border border-rose-200 dark:border-rose-800 shadow-2xs active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-                              title="Limpiar cantidad a 1"
-                            >
-                              C
-                            </button>
-
-                            {/* Row 2 */}
-                            {['4', '5', '6'].map(d => (
-                              <button
-                                key={d}
-                                type="button"
-                                onClick={() => handleNumpadDigit(d)}
-                                className="h-12 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 font-mono font-black text-xl rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs active:bg-blue-50 dark:active:bg-blue-950/60 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-                              >
-                                {d}
-                              </button>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={handleNumpadBackspace}
-                              className="h-12 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 font-black text-base rounded-xl border border-amber-200 dark:border-amber-800 shadow-2xs active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-                              title="Borrar último dígito"
-                            >
-                              ⌫
-                            </button>
-
-                            {/* Row 3 */}
-                            {['1', '2', '3'].map(d => (
-                              <button
-                                key={d}
-                                type="button"
-                                onClick={() => handleNumpadDigit(d)}
-                                className="h-12 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 font-mono font-black text-xl rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs active:bg-blue-50 dark:active:bg-blue-950/60 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-                              >
-                                {d}
-                              </button>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={() => handleApplyPackagingMultiplier(10)}
-                              className="h-12 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-black text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 shadow-2xs active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-                              title="Multiplicar por 10"
-                            >
-                              ×10
-                            </button>
-
-                            {/* Row 4 */}
-                            <button
-                              type="button"
-                              onClick={() => handleNumpadDigit('0')}
-                              className="h-12 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 font-mono font-black text-xl rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs active:bg-blue-50 dark:active:bg-blue-950/60 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-                            >
-                              0
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleNumpadDigit('00')}
-                              className="h-12 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 font-mono font-black text-base rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs active:bg-blue-50 dark:active:bg-blue-950/60 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-                            >
-                              00
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCountQuantity(prev => prev + 1);
-                                playBeep('skip');
-                              }}
-                              className="h-12 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-black text-xs rounded-xl border border-emerald-200 dark:border-emerald-800 shadow-2xs active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-                              title="Sumar 1 unidad"
-                            >
-                              +1
-                            </button>
-                            <button
-                              type="submit"
-                              className="h-12 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-black text-xs rounded-xl shadow-md shadow-blue-500/30 active:scale-95 transition-all flex items-center justify-center cursor-pointer uppercase tracking-tight"
-                            >
-                              ↵ OK
-                            </button>
-                          </div>
+                          <CountNumpad
+                            onDigit={handleNumpadDigit}
+                            onClear={handleNumpadClear}
+                            onBackspace={handleNumpadBackspace}
+                            onMultiply={handleApplyPackagingMultiplier}
+                            onIncrement={() => {
+                              setCountQuantity(prev => prev + 1);
+                              playBeep('skip');
+                            }}
+                          />
                         )}
                       </div>
 
@@ -2054,161 +1972,23 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
               )}
 
               {/* MOBILE TAB 2: FULL READINGS LIST */}
+              {/* MOBILE TAB 2: FULL READINGS LIST */}
               {mobileCountingTab === 'READINGS' && (
-                <div className="flex-1 p-3 overflow-hidden flex flex-col gap-2.5">
-                  
-                  {/* Search & Mode Bar */}
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        value={readingsSearch}
-                        onChange={(e) => setReadingsSearch(e.target.value)}
-                        placeholder="Buscar SKU o nombre..."
-                        className="w-full pl-8 pr-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none min-h-[42px]"
-                      />
-                    </div>
-
-                    <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 rounded-xl p-0.5 text-xs font-bold shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setReadingsViewMode('GROUPED')}
-                        className={`px-2.5 py-1.5 rounded-lg transition-all ${
-                          readingsViewMode === 'GROUPED'
-                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
-                            : 'text-slate-500'
-                        }`}
-                      >
-                        Agrupado ({groupedSkuEntries.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setReadingsViewMode('CHRONO')}
-                        className={`px-2.5 py-1.5 rounded-lg transition-all ${
-                          readingsViewMode === 'CHRONO'
-                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
-                            : 'text-slate-500'
-                        }`}
-                      >
-                        Historial ({currentSession.conteos.length})
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Readings Content */}
-                  {currentSession.conteos.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400">
-                      <Barcode className="w-12 h-12 mb-3 opacity-30 text-blue-500" />
-                      <p className="text-sm font-bold text-slate-700 dark:text-slate-200">No hay lecturas registradas</p>
-                      <p className="text-xs text-slate-400 mt-1 mb-4">Usa la pestaña Pistolear para escanear productos.</p>
-                      <button
-                        type="button"
-                        onClick={() => setMobileCountingTab('SCAN')}
-                        className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold"
-                      >
-                        Ir a Pistolear
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-0.5">
-                      {readingsViewMode === 'GROUPED' ? (
-                        filteredGroupedSkuEntries.map(group => (
-                          <div
-                            key={group.sku}
-                            className="p-3.5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between gap-2"
-                          >
-                            <div className="truncate pr-1 flex-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-mono font-extrabold text-blue-600 dark:text-blue-400 text-sm">{group.sku}</span>
-                                {group.mm && group.yyyy && (
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
-                                    {group.mm}/{group.yyyy}
-                                  </span>
-                                )}
-                                {group.ubicaciones.length > 0 && (
-                                  <span className="text-[10px] font-semibold text-slate-400 flex items-center gap-0.5">
-                                    <MapPin className="w-3 h-3" /> {group.ubicaciones.join(', ')}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-slate-800 dark:text-slate-100 font-bold text-xs mt-1 line-clamp-2">
-                                {group.descripcion}
-                              </p>
-                              <span className="text-[10px] text-slate-400 mt-0.5 block">
-                                {group.readingsCount} {group.readingsCount === 1 ? 'lectura' : 'lecturas'}
-                              </span>
-                            </div>
-
-                            {/* Big Touch Steppers */}
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => handleDecrementSkuQuantity(group.sku)}
-                                className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-xl font-black text-slate-700 dark:text-slate-200 flex items-center justify-center active:scale-90 text-sm"
-                              >
-                                -
-                              </button>
-
-                              <span className="font-black text-base text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2.5 py-1.5 rounded-xl min-w-[42px] text-center font-mono">
-                                {group.totalCantidad}
-                              </span>
-
-                              <button
-                                type="button"
-                                onClick={() => handleIncrementSkuQuantity(group.sku)}
-                                className="w-10 h-10 bg-blue-100 dark:bg-blue-900/60 rounded-xl font-black text-blue-700 dark:text-blue-300 flex items-center justify-center active:scale-90 text-sm"
-                              >
-                                +
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveSkuAllEntries(group.sku, group.descripcion)}
-                                className="text-slate-400 hover:text-red-600 p-2 ml-0.5"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        filteredChronoEntries.map(entry => (
-                          <div
-                            key={entry.id}
-                            className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between text-xs"
-                          >
-                            <div className="truncate pr-2">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-mono font-bold text-blue-600">{entry.sku}</span>
-                                {entry.mm && entry.yyyy && (
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
-                                    {entry.mm}/{entry.yyyy}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-slate-700 font-bold truncate mt-0.5">{entry.descripcion}</p>
-                              <span className="text-[10px] text-slate-400">{new Date(entry.timestamp).toLocaleTimeString('es-CL')}</span>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="font-black text-sm text-slate-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-lg font-mono">
-                                +{entry.cantidad}
-                              </span>
-                              <button
-                                onClick={() => handleRemoveEntry(entry.id)}
-                                className="text-slate-400 hover:text-red-600 p-1"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-
-                </div>
+                <MobileReadingsList
+                  currentSession={currentSession}
+                  readingsSearch={readingsSearch}
+                  onReadingsSearchChange={setReadingsSearch}
+                  readingsViewMode={readingsViewMode}
+                  onReadingsViewModeChange={setReadingsViewMode}
+                  groupedSkuEntries={groupedSkuEntries}
+                  filteredGroupedSkuEntries={filteredGroupedSkuEntries}
+                  filteredChronoEntries={filteredChronoEntries}
+                  onGoToScan={() => setMobileCountingTab('SCAN')}
+                  onDecrementSku={handleDecrementSkuQuantity}
+                  onIncrementSku={handleIncrementSkuQuantity}
+                  onRemoveSkuAllEntries={handleRemoveSkuAllEntries}
+                  onRemoveEntry={handleRemoveEntry}
+                />
               )}
 
             </div>

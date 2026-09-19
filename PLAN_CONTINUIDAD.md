@@ -78,9 +78,21 @@ Estos puntos **deben** abordarse porque el propio repo los declara no negociable
 
 ### 2.3 Terminar de descomponer los monolitos
 
-- **Evidencia**: `StockCountTerminal.tsx` 3.409 líneas (faltan los bloques CAMPAIGN/LIST/COUNTING); `InventoryDashboard.tsx` 2.328; `stockCountUtils.ts` 1.515; `CampaignConsolidationDashboard.tsx` 1.397.
+- **Evidencia**: `StockCountTerminal.tsx` 3.409 → **2.851 líneas** (CAMPAIGN/LIST/RECONCILIATION ya extraídos; COUNTING aún en el padre); `InventoryDashboard.tsx` 2.328; `stockCountUtils.ts` 1.515; `CampaignConsolidationDashboard.tsx` 1.397.
 - **Cita del guardrail §6**: *"No introduzcas lógica pesada ni componentes monolíticos"*.
 - **Enfoque**: continuar la receta ya probada en el punto 6 completado — extraer cada bloque `viewState === 'X'` a su propio componente, con props tipadas y verificando que el JSX sea idéntico. Orden sugerido por autonomía: CAMPAIGN (≈60 líneas) → LIST (≈310) → COUNTING (≈1.510, el más acoplado, dejar para el final).
+
+#### Avance: sub-extracción dentro del bloque COUNTING
+
+El bloque COUNTING (≈1.500 líneas) **no** se puede extraer de una sola pieza sin riesgo desproporcionado: comparte 59 identificadores con el padre (cámara `MobileCameraBarcodeScanner`, nav inferior móvil y contenedor de ticket térmico viven **fuera** del bloque) y la vista COUNTING se solapa con las vistas CAMPAIGN/LIST ya extraídas. Se procedió, por YAGNI, con sub-extracciones presentacionales puras y autocontenidas:
+
+- ✅ `CountNumpad.tsx` (88 líneas): teclado numérico táctil. Props: `onDigit`, `onClear`, `onBackspace`, `onMultiply`, `onIncrement`. −82 líneas del padre.
+- ✅ `MobileReadingsList.tsx` (187 líneas): pestaña móvil "Lecturas" (búsqueda, conmutador Agrupado/Historial, steppers y borrado). 13 props. −155 líneas del padre.
+- 🧹 Se eliminaron además 8 imports de `lucide-react` que ya estaban sin uso desde antes de esta sesión (no introducidos aquí).
+
+- **Restante del bloque COUNTING**: los sub-bloques que comparten estado con el padre (formulario de escaneo, prompt de vencimiento, hero "último escaneado" móvil y panel derecho de escritorio). Antes de intentar la extracción completa hay que **mover también** la cámara, la nav inferior y el ticket térmico al nuevo componente (o dejarlos como puentes), para que el estado viaje con el JSX.
+
+- **Duplicación detectada (no atacada aún)**: entre los paneles móvil y escritorio hay ~33% de líneas equivalentes; el selector Mes/Año y el selector de multiplicadores/saltos están escritos dos veces con estilos distintos (tokens táctiles vs. compactos). Candidato a un componente con variante de tono, pero los estilos difieren lo suficiente como para exigir un diseño común primero — no hacerlo a lo bruto con ternarios.
 
 ---
 
