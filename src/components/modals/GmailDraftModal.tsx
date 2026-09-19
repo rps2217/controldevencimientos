@@ -111,10 +111,6 @@ export const GmailDraftModal: React.FC<GmailDraftModalProps> = ({
     setVisibleColumns(availableColumns);
   };
 
-  const selectAllColumns = () => {
-    setVisibleColumns(availableColumns);
-  };
-
   const clearAllColumns = () => {
     setVisibleColumns([]);
   };

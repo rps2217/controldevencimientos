@@ -36,7 +36,6 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   onPrintBarcode,
   onNewEventForProduct,
   allMainItems,
-  policies,
   products = [],
   customAliases
 }) => {

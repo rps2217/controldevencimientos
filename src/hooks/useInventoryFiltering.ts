@@ -360,7 +360,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
 
   // Fast filtering using Worker matching indices when available
   const filteredItems = useMemo(() => {
-    let rawFiltered: InventoryItem[] = [];
+    const rawFiltered: InventoryItem[] = [];
 
     if (matchingIndices !== null && isWorkerReady) {
       for (let k = 0; k < matchingIndices.length; k++) {

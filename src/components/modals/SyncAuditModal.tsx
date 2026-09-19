@@ -43,8 +43,6 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
   isSyncing,
   latencyMs,
   connectionStatus,
-  lastHealthCheck,
-  healthErrorMessage,
   testConnectionHealth,
   syncQueue,
   removeMutation,

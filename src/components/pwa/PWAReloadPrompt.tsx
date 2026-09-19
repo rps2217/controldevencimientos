@@ -10,7 +10,7 @@ export const PWAReloadPrompt: React.FC = () => {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegistered(r) {
+    onRegistered() {
       // SW registered successfully
     },
     onRegisterError(error) {

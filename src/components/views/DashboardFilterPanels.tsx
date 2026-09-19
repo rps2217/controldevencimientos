@@ -44,7 +44,7 @@ export const DashboardFilterPanels: React.FC<DashboardFilterPanelsProps> = (prop
   const items = props.items ?? dashboard.items ?? [];
   const eventResolutionFilter = props.eventResolutionFilter ?? dashboard.eventResolutionFilter ?? [];
   const setEventResolutionFilter = props.setEventResolutionFilter ?? dashboard.setEventResolutionFilter ?? (() => {});
-  const handleFilterToggle = props.handleFilterToggle ?? dashboard.handleFilterToggle ?? ((prev, val) => prev);
+  const handleFilterToggle = props.handleFilterToggle ?? dashboard.handleFilterToggle ?? ((prev, _val) => prev);
   const eventResolutionMetrics = props.eventResolutionMetrics ?? dashboard.eventResolutionMetrics;
   const eventFilter = props.eventFilter ?? dashboard.eventFilter ?? [];
   const setEventFilter = props.setEventFilter ?? dashboard.setEventFilter ?? (() => {});

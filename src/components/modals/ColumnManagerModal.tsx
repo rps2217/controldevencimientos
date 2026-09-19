@@ -145,7 +145,7 @@ export const ColumnManagerModal: React.FC<ColumnManagerModalProps> = ({
               No se encontraron columnas con "{searchTerm}".
             </div>
           ) : (
-            filteredColumns.map((col, index) => {
+            filteredColumns.map((col) => {
               const fullIndex = columns.findIndex(c => c.id === col.id);
               const isFirst = fullIndex === 0;
               const isLast = fullIndex === columns.length - 1;

@@ -52,7 +52,6 @@ export const MobileErpSnapshotView: React.FC<MobileErpSnapshotViewProps> = ({
   activeCampaignId,
   sessions,
   onUpdateCampaigns,
-  onSelectCampaign,
   onSwitchToTerminal,
   showToast,
   onSyncCloud,

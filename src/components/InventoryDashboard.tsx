@@ -1,12 +1,11 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { getSpreadsheetMetadata, getAllSheetsData, appendRow, updateRow, deleteRow, deleteRows, saveCloudConfig, loadCloudConfig, getScriptPropertiesConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
-import type { CellValue, SheetRow } from '../lib/sheets';
+import type { SheetRow } from '../lib/sheets';
 import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, EventCategory, ViewKey } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
 import { DashboardProvider, DashboardContextType } from '../context/DashboardContext';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AlertCircle, Package } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 // Utilities & Hooks
 import { EVENT_CATEGORIES, getEventCategory, getItemStatus, parseLocaleNumber } from '../utils/dateCalculations';
@@ -69,8 +68,7 @@ import { useTableSlices } from '../hooks/useTableSlices';
 const AnalyticsDashboard = lazy(() => import('./views/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 
 export const InventoryDashboard: React.FC = () => {
-  const navigate = useNavigate();
-  const { showToast, updateToast } = useToast();
+  const { showToast, updateToast, removeToast } = useToast();
   const [metadata, setMetadata] = useState<SpreadsheetMetadata | null>(null);
   const [activeSheet, setActiveSheet] = useState<SheetProperties | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -93,7 +91,7 @@ export const InventoryDashboard: React.FC = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Advanced features: Pagination, Offline Cache & Concurrency
-  const [pageSize, setPageSize] = useState<number | 'all'>(100);
+  const [pageSize] = useState<number | 'all'>(100);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isSyncAuditOpen, setIsSyncAuditOpen] = useState<boolean>(false);
 
@@ -193,12 +191,14 @@ export const InventoryDashboard: React.FC = () => {
     try {
       const res = await syncQueue();
       if (res && res.success) {
-        showToast(`¡Se sincronizaron exitosamente ${res.count} mutaciones en Google Sheets!`, 'success', 'Sincronización Exitosa');
+        updateToast(toastId, `¡Se sincronizaron exitosamente ${res.count} mutaciones en Google Sheets!`, 'success', 'Sincronización Exitosa');
       } else if (res && res.errors && res.errors.length > 0) {
-        showToast(`Hubo errores al sincronizar: ${res.errors.join(', ')}`, 'error', 'Sincronización Parcial');
+        updateToast(toastId, `Hubo errores al sincronizar: ${res.errors.join(', ')}`, 'error', 'Sincronización Parcial');
+      } else {
+        removeToast(toastId);
       }
     } catch (err: unknown) {
-      showToast(`Error sincronizando cola offline: ${getErrorMessage(err)}`, 'error', 'Error de Sincronización');
+      updateToast(toastId, `Error sincronizando cola offline: ${getErrorMessage(err)}`, 'error', 'Error de Sincronización');
     }
   };
 
@@ -206,8 +206,6 @@ export const InventoryDashboard: React.FC = () => {
 
   // Search, Selection and Scoped Module States via useModuleViewState Hook
   const {
-    moduleStates,
-    setModuleStates,
     searchTerm,
     setSearchTerm,
     activeQuickChip,
@@ -314,8 +312,6 @@ export const InventoryDashboard: React.FC = () => {
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [whatsAppModalItems, setWhatsAppModalItems] = useState<any[]>([]);
   const [isBulkActionsConfigOpen, setIsBulkActionsConfigOpen] = useState(false);
-  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
-  const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
   const [isRightDrawerOpen, setIsRightDrawerOpen] = useState<boolean>(false);
   const [tableDensity, setTableDensity] = useState<'comfortable' | 'compact' | 'ultra'>(() => {
     try {
@@ -338,21 +334,6 @@ export const InventoryDashboard: React.FC = () => {
   const bulkActionCtx = useMemo(() => {
     return buildBulkActionContext(headers, activeView, activeSheet?.title);
   }, [headers, activeView, activeSheet?.title]);
-
-  // Close menus on click outside
-  useEffect(() => {
-    const handleGlobalClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('#actions-dropdown-btn') && !target.closest('#actions-dropdown-menu')) {
-        setIsActionsMenuOpen(false);
-      }
-      if (!target.closest('#view-dropdown-btn') && !target.closest('#view-dropdown-menu')) {
-        setIsViewMenuOpen(false);
-      }
-    };
-    window.addEventListener('click', handleGlobalClick);
-    return () => window.removeEventListener('click', handleGlobalClick);
-  }, []);
 
   // Sync ticket print config if sheetConfig updates from cloud
   useEffect(() => {
@@ -487,7 +468,6 @@ export const InventoryDashboard: React.FC = () => {
     showAllColumns,
     resetColumnOrder,
     setVisibleColumns,
-    columnOrders,
     hiddenColumns
   } = useColumnManager({
     headers,
@@ -576,7 +556,6 @@ export const InventoryDashboard: React.FC = () => {
 
   // Unified filtering, metrics aggregation, virtual columns, and grouping hook
   const {
-    deferredSearchTerm,
     toggleGroupByDirection,
     handleToggleSort,
     collapsedGroups,
@@ -593,7 +572,6 @@ export const InventoryDashboard: React.FC = () => {
     columnOptionsMap,
     filteredItems,
     groupedItems,
-    displayRows,
     paginatedDisplayRows
   } = useInventoryFiltering({
     items,
@@ -662,11 +640,6 @@ export const InventoryDashboard: React.FC = () => {
       tableGroupings: updatedGroupings
     });
   }, [activeSheetKey, sheetConfig, saveConfig, setGroupByDirection]);
-
-  const handleToggleGroupByDirection = useCallback(() => {
-    const nextDir = groupByDirection === 'asc' ? 'desc' : 'asc';
-    handleSetGroupByDirection(nextDir);
-  }, [groupByDirection, handleSetGroupByDirection]);
 
   // Load contextual table grouping whenever activeSheetKey changes or on mount
   useEffect(() => {
@@ -771,7 +744,6 @@ export const InventoryDashboard: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm, activeQuickChip, activeView]);
 
-  const totalPages = pageSize === 'all' || groupByColumn !== 'none' ? 1 : Math.ceil(filteredItems.length / (pageSize as number)) || 1;
 
   const rowVirtualizer = useVirtualizer({
     count: paginatedDisplayRows.length,
@@ -971,10 +943,10 @@ export const InventoryDashboard: React.FC = () => {
         } catch {}
       }
 
-      let mainSheetTitle = currentConfig.main || allSheets.find((t: string) => /vencimiento|caducidad/i.test(t)) || allSheets[0];
-      let eventsSheetTitle = currentConfig.events || allSheets.find((t: string) => /^frc$|evento|incidencia|averia|merma|diferencia|transporte/i.test(t));
-      let prodSheetTitle = currentConfig.products || allSheets.find((t: string) => /producto/i.test(t));
-      let polSheetTitle = currentConfig.policies || allSheets.find((t: string) => /política|politica|canje/i.test(t));
+      const mainSheetTitle = currentConfig.main || allSheets.find((t: string) => /vencimiento|caducidad/i.test(t)) || allSheets[0];
+      const eventsSheetTitle = currentConfig.events || allSheets.find((t: string) => /^frc$|evento|incidencia|averia|merma|diferencia|transporte/i.test(t));
+      const prodSheetTitle = currentConfig.products || allSheets.find((t: string) => /producto/i.test(t));
+      const polSheetTitle = currentConfig.policies || allSheets.find((t: string) => /política|politica|canje/i.test(t));
       
       if (!currentConfig.main && mainSheetTitle) currentConfig.main = mainSheetTitle;
       if (!currentConfig.events && eventsSheetTitle) currentConfig.events = eventsSheetTitle;
@@ -1271,7 +1243,7 @@ export const InventoryDashboard: React.FC = () => {
         // Fallback / standard append mode for other views or explicit append
         const validRowIndexes = items.map(i => typeof i._rowIndex === 'number' ? i._rowIndex : parseInt(String(i._rowIndex || '0'), 10)).filter(n => !isNaN(n) && n > 0);
         let nextRowIndex = validRowIndexes.length ? Math.max(...validRowIndexes) + 1 : 2;
-        let updatedItemsList = [...items];
+        const updatedItemsList = [...items];
 
         for (const item of mappedData) {
           const rowValues = headers.map(h => item[h] !== undefined ? String(item[h]) : '');
@@ -1727,7 +1699,7 @@ export const InventoryDashboard: React.FC = () => {
     let colTipoEvento = findColumnBySemantic(headers, 'tipo_evento') || findHeader('tipo_de_evento') || findHeader('tipo_evento') || findHeader('tipo') || findHeader('incidencia');
     const colFrcBod = findHeader('frc_bod') || findHeader('bodega') || findHeader('frc_bodega');
 
-    let currentHeaders = [...headers];
+    const currentHeaders = [...headers];
     if (values.tipo_evento && !colTipoEvento) {
       colTipoEvento = 'TIPO_EVENTO';
       currentHeaders.push(colTipoEvento);
@@ -2096,8 +2068,6 @@ export const InventoryDashboard: React.FC = () => {
     searchableHeaders,
     hasActiveFilters,
     clearAllFilters,
-    isActionsMenuOpen,
-    setIsActionsMenuOpen,
     lastCachedAt,
     handleSyncOfflineQueue,
     loading,

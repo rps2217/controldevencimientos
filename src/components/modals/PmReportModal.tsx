@@ -27,7 +27,7 @@ export const PmReportModal: React.FC<PmReportModalProps> = ({
     const set = new Set<string>();
     drainageReportItems.forEach(it => {
       const keys = Object.keys(it);
-      const provCol = findColumnBySemantic(keys, 'proveedor') || 'PROVEEDOR' || 'RUT';
+      const provCol = findColumnBySemantic(keys, 'proveedor') || 'PROVEEDOR';
       const val = it[provCol] || it['PROVEEDOR'] || it['RUT'] || it['LABORATORIO'];
       if (val && String(val).trim()) {
         set.add(String(val).trim());
@@ -41,7 +41,7 @@ export const PmReportModal: React.FC<PmReportModalProps> = ({
     if (selectedProvider === 'ALL') return drainageReportItems;
     return drainageReportItems.filter(it => {
       const keys = Object.keys(it);
-      const provCol = findColumnBySemantic(keys, 'proveedor') || 'PROVEEDOR' || 'RUT';
+      const provCol = findColumnBySemantic(keys, 'proveedor') || 'PROVEEDOR';
       const val = it[provCol] || it['PROVEEDOR'] || it['RUT'] || it['LABORATORIO'];
       return String(val || '').trim() === String(selectedProvider || '').trim();
     });

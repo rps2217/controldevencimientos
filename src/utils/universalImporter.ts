@@ -59,7 +59,7 @@ export function detectDelimiter(text: string): string {
 export function sanitizeHeader(header: string, index: number, existingHeaders: Set<string>): string {
   let cleaned = String(header || '')
     .replace(/^\uFEFF/, '') // Strip BOM
-    .replace(/[▼▲▶◀•▪🔹]/g, '') // Strip sort icons / bullet marks
+    .replace(/[▼▲▶◀•▪🔹]/gu, '') // Strip sort icons / bullet marks
     .replace(/[\r\n]+/g, ' ') // Strip newlines
     .trim();
 

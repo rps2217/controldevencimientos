@@ -17,7 +17,6 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
   onClose,
   selectedItems,
   headers,
-  activeViewTitle = 'Contactos',
   customAliases,
 }) => {
   const [selectedContactIndex, setSelectedContactIndex] = useState<number>(0);

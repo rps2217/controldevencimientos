@@ -54,11 +54,19 @@ Cada punto indica **evidencia reproducible** y **veredicto Ponytail** (YAGNI, re
 - **Veredicto Ponytail**: ya existe `ToastProvider` y modales propios; `window.confirm` rompe el lenguaje visual. Bajo impacto funcional, ruido de cambio moderado.
 - **Prioridad**: Baja-Media.
 
-### 1.5 🟡 Ausencia total de linting/formatting
+### 1.5 ✅ RESUELTO — ESLint configurado (flat config)
 
-- **Evidencia**: no existe `.eslintrc*`, `eslint.config.*`, `.prettierrc*` ni `prettier.config.*`. El único filtro es `tsc --noEmit`.
-- **Veredicto Ponytail**: herramienta justificada, no sobreingeniería. Sin linter, los `any`/imports muertos reaparecen silenciosamente (ya se limpiaron 176 imports a mano una vez).
-- **Prioridad**: Media — pero es una decisión de tooling que conviene acordar con el usuario antes de instalar.
+- **Estado**: `eslint.config.mjs` (flat config, ESLint 9 + `typescript-eslint` + `eslint-plugin-react-hooks`).
+- **Barrido inicial**: 113 errores → **0 errores** (23 `react-hooks/exhaustive-deps` en `warn`, pre-existentes).
+- **Reglas**: `no-unused-vars` con `argsIgnorePattern`/`varsIgnorePattern: ^_` y `caughtErrors: 'none'` (los 20 catch vacíos eran deliberados: `localStorage` best-effort, `navigator.vibrate`); `no-empty` con `allowEmptyCatch: true`.
+- **Bugs reales corregidos por el linter**:
+  1. `universalImporter.ts` — char class `[▼▲▶◀•▪🔹]` sin flag `u` borraba emojis no relacionados (🔸). Añadido `+u`.
+  2. `pureCalculations.ts` — regex escapada inútil `^[\(-]+|[\)]+$` → `^[(-]+|[)]+$`.
+  3. `PmReportModal.tsx` — rama muerta `|| 'RUT'` (x2), eliminada sin cambio de conducta.
+  4. `InventoryDashboard.tsx` — `handleSyncOfflineQueue` mostraba un toast `loading` con `duration: 0` que nunca se actualizaba (quedaba colgado para siempre). Ahora usa `updateToast`/`removeToast`.
+  5. `barcodeGenerator.ts` — `isCodeC` se asignaba 3 veces y nunca se leía; `CODE_B_TO_C` nunca usado. Eliminados.
+- **Código muerto purgado**: ~120 líneas (imports, alias de contexto sin uso, estado vestigial `pageSize`/`totalPages`/`isViewMenuOpen`, el `useEffect` de "click outside" de dropdowns `#actions-dropdown`/`#view-dropdown` que ya no existen en el DOM, 21 props destructuradas sin uso).
+- **Pendiente de decisión del usuario**: `handleFinishAndBackupSession` en `StockCountTerminal.tsx` es funcionalidad real (~45 líneas: cierra sesión y sube manifiesto) que **nunca tuvo invocador** en ningún commit. Queda marcada con `TODO(ponytail)` + `eslint-disable`. Opciones: cablearla desde la vista LIST o eliminarla. **No es regresión de esta auditoría.**
 
 ---
 
@@ -112,7 +120,6 @@ Aplico YAGNI también a las mejoras. Estas piezas están bien resueltas:
 1. **2.3** descomposición restante de `StockCountTerminal` (LIST ≈310 líneas → COUNTING ≈1.510).
 2. **1.4** `window.confirm` → modales propios (7 sitios).
 3. **1.3** prefijos de `localStorage` (requiere migración).
-4. **1.5** ESLint/Prettier (acordar con el usuario antes de instalar).
-5. **1.1-bis** tipado incremental del contrato sólo si aparece un síntoma.
+4. **1.1-bis** tipado incremental del contrato sólo si aparece un síntoma.
 
-**Invariante para todos**: `tsc --noEmit` + `npm test` + `npm run build` en verde antes de cada commit. No hay ESLint, así que `tsc` es la única red de seguridad automática.
+**Invariante para todos**: `tsc --noEmit` + `npm test` + `npm run build` en verde antes de cada commit. Desde 1.5 hay además `npx eslint src` como red de seguridad automática (0 errores exigidos; las 23 advertencias `exhaustive-deps` son deuda conocida).

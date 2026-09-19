@@ -22,7 +22,6 @@ const CODE128_PATTERNS: string[] = [
 
 const START_CODE_B = 104; // ASCII 32-127
 const START_CODE_C = 105; // Numeric pairs 00-99
-const CODE_B_TO_C = 99;
 const CODE_C_TO_B = 100;
 const STOP_CODE = 106;
 
@@ -45,7 +44,6 @@ export function encodeCode128(text: string): number[] {
   if (!sanitized) return [];
 
   const codes: number[] = [];
-  let isCodeC = false;
 
   // Check if string is purely numeric with even length of 4+ digits
   const isPureDigits = /^\d+$/.test(sanitized);
@@ -53,7 +51,6 @@ export function encodeCode128(text: string): number[] {
   if (isPureDigits && sanitized.length >= 4) {
     // Start with Code C for pure numeric SKUs (higher density)
     codes.push(START_CODE_C);
-    isCodeC = true;
 
     let i = 0;
     while (i < sanitized.length) {
@@ -64,7 +61,6 @@ export function encodeCode128(text: string): number[] {
       } else {
         // Odd trailing digit, switch to Code B
         codes.push(CODE_C_TO_B);
-        isCodeC = false;
         codes.push(sanitized.charCodeAt(i) - 32);
         i += 1;
       }
@@ -72,7 +68,6 @@ export function encodeCode128(text: string): number[] {
   } else {
     // Standard Code B for alphanumeric SKUs
     codes.push(START_CODE_B);
-    isCodeC = false;
 
     for (let i = 0; i < sanitized.length; i++) {
       const code = sanitized.charCodeAt(i);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Check, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2 } from 'lucide-react';
+import { X, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2 } from 'lucide-react';
 import { StockCountSession, StockCountEntry, InventoryItem, InventoryCampaign } from '../../types';
 import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorage, saveStockCountSessionsToStorageDebounced, loadCampaignsFromStorage, saveCampaignsToStorage, getActiveCampaignId, setActiveCampaignId, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
 import { saveAuditRowsToDedicatedSheet, syncCampaignsWithCloud } from '../../lib/sheets';
@@ -167,7 +167,9 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     }
   };
 
+  // TODO(ponytail): función sin invocador — cierra sesión y sube manifiesto. Requiere botón en la vista LIST o eliminar.
   // Finalizar mueble y subir manifiesto oficial a la nube
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleFinishAndBackupSession = async (sessionToFinish: StockCountSession) => {
     const confirmClose = confirm(`¿Deseas finalizar el conteo de "${sessionToFinish.nombre}" y enviar su manifiesto oficial a la nube?`);
     if (!confirmClose) return;
@@ -668,8 +670,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     const summary = masterCatalogIndex.getBySku(cleanSku);
     const finalDesc = summary ? summary.name : 'Producto sin descripción';
     setSelectedProductDesc(finalDesc);
-
-    const qty = isBurstScanMode ? 1 : countQuantity;
 
     if (currentSession.requiereVencimiento) {
       const previousMatch = currentSession.conteos.find(c => c.sku === cleanSku && c.mm && c.yyyy);

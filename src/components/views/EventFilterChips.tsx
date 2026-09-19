@@ -41,7 +41,7 @@ export const EventFilterChips: React.FC<EventFilterChipsProps> = ({
       <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
         <span className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mr-1">Filtrar Tipo de Incidencia:</span>
         <button 
-          onClick={(e) => onFilterClick('all', false)}
+          onClick={() => onFilterClick('all', false)}
           className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
             eventFilter.length === 0
               ? 'bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' 
@@ -160,7 +160,7 @@ export const EventFilterChips: React.FC<EventFilterChipsProps> = ({
         <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
           <span className="font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mr-1">Filtrar por Bodega (FRC_BOD):</span>
           <button 
-            onClick={(e) => onFrcBodFilterClick('all', false)}
+            onClick={() => onFrcBodFilterClick('all', false)}
             className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
               frcBodFilter.length === 0
                 ? 'bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' 

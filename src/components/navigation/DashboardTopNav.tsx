@@ -1,7 +1,6 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle } from 'lucide-react';
 import { InventoryItem, SheetConfig, SheetProperties } from '../../types';
-import { buildBulkActionContext, isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { useDashboard } from '../../context/DashboardContext';
 
@@ -57,7 +56,6 @@ export interface DashboardTopNavProps {
 export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
   const dashboard = useDashboard();
 
-  const isMobileMenuOpen = props.isMobileMenuOpen ?? false;
   const setIsMobileMenuOpen = props.setIsMobileMenuOpen ?? (() => {});
   const activeView = props.activeView ?? dashboard.activeView;
   const activeSheetTitle = props.activeSheetTitle ?? dashboard.activeSheet?.title;
@@ -68,21 +66,8 @@ export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
   const clearAllFilters = props.clearAllFilters ?? dashboard.clearAllFilters ?? (() => {});
   const setIsScannerOpen = props.setIsScannerOpen ?? dashboard.setIsScannerOpen;
   const setIsMobilePistoleoOpen = props.setIsMobilePistoleoOpen ?? dashboard.setIsMobilePistoleoOpen;
-  const isActionsMenuOpen = props.isActionsMenuOpen ?? dashboard.isActionsMenuOpen ?? false;
-  const setIsActionsMenuOpen = props.setIsActionsMenuOpen ?? dashboard.setIsActionsMenuOpen ?? (() => {});
-  const setIsGmailModalOpen = props.setIsGmailModalOpen ?? dashboard.setIsGmailModalOpen;
-  const setIsWhatsAppModalOpen = props.setIsWhatsAppModalOpen ?? dashboard.setIsWhatsAppModalOpen;
-  const setIsPmReportOpen = props.setIsPmReportOpen ?? dashboard.setIsPmReportOpen;
-  const onOpenBulkActionsConfig = props.onOpenBulkActionsConfig ?? (() => dashboard.setIsBulkActionsConfigOpen?.(true));
-  const onOpenTicketConfig = props.onOpenTicketConfig ?? (() => dashboard.setIsTicketConfigOpen?.(true));
-  const drainageReportItems = props.drainageReportItems ?? dashboard.drainageReportItems ?? [];
-  const headers = props.headers ?? dashboard.headers ?? [];
-  const visibleHeaders = props.visibleHeaders ?? dashboard.visibleHeaders;
   const filteredItems = props.filteredItems ?? dashboard.filteredItems ?? [];
   const sheetConfig = props.sheetConfig ?? dashboard.sheetConfig;
-  const products = props.products ?? dashboard.products ?? [];
-  const policies = props.policies ?? dashboard.policies ?? [];
-  const handlePrintTicket = props.handlePrintTicket ?? dashboard.handlePrintTicket;
   const isOffline = props.isOffline ?? dashboard.isOffline ?? false;
   const lastCachedAt = props.lastCachedAt ?? dashboard.lastCachedAt;
   const isSyncing = props.isSyncing ?? dashboard.isSyncing;
@@ -91,7 +76,6 @@ export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
   const fetchData = props.fetchData ?? dashboard.fetchData;
   const loading = props.loading ?? dashboard.loading ?? false;
   const latencyMs = props.latencyMs ?? dashboard.latencyMs;
-  const connectionStatus = props.connectionStatus ?? dashboard.connectionStatus ?? 'connected';
   const onOpenSyncAudit = props.onOpenSyncAudit ?? (() => dashboard.setIsSyncAuditOpen?.(true));
   const failedCount = props.failedCount ?? dashboard.failedCount ?? 0;
   const isRelationalActive = props.isRelationalActive ?? dashboard.isRelationalActive ?? false;
@@ -117,16 +101,6 @@ export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const bulkActionCtx = useMemo(() => {
-    return buildBulkActionContext(headers, activeView, activeSheetTitle);
-  }, [headers, activeView, activeSheetTitle]);
-
-  const isWhatsAppActive = isActionEnabledForTable('whatsapp', bulkActionCtx, sheetConfig);
-  const isGmailActive = isActionEnabledForTable('gmail', bulkActionCtx, sheetConfig);
-  const isPmReportActive = isActionEnabledForTable('pm_report', bulkActionCtx, sheetConfig);
-  const isTicketActive = isActionEnabledForTable('ticket', bulkActionCtx, sheetConfig);
-  const isBarcodeTicketActive = isActionEnabledForTable('barcode_ticket', bulkActionCtx, sheetConfig);
-  const isExcelActive = isActionEnabledForTable('excel', bulkActionCtx, sheetConfig);
 
   const getViewMeta = () => {
     switch (activeView) {

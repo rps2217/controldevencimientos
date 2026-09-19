@@ -32,7 +32,7 @@ export const EventResolutionCards: React.FC<EventResolutionCardsProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* 1. Todos los registros */}
         <button
-          onClick={(e) => onFilterClick('all', false)}
+          onClick={() => onFilterClick('all', false)}
           className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden flex items-center justify-between cursor-pointer ${
             eventResolutionFilter.length === 0
               ? 'border-indigo-600 dark:border-indigo-400 ring-2 ring-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-950/40 shadow-sm'

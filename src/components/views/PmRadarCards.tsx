@@ -30,7 +30,7 @@ export const PmRadarCards: React.FC<PmRadarCardsProps> = ({
         <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-2.5">
           {/* Card: Total */}
           <button
-            onClick={(e) => onFilterClick('all', false)}
+            onClick={() => onFilterClick('all', false)}
             className={`group p-3 sm:p-3.5 rounded-2xl border text-left transition-all duration-200 relative flex flex-col justify-between min-h-[72px] sm:min-h-[78px] active:scale-[0.97] cursor-pointer shadow-2xs ${
               pmRadarFilter.length === 0
                 ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20 ring-2 ring-blue-500/30'

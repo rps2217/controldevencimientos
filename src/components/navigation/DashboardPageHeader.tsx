@@ -66,10 +66,6 @@ export const DashboardPageHeader: React.FC<DashboardPageHeaderProps> = (props) =
   const onSelectSlice = props.onSelectSlice ?? dashboard.handleSelectSlice ?? (() => {});
   const sliceCounts = props.sliceCounts ?? dashboard.sliceCounts ?? {};
   const totalItemsCount = props.totalItemsCount ?? dashboard.items?.length ?? 0;
-  const onEditSlice = props.onEditSlice ?? ((slice: TableSlice) => {
-    dashboard.setEditingSliceModalItem?.(slice);
-    dashboard.setIsSliceModalOpen?.(true);
-  });
   const hasSlices = slices.length > 0 && activeView !== 'schema' && activeView !== 'analytics';
 
   return (

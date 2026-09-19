@@ -22,8 +22,6 @@ interface AnalyticsDashboardProps {
   headers: string[];
 }
 
-const COLORS = ['#3b82f6', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6'];
-
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ items, headers }) => {
   // Aggregate data for incidents
   const incidentData = useMemo(() => {

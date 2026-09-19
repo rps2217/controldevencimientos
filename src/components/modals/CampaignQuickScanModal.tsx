@@ -36,7 +36,6 @@ export const CampaignQuickScanModal: React.FC<CampaignQuickScanModalProps> = ({
   isOpen,
   onClose,
   matrix,
-  sessions,
   masterProducts = [],
   onMarkSkuClosed,
   onReopenSku,

@@ -214,7 +214,7 @@ export function parseLocaleNumber(val: any, fallback = 0): number {
   let isNegative = false;
   if (str.startsWith('-') || (str.startsWith('(') && str.endsWith(')'))) {
     isNegative = true;
-    str = str.replace(/^[\(-]+|[\)]+$/g, '').trim();
+    str = str.replace(/^[(-]+|[)]+$/g, '').trim();
   }
 
   // Strip common unit suffixes
@@ -537,7 +537,7 @@ export function calculateWithdrawalDate(dVc: Date, diasRetiro: number): Date {
  * Clean and format phone numbers, ensuring they have the +56 prefix (Chile)
  */
 export function formatPhoneNumber(phone: any): string {
-  let rawPhone = String(phone || '').trim().replace(/[^\d+]/g, '');
+  const rawPhone = String(phone || '').trim().replace(/[^\d+]/g, '');
   if (!rawPhone) return '';
   // If it already has an international prefix with '+'
   if (rawPhone.startsWith('+')) {

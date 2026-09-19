@@ -23,7 +23,6 @@ export const ColumnFilterMenu: React.FC<ColumnFilterMenuProps> = ({
   selectedValues,
   onToggle,
   onClear,
-  onSelectAll,
   title,
   alignRight = false
 }) => {

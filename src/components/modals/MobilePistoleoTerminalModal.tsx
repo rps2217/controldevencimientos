@@ -43,8 +43,6 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
   items,
   headers,
   masterProducts = [],
-  policies = [],
-  activeSheetTitle = 'VENCIMIENTOS',
   onSaveItem,
   onDeleteItem,
   onOpenFullModal,
@@ -57,8 +55,6 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
   const [hasTorch, setHasTorch] = useState<boolean>(false);
   
   // Camera state
-  const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
   const [cameraStatus, setCameraStatus] = useState<'IDLE' | 'STARTING' | 'RUNNING' | 'ERROR'>('IDLE');
   const [cameraError, setCameraError] = useState<string>('');
 
@@ -99,7 +95,6 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
   const yyyyCol = findColumnBySemantic(headers, 'anio') || 'YYYY';
   const cuCol = findColumnBySemantic(headers, 'id') || 'CU_VC';
   const rutCol = findColumnBySemantic(headers, 'proveedor') || 'RUT_PROVEEDOR_VC';
-  const polCol = findColumnBySemantic(headers, 'politica') || 'POLITICA';
 
   // Session stats
   const totalScannedItemsCount = sessionScans.length;
@@ -170,10 +165,8 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
       if (!isMounted.current) return;
 
       if (devices && devices.length > 0) {
-        setCameras(devices);
         const backCam = devices.find(d => /back|rear|trasera|environment|externa|pda|2/i.test(d.label));
         const camId = backCam ? backCam.id : devices[devices.length - 1].id;
-        setSelectedCameraId(camId);
 
         if (scannerRef.current) {
           await stopCameraScanner();

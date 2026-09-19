@@ -299,10 +299,10 @@ export function reconcileStockCountSession(
     // Dereference master product details if missing
     let finalDesc = theor.descripcion || (physical ? physical.descripcion : '');
     let finalRut = theor.rutProveedor || (physical ? physical.rutProveedor : '');
-    let finalPol = theor.politica || (physical ? physical.politica : '');
-    let finalDias = theor.diasRetiro || (physical ? physical.diasRetiro : '');
+    const finalPol = theor.politica || (physical ? physical.politica : '');
+    const finalDias = theor.diasRetiro || (physical ? physical.diasRetiro : '');
     let finalMundo = theor.mundo || (physical ? physical.mundo : '');
-    let finalPm = theor.pm || (physical ? physical.pm : '');
+    const finalPm = theor.pm || (physical ? physical.pm : '');
 
     if (!finalDesc && masterProducts.length > 0) {
       const masterProd = findMasterProduct(theor.sku, masterProducts);
@@ -348,9 +348,9 @@ export function reconcileStockCountSession(
     let finalDesc = physical.descripcion;
     let finalRut = physical.rutProveedor;
     let finalMundo = physical.mundo;
-    let finalPol = physical.politica;
-    let finalDias = physical.diasRetiro;
-    let finalPm = physical.pm;
+    const finalPol = physical.politica;
+    const finalDias = physical.diasRetiro;
+    const finalPm = physical.pm;
 
     if (!finalDesc && masterProducts.length > 0) {
       const masterProd = findMasterProduct(physical.sku, masterProducts);

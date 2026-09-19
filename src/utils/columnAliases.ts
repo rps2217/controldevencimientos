@@ -374,7 +374,7 @@ export function findColumnBySemantic(
 
   // Check cache for headers array reference when no customAliases are passed (most common case)
   if (!customAliases) {
-    let cachedMap = headerSemanticsCache.get(headers);
+    const cachedMap = headerSemanticsCache.get(headers);
     if (cachedMap && semantic in cachedMap) {
       return cachedMap[semantic];
     }

@@ -88,7 +88,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = (props) => {
   const resizingCol = props.resizingCol ?? dashboard.resizingCol ?? null;
   const pmRadarFilter = props.pmRadarFilter ?? dashboard.pmRadarFilter ?? [];
   const setPmRadarFilter = props.setPmRadarFilter ?? dashboard.setPmRadarFilter ?? (() => {});
-  const handleFilterToggle = props.handleFilterToggle ?? dashboard.handleFilterToggle ?? ((prev, val) => prev);
+  const handleFilterToggle = props.handleFilterToggle ?? dashboard.handleFilterToggle ?? ((prev, _val) => prev);
   const onSelectRow = props.onSelectRow ?? dashboard.onSelectRow ?? (() => {});
   const onClickItem = props.onClickItem ?? dashboard.onClickItem ?? dashboard.setSelectedProduct;
   const onDeleteRow = props.onDeleteRow ?? dashboard.onDeleteRow ?? dashboard.handleDelete;
@@ -133,7 +133,6 @@ export const InventoryTable: React.FC<InventoryTableProps> = (props) => {
   const tableDensity = props.tableDensity ?? dashboard.tableDensity ?? 'compact';
   const expandAllGroups = props.expandAllGroups ?? dashboard.expandAllGroups;
   const collapseAllGroups = props.collapseAllGroups ?? dashboard.collapseAllGroups;
-  const collapsedGroups = props.collapsedGroups ?? dashboard.collapsedGroups;
   const isSticky = sheetConfig?.enableStickyColumns === true;
 
   // Calculate padding class based on table density

@@ -79,7 +79,6 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const darkMode = themeMode !== 'light';
 
   const handleSetupSubmit = (e: React.FormEvent) => {
     e.preventDefault();
