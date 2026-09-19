@@ -1,5 +1,6 @@
 import type { SheetConfig, SheetMetadata, InventoryCampaign, StockCountSession } from '../types';
 import { getErrorMessage } from '../utils/pureCalculations';
+import { consolidateAuditRows, dedupeAuditRows } from '../utils/auditConsolidation';
 import { fetchWithTimeout } from './http';
 
 import { STORAGE_KEYS } from '../utils/appStorage';
@@ -48,6 +49,12 @@ function getSecurityToken(): string {
   }
 }
 
+/** Normaliza un índice de fila de Google Sheets (1-based). Devuelve 0 si no es un entero >= 1. */
+function parseSheetRowIndex(rowIndex: number | string | null | undefined): number {
+  const parsed = typeof rowIndex === 'number' ? Math.floor(rowIndex) : parseInt(String(rowIndex ?? ''), 10);
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : 0;
+}
+
 /**
  * Robust fetch client for Google Apps Script with exponential backoff retries,
  * network timeout handling, and informative Spanish error messages.
@@ -84,22 +91,16 @@ async function fetchFromScript<T = ScriptResponse>(
   let lastError: unknown = null;
 
   while (attempt <= maxRetries) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
     try {
       // By using text/plain, fetch avoids unnecessary CORS preflight (OPTIONS)
       // which Apps Script doesn't handle natively.
-      const response = await fetch(url, {
+      const response = await fetchWithTimeout(url, {
         method: 'POST',
         body: JSON.stringify(finalPayload),
         headers: {
           'Content-Type': 'text/plain;charset=utf-8'
-        },
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
+        }
+      }, timeoutMs);
 
       if (!response.ok) {
         throw new Error(`Error en el servicio de Google Apps Script (HTTP ${response.status}: ${response.statusText})`);
@@ -119,7 +120,6 @@ async function fetchFromScript<T = ScriptResponse>(
 
       return data as T;
     } catch (err: unknown) {
-      clearTimeout(timeoutId);
       lastError = err;
 
       const errName = err instanceof Error ? err.name : '';
@@ -277,9 +277,7 @@ export async function updateRow(
   extraKeys?: { entityKey?: string; keyValue?: string; entityKeyCol?: string; keyColumn?: string }
 ) {
   clearSheetsCache(sheetName);
-  const parsedRowIndex = typeof rowIndex === 'number' && !isNaN(rowIndex) && rowIndex >= 1 
-    ? Math.floor(rowIndex) 
-    : (typeof rowIndex === 'string' && !isNaN(parseInt(rowIndex, 10)) && parseInt(rowIndex, 10) >= 1 ? parseInt(rowIndex, 10) : 0);
+  const parsedRowIndex = parseSheetRowIndex(rowIndex);
 
   const entityKey = extraKeys?.entityKey || extraKeys?.keyValue;
 
@@ -305,9 +303,7 @@ export async function updateRow(
 
 export async function deleteRow(sheetId: number, rowIndex: number | null | undefined, sheetName?: string) {
   clearSheetsCache(sheetName);
-  const parsedRowIndex = typeof rowIndex === 'number' && !isNaN(rowIndex) && rowIndex >= 1 
-    ? Math.floor(rowIndex) 
-    : (typeof rowIndex === 'string' && !isNaN(parseInt(rowIndex, 10)) && parseInt(rowIndex, 10) >= 1 ? parseInt(rowIndex, 10) : 0);
+  const parsedRowIndex = parseSheetRowIndex(rowIndex);
 
   if (parsedRowIndex < 1) {
     throw new Error(`Índice de fila inválido (${rowIndex}) para eliminar en "${sheetName || sheetId}".`);
@@ -790,44 +786,12 @@ export async function saveAuditRowsToDedicatedSheet(
     ? existingData[0].map(h => String(h).trim().toUpperCase()) 
     : AUDIT_SHEET_DEFAULT_HEADERS;
 
-  // Mapa de filas existentes por clave compuesta de campaña + SKU
-  const existingRowsMap = new Map<string, SheetRow>();
-  const campaignColIdx = headerList.findIndex(h => /ID_CAMPANA|CAMPANA/i.test(h));
-  const skuColIdx = headerList.findIndex(h => /^SKU$|CODIGO/i.test(h));
-
-  for (let r = 1; r < existingData.length; r++) {
-    const row = existingData[r];
-    const campVal = campaignColIdx >= 0 ? String(row[campaignColIdx] || '').trim() : '';
-    const skuVal = skuColIdx >= 0 ? String(row[skuColIdx] || '').trim() : '';
-    if (skuVal) {
-      existingRowsMap.set(`${campVal}_${skuVal}`, row);
-    }
-  }
-
   const nowIso = new Date().toISOString();
 
-  // Incorporar / sobrescribir las nuevas filas de auditoría
-  for (const row of rows) {
-    const campId = String(row.ID_CAMPANA || row.id_campana || '').trim();
-    const sku = String(row.SKU || row.sku || '').trim();
-    const compositeKey = `${campId}_${sku}`;
-
-    const rowValues = headerList.map(header => {
-      if (header === 'ULTIMA_ACTUALIZACION') return nowIso;
-      if (row[header] !== undefined) return String(row[header]);
-      const lowerKey = header.toLowerCase();
-      if (row[lowerKey] !== undefined) return String(row[lowerKey]);
-      return '';
-    });
-
-    existingRowsMap.set(compositeKey, rowValues);
-  }
-
-  // Ensamblar la matriz completa (Encabezados + Todas las filas consolidadas)
-  const fullMatrix: SheetMatrix = [
-    headerList,
-    ...Array.from(existingRowsMap.values())
-  ];
+  // Encabezados + filas consolidadas por campaña + SKU (sin duplicar)
+  const fullMatrix: SheetMatrix = consolidateAuditRows(existingData, rows, headerList, nowIso);
+  // Conteo honesto: filas realmente distintas escritas para este lote
+  const consolidatedCount = dedupeAuditRows(rows, headerList, nowIso).length;
 
   // 1. Intentar volcado en lote ultra-rápido en una sola petición HTTP (setSheetData)
   try {
@@ -843,7 +807,7 @@ export async function saveAuditRowsToDedicatedSheet(
       clearSheetsCache(sheetName);
       return {
         success: true,
-        count: rows.length,
+        count: consolidatedCount,
         sheetName
       };
     }
@@ -851,21 +815,18 @@ export async function saveAuditRowsToDedicatedSheet(
     console.warn('[Sheets] Volcado setSheetData no soportado por versión antigua de Apps Script, aplicando fallback fila a fila:', batchErr);
   }
 
-  // 2. Fallback resiliente para implementaciones anteriores de Apps Script
+  // 2. Fallback resiliente para implementaciones anteriores de Apps Script.
+  // No hay setSheetData para sobrescribir por clave: se insertan las filas
+  // consolidadas de esta campaña, deduplicadas en memoria, para no duplicar
+  // filas repetidas dentro del mismo lote.
+  const rowsToAppend = dedupeAuditRows(rows, headerList, nowIso);
+
   if (!existingData || existingData.length === 0) {
     await appendRow(sheetName, headerList);
   }
 
   let successCount = 0;
-  for (const row of rows) {
-    const values = headerList.map(header => {
-      if (header === 'ULTIMA_ACTUALIZACION') return nowIso;
-      if (row[header] !== undefined) return String(row[header]);
-      const lowerKey = header.toLowerCase();
-      if (row[lowerKey] !== undefined) return String(row[lowerKey]);
-      return '';
-    });
-
+  for (const values of rowsToAppend) {
     try {
       await appendRow(sheetName, values);
       successCount++;

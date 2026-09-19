@@ -27,6 +27,11 @@ import {
 
 import { OfflineMutation } from './src/db/indexedDbService';
 import {
+  buildAuditRowValues,
+  consolidateAuditRows,
+  dedupeAuditRows
+} from './src/utils/auditConsolidation';
+import {
   isFailedMutation,
   sortQueueFifo
 } from './src/utils/offlineQueueUtils';
@@ -379,6 +384,59 @@ console.log('\n--- 12. Pruebas de offlineQueueUtils.ts (orquestación de la cola
     'sortQueueFifo ordena estrictamente por createdAt (FIFO)');
   assert(queue.map(m => m.id).join(',') === originalOrder,
     'sortQueueFifo no muta el arreglo de entrada');
+}
+
+console.log('\n--- 13. Pruebas de auditConsolidation.ts (cuadratura de actas) ---');
+{
+  const HEADERS = ['ID_CAMPANA', 'SKU', 'STOCK_ERP', 'STOCK_FISICO', 'ULTIMA_ACTUALIZACION'];
+  const NOW = '2026-09-19T00:00:00.000Z';
+
+  // La marca de tiempo se inyecta siempre, y el resto se toma del encabezado exacto
+  const built = buildAuditRowValues(HEADERS, { ID_CAMPANA: 'C1', SKU: 'S1', STOCK_ERP: 10 }, NOW);
+  assert(built.join('|') === `C1|S1|10||${NOW}`,
+    'buildAuditRowValues respeta el orden de encabezados y sella la actualización');
+
+  // Claves en minúscula (payloads internos) se resuelven igual
+  const builtLower = buildAuditRowValues(HEADERS, { id_campana: 'C1', sku: 'S1', stock_erp: 7 }, NOW);
+  assert(builtLower.join('|') === `C1|S1|7||${NOW}`,
+    'buildAuditRowValues acepta claves en minúscula');
+
+  // Regresión: filas repetidas de la MISMA campaña + SKU en un lote no deben duplicarse.
+  // Antes, el fallback fila a fila insertaba una fila por cada entrada del lote.
+  const duplicated = dedupeAuditRows([
+    { ID_CAMPANA: 'C1', SKU: 'S1', STOCK_ERP: 10 },
+    { ID_CAMPANA: 'C1', SKU: 'S1', STOCK_ERP: 20 },
+  ], HEADERS, NOW);
+  assert(duplicated.length === 1,
+    'dedupeAuditRows colapsa filas repetidas de campaña + SKU');
+  assert(duplicated[0][2] === '20',
+    'dedupeAuditRows conserva la ÚLTIMA lectura del lote');
+
+  // Consolidación: sobrescribe la fila existente de la misma campaña + SKU (no agrega)
+  const existing = [HEADERS, ['C1', 'S1', '5', '5', 'previo'], ['C1', 'S2', '3', '3', 'previo']];
+  const merged = consolidateAuditRows(existing, [{ ID_CAMPANA: 'C1', SKU: 'S1', STOCK_ERP: 99 }], HEADERS, NOW);
+  assert(merged.length === 3, // 1 encabezado + 2 filas (S1 sobrescrita, S2 intacta)
+    'consolidateAuditRows no agrega filas cuando la clave ya existe');
+  assert(merged[1][2] === '99', 'consolidateAuditRows sobrescribe los valores de la clave existente');
+  assert(merged[2][2] === '3', 'consolidateAuditRows preserva las filas de otras claves');
+
+  // Una clave nueva sí se agrega
+  const mergedNew = consolidateAuditRows(existing, [{ ID_CAMPANA: 'C1', SKU: 'S3', STOCK_ERP: 1 }], HEADERS, NOW);
+  assert(mergedNew.length === 4, 'consolidateAuditRows agrega una fila para una clave nueva');
+
+  // Filas de encabezado siempre en la primera posición
+  assert(mergedNew[0].join('|') === HEADERS.join('|'),
+    'consolidateAuditRows mantiene los encabezados como primera fila');
+
+  // Detección tolerante de columnas: encabezados con nombres alternativos
+  const altHeaders = ['CAMPANA', 'CODIGO', 'STOCK_ERP'];
+  const mergedAlt = consolidateAuditRows(
+    [altHeaders, ['C9', 'SKU9', '1']],
+    [{ ID_CAMPANA: 'C9', SKU: 'SKU9', STOCK_ERP: 42 }],
+    altHeaders, NOW
+  );
+  assert(mergedAlt.length === 2 && mergedAlt[1][2] === '42',
+    'consolidateAuditRows reconoce columnas CAMPANA/CODIGO alternativas');
 }
 
 console.log(`\n========================================`);
