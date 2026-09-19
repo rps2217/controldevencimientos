@@ -166,7 +166,7 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
       if (!isMounted.current) return;
 
       if (devices && devices.length > 0) {
-        const camId = pickRearCamera(devices)!.id;
+        const camId = pickRearCamera(devices)?.id ?? devices[devices.length - 1].id;
 
         if (scannerRef.current) {
           await stopCameraScanner();
