@@ -130,6 +130,32 @@ Se midió el acoplamiento real: el bloque `viewState === 'COUNTING'` comparte **
 
 ---
 
+## 2-quater. Correcciones de diseño del módulo de Conteo
+
+Auditoría funcional del terminal de conteo. Tres correcciones, todas de valor operativo real.
+
+### 2q.1 ✅ El "Conteo a Ciegas" no estaba a ciegas (defecto, no mejora)
+
+`AGENTS.md §M` define `BLIND` como *"sin ver el stock teórico en pantalla, previniendo sesgos de conteo"*, pero el código lo incumplía con tres fugas activas:
+
+1. `campaignSkuStats` (`StockCountTerminal.tsx`) mostraba siempre `ERP: {stockTeorico} un`, `Total Farmacia` y el veredicto `🟢 Cuadrado / 🟡 Sobran / 🔴 Faltan` al escanear — en móvil y escritorio.
+2. Botón **"Foto ERP"** (barra de modo móvil) abría el snapshot del ERP.
+3. Tab superior **"Matriz Campaña / Foto ERP"** daba el mismo acceso desde cualquier vista.
+
+**Corrección**: derivado `const isBlind = currentSession?.modo === 'BLIND'` que condiciona los dos badges de `campaignSkuStats`, oculta el botón "Foto ERP" y el tab de campaña mientras se pistolea. **Decisión de alcance**: la pestaña **Cuadratura se conserva** porque es la única vía que ejecuta `handleSyncToVencimientos` (marca la sesión `COMPLETED`); ocultarla habría bloqueado el cierre de sesión. El sesgo ocurre durante el pistoleo, y ahí es donde se bloquea. Verificado en navegador: con sesión A Ciegas, SKU-1001 ya no expone `ERP: 320 un` ni el veredicto de cuadre.
+
+### 2q.2 ✅ SKU no catalogado registraba como éxito silencioso
+
+`commitCountEntry` emitía `playBeep('success')` + flash verde + toast de éxito también cuando el SKU no existía en el catálogo maestro, quedaba como `'Producto sin descripción'`. Un dígito mal leído por la pistola entraba como lectura válida y solo se descubría en la cuadratura. Ahora se distingue: beep neutro, flash `WARNING` y toast `"SKU no catalogado: {sku}. Verifica el código."`. La lectura se guarda igual (puede ser un hallazgo físico legítimo), solo cambia el tono.
+
+### 2q.3 ✅ Deshacer última lectura
+
+El único camino para corregir una lectura era ir a "Lecturas" y localizarla. Se añadió `handleUndoLastEntry` (elimina `conteos[0]`, que es la lectura más reciente por inserción al inicio) expuesto como botón "Deshacer" en el header de escritorio y como botón-icono en el header móvil, deshabilitado con 0 lecturas. Verificado en navegador: 1 → 0 lecturas.
+
+**Duplicación en el modal de vencimiento (observada, no atacada)**: los prompts Mes/Año móvil y escritorio renderizan a la vez en el DOM (uno oculto por CSS). Funciona, pero duplica markup; unificarlos exigiría un componente con variante de tono.
+
+---
+
 ## 3. Lo que NO hay que tocar
 
 Aplico YAGNI también a las mejoras. Estas piezas están bien resueltas:

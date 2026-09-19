@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2 } from 'lucide-react';
+import { X, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2, Undo2 } from 'lucide-react';
 import { StockCountSession, StockCountEntry, InventoryItem, InventoryCampaign } from '../../types';
 import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorage, saveStockCountSessionsToStorageDebounced, loadCampaignsFromStorage, saveCampaignsToStorage, getActiveCampaignId, setActiveCampaignId, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
 import { saveAuditRowsToDedicatedSheet, syncCampaignsWithCloud } from '../../lib/sheets';
@@ -389,6 +389,9 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     return sessions.find(s => s.id === activeSessionId) || null;
   }, [sessions, activeSessionId]);
 
+  // En modalidad BLIND el operario no debe ver ningún dato teórico (AGENTS.md §M: auditoría limpia).
+  const isBlind = currentSession?.modo === 'BLIND';
+
   // Dynamic years list based on session configuration
   const yearsList = useMemo(() => {
     if (currentSession?.rangoAnos) {
@@ -587,7 +590,13 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     setIsSearchDropdownOpen(false);
 
     // Dynamic beep and toast confirmation
-    if (isOmitted) {
+    if (!summary) {
+      // SKU fuera del catálogo maestro: la lectura se guarda (puede ser un hallazgo legítimo),
+      // pero se avisa con tono neutro para que el operario note un posible dígito mal leído.
+      playBeep('skip');
+      triggerVisualFlash('WARNING');
+      showToast(`SKU no catalogado: ${cleanSku} (+${qty}). Verifica el código.`, 'warning');
+    } else if (isOmitted) {
       playBeep('skip');
       triggerVisualFlash('WARNING');
       showToast(`Registrado sin vencimiento: ${cleanSku} (+${qty})`, 'info');
@@ -699,6 +708,19 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       return s;
     }));
     showToast('Lectura eliminada del conteo', 'info');
+  };
+
+  // Deshace la última lectura registrada (las entradas se insertan al inicio del arreglo).
+  const handleUndoLastEntry = () => {
+    if (!currentSession || currentSession.conteos.length === 0) {
+      playBeep('error');
+      showToast('No hay lecturas que deshacer', 'warning');
+      return;
+    }
+    const last = currentSession.conteos[0];
+    handleRemoveEntry(last.id);
+    playBeep('skip');
+    showToast(`Deshecha lectura: ${last.sku} (-${last.cantidad})`, 'info');
   };
 
   // Group count entries by SKU for consolidated view on mobile/desktop
@@ -1256,7 +1278,8 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
 
           {/* Sub-bar Navigation Pills (Horizontally Scrollable on Mobile) */}
           <div className="px-3 sm:px-6 py-1.5 bg-slate-100/70 dark:bg-slate-900/60 border-t border-slate-200/70 dark:border-slate-800/70 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            {/* Tab: Campaña Farmacia / Foto ERP */}
+            {/* Tab: Campaña Farmacia / Foto ERP (oculto durante pistoleo a ciegas) */}
+            {!(isBlind && viewState === 'COUNTING') && (
             <button
               onClick={() => {
                 setForceDesktopCampaignView(false);
@@ -1271,6 +1294,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
               <Store className="w-3.5 h-3.5" />
               <span>{isMobile ? 'Foto ERP' : 'Matriz Campaña'}</span>
             </button>
+            )}
 
             {/* Tab: Sesiones por Mueble */}
             <button
@@ -1390,6 +1414,15 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
 
                 {/* Real-time Session Counter Pills */}
                 <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleUndoLastEntry}
+                    disabled={currentSession.conteos.length === 0}
+                    className="p-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-all cursor-pointer"
+                    title="Deshacer la última lectura"
+                  >
+                    <Undo2 className="w-4 h-4" />
+                  </button>
                   <span className="px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 text-[11px] font-black">
                     {groupedSkuEntries.length} SKUs
                   </span>
@@ -1425,18 +1458,20 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                   <ListTodo className="w-3.5 h-3.5" />
                   <span>Lecturas ({currentSession.conteos.length})</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForceDesktopCampaignView(false);
-                    setViewState('CAMPAIGN');
-                  }}
-                  className="py-1.5 px-2.5 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900 flex items-center gap-1 shrink-0 cursor-pointer"
-                  title="Consultar Foto ERP"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  <span className="text-[11px] font-extrabold">Foto ERP</span>
-                </button>
+                {!isBlind && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForceDesktopCampaignView(false);
+                      setViewState('CAMPAIGN');
+                    }}
+                    className="py-1.5 px-2.5 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900 flex items-center gap-1 shrink-0 cursor-pointer"
+                    title="Consultar Foto ERP"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span className="text-[11px] font-extrabold">Foto ERP</span>
+                  </button>
+                )}
               </div>
 
               {/* MOBILE TAB 1: SCANNER & KEYPAD PAD */}
@@ -1571,7 +1606,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                                 <span className="truncate">{selectedProductDesc}</span>
                               </div>
-                              {campaignSkuStats?.inErp ? (
+                              {!isBlind && (campaignSkuStats?.inErp ? (
                                 <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 rounded-lg text-[10px] font-black shrink-0">
                                   ERP: {campaignSkuStats.stockTeorico} un
                                 </span>
@@ -1579,11 +1614,11 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                                 <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 rounded-lg text-[10px] font-black shrink-0">
                                   Hallazgo Físico
                                 </span>
-                              )}
+                              ))}
                             </div>
 
                             {/* Campaign Status Pill Bar */}
-                            {campaignSkuStats && (
+                            {!isBlind && campaignSkuStats && (
                               <div className="pt-1 border-t border-emerald-200/60 dark:border-emerald-800/60 flex items-center justify-between text-[11px]">
                                 <span className="text-slate-600 dark:text-slate-300 font-medium">
                                   Total Farmacia: <strong className="font-mono text-slate-800 dark:text-slate-100">{campaignSkuStats.totalFisicoCampana}</strong> un
@@ -1844,6 +1879,16 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
 
                       <div className="flex items-center gap-2 shrink-0">
                         <button
+                          type="button"
+                          onClick={handleUndoLastEntry}
+                          disabled={currentSession.conteos.length === 0}
+                          className="px-3 py-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                          title="Deshacer la última lectura registrada"
+                        >
+                          <Undo2 className="w-3.5 h-3.5" />
+                          <span>Deshacer</span>
+                        </button>
+                        <button
                           onClick={() => setViewState('RECONCILIATION')}
                           className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer"
                         >
@@ -2021,7 +2066,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                               <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 truncate">
                                 ✓ {selectedProductDesc}
                               </span>
-                              {campaignSkuStats?.inErp ? (
+                              {!isBlind && (campaignSkuStats?.inErp ? (
                                 <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 rounded text-[10px] font-black shrink-0">
                                   ERP: {campaignSkuStats.stockTeorico} un
                                 </span>
@@ -2029,8 +2074,8 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                                 <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 rounded text-[10px] font-black shrink-0">
                                   Hallazgo
                                 </span>
-                              )}
-                              {campaignSkuStats && campaignSkuStats.diferencia !== null && (
+                              ))}
+                              {!isBlind && campaignSkuStats && campaignSkuStats.diferencia !== null && (
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-black shrink-0 ${
                                   campaignSkuStats.diferencia === 0
                                     ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
