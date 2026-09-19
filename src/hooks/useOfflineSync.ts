@@ -5,6 +5,7 @@ import { matchRowIndexByIdentity, buildRowIdentityIndex } from '../utils/entityI
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { backendMirrorService } from '../services/backendMirrorService';
 import { getErrorMessage } from '../utils/pureCalculations';
+import { isFailedMutation, sortQueueFifo } from '../utils/offlineQueueUtils';
 
 import { STORAGE_KEYS } from '../utils/appStorage';
 export type ConnectionHealthStatus = 'connected' | 'syncing' | 'offline' | 'unconfigured' | 'error';
@@ -111,9 +112,9 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
     try {
       const queue = await indexedDbService.getOfflineQueue();
       // Ensure strict FIFO ordering by creation date
-      queue.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      setOfflineQueue(queue);
-      return queue;
+      const sorted = sortQueueFifo(queue);
+      setOfflineQueue(sorted);
+      return sorted;
     } catch (e) {
       console.warn('Error refreshing offline queue:', e);
       return [];
@@ -238,7 +239,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
     }
 
     // Sort strictly FIFO
-    currentQueue.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    currentQueue = sortQueueFifo(currentQueue);
 
     setIsSyncing(true);
     setConnectionStatus('syncing');
@@ -469,7 +470,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
   // Retry all failed mutations
   const retryAllFailedMutations = useCallback(async () => {
     const queue = await indexedDbService.getOfflineQueue();
-    const failedList = queue.filter(m => m.status === 'failed' || (m.attempts && m.attempts >= 3));
+    const failedList = queue.filter(isFailedMutation);
     for (const m of failedList) {
       await indexedDbService.resetMutationForRetry(m.id);
     }
@@ -490,7 +491,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
   }, [refreshQueue, refreshAuditLog, syncQueue]);
 
   const failedMutations = useMemo(() => {
-    return offlineQueue.filter(m => m.status === 'failed' || (m.attempts && m.attempts >= 3));
+    return offlineQueue.filter(isFailedMutation);
   }, [offlineQueue]);
 
   // Clear all pending mutations in the queue

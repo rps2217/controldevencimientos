@@ -25,6 +25,12 @@ import {
   reconcileImportWithInventory 
 } from './src/utils/cuVcConsolidator';
 
+import { OfflineMutation } from './src/db/indexedDbService';
+import {
+  isFailedMutation,
+  sortQueueFifo
+} from './src/utils/offlineQueueUtils';
+
 import { 
   resolveItemIdentity, 
   matchRowIndexByIdentity,
@@ -331,6 +337,48 @@ console.log('\n--- 12. Pruebas de persistencia diferida de sesiones de conteo --
   flushStockCountSessionsToStorage();
   assert(store.get(STORAGE_KEYS.STOCK_COUNT_SESSIONS) === undefined,
     'flush: sin pendientes es una operación no-op segura');
+}
+
+console.log('\n--- 12. Pruebas de offlineQueueUtils.ts (orquestación de la cola) ---');
+{
+  const mk = (o: Partial<OfflineMutation> & { id: string }): OfflineMutation => ({
+    type: 'update', sheetTitle: 'VENCIMIENTOS', createdAt: '2026-01-01T00:00:00.000Z',
+    status: 'pending', attempts: 0, ...o,
+  } as OfflineMutation);
+
+  // Un fallo real: status failed o >= 3 intentos
+  assert(isFailedMutation(mk({ id: 'a', status: 'failed' })) === true,
+    'isFailedMutation detecta status failed');
+  assert(isFailedMutation(mk({ id: 'b', attempts: 3 })) === true,
+    'isFailedMutation detecta intentos agotados (3)');
+  assert(isFailedMutation(mk({ id: 'c', attempts: 2 })) === false,
+    'isFailedMutation no marca una mutación con intentos < 3');
+
+  // Regresión: una mutación reintentada queda pending + attempts 0 pero CONSERVA lastError.
+  // No debe clasificarse como fallida (antes el modal la ocultaba del filtro "pendientes"
+  // y el descarte masivo podía borrarla).
+  const retried = mk({ id: 'd', status: 'pending', attempts: 0, lastError: 'timeout previo' });
+  assert(isFailedMutation(retried) === false,
+    'isFailedMutation ignora lastError residual tras reintento');
+
+  // Filtros del modal: complementarios y sin solape
+  const queue = [
+    mk({ id: 'p1', createdAt: '2026-01-01T00:00:00.000Z' }),
+    mk({ id: 'f1', status: 'failed', createdAt: '2026-01-02T00:00:00.000Z' }),
+    mk({ id: 'p2', createdAt: '2026-01-03T00:00:00.000Z', attempts: 3 }),
+  ];
+  assert(queue.filter(isFailedMutation).map(m => m.id).join(',') === 'f1,p2',
+    'el filtro de conflictos devuelve exactamente las fallidas');
+  assert(queue.filter(m => !isFailedMutation(m)).map(m => m.id).join(',') === 'p1',
+    'el filtro de pendientes es el complementario exacto (sin solape)');
+
+  // FIFO determinista y sin mutar el arreglo original
+  const originalOrder = queue.map(m => m.id).join(',');
+  const sorted = sortQueueFifo([queue[2], queue[0], queue[1]]);
+  assert(sorted.map(m => m.id).join(',') === 'p1,f1,p2',
+    'sortQueueFifo ordena estrictamente por createdAt (FIFO)');
+  assert(queue.map(m => m.id).join(',') === originalOrder,
+    'sortQueueFifo no muta el arreglo de entrada');
 }
 
 console.log(`\n========================================`);

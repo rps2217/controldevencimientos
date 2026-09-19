@@ -9,6 +9,7 @@ import {
 import { OfflineMutation, AuditLogEntry, indexedDbService } from '../../db/indexedDbService';
 import { ConnectionHealthStatus } from '../../hooks/useOfflineSync';
 import { getErrorMessage } from '../../utils/pureCalculations';
+import { isFailedMutation } from '../../utils/offlineQueueUtils';
 
 interface SyncAuditModalProps {
   isOpen: boolean;
@@ -84,7 +85,7 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
 
   // Compute failed/conflicting mutations
   const failedMutations = useMemo(() => {
-    return offlineQueue.filter(m => m.status === 'failed' || (m.attempts && m.attempts >= 3) || Boolean(m.lastError));
+    return offlineQueue.filter(isFailedMutation);
   }, [offlineQueue]);
 
   // If there are conflicts and user opens the modal, default to 'all' or show the conflicts prominently
@@ -93,7 +94,7 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
       return failedMutations;
     }
     if (queueFilter === 'pending') {
-      return offlineQueue.filter(m => !(m.status === 'failed' || (m.attempts && m.attempts >= 3) || Boolean(m.lastError)));
+      return offlineQueue.filter(m => !isFailedMutation(m));
     }
     return offlineQueue;
   }, [offlineQueue, queueFilter, failedMutations]);
@@ -554,7 +555,7 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
               ) : (
                 <div className="space-y-3">
                   {filteredQueue.map((item, idx) => {
-                    const isConflict = item.status === 'failed' || (item.attempts && item.attempts >= 3) || Boolean(item.lastError);
+                    const isConflict = isFailedMutation(item);
                     const isExpanded = expandedPayloadIds.has(item.id);
                     const isOperating = actionInProgressId === item.id;
 

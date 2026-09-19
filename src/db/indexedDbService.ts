@@ -4,6 +4,7 @@
  * asíncrona, robusta y capaz de almacenar cientos de miles de registros y colas de mutación.
  */
 import { STORAGE_KEYS, sheetCacheKey } from '../utils/appStorage';
+import { isFailedMutation } from '../utils/offlineQueueUtils';
 
 export interface CachedSheetData {
   sheetTitle: string;
@@ -487,7 +488,7 @@ class IndexedDbService {
    */
   async discardAllFailedMutations(): Promise<number> {
     const queue = await this.getOfflineQueue();
-    const failedList = queue.filter(m => m.status === 'failed' || (m.attempts && m.attempts >= 3));
+    const failedList = queue.filter(isFailedMutation);
     for (const m of failedList) {
       await this.discardMutation(m.id, 'Descarte masivo de conflictos de conciliación');
     }
