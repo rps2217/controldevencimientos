@@ -15,6 +15,7 @@ import { findColumnBySemantic } from '../../utils/columnAliases';
 import { findMasterProduct, getMasterProductSummary } from '../../utils/referenceResolver';
 import { Barcode } from '../common/Barcode';
 
+import { STORAGE_KEYS } from '../../utils/appStorage';
 interface ItemDetailDrawerProps {
   product: InventoryItem | null;
   onClose: () => void;
@@ -41,7 +42,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
 }) => {
   const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>(() => {
     try {
-      const saved = localStorage.getItem('appsheet_detail_hidden_fields');
+      const saved = localStorage.getItem(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS);
       return saved ? JSON.parse(saved) : {};
     } catch (err) {
       console.warn('Error loading detail drawer hidden fields:', err);
@@ -57,7 +58,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
         [key]: !prev[key]
       };
       try {
-        localStorage.setItem('appsheet_detail_hidden_fields', JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS, JSON.stringify(updated));
       } catch (err) {
         console.warn('Error saving detail drawer hidden fields:', err);
       }
@@ -68,7 +69,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   const handleShowAllFields = () => {
     setHiddenFields({});
     try {
-      localStorage.removeItem('appsheet_detail_hidden_fields');
+      localStorage.removeItem(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS);
     } catch (err) {
       console.warn('Error resetting detail drawer hidden fields:', err);
     }

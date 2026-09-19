@@ -8,6 +8,7 @@ import {
 import { TableSlice } from '../../types';
 import { SLICE_COLOR_CLASSES } from '../../utils/sliceRegistry';
 
+import { STORAGE_KEYS } from '../../utils/appStorage';
 interface SliceSelectorBarProps {
   slices: TableSlice[];
   activeSliceId: string | null;
@@ -73,7 +74,7 @@ export const SliceSelectorBar: React.FC<SliceSelectorBarProps> = ({
 }) => {
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     try {
-      const saved = localStorage.getItem('appsheet_slices_collapsed');
+      const saved = localStorage.getItem(STORAGE_KEYS.SLICES_COLLAPSED);
       return saved !== null ? saved === 'true' : isCollapsedDefault;
     } catch {
       return isCollapsedDefault;
@@ -83,7 +84,7 @@ export const SliceSelectorBar: React.FC<SliceSelectorBarProps> = ({
   const toggleCollapse = () => {
     setIsCollapsed(prev => {
       const next = !prev;
-      try { localStorage.setItem('appsheet_slices_collapsed', String(next)); } catch {}
+      try { localStorage.setItem(STORAGE_KEYS.SLICES_COLLAPSED, String(next)); } catch {}
       return next;
     });
   };

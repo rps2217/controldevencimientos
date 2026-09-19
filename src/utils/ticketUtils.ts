@@ -7,8 +7,7 @@ import {
 } from '../types';
 import { findColumnBySemantic } from './columnAliases';
 
-export const LOCAL_STORAGE_TICKET_KEY = 'global_ticket_print_config';
-
+import { STORAGE_KEYS } from '../utils/appStorage';
 /**
  * Returns default general ticket settings based on the view
  */
@@ -160,7 +159,7 @@ export function normalizeTicketConfig(
  */
 export function loadTicketConfigFromStorage(): GlobalTicketConfig {
   try {
-    const saved = localStorage.getItem(LOCAL_STORAGE_TICKET_KEY);
+    const saved = localStorage.getItem(STORAGE_KEYS.TICKET_CONFIG);
     if (saved) {
       return JSON.parse(saved);
     }
@@ -175,7 +174,7 @@ export function loadTicketConfigFromStorage(): GlobalTicketConfig {
  */
 export function saveTicketConfigToStorage(config: GlobalTicketConfig): void {
   try {
-    localStorage.setItem(LOCAL_STORAGE_TICKET_KEY, JSON.stringify(config));
+    localStorage.setItem(STORAGE_KEYS.TICKET_CONFIG, JSON.stringify(config));
   } catch (e) {
     console.error('Failed to save global ticket config to storage', e);
   }

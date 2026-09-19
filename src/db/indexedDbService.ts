@@ -3,6 +3,7 @@
  * Reemplaza el frágil límite de 5MB de localStorage por una base de datos local
  * asíncrona, robusta y capaz de almacenar cientos de miles de registros y colas de mutación.
  */
+import { STORAGE_KEYS, sheetCacheKey } from '../utils/appStorage';
 
 export interface CachedSheetData {
   sheetTitle: string;
@@ -161,13 +162,13 @@ class IndexedDbService {
               });
             } else {
               // Intentar leer de localStorage si viene de versiones previas
-              const lsFallback = this.getLocalStorageFallback(`appsheet_clone_cache_${sheetTitle}`);
+              const lsFallback = this.getLocalStorageFallback(sheetCacheKey(sheetTitle));
               resolve(lsFallback);
             }
           };
 
           req.onerror = () => {
-            resolve(this.getLocalStorageFallback(`appsheet_clone_cache_${sheetTitle}`));
+            resolve(this.getLocalStorageFallback(sheetCacheKey(sheetTitle)));
           };
         });
       }
@@ -175,7 +176,7 @@ class IndexedDbService {
       console.warn('IndexedDB read error, fallback a localStorage:', err);
     }
 
-    return this.getLocalStorageFallback(`appsheet_clone_cache_${sheetTitle}`);
+    return this.getLocalStorageFallback(sheetCacheKey(sheetTitle));
   }
 
   /**
@@ -210,7 +211,7 @@ class IndexedDbService {
 
     // Fallback safe localStorage si IndexedDB falla
     try {
-      localStorage.setItem(`appsheet_clone_cache_${sheetTitle}`, JSON.stringify({
+      localStorage.setItem(sheetCacheKey(sheetTitle), JSON.stringify({
         rows,
         timestamp: payload.timestamp
       }));
@@ -241,7 +242,7 @@ class IndexedDbService {
     }
 
     try {
-      localStorage.removeItem(`appsheet_clone_cache_${sheetTitle}`);
+      localStorage.removeItem(sheetCacheKey(sheetTitle));
     } catch {
       // Ignore
     }
@@ -337,7 +338,7 @@ class IndexedDbService {
       } else {
         current.push(fullMutation);
       }
-      localStorage.setItem('appsheet_clone_offline_queue', JSON.stringify(current));
+      localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(current));
     } catch (e) {
       console.warn('localStorage mutation backup error:', e);
     }
@@ -387,7 +388,7 @@ class IndexedDbService {
         item.status = status;
         if (status === 'failed') item.attempts = (item.attempts || 0) + 1;
         if (errorMsg) item.lastError = errorMsg;
-        localStorage.setItem('appsheet_clone_offline_queue', JSON.stringify(current));
+        localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(current));
       }
     } catch {
       // Ignore
@@ -415,7 +416,7 @@ class IndexedDbService {
 
     try {
       const current = this.getLocalStorageQueue().filter(m => m.id !== id);
-      localStorage.setItem('appsheet_clone_offline_queue', JSON.stringify(current));
+      localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(current));
     } catch {
       // Ignore
     }
@@ -441,7 +442,7 @@ class IndexedDbService {
     }
 
     try {
-      localStorage.removeItem('appsheet_clone_offline_queue');
+      localStorage.removeItem(STORAGE_KEYS.OFFLINE_QUEUE);
     } catch {
       // Ignore
     }
@@ -529,7 +530,7 @@ class IndexedDbService {
       if (item) {
         item.status = 'pending';
         item.attempts = 0;
-        localStorage.setItem('appsheet_clone_offline_queue', JSON.stringify(current));
+        localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(current));
       }
     } catch {
       // Ignore
@@ -577,7 +578,7 @@ class IndexedDbService {
       const idx = current.findIndex(m => m.id === id);
       if (idx >= 0) {
         current[idx] = forked;
-        localStorage.setItem('appsheet_clone_offline_queue', JSON.stringify(current));
+        localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(current));
       }
     } catch {
       // Ignore
@@ -641,7 +642,7 @@ class IndexedDbService {
       const current = this.getLocalStorageAuditLog();
       current.unshift(fullEntry);
       const capped = current.slice(0, 100);
-      localStorage.setItem('appsheet_audit_log', JSON.stringify(capped));
+      localStorage.setItem(STORAGE_KEYS.AUDIT_LOG, JSON.stringify(capped));
     } catch {
       // Ignore
     }
@@ -714,7 +715,7 @@ class IndexedDbService {
       if (match) {
         match.status = status;
         if (errorMessage) match.errorMessage = errorMessage;
-        localStorage.setItem('appsheet_audit_log', JSON.stringify(current));
+        localStorage.setItem(STORAGE_KEYS.AUDIT_LOG, JSON.stringify(current));
       }
     } catch {
       // Ignore
@@ -741,7 +742,7 @@ class IndexedDbService {
     }
 
     try {
-      localStorage.removeItem('appsheet_audit_log');
+      localStorage.removeItem(STORAGE_KEYS.AUDIT_LOG);
     } catch {
       // Ignore
     }
@@ -749,7 +750,7 @@ class IndexedDbService {
 
   private getLocalStorageAuditLog(): AuditLogEntry[] {
     try {
-      const saved = localStorage.getItem('appsheet_audit_log');
+      const saved = localStorage.getItem(STORAGE_KEYS.AUDIT_LOG);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -875,7 +876,7 @@ class IndexedDbService {
 
   private getLocalStorageQueue(): OfflineMutation[] {
     try {
-      const saved = localStorage.getItem('appsheet_clone_offline_queue');
+      const saved = localStorage.getItem(STORAGE_KEYS.OFFLINE_QUEUE);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];

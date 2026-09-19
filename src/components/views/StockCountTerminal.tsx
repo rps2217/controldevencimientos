@@ -21,6 +21,7 @@ import { TicketPrintView } from './TicketPrintView';
 import { getErrorMessage } from '../../utils/pureCalculations';
 import { useConfirm } from '../common/ConfirmDialog';
 
+import { STORAGE_KEYS } from '../../utils/appStorage';
 const CampaignConsolidationDashboard = lazy(() => import('./CampaignConsolidationDashboard').then(m => ({ default: m.CampaignConsolidationDashboard })));
 
 interface StockCountTerminalProps {
@@ -54,7 +55,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
   const [lastCloudSyncDate, setLastCloudSyncDate] = useState<string | null>(() => {
     try {
-      return localStorage.getItem('app_last_campaign_cloud_sync');
+      return localStorage.getItem(STORAGE_KEYS.LAST_CAMPAIGN_CLOUD_SYNC);
     } catch {
       return null;
     }
@@ -92,7 +93,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
         const nowStr = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
         setLastCloudSyncDate(nowStr);
         try {
-          localStorage.setItem('app_last_campaign_cloud_sync', nowStr);
+          localStorage.setItem(STORAGE_KEYS.LAST_CAMPAIGN_CLOUD_SYNC, nowStr);
         } catch {}
 
         if (!silent) {

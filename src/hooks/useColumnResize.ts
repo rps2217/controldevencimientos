@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { InventoryItem } from '../types';
 
+import { STORAGE_KEYS } from '../utils/appStorage';
 export interface UseColumnResizeProps {
   activeSheetKey: string;
   items: InventoryItem[];
@@ -9,7 +10,7 @@ export interface UseColumnResizeProps {
 export function useColumnResize({ activeSheetKey, items }: UseColumnResizeProps) {
   const [colWidths, setColWidths] = useState<Record<string, Record<string, number>>>(() => {
     try {
-      const saved = localStorage.getItem('appsheet_col_widths');
+      const saved = localStorage.getItem(STORAGE_KEYS.COL_WIDTHS);
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -86,7 +87,7 @@ export function useColumnResize({ activeSheetKey, items }: UseColumnResizeProps)
             }
           };
           try {
-            localStorage.setItem('appsheet_col_widths', JSON.stringify(updated));
+            localStorage.setItem(STORAGE_KEYS.COL_WIDTHS, JSON.stringify(updated));
           } catch (e) {}
           return updated;
         });
@@ -137,7 +138,7 @@ export function useColumnResize({ activeSheetKey, items }: UseColumnResizeProps)
         }
       };
       try {
-        localStorage.setItem('appsheet_col_widths', JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEYS.COL_WIDTHS, JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -149,7 +150,7 @@ export function useColumnResize({ activeSheetKey, items }: UseColumnResizeProps)
       const updated = { ...prev };
       delete updated[activeSheetKey];
       try {
-        localStorage.setItem('appsheet_col_widths', JSON.stringify(updated));
+        localStorage.setItem(STORAGE_KEYS.COL_WIDTHS, JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });

@@ -1,6 +1,7 @@
 import { TableSlice, InventoryItem } from '../types';
 import { getItemStatus, getEventCategory, getItemResolutionStatus } from './dateCalculations';
 
+import { STORAGE_KEYS } from '../utils/appStorage';
 export const BUILT_IN_SLICES: TableSlice[] = [
   // 1. Radar de Vencimientos (main)
   {
@@ -151,12 +152,10 @@ export const BUILT_IN_SLICES: TableSlice[] = [
   }
 ];
 
-const CUSTOM_SLICES_STORAGE_KEY = 'appsheet_custom_slices';
-const HIDDEN_SLICES_STORAGE_KEY = 'appsheet_hidden_slice_ids';
 
 export function loadCustomSlices(): TableSlice[] {
   try {
-    const raw = localStorage.getItem(CUSTOM_SLICES_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.CUSTOM_SLICES);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -168,7 +167,7 @@ export function loadCustomSlices(): TableSlice[] {
 
 export function saveCustomSlices(slices: TableSlice[]): void {
   try {
-    localStorage.setItem(CUSTOM_SLICES_STORAGE_KEY, JSON.stringify(slices));
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_SLICES, JSON.stringify(slices));
   } catch (err) {
     console.warn('Error saving custom slices to localStorage:', err);
   }
@@ -176,7 +175,7 @@ export function saveCustomSlices(slices: TableSlice[]): void {
 
 export function loadHiddenSliceIds(sheetConfigHidden?: string[]): string[] {
   try {
-    const raw = localStorage.getItem(HIDDEN_SLICES_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.HIDDEN_SLICE_IDS);
     const localHidden: string[] = raw ? JSON.parse(raw) : [];
     const configHidden = Array.isArray(sheetConfigHidden) ? sheetConfigHidden : [];
     // Combine unique hidden IDs
@@ -190,7 +189,7 @@ export function loadHiddenSliceIds(sheetConfigHidden?: string[]): string[] {
 
 export function saveHiddenSliceIds(hiddenIds: string[]): void {
   try {
-    localStorage.setItem(HIDDEN_SLICES_STORAGE_KEY, JSON.stringify(hiddenIds));
+    localStorage.setItem(STORAGE_KEYS.HIDDEN_SLICE_IDS, JSON.stringify(hiddenIds));
   } catch (err) {
     console.warn('Error saving hidden slice IDs to localStorage:', err);
   }

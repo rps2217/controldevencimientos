@@ -35,6 +35,7 @@ import { exportToExcel } from '../../utils/exportUtils';
 import { buildBulkActionContext, isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
 import { useDashboard } from '../../context/DashboardContext';
 
+import { STORAGE_KEYS } from '../../utils/appStorage';
 export interface ViewConfigControlDrawerProps {
   isOpen?: boolean;
   onClose?: () => void;
@@ -982,7 +983,7 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
 
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 space-y-1">
                   <div className="font-semibold text-slate-700 dark:text-slate-300">Hoja Activa: {activeTableKey}</div>
-                  <div>URL de sincronización configurada: {localStorage.getItem('appsheet_clone_scriptUrl') ? 'Conectado' : 'No conectada (Modo Local)'}</div>
+                  <div>URL de sincronización configurada: {localStorage.getItem(STORAGE_KEYS.SCRIPT_URL) ? 'Conectado' : 'No conectada (Modo Local)'}</div>
                 </div>
               </div>
             )}

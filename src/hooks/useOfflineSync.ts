@@ -6,6 +6,7 @@ import { findColumnBySemantic } from '../utils/columnAliases';
 import { backendMirrorService } from '../services/backendMirrorService';
 import { getErrorMessage } from '../utils/pureCalculations';
 
+import { STORAGE_KEYS } from '../utils/appStorage';
 export type ConnectionHealthStatus = 'connected' | 'syncing' | 'offline' | 'unconfigured' | 'error';
 
 function getMutationDescription(mutation: {
@@ -200,7 +201,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
 
       // Real-time mirror replication if enabled
       try {
-        const savedConfigStr = localStorage.getItem('appsheet_config');
+        const savedConfigStr = localStorage.getItem(STORAGE_KEYS.SHEET_CONFIG);
         if (savedConfigStr) {
           const parsed = JSON.parse(savedConfigStr);
           if (parsed?.backendMirror?.enabled) {

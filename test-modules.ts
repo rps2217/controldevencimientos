@@ -53,6 +53,14 @@ import {
   generateSmartColumnMappings 
 } from './src/utils/universalImporter';
 
+import {
+  STORAGE_KEYS,
+  sheetCacheKey,
+  demoItemsKey,
+  migrateLegacyStorageKeys
+} from './src/utils/appStorage';
+
+
 import { 
   SAMPLE_HEADERS, 
   SAMPLE_ITEMS, 
@@ -226,6 +234,39 @@ console.log('\n--- 10. Pruebas de getErrorMessage (pureCalculations.ts) ---');
   assert(getErrorMessage(new Error('fallo de red')) === 'fallo de red', 'getErrorMessage extrae .message de Error');
   assert(getErrorMessage('texto plano') === 'texto plano', 'getErrorMessage convierte strings');
   assert(getErrorMessage(null) === 'null', 'getErrorMessage maneja valores no-Error');
+}
+
+
+console.log('\n--- 11. Pruebas de appStorage.ts ---');
+{
+  // Stub mínimo de localStorage para el entorno Node
+  const store = new Map<string, string>();
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+    setItem: (k: string, v: string) => { store.set(k, String(v)); },
+    removeItem: (k: string) => { store.delete(k); },
+  };
+
+  assert(STORAGE_KEYS.SHEET_CONFIG === 'appsheet_clone_config', 'appStorage: SHEET_CONFIG es la clave canónica');
+  assert(STORAGE_KEYS.TICKET_CONFIG === 'global_ticket_print_config', 'appStorage: TICKET_CONFIG conserva la clave histórica');
+  assert(sheetCacheKey('Hoja 1') === 'appsheet_clone_cache_Hoja 1', 'appStorage: sheetCacheKey construye la clave por pestaña');
+  assert(demoItemsKey('main') === 'app_demo_items_main', 'appStorage: demoItemsKey construye la clave por vista');
+
+  // Migración: la canónica ausente se promueve desde la heredada
+  store.clear();
+  store.set('appsheet_config', JSON.stringify({ backendMirror: { enabled: true } }));
+  migrateLegacyStorageKeys();
+  assert(store.get(STORAGE_KEYS.SHEET_CONFIG) === JSON.stringify({ backendMirror: { enabled: true } }),
+    'appStorage: migra appsheet_config hacia la clave canónica');
+  assert(!store.has('appsheet_config'), 'appStorage: elimina la clave heredada tras migrar');
+
+  // No debe pisar la canónica existente
+  store.clear();
+  store.set(STORAGE_KEYS.SHEET_CONFIG, 'CANONICA');
+  store.set('appsheet_config', 'HEREDADA');
+  migrateLegacyStorageKeys();
+  assert(store.get(STORAGE_KEYS.SHEET_CONFIG) === 'CANONICA',
+    'appStorage: la migración no sobreescribe la clave canónica existente');
 }
 
 console.log(`\n========================================`);

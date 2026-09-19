@@ -8,6 +8,7 @@ import { parseDelimitedText, detectDelimiter } from '../../utils/universalImport
 import { CampaignQuickScanModal } from '../modals/CampaignQuickScanModal';
 import { getErrorMessage } from '../../utils/pureCalculations';
 
+import { STORAGE_KEYS } from '../../utils/appStorage';
 interface CampaignConsolidationDashboardProps {
   campaigns: InventoryCampaign[];
   activeCampaignId: string | null;
@@ -60,7 +61,7 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
   const [isSavingToAuditSheet, setIsSavingToAuditSheet] = useState(false);
   const [lastCloudSyncDate, setLastCloudSyncDate] = useState<string | null>(() => {
     try {
-      return localStorage.getItem('app_last_campaign_cloud_sync');
+      return localStorage.getItem(STORAGE_KEYS.LAST_CAMPAIGN_CLOUD_SYNC);
     } catch {
       return null;
     }
@@ -77,7 +78,7 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
       const nowStr = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
       setLastCloudSyncDate(nowStr);
       try {
-        localStorage.setItem('app_last_campaign_cloud_sync', nowStr);
+        localStorage.setItem(STORAGE_KEYS.LAST_CAMPAIGN_CLOUD_SYNC, nowStr);
       } catch {}
     } catch (err) {
       console.warn('[Cloud AutoSync] Background sync to Google Sheets error:', err);
@@ -102,7 +103,7 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
         const nowStr = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
         setLastCloudSyncDate(nowStr);
         try {
-          localStorage.setItem('app_last_campaign_cloud_sync', nowStr);
+          localStorage.setItem(STORAGE_KEYS.LAST_CAMPAIGN_CLOUD_SYNC, nowStr);
         } catch {}
       }
     }).catch((err) => {
@@ -330,7 +331,7 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
         const nowStr = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
         setLastCloudSyncDate(nowStr);
         try {
-          localStorage.setItem('app_last_campaign_cloud_sync', nowStr);
+          localStorage.setItem(STORAGE_KEYS.LAST_CAMPAIGN_CLOUD_SYNC, nowStr);
         } catch {}
         showToast(
           `¡Foto ERP sincronizada en la nube! Visible inmediatamente en tu dispositivo móvil / PDA.`,
@@ -411,7 +412,7 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
         const nowStr = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
         setLastCloudSyncDate(nowStr);
         try {
-          localStorage.setItem('app_last_campaign_cloud_sync', nowStr);
+          localStorage.setItem(STORAGE_KEYS.LAST_CAMPAIGN_CLOUD_SYNC, nowStr);
         } catch {}
 
         playBeep('success');

@@ -5,6 +5,7 @@
  * en paralelo a Google Sheets, superando las limitaciones de latencia y concurrencia 
  * en operaciones críticas de alta frecuencia (como conteos masivos en farmacia).
  */
+import { STORAGE_KEYS } from '../utils/appStorage';
 
 import { BackendMirrorConfig, InventoryItem } from '../types';
 import { OfflineMutation } from '../db/indexedDbService';
@@ -34,10 +35,10 @@ class BackendMirrorService {
   constructor() {
     // Generate or retrieve unique device ID for conflict detection
     if (typeof window !== 'undefined') {
-      let devId = localStorage.getItem('app_device_id');
+      let devId = localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
       if (!devId) {
         devId = 'dev_' + Math.random().toString(36).substring(2, 10);
-        localStorage.setItem('app_device_id', devId);
+        localStorage.setItem(STORAGE_KEYS.DEVICE_ID, devId);
       }
       this.deviceId = devId;
     } else {

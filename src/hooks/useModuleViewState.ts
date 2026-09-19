@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { SortConfig, DynamicMonthRange } from '../types';
 import { ModuleViewState, DEFAULT_MODULE_STATE } from '../utils/dashboardConfigUtils';
 
+import { STORAGE_KEYS } from '../utils/appStorage';
 export interface UseModuleViewStateOptions {
   activeView: string;
   storageKey?: string;
@@ -9,7 +10,7 @@ export interface UseModuleViewStateOptions {
 
 export function useModuleViewState({
   activeView,
-  storageKey = 'app_module_states'
+  storageKey = STORAGE_KEYS.MODULE_STATES
 }: UseModuleViewStateOptions) {
   const [moduleStates, setModuleStates] = useState<Record<string, ModuleViewState>>(() => {
     try {

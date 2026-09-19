@@ -42,11 +42,14 @@ Cada punto indica **evidencia reproducible** y **veredicto Ponytail** (YAGNI, re
 - **Veredicto Ponytail**: paso 2 de la escalera (reutilizar). Un único helper puro `rowToObject(headers, row)` en `src/utils/` elimina la duplicación y centraliza la normalización de encabezados. Es el mismo patrón que ya usan `pureCalculations.ts`/`columnAliases.ts`.
 - **Prioridad**: Media — deuda real, bajo riesgo, ~10 líneas de helper.
 
-### 1.3 🟡 18 claves de `localStorage` con 3 prefijos inconsistentes
+### 1.3 ✅ RESUELTO — Módulo central de claves `src/utils/appStorage.ts`
 
-- **Evidencia**: `app_*` (22 usos), `appsheet_*` (14), `appsheet_clone_*` (32). Ej.: `appsheet_config` vs `appsheet_clone_config`.
-- **Veredicto Ponytail**: real, pero refactor de riesgo medio (migración de claves). El paso correcto es un módulo central de storage **cuando se toque ese código**, con migración de claves antiguas.
-- **Prioridad**: Media — no hacer de forma aislada.
+- **Evidencia del bug real**: `useOfflineSync.ts` leía `'appsheet_config'`, pero el único escritor (`InventoryDashboard.tsx`) guardaba en `'appsheet_clone_config'`. Resultado: la réplica inmediata al espejo de backend **nunca se ejecutaba** porque `savedConfigStr` siempre era `null`.
+- **Solución**: `STORAGE_KEYS` como fuente única + helpers `sheetCacheKey()` / `demoItemsKey()` + `migrateLegacyStorageKeys()` invocado en `main.tsx`.
+- **Decisión de valor**: se conservan los strings históricos (varios se serializan a la nube vía PropertiesService); unificar el prefijo literal invalidaría datos y no aporta valor operativo. La centralización es la que previene la clase de bug encontrada.
+- **Alcance**: 18 archivos, 94 usos. Se eliminaron las constantes locales duplicadas.
+- **Tests**: 7 nuevos casos en `test-modules.ts` (construcción de claves dinámicas + migración que promueve, no pisa y limpia la heredada). Total 49/49.
+- **Prioridad**: Media — resuelta de forma aislada con red de tests.
 
 ### 1.4 ✅ RESUELTO — 6 `confirm()` nativos reemplazados por `ConfirmDialog`
 
@@ -125,7 +128,6 @@ Aplico YAGNI también a las mejoras. Estas piezas están bien resueltas:
 
 ## 4. Orden de ejecución sugerido
 
-1. **1.3** prefijos de `localStorage` (requiere migración).
-2. **1.1-bis** tipado incremental del contrato sólo si aparece un síntoma.
+1. **1.1-bis** tipado incremental del contrato sólo si aparece un síntoma.
 
 **Invariante para todos**: `tsc --noEmit` + `npm test` + `npm run build` en verde antes de cada commit. Desde 1.5 hay además `npx eslint src` como red de seguridad automática (0 errores exigidos; las 23 advertencias `exhaustive-deps` son deuda conocida).

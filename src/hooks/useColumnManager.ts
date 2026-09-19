@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { SheetConfig, ViewKey } from '../types';
 import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
 
+import { STORAGE_KEYS } from '../utils/appStorage';
 export interface ManageableColumn {
   id: string;
   label: string;
@@ -40,7 +41,7 @@ export function useColumnManager({
   // Load column orders and hidden columns from localStorage
   const [columnOrders, setColumnOrders] = useState<Record<string, string[]>>(() => {
     try {
-      const saved = localStorage.getItem('appsheet_clone_col_orders');
+      const saved = localStorage.getItem(STORAGE_KEYS.COL_ORDERS);
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -49,7 +50,7 @@ export function useColumnManager({
 
   const [hiddenColumns, setHiddenColumns] = useState<Record<string, string[]>>(() => {
     try {
-      const saved = localStorage.getItem('appsheet_clone_hidden_cols');
+      const saved = localStorage.getItem(STORAGE_KEYS.HIDDEN_COLS);
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -59,7 +60,7 @@ export function useColumnManager({
   // Persist preferences
   useEffect(() => {
     try {
-      localStorage.setItem('appsheet_clone_col_orders', JSON.stringify(columnOrders));
+      localStorage.setItem(STORAGE_KEYS.COL_ORDERS, JSON.stringify(columnOrders));
     } catch (e) {
       console.warn('LocalStorage save error:', e);
     }
@@ -67,7 +68,7 @@ export function useColumnManager({
 
   useEffect(() => {
     try {
-      localStorage.setItem('appsheet_clone_hidden_cols', JSON.stringify(hiddenColumns));
+      localStorage.setItem(STORAGE_KEYS.HIDDEN_COLS, JSON.stringify(hiddenColumns));
     } catch (e) {
       console.warn('LocalStorage save error:', e);
     }

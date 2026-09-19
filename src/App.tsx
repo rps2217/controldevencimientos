@@ -7,6 +7,7 @@ import { ConfirmProvider } from './components/common/ConfirmDialog';
 import { PWAReloadPrompt } from './components/pwa/PWAReloadPrompt';
 import { AppLogo } from './components/common/AppLogo';
 
+import { STORAGE_KEYS } from './utils/appStorage';
 export type ThemeMode = 'light' | 'dark-slate' | 'dark-gray';
 
 export default function App() {
@@ -22,9 +23,9 @@ export default function App() {
   // Initialize values on mount
   useEffect(() => {
     try {
-      const storedUrl = localStorage.getItem('appsheet_clone_scriptUrl') || '';
-      const storedToken = localStorage.getItem('appsheet_clone_securityToken') || '';
-      const storedSheetId = localStorage.getItem('appsheet_clone_spreadsheetId') || '';
+      const storedUrl = localStorage.getItem(STORAGE_KEYS.SCRIPT_URL) || '';
+      const storedToken = localStorage.getItem(STORAGE_KEYS.SECURITY_TOKEN) || '';
+      const storedSheetId = localStorage.getItem(STORAGE_KEYS.SPREADSHEET_ID) || '';
       
       setSetupUrl(storedUrl);
       setSecurityToken(storedToken);
@@ -40,8 +41,8 @@ export default function App() {
 
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     try {
-      const savedVariant = localStorage.getItem('app_theme_variant');
-      const isDark = localStorage.getItem('app_dark_mode') === 'true';
+      const savedVariant = localStorage.getItem(STORAGE_KEYS.THEME_VARIANT);
+      const isDark = localStorage.getItem(STORAGE_KEYS.DARK_MODE) === 'true';
       if (!isDark) return 'light';
       return savedVariant === 'gray' ? 'dark-gray' : 'dark-slate';
     } catch {
@@ -52,16 +53,16 @@ export default function App() {
   useEffect(() => {
     try {
       if (themeMode === 'light') {
-        localStorage.setItem('app_dark_mode', 'false');
+        localStorage.setItem(STORAGE_KEYS.DARK_MODE, 'false');
         document.documentElement.classList.remove('dark', 'theme-gray');
       } else if (themeMode === 'dark-slate') {
-        localStorage.setItem('app_dark_mode', 'true');
-        localStorage.setItem('app_theme_variant', 'slate');
+        localStorage.setItem(STORAGE_KEYS.DARK_MODE, 'true');
+        localStorage.setItem(STORAGE_KEYS.THEME_VARIANT, 'slate');
         document.documentElement.classList.add('dark');
         document.documentElement.classList.remove('theme-gray');
       } else if (themeMode === 'dark-gray') {
-        localStorage.setItem('app_dark_mode', 'true');
-        localStorage.setItem('app_theme_variant', 'gray');
+        localStorage.setItem(STORAGE_KEYS.DARK_MODE, 'true');
+        localStorage.setItem(STORAGE_KEYS.THEME_VARIANT, 'gray');
         document.documentElement.classList.add('dark', 'theme-gray');
       }
     } catch (err) {
@@ -89,9 +90,9 @@ export default function App() {
     }
 
     try {
-      localStorage.setItem('appsheet_clone_scriptUrl', setupUrl.trim());
-      localStorage.setItem('appsheet_clone_securityToken', securityToken.trim());
-      localStorage.setItem('appsheet_clone_spreadsheetId', spreadsheetId.trim());
+      localStorage.setItem(STORAGE_KEYS.SCRIPT_URL, setupUrl.trim());
+      localStorage.setItem(STORAGE_KEYS.SECURITY_TOKEN, securityToken.trim());
+      localStorage.setItem(STORAGE_KEYS.SPREADSHEET_ID, spreadsheetId.trim());
     } catch (err) {
       console.warn('LocalStorage error setting config:', err);
     }

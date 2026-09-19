@@ -18,6 +18,7 @@ import { exportToExcel } from './exportUtils';
  * Generates the composed natural unique key CU_VC: SKU + YYYY + MM
  * e.g. SKU: "2000210218569", YYYY: "2027", MM: "12" -> "2000210218569202712"
  */
+import { STORAGE_KEYS } from '../utils/appStorage';
 export function generateCuVc(
   sku: string | number, 
   yyyy?: string | number, 
@@ -67,7 +68,6 @@ export function generateShortVcId(): string {
   return result;
 }
 
-const STOCK_COUNT_STORAGE_KEY = 'app_stock_count_sessions_v1';
 
 let saveSessionsDebounceTimer: any = null;
 
@@ -76,7 +76,7 @@ let saveSessionsDebounceTimer: any = null;
  */
 export function loadStockCountSessionsFromStorage(): StockCountSession[] {
   try {
-    const raw = localStorage.getItem(STOCK_COUNT_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.STOCK_COUNT_SESSIONS);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -91,7 +91,7 @@ export function loadStockCountSessionsFromStorage(): StockCountSession[] {
  */
 export function saveStockCountSessionsToStorage(sessions: StockCountSession[]): void {
   try {
-    localStorage.setItem(STOCK_COUNT_STORAGE_KEY, JSON.stringify(sessions));
+    localStorage.setItem(STORAGE_KEYS.STOCK_COUNT_SESSIONS, JSON.stringify(sessions));
   } catch (e) {
     console.warn('Error saving stock count sessions to storage:', e);
   }
@@ -481,15 +481,13 @@ export async function exportStockCountToExcel(
 // CAMPAÑA DE INVENTARIO CÍCLICO MULTISESIÓN
 // ==========================================
 
-const CAMPAIGNS_STORAGE_KEY = 'app_inventory_campaigns_v1';
-const ACTIVE_CAMPAIGN_ID_KEY = 'app_active_campaign_id_v1';
 
 /**
  * Loads all saved inventory campaigns from storage
  */
 export function loadCampaignsFromStorage(): InventoryCampaign[] {
   try {
-    const raw = localStorage.getItem(CAMPAIGNS_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.CAMPAIGNS);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -504,7 +502,7 @@ export function loadCampaignsFromStorage(): InventoryCampaign[] {
  */
 export function saveCampaignsToStorage(campaigns: InventoryCampaign[]): void {
   try {
-    localStorage.setItem(CAMPAIGNS_STORAGE_KEY, JSON.stringify(campaigns));
+    localStorage.setItem(STORAGE_KEYS.CAMPAIGNS, JSON.stringify(campaigns));
   } catch (e) {
     console.warn('Error saving campaigns to storage:', e);
   }
@@ -515,7 +513,7 @@ export function saveCampaignsToStorage(campaigns: InventoryCampaign[]): void {
  */
 export function getActiveCampaignId(): string | null {
   try {
-    return localStorage.getItem(ACTIVE_CAMPAIGN_ID_KEY);
+    return localStorage.getItem(STORAGE_KEYS.ACTIVE_CAMPAIGN_ID);
   } catch (e) {
     return null;
   }
@@ -527,9 +525,9 @@ export function getActiveCampaignId(): string | null {
 export function setActiveCampaignId(id: string | null): void {
   try {
     if (id) {
-      localStorage.setItem(ACTIVE_CAMPAIGN_ID_KEY, id);
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_CAMPAIGN_ID, id);
     } else {
-      localStorage.removeItem(ACTIVE_CAMPAIGN_ID_KEY);
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_CAMPAIGN_ID);
     }
   } catch (e) {
     console.warn('Error setting active campaign ID:', e);
@@ -1256,13 +1254,13 @@ export function playBeep(type: 'success' | 'error' | 'skip'): void {
  */
 export function getOrCreateDeviceId(): string {
   try {
-    let id = localStorage.getItem('app_device_id');
+    let id = localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
     if (!id) {
       const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
       const prefix = isMobile ? 'Móvil' : 'Terminal';
       const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
       id = `${prefix}-${randomHex}`;
-      localStorage.setItem('app_device_id', id);
+      localStorage.setItem(STORAGE_KEYS.DEVICE_ID, id);
     }
     return id;
   } catch {

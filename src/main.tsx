@@ -2,7 +2,10 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/common/ErrorBoundary.tsx';
+import { migrateLegacyStorageKeys } from './utils/appStorage';
 import './index.css';
+
+migrateLegacyStorageKeys();
 
 // Suppress harmless ResizeObserver loop limit exceeded error
 window.addEventListener('error', (e) => {

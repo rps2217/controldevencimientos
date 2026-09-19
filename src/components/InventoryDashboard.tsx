@@ -32,6 +32,7 @@ import {
   SAMPLE_PRODUCTS, 
   SAMPLE_POLICIES 
 } from '../data/sampleInventory';
+import { STORAGE_KEYS } from '../utils/appStorage';
 
 // Helpers para almacenamiento persistente y configuración modular
 import { getStoredDemoItems, saveStoredDemoItems, mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
@@ -255,7 +256,7 @@ export const InventoryDashboard: React.FC = () => {
   // Sheet configuration state
   const [sheetConfig, setSheetConfig] = useState<SheetConfig>(() => {
     try {
-      const saved = localStorage.getItem('appsheet_clone_config');
+      const saved = localStorage.getItem(STORAGE_KEYS.SHEET_CONFIG);
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -317,7 +318,7 @@ export const InventoryDashboard: React.FC = () => {
   const [isRightDrawerOpen, setIsRightDrawerOpen] = useState<boolean>(false);
   const [tableDensity, setTableDensity] = useState<'comfortable' | 'compact' | 'ultra'>(() => {
     try {
-      const saved = localStorage.getItem('app_table_density');
+      const saved = localStorage.getItem(STORAGE_KEYS.TABLE_DENSITY);
       return (saved as 'comfortable' | 'compact' | 'ultra') || 'compact';
     } catch {
       return 'compact';
@@ -326,7 +327,7 @@ export const InventoryDashboard: React.FC = () => {
 
   useEffect(() => {
     try {
-      localStorage.setItem('app_table_density', tableDensity);
+      localStorage.setItem(STORAGE_KEYS.TABLE_DENSITY, tableDensity);
     } catch {
       // ignore
     }
@@ -411,13 +412,13 @@ export const InventoryDashboard: React.FC = () => {
     };
     setSheetConfig(configWithTimestamp);
     try {
-      localStorage.setItem('appsheet_clone_config', JSON.stringify(configWithTimestamp));
+      localStorage.setItem(STORAGE_KEYS.SHEET_CONFIG, JSON.stringify(configWithTimestamp));
     } catch (e) {
       console.warn('LocalStorage save error:', e);
     }
 
     // Auto-sync background push to Google Apps Script PropertiesService / Cloud Config if connected
-    const scriptUrl = localStorage.getItem('appsheet_clone_scriptUrl')?.trim();
+    const scriptUrl = localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
     if (scriptUrl) {
       saveScriptPropertiesConfig(configWithTimestamp).catch(err => {
         console.warn('Auto-sync ScriptProperties fallback to Cloud Sheet:', err);
@@ -500,7 +501,7 @@ export const InventoryDashboard: React.FC = () => {
   const [isSummaryView, setIsSummaryView] = useState<boolean>(false);
   const [isZenMode, setIsZenMode] = useState<boolean>(() => {
     try {
-      const saved = localStorage.getItem('app_zen_mode');
+      const saved = localStorage.getItem(STORAGE_KEYS.ZEN_MODE);
       return saved !== null ? JSON.parse(saved) : false;
     } catch {
       return false;
@@ -509,7 +510,7 @@ export const InventoryDashboard: React.FC = () => {
 
   useEffect(() => {
     try {
-      localStorage.setItem('app_zen_mode', JSON.stringify(isZenMode));
+      localStorage.setItem(STORAGE_KEYS.ZEN_MODE, JSON.stringify(isZenMode));
     } catch {
       // ignore quota / security error
     }
@@ -824,7 +825,7 @@ export const InventoryDashboard: React.FC = () => {
   const fetchData = async (currentConfig = sheetConfig, currentView = activeView, forceRefresh = false) => {
     let hasRenderedCache = false;
     try {
-      const scriptUrl = localStorage.getItem('appsheet_clone_scriptUrl');
+      const scriptUrl = localStorage.getItem(STORAGE_KEYS.SCRIPT_URL);
       if (!scriptUrl || !scriptUrl.trim()) {
         throw new Error('No script URL configured, loading demo mode');
       }
@@ -941,7 +942,7 @@ export const InventoryDashboard: React.FC = () => {
       if (remoteConfigToMerge) {
         currentConfig = mergeCloudConfigs(currentConfig, remoteConfigToMerge);
         try {
-          localStorage.setItem('appsheet_clone_config', JSON.stringify(currentConfig));
+          localStorage.setItem(STORAGE_KEYS.SHEET_CONFIG, JSON.stringify(currentConfig));
         } catch {}
       }
 
@@ -956,7 +957,7 @@ export const InventoryDashboard: React.FC = () => {
       if (!currentConfig.policies && polSheetTitle) currentConfig.policies = polSheetTitle;
       if (currentConfig !== sheetConfig) {
         setSheetConfig(currentConfig);
-        localStorage.setItem('appsheet_clone_config', JSON.stringify(currentConfig));
+        localStorage.setItem(STORAGE_KEYS.SHEET_CONFIG, JSON.stringify(currentConfig));
       }
       
       // Determinar hoja objetivo para la vista activa
@@ -1148,7 +1149,7 @@ export const InventoryDashboard: React.FC = () => {
     }
     try {
       setIsSaving(true);
-      const isDemo = !localStorage.getItem('appsheet_clone_scriptUrl')?.trim();
+      const isDemo = !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
 
       const isVencimientosTable = activeView === 'main' || /vencimiento|caducidad|stock/i.test(activeSheet.title);
 
@@ -1365,7 +1366,7 @@ export const InventoryDashboard: React.FC = () => {
 
     const originalItems = [...items];
     const originalMainItems = [...allMainItems];
-    const isDemo = !localStorage.getItem('appsheet_clone_scriptUrl')?.trim();
+    const isDemo = !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
     
     try {
       setIsSaving(true);
@@ -1500,7 +1501,7 @@ export const InventoryDashboard: React.FC = () => {
     if (!activeSheet || headers.length === 0) return;
     setIsSaving(true);
     try {
-      const isDemo = !localStorage.getItem('appsheet_clone_scriptUrl')?.trim();
+      const isDemo = !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
       const now = new Date();
       const currentFormattedDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' ');
 
@@ -1591,7 +1592,7 @@ export const InventoryDashboard: React.FC = () => {
 
     const originalItems = [...items];
     const originalMainItems = [...allMainItems];
-    const isDemo = !localStorage.getItem('appsheet_clone_scriptUrl')?.trim();
+    const isDemo = !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
 
     try {
       setIsSaving(true);
@@ -1802,7 +1803,7 @@ export const InventoryDashboard: React.FC = () => {
 
     const originalItems = [...items];
     const originalMainItems = [...allMainItems];
-    const isDemo = !localStorage.getItem('appsheet_clone_scriptUrl')?.trim();
+    const isDemo = !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
 
     try {
       setIsSaving(true);

@@ -2,6 +2,7 @@ import type { SheetConfig, SheetMetadata, InventoryCampaign, StockCountSession }
 import { getErrorMessage } from '../utils/pureCalculations';
 import { fetchWithTimeout } from './http';
 
+import { STORAGE_KEYS } from '../utils/appStorage';
 export const SPREADSHEET_ID = '1a4jGo-7pduH4fue73F_67sQYJS0LJqI7hiXYpyWVA8o';
 
 /** Valor de una celda tal como lo devuelve Google Sheets. */
@@ -16,7 +17,7 @@ export interface CloudConfig extends SheetConfig {
 
 function getScriptUrl(): string | null {
   try {
-    const url = localStorage.getItem('appsheet_clone_scriptUrl');
+    const url = localStorage.getItem(STORAGE_KEYS.SCRIPT_URL);
     return url ? url.trim() : null;
   } catch {
     return null;
@@ -41,7 +42,7 @@ interface FetchOptions {
 
 function getSecurityToken(): string {
   try {
-    return localStorage.getItem('appsheet_clone_securityToken') || '';
+    return localStorage.getItem(STORAGE_KEYS.SECURITY_TOKEN) || '';
   } catch {
     return '';
   }
@@ -65,7 +66,7 @@ async function fetchFromScript<T = ScriptResponse>(
   // Intercept and inject dynamic Spreadsheet ID and Security Token
   const customId = (() => {
     try {
-      return localStorage.getItem('appsheet_clone_spreadsheetId') || '';
+      return localStorage.getItem(STORAGE_KEYS.SPREADSHEET_ID) || '';
     } catch {
       return '';
     }
