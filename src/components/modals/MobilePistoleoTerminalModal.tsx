@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, X, Scan, Zap, Volume2, VolumeX, Plus, Minus, Search, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, Layers, Barcode, Sparkles, Trash2, Edit3, ShieldCheck, Keyboard } from 'lucide-react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
+import { BARCODE_SUPPORTED_FORMATS, pickRearCamera } from '../../utils/barcodeScannerConfig';
 import { InventoryItem } from '../../types';
 import { findColumnBySemantic } from '../../utils/columnAliases';
 import { findMasterProduct, getMasterProductSummary } from '../../utils/referenceResolver';
@@ -165,25 +166,14 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
       if (!isMounted.current) return;
 
       if (devices && devices.length > 0) {
-        const backCam = devices.find(d => /back|rear|trasera|environment|externa|pda|2/i.test(d.label));
-        const camId = backCam ? backCam.id : devices[devices.length - 1].id;
+        const camId = pickRearCamera(devices)!.id;
 
         if (scannerRef.current) {
           await stopCameraScanner();
         }
 
-        const formatsToSupport: Html5QrcodeSupportedFormats[] = [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.QR_CODE
-        ];
-
         const html5QrCode = new Html5Qrcode(readerElementId, {
-          formatsToSupport,
+          formatsToSupport: BARCODE_SUPPORTED_FORMATS,
           verbose: false
         });
         scannerRef.current = html5QrCode;

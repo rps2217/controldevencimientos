@@ -26,6 +26,11 @@ import {
 } from './src/utils/cuVcConsolidator';
 
 import { OfflineMutation } from './src/db/indexedDbService';
+import { Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import {
+  BARCODE_SUPPORTED_FORMATS,
+  pickRearCamera
+} from './src/utils/barcodeScannerConfig';
 import {
   buildAuditRowValues,
   consolidateAuditRows,
@@ -437,6 +442,47 @@ console.log('\n--- 13. Pruebas de auditConsolidation.ts (cuadratura de actas) --
   );
   assert(mergedAlt.length === 2 && mergedAlt[1][2] === '42',
     'consolidateAuditRows reconoce columnas CAMPANA/CODIGO alternativas');
+}
+
+console.log('\n--- 14. Pruebas de barcodeScannerConfig.ts (lectores de cámara) ---');
+{
+  // Regresión: el pistoleo móvil no incluía ITF, así que un código ITF (cajas y
+  // pallets) escaneaba en el terminal de conteo pero NO en el móvil, dejando un
+  // conteo incompleto. Todos los lectores comparten ahora esta lista.
+  assert(BARCODE_SUPPORTED_FORMATS.includes(Html5QrcodeSupportedFormats.ITF),
+    'la lista canónica incluye ITF (intercalado 2 de 5)');
+  assert(BARCODE_SUPPORTED_FORMATS.length === 8,
+    'la lista canónica cubre los 8 formatos de bodega sin duplicados');
+  assert(new Set(BARCODE_SUPPORTED_FORMATS).size === BARCODE_SUPPORTED_FORMATS.length,
+    'la lista canónica no tiene formatos repetidos');
+  for (const required of [
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.UPC_A,
+    Html5QrcodeSupportedFormats.UPC_E,
+    Html5QrcodeSupportedFormats.QR_CODE,
+  ]) {
+    assert(BARCODE_SUPPORTED_FORMATS.includes(required),
+      `la lista canónica incluye el formato ${Html5QrcodeSupportedFormats[required]}`);
+  }
+
+  // Selección de cámara trasera
+  const cams = [
+    { id: 'front', label: 'Front Camera' },
+    { id: 'back', label: 'Back Camera' },
+  ];
+  assert(pickRearCamera(cams)?.id === 'back',
+    'pickRearCamera elige la cámara trasera según la etiqueta');
+  assert(pickRearCamera([{ id: 'environ', label: 'camera2 0, facing back' }])?.id === 'environ',
+    'pickRearCamera reconoce etiquetas genéricas de cámara trasera');
+
+  // Sin etiqueta identificable cae a la última cámara (suele ser la trasera)
+  assert(pickRearCamera([{ id: 'a', label: '' }, { id: 'b', label: '' }])?.id === 'b',
+    'pickRearCamera cae a la última cámara cuando no hay etiqueta reconocible');
+  assert(pickRearCamera([]) === null,
+    'pickRearCamera devuelve null cuando no hay cámaras');
 }
 
 console.log(`\n========================================`);

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
+import { BARCODE_SUPPORTED_FORMATS, pickRearCamera } from '../../utils/barcodeScannerConfig';
 import { Camera, X, RefreshCw, Zap, Volume2, VolumeX, ShieldAlert } from 'lucide-react';
 import { playBeep } from '../../utils/stockCountUtils';
 import { getErrorMessage } from '../../utils/pureCalculations';
@@ -66,10 +67,8 @@ export const MobileCameraBarcodeScanner: React.FC<MobileCameraBarcodeScannerProp
         if (devices && devices.length > 0) {
           setCameras(devices);
           // Prefer back camera ("environment")
-          const backCam = devices.find(d => 
-            /back|rear|trasera|environment|externa|pda|2/i.test(d.label)
-          );
-          const defaultCamId = backCam ? backCam.id : devices[devices.length - 1].id;
+          const defaultCam = pickRearCamera(devices);
+          const defaultCamId = defaultCam ? defaultCam.id : devices[devices.length - 1].id;
           setSelectedCameraId(defaultCamId);
           startScannerWithCamera(defaultCamId);
         } else {
@@ -114,19 +113,8 @@ export const MobileCameraBarcodeScanner: React.FC<MobileCameraBarcodeScannerProp
       }
 
       setScannerStatus('STARTING');
-      const formatsToSupport: Html5QrcodeSupportedFormats[] = [
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.ITF
-      ];
-
       const html5QrCode = new Html5Qrcode(readerElementId, {
-        formatsToSupport,
+        formatsToSupport: BARCODE_SUPPORTED_FORMATS,
         verbose: false
       });
       scannerRef.current = html5QrCode;
