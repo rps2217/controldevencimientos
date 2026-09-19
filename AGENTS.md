@@ -44,6 +44,7 @@ El proyecto sigue una estructura modular limpia construida en **React 18+**, **T
     │   ├── useOfflineSync.ts     # Hook de sincronización y vaciado de cola offline
     │   └── useColumnResize.ts    # Manejo interactivo del ancho de columnas
     ├── utils/
+    │   ├── appStorage.ts        # Fuente única de claves de localStorage (STORAGE_KEYS) y migración
     │   ├── columnAliases.ts      # Motor de detección semántica de encabezados de columnas
     │   ├── pureCalculations.ts   # Cálculos puros y parsing de fechas y métricas (Zero-DOM/Web Worker compatible)
     │   ├── universalImporter.ts  # Parser universal de Excel/CSV/TSV y motor de auto-mapeo semántico
@@ -240,6 +241,7 @@ Para garantizar un código limpio, sin sobreingeniería (*anti-bloat*) y con el 
 ### Reglas Clave del Protocolo Ponytail:
 1. **Principio YAGNI Estricto**: No agregues opciones de configuración hipotéticas, abstracciones especulativas ni botones de acciones no solicitadas.
 2. **Reutilización Obligatoria**: Antes de crear un helper o función nueva, consulta `src/utils/dateCalculations.tsx`, `src/utils/columnAliases.ts` y `src/utils/exportUtils.ts`.
+2-bis. **Claves de `localStorage`**: nunca escribas una clave literal. Usa `STORAGE_KEYS` (y `sheetCacheKey()` / `demoItemsKey()` para las dinámicas) desde `src/utils/appStorage.ts`. Un desajuste de prefijo entre lector y escritor fue un bug real (`appsheet_config` vs `appsheet_clone_config`).
 3. **Cero Dependencias Innecesarias**: No instales paquetes nuevos si la funcionalidad se puede lograr con la biblioteca estándar de TypeScript o las dependencias existentes (`lucide-react`, `recharts`, `motion`, `@tanstack/react-virtual`).
 4. **Líneas Mínimas y Concisas**: Prefiere código conciso, legible y directo sobre patrones complejos con múltiples capas de wrappers o interfaces redundantes.
 5. **Sin Costos Monetarios (Estricto)**: Esta aplicación está diseñada estrictamente para la gestión operativa y logística de fechas de vencimiento y de incidencias. No se manejan costos monetarios ni precios de ningún tipo. No se deben crear o reintroducir campos, tarjetas o métricas financieras en ninguna parte de la UI (vistas, modales, drawers o tablas).

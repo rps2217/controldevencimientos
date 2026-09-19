@@ -30,11 +30,12 @@ Cada punto indica **evidencia reproducible** y **veredicto Ponytail** (YAGNI, re
 
 - **Evidencia**: `DashboardTopNav.tsx:104,327` usa `dashboard.setIsStockCountOpen?.(true)`; verificado en navegador: el click abre "Muebles & Pasillos" / "Pistola Conteo".
 
-### 1.1-bis 🟢 Contrato central `DashboardContext` con 25 `any`
+### 1.1-bis ⛔ NO EJECUTADO POR DISEÑO — Contrato central `DashboardContext` con 25 `any`
 
-- **Evidencia**: `products`/`policies`/`gmailModalItems`/`testConnectionHealth`/`syncQueue`/`eventMetrics`/`pmMetrics`/`virtualRows` etc. sin tipar.
-- **Veredicto Ponytail**: 41 `Record<string, any>` y 1 sola index signature (`InventoryItem`) indican que el modelo ya es dinámico por diseño; tipar el contrato es un refactor de riesgo medio-alto y **sin síntoma observable** (no hay bugs asociados). YAGNI: no hacerlo de forma aislada. Atacar sólo los parámetros públicos cuando se toque cada función.
-- **Prioridad**: Baja.
+- **Evidencia de la verificación (no asumida, medida)**: se contrastaron los **222** miembros declarados en `DashboardContextType` contra los **142** accesos reales (`dashboard.*`) en todos los `.tsx`. Resultado: **0 accesos a miembros no declarados**. No hay typos ni deriva de contrato que el `any` esté ocultando.
+- **Por qué el `any` es correcto aquí**: `products`/`policies` provienen de hojas de cálculo del usuario con encabezados arbitrarios. `resolveItemPolicyAndRetiro` los consume con cadenas de fallback deliberadas (`p['RUT'] || p['RUT PROVEEDOR'] || p['RUT_PROVEEDOR'] || p['A']`). Tiparlos con una interfaz cerrada **rompería** el soporte de hojas heterogéneas, que es un invariante del proyecto (AGENTS.md §6.5).
+- **Veredicto YAGNI**: el ítem estaba condicionado a "sólo si aparece un síntoma". Se buscó el síntoma en los dos sitios donde aparecería (miembros fantasma del contrato y nombres de campo de `products`/`policies`) y **no existe**. Aplicar la escalera de Ponytail (paso 1: *¿esto realmente necesita existir?*) da **no**. Se cierra sin cambios de código.
+- **Prioridad**: Baja — cerrada con evidencia.
 
 ### 1.2 ✅ RESUELTO — Duplicación fila de planilla → objeto
 
