@@ -82,7 +82,10 @@ export const InventoryTable: React.FC<InventoryTableProps> = (props) => {
   const visibleColumnMeta = props.visibleColumnMeta ?? dashboard.visibleColumnMeta ?? [];
   const activeView = props.activeView ?? dashboard.activeView;
   const tableContainerRef = props.tableContainerRef ?? dashboard.tableContainerRef;
-  const getColWidth = props.getColWidth ?? dashboard.getColWidth ?? (() => 150);
+  const getColWidth = useMemo(
+    () => props.getColWidth ?? dashboard.getColWidth ?? (() => 150),
+    [props.getColWidth, dashboard.getColWidth]
+  );
   const handleStartResize = props.handleStartResize ?? dashboard.handleStartResize ?? (() => {});
   const handleAutoFitColumn = props.handleAutoFitColumn ?? dashboard.handleAutoFitColumn ?? (() => {});
   const resizingCol = props.resizingCol ?? dashboard.resizingCol ?? null;

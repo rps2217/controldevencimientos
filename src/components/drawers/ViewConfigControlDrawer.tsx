@@ -108,7 +108,10 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
 
   const isOpen = props.isOpen ?? dashboard.isRightDrawerOpen ?? false;
   const onClose = props.onClose ?? (() => dashboard.setIsRightDrawerOpen?.(false));
-  const allHeaders = props.allHeaders ?? dashboard.headers ?? [];
+  const allHeaders = useMemo(
+    () => props.allHeaders ?? dashboard.headers ?? [],
+    [props.allHeaders, dashboard.headers]
+  );
   const hiddenColumns = props.hiddenColumns ?? (dashboard.hiddenColumns?.[dashboard.activeView] || []);
   const onToggleColumnVisibility = props.onToggleColumnVisibility ?? ((h: string) => dashboard.toggleVisibility?.(h));
   const onResetColumns = props.onResetColumns ?? (() => dashboard.resetColumnOrder?.());
