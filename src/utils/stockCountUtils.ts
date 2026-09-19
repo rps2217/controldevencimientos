@@ -263,11 +263,11 @@ export function reconcileStockCountSession(
         if (!theoreticalMap.has(key)) {
           const rawSku = key.length >= 13 ? key.slice(0, 13) : key;
           theoreticalMap.set(key, {
-            item: { _rowIndex: -1 } as any,
+            item: { _rowIndex: -1 },
             teorico: session.snapshotTeorico[key],
             sku: rawSku,
             descripcion: 'Producto en Snapshot (Eliminado de planilla)',
-          } as any);
+          });
         }
       }
     }
@@ -1174,7 +1174,7 @@ function getSharedAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   try {
     if (!sharedAudioContext) {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (AudioContextClass) {
         sharedAudioContext = new AudioContextClass();
       }

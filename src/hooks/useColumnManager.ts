@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { SheetConfig } from '../types';
+import { SheetConfig, ViewKey } from '../types';
 import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
 
 export interface ManageableColumn {
@@ -77,7 +77,7 @@ export function useColumnManager({
   const activeVirtualCols = useMemo(() => {
     const activeVCs = sheetConfig.activeVirtualColumns || [];
     return VIRTUAL_COLUMNS.filter(
-      vc => activeVCs.includes(vc.id) && (!vc.supportedViews || vc.supportedViews.includes(activeView as any))
+      vc => activeVCs.includes(vc.id) && (!vc.supportedViews || vc.supportedViews.includes(activeView as ViewKey))
     );
   }, [sheetConfig.activeVirtualColumns, activeView]);
 

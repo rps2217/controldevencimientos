@@ -20,6 +20,9 @@ export interface SheetMetadata {
 
 export type SpreadsheetMetadata = SheetMetadata;
 
+/** Vistas/hojas canónicas gestionadas por la app (y títulos personalizados). */
+export type ViewKey = 'main' | 'events' | 'products' | 'policies';
+
 export interface UserVirtualColumn {
   id: string;
   label: string;
@@ -71,7 +74,7 @@ export type ColumnType = 'text' | 'longtext' | 'number' | 'date' | 'datetime' | 
 export interface VirtualColumn {
   id: string;
   label: string;
-  supportedViews?: Array<'main' | 'events' | 'products' | 'policies'>;
+  supportedViews?: ViewKey[];
   calculate: (item: any, headers: any, allData?: any) => any;
 }
 export type ColumnBehavior = 'none' | 'auto_id' | 'calc_fecha_vc' | 'calc_retiro' | 'sku_lookup';

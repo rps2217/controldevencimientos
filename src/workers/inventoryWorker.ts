@@ -1,4 +1,4 @@
-import { InventoryItem, EventCategory } from '../types';
+import { InventoryItem, EventCategory, ViewKey } from '../types';
 import { 
   getEventCategory, 
   computeItemRawStatus, 
@@ -70,7 +70,7 @@ export type WorkerInMessage =
   | {
       type: 'FILTER_DATA';
       payload: {
-        activeView: 'main' | 'events' | 'products' | 'policies';
+        activeView: ViewKey;
         searchTerm: string;
         eventFilter: string[];
         frcBodFilter: string[];

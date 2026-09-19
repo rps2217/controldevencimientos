@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Database, Key, Link2, Trash2, Plus, HelpCircle, ChevronRight, Sparkles, X, Info, Settings, Layers, Tag } from 'lucide-react';
-import { SheetConfig, SpreadsheetMetadata, ColumnSchema, ColumnType } from '../../types';
+import { SheetConfig, SpreadsheetMetadata, ColumnSchema, ColumnType, ColumnBehavior } from '../../types';
 
 interface VisualSchemaDesignerProps {
   sheetConfig: SheetConfig;
@@ -655,8 +655,8 @@ export const VisualSchemaDesigner: React.FC<VisualSchemaDesignerProps> = ({
                       <select
                         value={colSchema.type || 'text'}
                         onChange={(e) => {
-                          const newType = e.target.value as any;
-                          const updates: any = { type: newType };
+                          const newType = e.target.value as ColumnType;
+                          const updates: Partial<ColumnSchema> = { type: newType };
                           if (newType !== 'ref') {
                             updates.refTable = undefined;
                           } else {
@@ -708,7 +708,7 @@ export const VisualSchemaDesigner: React.FC<VisualSchemaDesignerProps> = ({
                       <select
                         value={colSchema.behavior || 'none'}
                         onChange={(e) => {
-                          handleUpdateColumnProperty(selectedColumn.table, selectedColumn.column, { behavior: e.target.value as any });
+                          handleUpdateColumnProperty(selectedColumn.table, selectedColumn.column, { behavior: e.target.value as ColumnBehavior });
                         }}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-300 outline-none"
                       >

@@ -517,7 +517,7 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
                     value={uvc.operation}
                     onChange={(e) => {
                       const updated = [...(sheetConfig.userVirtualColumns || [])];
-                      updated[index].operation = e.target.value as any;
+                      updated[index].operation = e.target.value as UserVirtualColumn['operation'];
                       saveConfig({ ...sheetConfig, userVirtualColumns: updated });
                     }}
                     className="col-span-1 px-3 py-2 text-sm border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 outline-none"

@@ -96,6 +96,12 @@ export interface ViewConfigControlDrawerProps {
   setIsPmReportOpen?: (open: boolean) => void;
 }
 
+const DENSITY_OPTIONS = [
+  { id: 'comfortable', label: 'Cómoda', desc: 'Espaciosa' },
+  { id: 'compact', label: 'Compacta', desc: 'Estándar' },
+  { id: 'ultra', label: 'Ultra', desc: 'Máx. Datos' },
+] as const;
+
 export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (props) => {
   const dashboard = useDashboard();
 
@@ -342,15 +348,11 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
                     Densidad de Filas
                   </label>
                   <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: 'comfortable', label: 'Cómoda', desc: 'Espaciosa' },
-                      { id: 'compact', label: 'Compacta', desc: 'Estándar' },
-                      { id: 'ultra', label: 'Ultra', desc: 'Máx. Datos' },
-                    ].map(d => (
+                    {DENSITY_OPTIONS.map(d => (
                       <button
                         key={d.id}
                         type="button"
-                        onClick={() => onChangeTableDensity(d.id as any)}
+                        onClick={() => onChangeTableDensity(d.id)}
                         className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                           tableDensity === d.id
                             ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 font-bold shadow-xs'

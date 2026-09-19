@@ -158,7 +158,7 @@ export const BackendMirrorPanel: React.FC<BackendMirrorPanelProps> = ({
             </label>
             <select
               value={currentConfig.syncMode}
-              onChange={(e) => updateConfig({ syncMode: e.target.value as any })}
+              onChange={(e) => updateConfig({ syncMode: e.target.value as BackendMirrorConfig['syncMode'] })}
               className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="dual_write">Escritura Dual (Sheets + Espejo en Paralelo)</option>
@@ -206,7 +206,7 @@ export const BackendMirrorPanel: React.FC<BackendMirrorPanelProps> = ({
             </label>
             <select
               value={currentConfig.conflictStrategy}
-              onChange={(e) => updateConfig({ conflictStrategy: e.target.value as any })}
+              onChange={(e) => updateConfig({ conflictStrategy: e.target.value as BackendMirrorConfig['conflictStrategy'] })}
               className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="last_write_wins">Última Escritura Gana (Atomic Timestamp)</option>

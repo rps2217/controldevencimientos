@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useDeferredValue } from 'react';
-import { InventoryItem, SheetConfig, SortConfig, DynamicMonthRange } from '../types';
+import { InventoryItem, SheetConfig, SortConfig, DynamicMonthRange, ViewKey } from '../types';
 import { 
   getItemStatus, 
   getEventCategory, 
@@ -32,7 +32,7 @@ export type DisplayRow = DisplayRowItem | DisplayRowHeader;
 export interface UseInventoryFilteringProps {
   items: InventoryItem[];
   headers: string[];
-  activeView: 'main' | 'events' | 'products' | 'policies';
+  activeView: ViewKey;
   frcBodCol: string | null;
   sheetConfig: SheetConfig;
   products: any[];

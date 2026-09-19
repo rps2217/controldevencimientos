@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { InventoryItem } from '../types';
+import { InventoryItem, ViewKey } from '../types';
 import { WorkerMetricsResult, WorkerOutMessage } from '../workers/inventoryWorker';
 
 export interface UseInventoryWorkerProps {
@@ -7,7 +7,7 @@ export interface UseInventoryWorkerProps {
   headers: string[];
   frcBodCol: string | null;
   searchableHeaders: string[];
-  activeView: 'main' | 'events' | 'products' | 'policies';
+  activeView: ViewKey;
   searchTerm: string;
   activeQuickChip: string | null;
   eventFilter: string[];

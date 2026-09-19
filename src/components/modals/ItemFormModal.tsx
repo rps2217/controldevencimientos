@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, Loader2, Sparkles, AlertCircle, Link2, Info, Search, Check, RotateCcw, Eye, EyeOff, Sliders, Plus, CheckCircle2, ChevronDown, Calendar, AlertTriangle, ArrowRight, Layers, ShieldCheck } from 'lucide-react';
-import { SheetProperties, InventoryItem, EventCategory, SheetConfig } from '../../types';
+import { SheetProperties, InventoryItem, EventCategory, SheetConfig, ColumnSchema } from '../../types';
 import { 
   EVENT_CATEGORIES, 
   renderEventIcon, 
@@ -73,6 +73,9 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   const [catalogSearchOpen, setCatalogSearchOpen] = useState(false);
   const [catalogSearchQuery, setCatalogSearchQuery] = useState('');
   const catalogSearchRef = useRef<HTMLDivElement>(null);
+
+  const emitFieldChange = (name: string, value: string) =>
+    onChange({ target: { name, value } } as React.ChangeEvent<HTMLInputElement>);
 
   // Close catalog search dropdown on click outside
   useEffect(() => {
@@ -173,7 +176,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   }, [formData, headers, products, policies, sheetConfig.customAliases]);
 
   // Evaluate Show_If for all headers
-  const evaluatedFields = headers.map(header => {
+  const evaluatedFields: Array<{ header: string; colSchema?: ColumnSchema; isKey?: boolean; isRequired?: boolean; isVisible: boolean; isCoreField: boolean; reason?: string }> = headers.map(header => {
     const colSchema = activeSheet?.title ? sheetConfig.schema?.[activeSheet.title]?.[header] : undefined;
     const isKey = colSchema?.isKey;
     const isRequired = colSchema?.required;
@@ -192,7 +195,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   if (activeView === 'main' && !hasRetiroCalc) {
     evaluatedFields.push({
       header: 'FECHA_RETIRO_CALC',
-      colSchema: { type: 'date', behavior: 'calc_retiro', label: 'Fecha Retiro Calc.' } as any,
+      colSchema: { visible: true, searchable: false, type: 'date', behavior: 'calc_retiro', label: 'Fecha Retiro Calc.' },
       isKey: false,
       isRequired: false,
       isVisible: true,
@@ -257,7 +260,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       onBatchUpdateFormData(updates);
     } else {
       Object.entries(updates).forEach(([k, v]) => {
-        onChange({ target: { name: k, value: v } } as any);
+        emitFieldChange(k, v);
       });
     }
   };
@@ -820,7 +823,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                                   type="button"
                                   title="Borrar fecha (dejar vacío)"
                                   onClick={() => {
-                                    onChange({ target: { name: header, value: '' } } as any);
+                                    emitFieldChange(header, '');
                                   }}
                                   className="p-1 rounded-md text-slate-400 hover:text-rose-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                                 >
@@ -841,7 +844,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                                     if (val) {
                                       const d = parseAnyDate(val);
                                       const formatted = d ? formatDisplayDate(d) : val;
-                                      onChange({ target: { name: header, value: formatted } } as any);
+                                      emitFieldChange(header, formatted);
                                     }
                                   }}
                                   className="absolute inset-0 opacity-0 w-full h-full cursor-pointer pointer-events-auto"
@@ -860,7 +863,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                                 onClick={() => {
                                   const today = new Date();
                                   const formatted = formatDisplayDate(today);
-                                  onChange({ target: { name: header, value: formatted } } as any);
+                                  emitFieldChange(header, formatted);
                                 }}
                                 className="font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                               >
@@ -870,7 +873,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    onChange({ target: { name: header, value: '' } } as any);
+                                    emitFieldChange(header, '');
                                   }}
                                   className="font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
                                 >

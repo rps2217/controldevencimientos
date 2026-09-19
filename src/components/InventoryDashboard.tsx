@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { getSpreadsheetMetadata, getAllSheetsData, appendRow, updateRow, deleteRow, deleteRows, saveCloudConfig, loadCloudConfig, getScriptPropertiesConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
 import type { CellValue, SheetRow } from '../lib/sheets';
-import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, EventCategory } from '../types';
+import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, EventCategory, ViewKey } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
 import { DashboardProvider, DashboardContextType } from '../context/DashboardContext';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -61,7 +61,7 @@ import {
   saveTicketConfigToStorage,
   executeThermalPrint
 } from '../utils/ticketUtils';
-import { GlobalTicketConfig, ViewTicketConfig } from '../types';
+import { GlobalTicketConfig, ViewTicketConfig, ViewTicketSettings, TicketGeneralSettings } from '../types';
 import { SkeletonLoader } from './common/SkeletonLoader';
 import { useToast } from './common/ToastContainer';
 import { useTableSlices } from '../hooks/useTableSlices';
@@ -391,8 +391,9 @@ export const InventoryDashboard: React.FC = () => {
     setTicketPrintMode(mode);
 
     // Retrieve active thermal config to pass exact paperWidth, orientation and cutMarginMm
-    const activeConfig = (globalTicketConfig[activeView] || sheetConfig.ticketPrintConfig?.[activeView] || {}) as any;
-    const generalSettings = activeConfig.general || activeConfig;
+    const activeConfig = globalTicketConfig[activeView] || sheetConfig.ticketPrintConfig?.[activeView];
+    const generalSettings: TicketGeneralSettings =
+      (activeConfig as ViewTicketSettings)?.general ?? (activeConfig as TicketGeneralSettings) ?? {};
     const paperWidth = generalSettings.paperWidth || '80mm';
     const orientation = generalSettings.orientation || 'portrait';
     const cutMarginMm = generalSettings.cutMarginMm !== undefined ? Number(generalSettings.cutMarginMm) : 2;
@@ -597,7 +598,7 @@ export const InventoryDashboard: React.FC = () => {
   } = useInventoryFiltering({
     items,
     headers,
-    activeView: activeView as any,
+    activeView: activeView as ViewKey,
     frcBodCol,
     sheetConfig,
     products,
@@ -873,7 +874,7 @@ export const InventoryDashboard: React.FC = () => {
             const h = cachedTarget.rows[0];
             setHeaders(h);
             const schemaKeys = Object.entries(currentConfig.schema?.[expectedTargetSheet] || {})
-              .filter(([_, conf]) => Boolean((conf as any)?.isKey))
+              .filter(([_, conf]) => Boolean(conf.isKey))
               .map(([colName]) => colName);
 
             const parsed = cachedTarget.rows.slice(1).map((row: string[], idx: number) => {
@@ -1054,7 +1055,7 @@ export const InventoryDashboard: React.FC = () => {
           const stringHeaders = headerRow.map(String);
           setHeaders(stringHeaders);
           const schemaKeys = Object.entries(sheetConfig.schema?.[targetSheetProp.title] || {})
-            .filter(([_, conf]) => Boolean((conf as any)?.isKey))
+            .filter(([_, conf]) => Boolean(conf.isKey))
             .map(([colName]) => colName);
 
           const parsedItems: InventoryItem[] = rows.slice(1).map((row: SheetRow, index: number) => {

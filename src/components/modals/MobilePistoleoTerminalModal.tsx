@@ -217,7 +217,7 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
 
         try {
           const capabilities = html5QrCode.getRunningTrackCapabilities();
-          if ((capabilities as any)?.torch) {
+          if ((capabilities as { torch?: boolean })?.torch) {
             setHasTorch(true);
           }
         } catch {}
@@ -255,7 +255,7 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
     try {
       const nextTorch = !torchOn;
       await scannerRef.current.applyVideoConstraints({
-        advanced: [{ torch: nextTorch } as any]
+        advanced: [{ torch: nextTorch } as MediaTrackConstraints]
       });
       setTorchOn(nextTorch);
     } catch {}
