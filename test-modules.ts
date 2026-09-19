@@ -79,8 +79,15 @@ import {
 
 import {
   saveStockCountSessionsToStorageDebounced,
-  flushStockCountSessionsToStorage
+  flushStockCountSessionsToStorage,
+  computeCampaignConsolidationMatrix,
+  markSkuAsClosedInCampaign,
+  buildAuditRowsFromCampaignMatrix,
+  generateCuVc,
+  calculateLastDayOfMonthDateString
 } from './src/utils/stockCountUtils';
+import { InventoryCampaign, StockCountSession, CampaignSnapshotItem } from './src/types';
+import { createMimeMessage, escapeHtml } from './src/lib/gmailService';
 
 
 import { 
@@ -483,6 +490,206 @@ console.log('\n--- 14. Pruebas de barcodeScannerConfig.ts (lectores de cámara) 
     'pickRearCamera cae a la última cámara cuando no hay etiqueta reconocible');
   assert(pickRearCamera([]) === null,
     'pickRearCamera devuelve null cuando no hay cámaras');
+}
+
+console.log('\n--- 15. Pruebas de computeCampaignConsolidationMatrix (matriz de cuadratura) ---');
+{
+  const makeCampaign = (overrides: Partial<InventoryCampaign> = {}): InventoryCampaign => ({
+    id: 'camp-1',
+    nombre: 'Auditoría Local 121',
+    local: 'LOCAL 121',
+    fechaInicio: '2026-09-01T00:00:00.000Z',
+    fechaActualizacion: '2026-09-01T00:00:00.000Z',
+    estado: 'ACTIVA',
+    snapshotTeoricoActual: {},
+    historialSnapshots: [],
+    sessionIds: [],
+    itemsValidadosCerrados: {},
+    ajustesVentaManual: {},
+    ...overrides
+  });
+
+  const makeSession = (sku: string, cantidad: number, overrides: Partial<StockCountSession> = {}): StockCountSession => ({
+    id: `ses-${sku}`,
+    nombre: 'Conteo Pasillo 3',
+    ubicacion: 'Pasillo 3',
+    modo: 'DOCUMENT',
+    requiereVencimiento: false,
+    hojaOrigen: 'main',
+    estado: 'IN_PROGRESS',
+    fechaInicio: '2026-09-10T00:00:00.000Z',
+    conteos: [{
+      id: 'c1', sku, descripcion: `Producto ${sku}`, cantidad,
+      timestamp: '2026-09-10T10:00:00.000Z'
+    }],
+    ...overrides
+  });
+
+  const snapshotItem = (sku: string, stockTeorico: number, extra: Partial<CampaignSnapshotItem> = {}) => ({
+    sku, descripcion: `Producto ${sku}`, stockTeorico, fechaCarga: '2026-09-01T00:00:00.000Z', ...extra
+  });
+
+  // Cuadrado: físico == teórico
+  const campOk = makeCampaign({
+    snapshotTeoricoActual: { SKU_A: snapshotItem('SKU_A', 100) }
+  });
+  const mOk = computeCampaignConsolidationMatrix(campOk, [makeSession('SKU_A', 100)]);
+  assert(mOk.cuadradosCount === 1 && mOk.discrepanciasCount === 0 &&
+    mOk.nuncaPistoleadosCount === 0 && mOk.hallazgosCount === 0,
+    'clasifica como VALIDADO_OK cuando el stock físico coincide con el teórico');
+  assert(mOk.porcentajeCobertura === 100,
+    'cobertura es 100% cuando se pistoleó todo el universo teórico');
+
+  // Falta: físico < teórico
+  const mShort = computeCampaignConsolidationMatrix(campOk, [makeSession('SKU_A', 85)]);
+  assert(mShort.discrepanciasCount === 1 && mShort.discrepancias[0].diferenciaNeta === -15,
+    'clasifica DISCREPANCIA por faltante con diferencia negativa (-15)');
+
+  // Sobra: físico > teórico
+  const mOver = computeCampaignConsolidationMatrix(campOk, [makeSession('SKU_A', 130)]);
+  assert(mOver.discrepanciasCount === 1 && mOver.discrepancias[0].diferenciaNeta === 30,
+    'clasifica DISCREPANCIA por sobrante con diferencia positiva (+30)');
+
+  // Nunca pistoleado: teórico con stock pero cero lecturas
+  const mNever = computeCampaignConsolidationMatrix(campOk, []);
+  assert(mNever.nuncaPistoleadosCount === 1 && mNever.porcentajeCobertura === 0,
+    'clasifica NUNCA_PISTOLEADO y cobertura 0% cuando no hay lecturas');
+
+  // Hallazgo: pistoleado físico ausente del snapshot ERP
+  const mFound = computeCampaignConsolidationMatrix(campOk, [makeSession('SKU_NUEVO', 12)]);
+  assert(mFound.hallazgosCount === 1 && mFound.hallazgos[0].stockTeorico === 0 &&
+    mFound.hallazgos[0].diferenciaNeta === 12,
+    'clasifica HALLAZGO para un SKU físico ausente del ERP');
+
+  // Ajuste de venta en caja: baja el teórico efectivo
+  const campAdj = makeCampaign({
+    snapshotTeoricoActual: { SKU_A: snapshotItem('SKU_A', 100) },
+    ajustesVentaManual: { SKU_A: 10 }
+  });
+  const mAdj = computeCampaignConsolidationMatrix(campAdj, [makeSession('SKU_A', 90)]);
+  assert(mAdj.cuadradosCount === 1 && mAdj.cuadrados[0].stockTeoricoEfectivo === 90,
+    'el ajuste de venta en caja (10u) reduce el teórico efectivo y cuadra con 90');
+
+  // Cierre manual manda sobre el cálculo
+  const campClosed = markSkuAsClosedInCampaign(campOk, 'SKU_A', 100, 5);
+  const mClosed = computeCampaignConsolidationMatrix(campClosed, [makeSession('SKU_A', 5)]);
+  assert(mClosed.cuadradosCount === 1 && mClosed.discrepanciasCount === 0,
+    'un SKU validado y cerrado permanece en VALIDADO_OK aunque su diferencia no sea cero');
+
+  // Consolidación multi-sesión
+  const mMulti = computeCampaignConsolidationMatrix(campOk, [
+    makeSession('SKU_A', 60),
+    makeSession('SKU_A', 40, { id: 'ses-2', ubicacion: 'Pasillo 4' })
+  ]);
+  assert(mMulti.cuadrados[0].stockFisicoTotal === 100 && mMulti.cuadrados[0].sesionesDondeAparece.length === 2,
+    'acumula el conteo del mismo SKU repartido en dos sesiones (60 + 40)');
+
+  // Filtro por campaña: sesiones ajenas no contaminan
+  const campScoped = makeCampaign({
+    snapshotTeoricoActual: { SKU_A: snapshotItem('SKU_A', 100) },
+    sessionIds: ['ses-SKU_A']
+  });
+  const mScoped = computeCampaignConsolidationMatrix(campScoped, [
+    makeSession('SKU_A', 100),
+    makeSession('SKU_A', 999, { id: 'otra' })
+  ]);
+  assert(mScoped.cuadrados[0].stockFisicoTotal === 100,
+    'ignora sesiones que no pertenecen a la campaña');
+
+  // Decimales: el stock del ERP puede venir con coma (1.250,50 -> 1250.5)
+  const campDec = makeCampaign({
+    snapshotTeoricoActual: { SKU_D: snapshotItem('SKU_D', 1250.5) }
+  });
+  const mDec = computeCampaignConsolidationMatrix(campDec, [makeSession('SKU_D', 1250)]);
+  assert(mDec.discrepanciasCount === 1 && mDec.discrepancias[0].diferenciaNeta === -0.5,
+    'diferencia decimal de -0.5 se clasifica DISCREPANCIA (no se redondea a cero)');
+
+  // Estado por defecto: un SKU sin lecturas queda fuera de cuadrados y discrepancias
+  const mDefault = computeCampaignConsolidationMatrix(campOk, []);
+  assert(mDefault.nuncaPistoleados[0].estadoGlobal === 'NUNCA_PISTOLEADO',
+    'el estado global del no pistoleado se fija explícitamente');
+
+  // Integridad de totales
+  assert(mOk.totalFisicoContado === 100 && mOk.totalTeoricoEsperado === 100 &&
+    mOk.diferenciaNetaTotal === 0,
+    'los totales físico/teórico/diferencia son consistentes');
+
+  // buildAuditRowsFromCampaignMatrix produce las filas canónicas
+  const auditRows = buildAuditRowsFromCampaignMatrix(mOk, campOk);
+  assert(auditRows.length === 1 && auditRows[0].SKU === 'SKU_A',
+    'buildAuditRowsFromCampaignMatrix emite una fila por SKU con el SKU correcto');
+  assert(auditRows[0].ID_CAMPANA === 'camp-1' && auditRows[0].LOCAL === 'LOCAL 121',
+    'las filas de auditoría llevan el ID de campaña y el local');
+  assert(auditRows[0].ESTADO_AUDITORIA === 'CUADRADO_OK',
+    'un SKU cuadrado se etiqueta CUADRADO_OK en la planilla de auditoría');
+}
+
+console.log('\n--- 16. Pruebas de identidad CU_VC y fin de mes (stockCountUtils) ---');
+{
+  // CU_VC = SKU + YYYY + MM: unidad de vencimiento sin lotes
+  assert(generateCuVc('200021', '2027', '12') === '200021202712',
+    'generateCuVc compone SKU + YYYY + MM');
+  assert(generateCuVc('200021', 2027, 1) === '200021202701',
+    'generateCuVc rellena el mes con cero a la izquierda (1 -> 01)');
+  assert(generateCuVc(' 200 021 ', '2027', '07') === '200021202707',
+    'generateCuVc elimina espacios internos y extremos del SKU');
+  assert(generateCuVc('200021') === '200021',
+    'sin año y mes, generateCuVc degrada al SKU limpio');
+  assert(generateCuVc('200021', '27', '12') === '200021',
+    'un año de 2 dígitos no produce un CU_VC válido (degrada al SKU)');
+  assert(generateCuVc('200021', '2027', '13') === '200021',
+    'un mes fuera de rango (13) no produce un CU_VC válido');
+  assert(generateCuVc('', '2027', '12') === '',
+    'generateCuVc devuelve cadena vacía sin SKU');
+
+  // Fin de mes: la fecha de vencimiento se fija al último día del mes
+  assert(calculateLastDayOfMonthDateString('2027', '02') === '28/02/2027',
+    'fin de mes de febrero de 2027 (no bisiesto) es el día 28');
+  assert(calculateLastDayOfMonthDateString('2028', '02') === '29/02/2028',
+    'fin de mes de febrero de 2028 (bisiesto) es el día 29');
+  assert(calculateLastDayOfMonthDateString('2027', '04') === '30/04/2027',
+    'fin de mes de abril es el día 30');
+  assert(calculateLastDayOfMonthDateString('2027', '12') === '31/12/2027',
+    'fin de mes de diciembre es el día 31');
+  assert(calculateLastDayOfMonthDateString('2027', '13') === '',
+    'un mes inválido no tiene fecha de fin de mes');
+}
+
+console.log('\n--- 17. Pruebas de seguridad de gmailService (inyección MIME y escape) ---');
+{
+  const decode = (raw: string) => {
+    const b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
+    return Buffer.from(b64, 'base64').toString('utf8');
+  };
+
+  // Un salto de linea en el destinatario permitiria inyectar cabeceras extra
+  const injected = createMimeMessage({
+    to: 'proveedor@ok.cl\r\nBcc: atacante@mal.cl',
+    subject: 'Reporte',
+    bodyHtml: '<p>hola</p>'
+  });
+  const decoded = decode(injected);
+  assert(!/^Bcc:/m.test(decoded),
+    'la inyeccion de cabecera Bcc via CRLF en el destinatario queda neutralizada');
+  assert(decoded.startsWith('To: proveedor@ok.cl Bcc: atacante@mal.cl'),
+    'el CRLF del destinatario se colapsa a un espacio dentro de la misma cabecera To');
+  assert((decoded.match(/^Bcc:/gm) || []).length === 0,
+    'el mensaje no contiene ninguna cabecera Bcc');
+
+  // El asunto se codifica en base64 (no puede inyectar cabeceras)
+  const withSubject = createMimeMessage({
+    to: 'a@b.cl', subject: 'Asunto\r\nX-Evil: 1', bodyHtml: '<p>x</p>'
+  });
+  assert(!/^X-Evil:/m.test(decode(withSubject)),
+    'un salto de linea en el asunto no inyecta cabeceras (va codificado en base64)');
+
+  // escapeHtml neutraliza HTML de valores de usuario en tablas de correo
+  assert(escapeHtml('<script>alert(1)</script>') === '&lt;script&gt;alert(1)&lt;/script&gt;',
+    'escapeHtml neutraliza etiquetas script');
+  assert(escapeHtml('a & b "c" \'d\'') === 'a &amp; b &quot;c&quot; &#39;d&#39;',
+    'escapeHtml neutraliza ampersand, comillas dobles y simples');
+  assert(escapeHtml(null) === '' && escapeHtml(undefined) === '',
+    'escapeHtml devuelve cadena vacia para null y undefined');
 }
 
 console.log(`\n========================================`);

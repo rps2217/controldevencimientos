@@ -2,7 +2,7 @@ import { findColumnBySemantic, KnownFieldSemantic } from '../utils/columnAliases
 import { formatDisplayDate, parseAnyDate, getItemStatus, getItemResolutionStatus } from '../utils/dateCalculations';
 import { fetchWithTimeout } from './http';
 
-function createMimeMessage({
+export function createMimeMessage({
   to,
   subject,
   bodyHtml,
@@ -15,8 +15,11 @@ function createMimeMessage({
 }) {
   const boundary = "=====" + Date.now().toString(16) + "=====";
   const nl = "\r\n";
+  // El destinatario se toma de un campo de texto libre. Los CR/LF permitirian
+  // inyectar cabeceras MIME adicionales (p. ej. Bcc:) dentro del mensaje.
+  const safeTo = String(to || '').replace(/[\r\n]+/g, ' ').trim();
   const str = [
-    `To: ${to}`,
+    `To: ${safeTo}`,
     `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
