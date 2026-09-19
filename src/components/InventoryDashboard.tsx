@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 
 // Utilities & Hooks
 import { EVENT_CATEGORIES, getEventCategory, getItemStatus, parseLocaleNumber } from '../utils/dateCalculations';
+import { rowToObject } from '../utils/pureCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { resolveItemIdentity } from '../utils/entityIdentityResolver';
 import { 
@@ -875,10 +876,7 @@ export const InventoryDashboard: React.FC = () => {
               .map(([colName]) => colName);
 
             const parsed = cachedTarget.rows.slice(1).map((row: string[], idx: number) => {
-              const it: InventoryItem = { _rowIndex: idx + 2 };
-              h.forEach((header: string, ci: number) => {
-                it[header] = row[ci] || '';
-              });
+              const it: InventoryItem = { ...rowToObject(h, row), _rowIndex: idx + 2 };
               const identity = resolveItemIdentity(it, h, expectedTargetSheet, schemaKeys);
               it._entityKey = identity.keyValue;
               it._entityKeyCol = identity.keyColumn || undefined;
@@ -898,11 +896,7 @@ export const InventoryDashboard: React.FC = () => {
           const cachedProds = await indexedDbService.getCachedSheet(prodTitle);
           if (cachedProds && cachedProds.rows && cachedProds.rows.length > 1) {
             const ph = cachedProds.rows[0];
-            setProducts(cachedProds.rows.slice(1).map((r: string[]) => {
-              const obj: any = {};
-              ph.forEach((header: string, i: number) => obj[header] = r[i] || '');
-              return obj;
-            }));
+            setProducts(cachedProds.rows.slice(1).map((r: string[]) => rowToObject(ph, r)));
             setIsRelationalActive(true);
           }
 
@@ -910,11 +904,7 @@ export const InventoryDashboard: React.FC = () => {
           const cachedPols = await indexedDbService.getCachedSheet(polTitle);
           if (cachedPols && cachedPols.rows && cachedPols.rows.length > 1) {
             const polH = cachedPols.rows[0];
-            setPolicies(cachedPols.rows.slice(1).map((r: string[]) => {
-              const obj: any = {};
-              polH.forEach((header: string, i: number) => obj[header] = r[i] || '');
-              return obj;
-            }));
+            setPolicies(cachedPols.rows.slice(1).map((r: string[]) => rowToObject(polH, r)));
             setIsRelationalActive(true);
           }
         } catch (cacheErr) {
@@ -1025,11 +1015,7 @@ export const InventoryDashboard: React.FC = () => {
       if (prodSheetTitle && batchData[prodSheetTitle] && batchData[prodSheetTitle].length > 0) {
         const prodRows = batchData[prodSheetTitle];
         const h = prodRows[0];
-        setProducts(prodRows.slice(1).map((row: SheetRow) => {
-          const obj: any = {};
-          h.forEach((header: CellValue, i: number) => obj[String(header)] = row[i] || '');
-          return obj;
-        }));
+        setProducts(prodRows.slice(1).map((row: SheetRow) => rowToObject(h, row)));
         await indexedDbService.saveCachedSheet(prodSheetTitle, prodRows);
         hasRelational = true;
       } else if (products.length > 0) {
@@ -1040,11 +1026,7 @@ export const InventoryDashboard: React.FC = () => {
       if (polSheetTitle && batchData[polSheetTitle] && batchData[polSheetTitle].length > 0) {
         const polRows = batchData[polSheetTitle];
         const h = polRows[0];
-        setPolicies(polRows.slice(1).map((row: SheetRow) => {
-          const obj: any = {};
-          h.forEach((header: CellValue, i: number) => obj[String(header)] = row[i] || '');
-          return obj;
-        }));
+        setPolicies(polRows.slice(1).map((row: SheetRow) => rowToObject(h, row)));
         await indexedDbService.saveCachedSheet(polSheetTitle, polRows);
         hasRelational = true;
       } else if (policies.length > 0) {
@@ -1055,11 +1037,7 @@ export const InventoryDashboard: React.FC = () => {
       if (mainSheetTitle && currentView !== 'main' && batchData[mainSheetTitle] && batchData[mainSheetTitle].length > 0) {
         const mainRows = batchData[mainSheetTitle];
         const h = mainRows[0];
-        setAllMainItems(mainRows.slice(1).map((row: SheetRow, index: number) => {
-          const obj: any = { _rowIndex: index + 2 };
-          h.forEach((header: CellValue, i: number) => obj[String(header)] = row[i] || '');
-          return obj;
-        }));
+        setAllMainItems(mainRows.slice(1).map((row: SheetRow, index: number) => ({ ...rowToObject(h, row), _rowIndex: index + 2 })));
         await indexedDbService.saveCachedSheet(mainSheetTitle, mainRows);
       }
 
@@ -1079,10 +1057,7 @@ export const InventoryDashboard: React.FC = () => {
             .map(([colName]) => colName);
 
           const parsedItems: InventoryItem[] = rows.slice(1).map((row: SheetRow, index: number) => {
-            const item: InventoryItem = { _rowIndex: index + 2 };
-            stringHeaders.forEach((header: string, colIndex: number) => {
-              item[header] = row[colIndex] || '';
-            });
+            const item: InventoryItem = { ...rowToObject(stringHeaders, row), _rowIndex: index + 2 };
 
             // Resolver clave primaria robusta
             const identity = resolveItemIdentity(item, stringHeaders, targetSheetProp.title, schemaKeys);
@@ -1298,8 +1273,7 @@ export const InventoryDashboard: React.FC = () => {
 
         for (const item of mappedData) {
           const rowValues = headers.map(h => item[h] !== undefined ? String(item[h]) : '');
-          const newItem: InventoryItem = { _rowIndex: nextRowIndex++ };
-          headers.forEach((h, i) => newItem[h] = rowValues[i]);
+          const newItem: InventoryItem = { ...rowToObject(headers, rowValues), _rowIndex: nextRowIndex++ };
           const identityInfo = resolveItemIdentity(newItem, headers, activeSheet.title);
           newItem._entityKey = identityInfo.keyValue;
           newItem._entityKeyCol = identityInfo.keyColumn || undefined;
@@ -1459,10 +1433,7 @@ export const InventoryDashboard: React.FC = () => {
       const nextRowIndex = targetExistingItem ? (targetExistingItem._rowIndex || 2) : (validRowIndexes.length ? Math.max(...validRowIndexes) + 1 : 2);
 
       // Optimistic update
-      const newItem: InventoryItem = { 
-        _rowIndex: nextRowIndex 
-      };
-      headers.forEach((h, i) => newItem[h] = rowValues[i]);
+      const newItem: InventoryItem = { ...rowToObject(headers, rowValues), _rowIndex: nextRowIndex };
 
       const identityInfo = resolveItemIdentity(newItem, headers, activeSheet.title);
       newItem._entityKey = identityInfo.keyValue;
@@ -1569,8 +1540,7 @@ export const InventoryDashboard: React.FC = () => {
       const validRowIndexes = items.map(i => typeof i._rowIndex === 'number' ? i._rowIndex : parseInt(String(i._rowIndex || '0'), 10)).filter(n => !isNaN(n) && n > 0);
       const nextRowIndex = targetExistingItem ? (targetExistingItem._rowIndex || 2) : (validRowIndexes.length ? Math.max(...validRowIndexes) + 1 : 2);
 
-      const newItem: InventoryItem = { _rowIndex: nextRowIndex };
-      headers.forEach((h, i) => newItem[h] = rowValues[i]);
+      const newItem: InventoryItem = { ...rowToObject(headers, rowValues), _rowIndex: nextRowIndex };
 
       const identityInfo = resolveItemIdentity(newItem, headers, activeSheet.title);
       newItem._entityKey = identityInfo.keyValue;

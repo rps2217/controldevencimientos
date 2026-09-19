@@ -550,3 +550,16 @@ export function formatPhoneNumber(phone: any): string {
   // Default Chilean prefix
   return '+56' + rawPhone;
 }
+
+/**
+ * Map a spreadsheet row (positional array) into a keyed object using the header row.
+ * Headers are normalized to strings and missing cells become empty strings.
+ */
+export function rowToObject(headers: ReadonlyArray<unknown>, row: ReadonlyArray<unknown>): Record<string, string> {
+  const obj: Record<string, string> = {};
+  headers.forEach((header, i) => {
+    const cell = row[i];
+    obj[String(header)] = cell === null || cell === undefined ? '' : String(cell);
+  });
+  return obj;
+}

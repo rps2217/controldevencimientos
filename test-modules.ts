@@ -6,6 +6,7 @@ import {
   parseAnyDate, 
   parseLocaleNumber, 
   formatLocaleNumber, 
+  rowToObject,
   getItemStatus, 
   getEventCategory, 
   getCategoryFromEventValue,
@@ -205,6 +206,18 @@ console.log('\n--- 8. Pruebas de universalImporter.ts ---');
   assert(mapping.length === 3, 'generateSmartColumnMappings genera mapeos para todas las columnas');
   const skuMap = mapping.find(m => m.targetHeader === 'SKU');
   assert(skuMap?.sourceHeader === 'SKU', 'generateSmartColumnMappings asocia SKU automáticamente');
+}
+
+console.log('\n--- 9. Pruebas de rowToObject (pureCalculations.ts) ---');
+{
+  const obj = rowToObject(['SKU', 'DESCRIPCION', 'CANTIDAD'], ['SKU-1', 'Leche', '320']);
+  assert(obj['SKU'] === 'SKU-1' && obj['CANTIDAD'] === '320', 'rowToObject mapea celdas por encabezado');
+
+  const short = rowToObject(['A', 'B', 'C'], ['solo']);
+  assert(short['B'] === '' && short['C'] === '', 'rowToObject rellena celdas faltantes con cadena vacía');
+
+  const numeric = rowToObject([101, 'DESC'], [0, null]);
+  assert(numeric['101'] === '0' && numeric['DESC'] === '', 'rowToObject normaliza encabezados y valores nulos');
 }
 
 console.log(`\n========================================`);

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { FileSpreadsheet, Upload, Clipboard, CheckCircle2, AlertCircle, ArrowRight, RefreshCw, Layers, Check, X, Sparkles, Filter } from 'lucide-react';
 import { parseExcelBuffer, parseDelimitedText, detectDelimiter, generateSmartColumnMappings, ParsedSpreadsheetResult } from '../../utils/universalImporter';
+import { rowToObject } from '../../utils/pureCalculations';
 import { InventoryItem } from '../../types';
 import { reconcileImportWithInventory, ImportConsolidationMode } from '../../utils/cuVcConsolidator';
 
@@ -106,13 +107,7 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
         return;
       }
 
-      const rows: Record<string, any>[] = parsed.rows.map(rowCells => {
-        const obj: Record<string, any> = {};
-        parsed.headers.forEach((h, idx) => {
-          obj[h] = rowCells[idx] !== undefined ? rowCells[idx] : '';
-        });
-        return obj;
-      });
+      const rows: Record<string, string>[] = parsed.rows.map(rowCells => rowToObject(parsed.headers, rowCells));
 
       setParsedData({
         headers: parsed.headers,

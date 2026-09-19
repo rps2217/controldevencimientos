@@ -20,6 +20,7 @@ import {
   getEventReason,
   detectPolicyActionType,
   createColumnsContext,
+  rowToObject,
   CalculationColumnsContext,
   ItemStatusCode,
   ItemActionType
@@ -42,7 +43,8 @@ export {
   calculateWithdrawalDate,
   getEventReason,
   detectPolicyActionType,
-  createColumnsContext
+  createColumnsContext,
+  rowToObject
 };
 export type { CalculationColumnsContext };
 
