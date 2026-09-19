@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  html.dark {
+    color-scheme: dark;
+    background-color: #020617;
+    color: #f8fafc;
+  }
+
+  /* Variant 2: Oscuro Gris Neutro (Zinc / Charcoal) */
+  html.dark.theme-gray {
+    background-color: #09090b !important;
+    color: #f4f4f5;
+    --color-slate-950: #09090b;
+    --color-slate-900: #18181b;
+    --color-slate-800: #27272a;
+    --color-slate-700: #3f3f46;
+    --color-slate-600: #52525b;
+    --color-slate-500: #71717a;
+    --color-slate-400: #a1a1aa;
+    --color-slate-300: #d4d4d8;
+    --color-slate-200: #e4e4e7;
+    --color-slate-100: #f4f4f5;
+    --color-slate-50:  #fafafa;
+  }
+}
+
+
+@media print {
+  @page {
+    /* 0 margin is mandatory for continuous thermal rolls */
+    margin: 0;
+    /* Clean fallback for browser print dialog */
+    size: auto;
+  }
+  
+  html, body {
+    background-color: white !important;
+    color: black !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    -webkit-font-smoothing: antialiased;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Reset root so it wraps strictly around printed content without stretching */
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    display: block !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Neutralize screen full-viewport classes in print mode */
+  .h-screen,
+  .min-h-screen,
+  .h-full,
+  .flex-1 {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    flex: none !important;
+  }
+
+  /* Hide screen-only navigation, modals, backdrops and floating UI */
+  nav,
+  aside,
+  header,
+  footer,
+  .fixed,
+  .print\:hidden,
+  [data-no-print="true"] {
+    display: none !important;
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+  }
+
+  /* Base page print layout - Force portrait default and zero margins */
+  @page {
+    size: portrait;
+    margin: 0mm;
+  }
+
+  /* Thermal ticket container */
+  #thermal-ticket-root {
+    display: block !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+}
+

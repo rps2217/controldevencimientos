@@ -1,0 +1,6 @@
+{
+  "name": "Gestión de Vencimientos",
+  "description": "Gestión especializada de fechas de vencimiento, políticas de retiro y eventos sobre productos (transporte, diferencias y mermas) con Google Sheets.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
