@@ -1,4 +1,20 @@
+import type { SheetConfig, SheetMetadata, InventoryCampaign, StockCountSession } from '../types';
+
 export const SPREADSHEET_ID = '1a4jGo-7pduH4fue73F_67sQYJS0LJqI7hiXYpyWVA8o';
+
+/** Valor de una celda tal como lo devuelve Google Sheets. */
+export type CellValue = string | number | boolean | null | undefined;
+export type SheetRow = CellValue[];
+export type SheetMatrix = SheetRow[];
+
+/** Configuración de la app tal como viaja en Script Properties (incluye claves extra del script). */
+export interface CloudConfig extends SheetConfig {
+  CAMPAIGNS_DATA?: string;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 function getScriptUrl(): string | null {
   try {
@@ -9,13 +25,14 @@ function getScriptUrl(): string | null {
   }
 }
 
-export interface ScriptResponse<T = any> {
+export interface ScriptResponse {
   success?: boolean;
   error?: string;
-  values?: any[][];
-  sheets?: any[];
-  config?: any;
-  [key: string]: any;
+  values?: SheetMatrix;
+  sheets?: SheetMetadata['sheets'];
+  data?: Record<string, SheetMatrix>;
+  config?: CloudConfig;
+  [key: string]: unknown;
 }
 
 interface FetchOptions {
@@ -37,7 +54,7 @@ function getSecurityToken(): string {
  * network timeout handling, and informative Spanish error messages.
  */
 async function fetchFromScript<T = ScriptResponse>(
-  payload: Record<string, any>,
+  payload: Record<string, unknown>,
   options: FetchOptions = {}
 ): Promise<T> {
   const { timeoutMs = 28000, maxRetries = 2, retryDelayMs = 1200 } = options;
@@ -65,7 +82,7 @@ async function fetchFromScript<T = ScriptResponse>(
   };
 
   let attempt = 0;
-  let lastError: any = null;
+  let lastError: unknown = null;
 
   while (attempt <= maxRetries) {
     const controller = new AbortController();
@@ -90,7 +107,7 @@ async function fetchFromScript<T = ScriptResponse>(
       }
 
       const text = await response.text();
-      let data: any;
+      let data: ScriptResponse;
       try {
         data = JSON.parse(text);
       } catch {
@@ -102,22 +119,22 @@ async function fetchFromScript<T = ScriptResponse>(
       }
 
       return data as T;
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(timeoutId);
       lastError = err;
 
-      const isAbort = err.name === 'AbortError';
-      const isNetworkError = err.message && (
-        err.message.includes('Failed to fetch') ||
-        err.message.includes('NetworkError') ||
-        err.message.includes('Load failed')
-      );
+      const errName = err instanceof Error ? err.name : '';
+      const errMsg = errorMessage(err);
+      const isAbort = errName === 'AbortError';
+      const isNetworkError = errMsg.includes('Failed to fetch') ||
+        errMsg.includes('NetworkError') ||
+        errMsg.includes('Load failed');
 
       // Only retry if it was a network drop or transient timeout and we have attempts left
       if ((isAbort || isNetworkError) && attempt < maxRetries) {
         attempt++;
         const backoff = retryDelayMs * Math.pow(1.5, attempt - 1);
-        console.warn(`[AppsScript] Reintento ${attempt}/${maxRetries} tras fallo transitorio (${err.message}). Esperando ${backoff}ms...`);
+        console.warn(`[AppsScript] Reintento ${attempt}/${maxRetries} tras fallo transitorio (${errMsg}). Esperando ${backoff}ms...`);
         await new Promise(r => setTimeout(r, backoff));
         continue;
       }
@@ -146,9 +163,9 @@ const METADATA_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const SHEET_DATA_TTL_MS = 3 * 60 * 1000; // 3 minutes
 const CONFIG_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-let cachedMetadata: CacheEntry<any> | null = null;
-let cachedPropertiesConfig: CacheEntry<any> | null = null;
-const cachedSheetsData = new Map<string, CacheEntry<any[][]>>();
+let cachedMetadata: CacheEntry<SheetMetadata> | null = null;
+let cachedPropertiesConfig: CacheEntry<ScriptResponse['config']> | null = null;
+const cachedSheetsData = new Map<string, CacheEntry<SheetMatrix>>();
 
 export function clearSheetsCache(sheetName?: string) {
   if (sheetName) {
@@ -166,11 +183,11 @@ export async function getSpreadsheetMetadata(forceRefresh = false) {
     return cachedMetadata.data;
   }
   const data = await fetchFromScript({ action: 'getMetadata', spreadsheetId: SPREADSHEET_ID });
-  cachedMetadata = { data, timestamp: now };
-  return data;
+  cachedMetadata = { data: data as SheetMetadata, timestamp: now };
+  return data as SheetMetadata;
 }
 
-export async function getSheetData(sheetName: string, forceRefresh = false) {
+export async function getSheetData(sheetName: string, forceRefresh = false): Promise<SheetMatrix> {
   const now = Date.now();
   const key = sheetName.trim().toLowerCase();
   if (!forceRefresh && cachedSheetsData.has(key)) {
@@ -193,8 +210,8 @@ export async function getSheetData(sheetName: string, forceRefresh = false) {
 export async function getAllSheetsData(
   sheetNames: string[],
   forceRefresh = false
-): Promise<Record<string, any[][]>> {
-  const result: Record<string, any[][]> = {};
+): Promise<Record<string, SheetMatrix>> {
+  const result: Record<string, SheetMatrix> = {};
   const namesToFetch: string[] = [];
   const now = Date.now();
 
@@ -223,7 +240,7 @@ export async function getAllSheetsData(
     });
 
     if (res && res.success && res.data) {
-      for (const [name, rows] of Object.entries(res.data as Record<string, any[][]>)) {
+      for (const [name, rows] of Object.entries(res.data)) {
         const rowsArr = rows || [];
         result[name] = rowsArr;
         cachedSheetsData.set(name.trim().toLowerCase(), { data: rowsArr, timestamp: now });
@@ -249,7 +266,7 @@ export async function getAllSheetsData(
   return result;
 }
 
-export async function appendRow(sheetName: string, values: any[]) {
+export async function appendRow(sheetName: string, values: SheetRow) {
   clearSheetsCache(sheetName);
   return fetchFromScript({ action: 'appendRow', sheetName, values, spreadsheetId: SPREADSHEET_ID });
 }
@@ -257,7 +274,7 @@ export async function appendRow(sheetName: string, values: any[]) {
 export async function updateRow(
   sheetName: string, 
   rowIndex: number | null | undefined, 
-  values: any[],
+  values: SheetRow,
   extraKeys?: { entityKey?: string; keyValue?: string; entityKeyCol?: string; keyColumn?: string }
 ) {
   clearSheetsCache(sheetName);
@@ -376,7 +393,7 @@ export async function pingGoogleSheets(): Promise<{
     }
 
     return { success: true, latencyMs, urlConfigured: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     clearTimeout(timeoutId);
     const tEnd = performance.now();
     const latencyMs = Math.round(tEnd - tStart);
@@ -384,13 +401,13 @@ export async function pingGoogleSheets(): Promise<{
       success: false,
       latencyMs,
       urlConfigured: true,
-      error: err.name === 'AbortError' ? 'Tiempo de espera agotado (>6s)' : (err.message || 'Error de conexión')
+      error: (err instanceof Error && err.name === 'AbortError') ? 'Tiempo de espera agotado (>6s)' : (errorMessage(err) || 'Error de conexión')
     };
   }
 }
 
 // PropertiesService storage (zero extra sheets needed)
-export async function getScriptPropertiesConfig(forceRefresh = false) {
+export async function getScriptPropertiesConfig(forceRefresh = false): Promise<ScriptResponse['config'] | null> {
   const now = Date.now();
   if (!forceRefresh && cachedPropertiesConfig && (now - cachedPropertiesConfig.timestamp < CONFIG_TTL_MS)) {
     return cachedPropertiesConfig.data;
@@ -407,7 +424,7 @@ export async function getScriptPropertiesConfig(forceRefresh = false) {
   return null;
 }
 
-export async function saveScriptPropertiesConfig(config: any) {
+export async function saveScriptPropertiesConfig(config: CloudConfig) {
   cachedPropertiesConfig = { data: config, timestamp: Date.now() };
   return fetchFromScript({ 
     action: 'saveAppProperties', 
@@ -416,21 +433,26 @@ export async function saveScriptPropertiesConfig(config: any) {
   });
 }
 
-export async function loadCloudConfig(configSheetName = '_CONFIG_APP') {
+export async function loadCloudConfig(configSheetName = '_CONFIG_APP'): Promise<SheetConfig | null> {
+  const parseCellConfig = (cell: CellValue): SheetConfig | null => {
+    if (typeof cell !== 'string' || !cell.startsWith('{')) return null;
+    try {
+      return JSON.parse(cell);
+    } catch {
+      return null;
+    }
+  };
+
   try {
     const data = await getSheetData(configSheetName);
     if (data && data.length >= 2) {
       for (let i = 1; i < data.length; i++) {
         if (data[i][0] === 'APP_CONFIG' && data[i][1]) {
-          return JSON.parse(data[i][1]);
+          const parsed = parseCellConfig(data[i][1]);
+          if (parsed) return parsed;
         }
       }
-      if (data[1][1] && data[1][1].startsWith('{')) {
-        return JSON.parse(data[1][1]);
-      }
-      if (data[1][0] && data[1][0].startsWith('{')) {
-        return JSON.parse(data[1][0]);
-      }
+      return parseCellConfig(data[1][1]) || parseCellConfig(data[1][0]);
     }
   } catch (e) {
     console.warn('Could not load cloud config:', e);
@@ -438,7 +460,7 @@ export async function loadCloudConfig(configSheetName = '_CONFIG_APP') {
   return null;
 }
 
-export async function saveCloudConfig(config: any, configSheetName = '_CONFIG_APP') {
+export async function saveCloudConfig(config: SheetConfig, configSheetName = '_CONFIG_APP') {
   const jsonStr = JSON.stringify(config, null, 2);
   const nowIso = new Date().toISOString();
 
@@ -481,9 +503,9 @@ export async function saveCloudConfig(config: any, configSheetName = '_CONFIG_AP
  */
 export async function saveCampaignsToCloud(
   campaignsPayload: {
-    campaigns: any[];
+    campaigns: InventoryCampaign[];
     activeCampaignId?: string | null;
-    sessions?: any[];
+    sessions?: StockCountSession[];
     lastUpdated?: string;
   },
   configSheetName = '_CONFIG_APP'
@@ -561,7 +583,7 @@ export async function saveCampaignsToCloud(
       const prevCountStr = existingKeyRowMap.get('CAMPAIGNS_DATA_CHUNKS') 
         ? rows[existingKeyRowMap.get('CAMPAIGNS_DATA_CHUNKS')! - 1]?.[1] 
         : null;
-      const prevCount = prevCountStr ? parseInt(prevCountStr, 10) : 0;
+      const prevCount = prevCountStr ? parseInt(String(prevCountStr), 10) : 0;
       if (prevCount > chunks.length) {
         for (let c = chunks.length; c < prevCount; c++) {
           const obsoleteKey = `CAMPAIGNS_DATA_CHUNK_${c}`;
@@ -600,9 +622,9 @@ export async function saveCampaignsToCloud(
  * Soporta reconstrucción automática de fragmentos (Chunks) para snapshots masivos.
  */
 export async function loadCampaignsFromCloud(configSheetName = '_CONFIG_APP'): Promise<{
-  campaigns?: any[];
+  campaigns?: InventoryCampaign[];
   activeCampaignId?: string | null;
-  sessions?: any[];
+  sessions?: StockCountSession[];
   lastUpdated?: string;
 } | null> {
   if (!getScriptUrl()) {
@@ -677,14 +699,14 @@ export async function loadCampaignsFromCloud(configSheetName = '_CONFIG_APP'): P
  */
 export async function syncCampaignsWithCloud(
   localPayload: {
-    campaigns: any[];
+    campaigns: InventoryCampaign[];
     activeCampaignId?: string | null;
-    sessions: any[];
+    sessions: StockCountSession[];
   },
   configSheetName = '_CONFIG_APP'
 ): Promise<{
-  mergedCampaigns: any[];
-  mergedSessions: any[];
+  mergedCampaigns: InventoryCampaign[];
+  mergedSessions: StockCountSession[];
   activeCampaignId: string | null;
   newRemoteSessionsCount: number;
   success: boolean;
@@ -755,14 +777,14 @@ export const AUDIT_SHEET_DEFAULT_HEADERS = [
  */
 export async function saveAuditRowsToDedicatedSheet(
   sheetName: string = '_AUDITORIA_INVENTARIO',
-  rows: Record<string, any>[]
+  rows: Record<string, CellValue>[]
 ): Promise<{ success: boolean; count: number; sheetName: string }> {
   if (!rows || rows.length === 0) {
     return { success: true, count: 0, sheetName };
   }
 
   clearSheetsCache(sheetName);
-  let existingData: any[][] = [];
+  let existingData: SheetMatrix = [];
   try {
     existingData = await getSheetData(sheetName, true);
   } catch (err) {
@@ -775,7 +797,7 @@ export async function saveAuditRowsToDedicatedSheet(
     : AUDIT_SHEET_DEFAULT_HEADERS;
 
   // Mapa de filas existentes por clave compuesta de campaña + SKU
-  const existingRowsMap = new Map<string, any[]>();
+  const existingRowsMap = new Map<string, SheetRow>();
   const campaignColIdx = headerList.findIndex(h => /ID_CAMPANA|CAMPANA/i.test(h));
   const skuColIdx = headerList.findIndex(h => /^SKU$|CODIGO/i.test(h));
 
@@ -808,7 +830,7 @@ export async function saveAuditRowsToDedicatedSheet(
   }
 
   // Ensamblar la matriz completa (Encabezados + Todas las filas consolidadas)
-  const fullMatrix: any[][] = [
+  const fullMatrix: SheetMatrix = [
     headerList,
     ...Array.from(existingRowsMap.values())
   ];

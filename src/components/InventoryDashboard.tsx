@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { getSpreadsheetMetadata, getAllSheetsData, appendRow, updateRow, deleteRow, deleteRows, saveCloudConfig, loadCloudConfig, getScriptPropertiesConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
+import type { CellValue, SheetRow } from '../lib/sheets';
 import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, EventCategory } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
 import { DashboardProvider, DashboardContextType } from '../context/DashboardContext';
@@ -1024,9 +1025,9 @@ export const InventoryDashboard: React.FC = () => {
       if (prodSheetTitle && batchData[prodSheetTitle] && batchData[prodSheetTitle].length > 0) {
         const prodRows = batchData[prodSheetTitle];
         const h = prodRows[0];
-        setProducts(prodRows.slice(1).map((row: string[]) => {
+        setProducts(prodRows.slice(1).map((row: SheetRow) => {
           const obj: any = {};
-          h.forEach((header: string, i: number) => obj[header] = row[i] || '');
+          h.forEach((header: CellValue, i: number) => obj[String(header)] = row[i] || '');
           return obj;
         }));
         await indexedDbService.saveCachedSheet(prodSheetTitle, prodRows);
@@ -1039,9 +1040,9 @@ export const InventoryDashboard: React.FC = () => {
       if (polSheetTitle && batchData[polSheetTitle] && batchData[polSheetTitle].length > 0) {
         const polRows = batchData[polSheetTitle];
         const h = polRows[0];
-        setPolicies(polRows.slice(1).map((row: string[]) => {
+        setPolicies(polRows.slice(1).map((row: SheetRow) => {
           const obj: any = {};
-          h.forEach((header: string, i: number) => obj[header] = row[i] || '');
+          h.forEach((header: CellValue, i: number) => obj[String(header)] = row[i] || '');
           return obj;
         }));
         await indexedDbService.saveCachedSheet(polSheetTitle, polRows);
@@ -1054,9 +1055,9 @@ export const InventoryDashboard: React.FC = () => {
       if (mainSheetTitle && currentView !== 'main' && batchData[mainSheetTitle] && batchData[mainSheetTitle].length > 0) {
         const mainRows = batchData[mainSheetTitle];
         const h = mainRows[0];
-        setAllMainItems(mainRows.slice(1).map((row: string[], index: number) => {
+        setAllMainItems(mainRows.slice(1).map((row: SheetRow, index: number) => {
           const obj: any = { _rowIndex: index + 2 };
-          h.forEach((header: string, i: number) => obj[header] = row[i] || '');
+          h.forEach((header: CellValue, i: number) => obj[String(header)] = row[i] || '');
           return obj;
         }));
         await indexedDbService.saveCachedSheet(mainSheetTitle, mainRows);
@@ -1071,19 +1072,20 @@ export const InventoryDashboard: React.FC = () => {
 
         if (rows.length > 0) {
           const headerRow = rows[0];
-          setHeaders(headerRow);
+          const stringHeaders = headerRow.map(String);
+          setHeaders(stringHeaders);
           const schemaKeys = Object.entries(sheetConfig.schema?.[targetSheetProp.title] || {})
             .filter(([_, conf]) => Boolean((conf as any)?.isKey))
             .map(([colName]) => colName);
 
-          const parsedItems: InventoryItem[] = rows.slice(1).map((row: string[], index: number) => {
+          const parsedItems: InventoryItem[] = rows.slice(1).map((row: SheetRow, index: number) => {
             const item: InventoryItem = { _rowIndex: index + 2 };
-            headerRow.forEach((header: string, colIndex: number) => {
+            stringHeaders.forEach((header: string, colIndex: number) => {
               item[header] = row[colIndex] || '';
             });
 
             // Resolver clave primaria robusta
-            const identity = resolveItemIdentity(item, headerRow, targetSheetProp.title, schemaKeys);
+            const identity = resolveItemIdentity(item, stringHeaders, targetSheetProp.title, schemaKeys);
             item._entityKey = identity.keyValue;
             item._entityKeyCol = identity.keyColumn || undefined;
             item._isSyntheticKey = identity.isSynthetic;

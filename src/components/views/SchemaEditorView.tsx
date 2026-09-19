@@ -238,7 +238,7 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
                     try {
                       const rows = await getSheetData(sheetProp.title);
                       if (rows.length > 0) {
-                        setHeaders(rows[0]);
+                        setHeaders(rows[0].map(String));
                       } else {
                         setHeaders([]);
                       }
