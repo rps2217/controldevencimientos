@@ -17,6 +17,7 @@ import { copyTextToClipboard } from '../../utils/exportUtils';
 import { executeThermalPrint } from '../../utils/ticketUtils';
 import { TicketPrintView } from './TicketPrintView';
 import { getErrorMessage } from '../../utils/pureCalculations';
+import { useConfirm } from '../common/ConfirmDialog';
 
 const CampaignConsolidationDashboard = lazy(() => import('./CampaignConsolidationDashboard').then(m => ({ default: m.CampaignConsolidationDashboard })));
 
@@ -56,6 +57,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   onClose
 }) => {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   // Campaigns list & active campaign
   const [campaigns, setCampaigns] = useState<InventoryCampaign[]>(() => loadCampaignsFromStorage());
   const [activeCampaignIdState, setActiveCampaignIdState] = useState<string | null>(() => getActiveCampaignId());
@@ -171,7 +173,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   // Finalizar mueble y subir manifiesto oficial a la nube
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleFinishAndBackupSession = async (sessionToFinish: StockCountSession) => {
-    const confirmClose = confirm(`¿Deseas finalizar el conteo de "${sessionToFinish.nombre}" y enviar su manifiesto oficial a la nube?`);
+    const confirmClose = await confirm({ title: 'Finalizar conteo', message: `¿Deseas finalizar el conteo de "${sessionToFinish.nombre}" y enviar su manifiesto oficial a la nube?`, confirmLabel: 'Finalizar y subir', variant: 'default' });
     if (!confirmClose) return;
 
     setIsSyncingCloud(true);
@@ -567,9 +569,9 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   };
 
   // Delete session
-  const handleDeleteSession = (sessionId: string, e: React.MouseEvent) => {
+  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('¿Estás seguro de eliminar esta sesión de conteo?')) {
+    if (await confirm({ title: 'Eliminar sesión', message: '¿Estás seguro de eliminar esta sesión de conteo?', confirmLabel: 'Eliminar' })) {
       setSessions(prev => prev.filter(s => s.id !== sessionId));
       if (activeSessionId === sessionId) {
         setActiveSessionId(null);
@@ -894,9 +896,9 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   };
 
   // Remove all count entries for a specific SKU
-  const handleRemoveSkuAllEntries = (sku: string, desc: string) => {
+  const handleRemoveSkuAllEntries = async (sku: string, desc: string) => {
     if (!currentSession) return;
-    if (confirm(`¿Eliminar todas las lecturas registradas para el SKU ${sku} (${desc})?`)) {
+    if (await confirm({ title: 'Eliminar lecturas', message: `¿Eliminar todas las lecturas registradas para el SKU ${sku} (${desc})?`, confirmLabel: 'Eliminar' })) {
       setSessions(prev => prev.map(s => {
         if (s.id === currentSession.id) {
           return {

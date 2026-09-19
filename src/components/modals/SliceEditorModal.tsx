@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useConfirm } from '../common/ConfirmDialog';
 import { X, Layers, Sparkles, Tag, Check, Trash2, Sliders, Columns, Filter, ArrowUpDown, RefreshCw, Copy, Search, Clock, CheckCircle2, Truck, ArrowUpAZ, ArrowDownZA } from 'lucide-react';
 import { 
   TableSlice, SliceFilterConfig, SliceColor, SortConfig, DynamicMonthRange 
@@ -125,6 +126,7 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
   onSaveSlice,
   onDeleteSlice
 }) => {
+  const confirm = useConfirm();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('Layers');
@@ -1127,8 +1129,8 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
             {editingSlice && !isBuiltIn && onDeleteSlice && (
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm(`¿Estás seguro de eliminar el slice "${editingSlice.name}"?`)) {
+                onClick={async () => {
+                  if (await confirm({ title: 'Eliminar slice', message: `¿Estás seguro de eliminar el slice "${editingSlice.name}"?`, confirmLabel: 'Eliminar' })) {
                     onDeleteSlice(editingSlice.id);
                     onClose();
                   }

@@ -63,12 +63,14 @@ import {
 import { GlobalTicketConfig, ViewTicketConfig, ViewTicketSettings, TicketGeneralSettings } from '../types';
 import { SkeletonLoader } from './common/SkeletonLoader';
 import { useToast } from './common/ToastContainer';
+import { useConfirm } from './common/ConfirmDialog';
 import { useTableSlices } from '../hooks/useTableSlices';
 
 const AnalyticsDashboard = lazy(() => import('./views/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 
 export const InventoryDashboard: React.FC = () => {
   const { showToast, updateToast, removeToast } = useToast();
+  const confirm = useConfirm();
   const [metadata, setMetadata] = useState<SpreadsheetMetadata | null>(null);
   const [activeSheet, setActiveSheet] = useState<SheetProperties | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -1584,7 +1586,7 @@ export const InventoryDashboard: React.FC = () => {
 
   const handleDelete = async (item: InventoryItem) => {
     if (!activeSheet) return;
-    const confirmed = window.confirm(`¿Estás seguro de que deseas eliminar la fila ${item._rowIndex}? Esta acción no se puede deshacer.`);
+    const confirmed = await confirm({ title: 'Eliminar fila', message: `¿Estás seguro de que deseas eliminar la fila ${item._rowIndex}? Esta acción no se puede deshacer.`, confirmLabel: 'Eliminar' });
     if (!confirmed) return;
 
     const originalItems = [...items];
@@ -1793,7 +1795,7 @@ export const InventoryDashboard: React.FC = () => {
   const handleBulkDelete = async () => {
     if (!activeSheet || selectedRowIds.length === 0) return;
     const count = selectedRowIds.length;
-    const confirmed = window.confirm(`¿Estás seguro de que deseas eliminar ${count} registros seleccionados? Esta acción no se puede deshacer.`);
+    const confirmed = await confirm({ title: 'Eliminación masiva', message: `¿Estás seguro de que deseas eliminar ${count} registros seleccionados? Esta acción no se puede deshacer.`, confirmLabel: `Eliminar ${count}` });
     if (!confirmed) return;
 
     const toastId = showToast(`Eliminando registros... ${count} restantes`, 'loading', 'Eliminación Masiva', 0);

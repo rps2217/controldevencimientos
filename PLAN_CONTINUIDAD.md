@@ -48,11 +48,13 @@ Cada punto indica **evidencia reproducible** y **veredicto Ponytail** (YAGNI, re
 - **Veredicto Ponytail**: real, pero refactor de riesgo medio (migración de claves). El paso correcto es un módulo central de storage **cuando se toque ese código**, con migración de claves antiguas.
 - **Prioridad**: Media — no hacer de forma aislada.
 
-### 1.4 🟡 6 `confirm()` nativos contradicen el sistema de diseño
+### 1.4 ✅ RESUELTO — 6 `confirm()` nativos reemplazados por `ConfirmDialog`
 
-- **Evidencia**: `SliceManagerModal.tsx:262`, `SliceEditorModal.tsx:1131`, `InventoryDashboard.tsx:1643` y `:1852`, `StockCountTerminal.tsx:558` y `:887`.
-- **Veredicto Ponytail**: ya existe `ToastProvider` y modales propios; `window.confirm` rompe el lenguaje visual. Bajo impacto funcional, ruido de cambio moderado.
-- **Prioridad**: Baja-Media.
+- **Estado**: nuevo `src/components/common/ConfirmDialog.tsx` con `ConfirmProvider` + `useConfirm(): Promise<boolean>` (mismo patrón que `ToastProvider`). Montado en `App.tsx` envolviendo a `ToastProvider`.
+- **Sitios convertidos** (6, no 7): `SliceManagerModal`, `SliceEditorModal`, `InventoryDashboard` ×2 (`handleDelete`, `handleBulkDelete`), `StockCountTerminal` ×3 (incl. el `confirm` de `handleFinishAndBackupSession`, que ahora usa `await` correctamente).
+- **API**: `await confirm({ title, message, confirmLabel, variant })` o `await confirm('mensaje')`. Variantes `danger` (por defecto) / `warning` / `default`. Cierra con Escape vía click en backdrop.
+- **Nota**: los handlers síncronos (`handleDeleteSession`, `handleRemoveSkuAllEntries`, `onClick` de borrado en ambos modales de slices) pasaron a `async`; los callers son `void` por lo que no propaga cambios de firma.
+- **Verificado en navegador**: el diálogo aparece, "Cancelar" cierra sin borrar (5 registros intactos).
 
 ### 1.5 ✅ RESUELTO — ESLint configurado (flat config)
 
@@ -118,8 +120,7 @@ Aplico YAGNI también a las mejoras. Estas piezas están bien resueltas:
 ## 4. Orden de ejecución sugerido
 
 1. **2.3** descomposición restante de `StockCountTerminal` (LIST ≈310 líneas → COUNTING ≈1.510).
-2. **1.4** `window.confirm` → modales propios (7 sitios).
-3. **1.3** prefijos de `localStorage` (requiere migración).
-4. **1.1-bis** tipado incremental del contrato sólo si aparece un síntoma.
+2. **1.3** prefijos de `localStorage` (requiere migración).
+3. **1.1-bis** tipado incremental del contrato sólo si aparece un síntoma.
 
 **Invariante para todos**: `tsc --noEmit` + `npm test` + `npm run build` en verde antes de cada commit. Desde 1.5 hay además `npx eslint src` como red de seguridad automática (0 errores exigidos; las 23 advertencias `exhaustive-deps` son deuda conocida).

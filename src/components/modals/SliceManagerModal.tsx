@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useConfirm } from '../common/ConfirmDialog';
 import { X, Layers, Plus, Edit2, Trash2, Sparkles, Search, Eye, EyeOff, Shield, User } from 'lucide-react';
 import { TableSlice } from '../../types';
 import { SliceIcon } from '../slices/SliceSelectorBar';
@@ -35,6 +36,7 @@ export const SliceManagerModal: React.FC<SliceManagerModalProps> = ({
   onToggleSliceVisibility,
   onSetBulkVisibility
 }) => {
+  const confirm = useConfirm();
   const [searchTerm, setSearchTerm] = useState('');
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'visible' | 'hidden'>('all');
 
@@ -258,8 +260,8 @@ export const SliceManagerModal: React.FC<SliceManagerModalProps> = ({
             {!slice.isBuiltIn && (
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm(`¿Estás seguro de eliminar la vista personalizada "${slice.name}"?`)) {
+                onClick={async () => {
+                  if (await confirm({ title: 'Eliminar vista', message: `¿Estás seguro de eliminar la vista personalizada "${slice.name}"?`, confirmLabel: 'Eliminar' })) {
                     onDeleteSlice(slice.id);
                   }
                 }}

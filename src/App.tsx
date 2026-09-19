@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Link as LinkIcon, Settings2, CheckCircle2, Moon, Sun, Contrast, Check } from 'lucide-react';
 import InventoryDashboard from './components/InventoryDashboard';
 import { ToastProvider } from './components/common/ToastContainer';
+import { ConfirmProvider } from './components/common/ConfirmDialog';
 import { PWAReloadPrompt } from './components/pwa/PWAReloadPrompt';
 import { AppLogo } from './components/common/AppLogo';
 
@@ -193,6 +194,7 @@ export default function App() {
   return (
     <Router>
       <ToastProvider>
+        <ConfirmProvider>
         <div className="flex flex-col h-screen w-full bg-[#F8FAFC] dark:bg-slate-950 font-sans overflow-hidden transition-colors print:overflow-visible print:h-auto print:min-h-0 print:block">
           <Routes>
             <Route path="/" element={
@@ -303,6 +305,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>
+        </ConfirmProvider>
       </ToastProvider>
     </Router>
   );
