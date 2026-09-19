@@ -1,7 +1,8 @@
 # Plan de Continuidad — Auditoría Ponytail
 
-Estado tras la rama `ponytail-audit-strict-types` (commits `7650255`, `a823189`, `4a7e8ff`, `57cbae7`).
-Verificado: `tsc --noEmit` limpio · 36/36 tests · build OK.
+Estado tras la rama `ponytail-audit-strict-types` (commits `7650255`, `a823189`, `4a7e8ff`, `57cbae7`,
+más `rowToObject`, `getErrorMessage`, `fetchWithTimeout` y eliminación total de `as any`).
+Verificado: `tsc --noEmit` limpio · 42/42 tests · build OK.
 
 Cada punto indica **evidencia reproducible** y **veredicto Ponytail** (YAGNI, reutilizar, mínimo código efectivo).
 
@@ -17,21 +18,27 @@ Cada punto indica **evidencia reproducible** y **veredicto Ponytail** (YAGNI, re
 | 4 | Script `npm test` para los 36 asserts existentes | `npm test` |
 | 5 | Tipado del borde Google Sheets (`lib/sheets.ts`) | `CellValue`/`SheetRow`/`SheetMatrix`, catches `unknown` |
 | 6 | Extracción de la vista RECONCILIATION de `StockCountTerminal` | JSX byte-idéntico; 3.831 → 3.409 líneas |
+| 7 | Helper puro `rowToObject` (10 mapeos fila→objeto unificados) | 42 tests |
+| 8 | `getErrorMessage` centralizado; 51 `catch (e: any)` → `unknown` | `tsc`, 42 tests |
+| 9 | `fetchWithTimeout` en los 4 `fetch` sin timeout (+ `clearTimeout` en error) | `src/lib/http.ts`; 42 tests |
 
 ---
 
 ## 1. Nuevos hallazgos de esta auditoría
 
-### 1.1 🔴 BUG FUNCIONAL — El botón "Conteo" del nav superior no hace nada
+### 1.1 ✅ RESUELTO — El botón "Conteo" del nav superior abre el terminal
 
-- **Evidencia**: `DashboardTopNav.tsx:327` ejecuta `navigate('/conteo')`; `App.tsx:303` define `<Route path="/conteo" element={<Navigate to="/" replace />} />`. La navegación vuelve a `/` sin abrir el terminal.
-- **Impacto**: En desktop, el terminal de conteo es inaccesible desde el nav superior. Solo se abre por el `Sidebar` y el drawer móvil, que sí llaman `dashboard.setIsStockCountOpen(true)`.
-- **Fix Ponytail (1 línea)**: reemplazar `onClick={() => navigate('/conteo')}` por `onClick={() => setIsStockCountOpen(true)}` usando el contexto ya disponible (`DashboardContext`), o pasar `onOpenStockCount` por props como hacen `Sidebar`/`DashboardMobileDrawer`.
-- **Prioridad**: Alta — funcionalidad existente inaccesible, corrección mínima.
+- **Evidencia**: `DashboardTopNav.tsx:104,327` usa `dashboard.setIsStockCountOpen?.(true)`; verificado en navegador: el click abre "Muebles & Pasillos" / "Pistola Conteo".
 
-### 1.2 🟡 Duplicación: fila de planilla → objeto (10 sitios, 3 variantes)
+### 1.1-bis 🟢 Contrato central `DashboardContext` con 25 `any`
 
-- **Evidencia**: `InventoryDashboard.tsx` líneas 879, 903, 915, 1030, 1045, 1060, 1083, 1302, 1465; `UniversalImportModal.tsx:111`. Variantes `obj[header] = row[i] || ''` con y sin `String(header)`.
+- **Evidencia**: `products`/`policies`/`gmailModalItems`/`testConnectionHealth`/`syncQueue`/`eventMetrics`/`pmMetrics`/`virtualRows` etc. sin tipar.
+- **Veredicto Ponytail**: 41 `Record<string, any>` y 1 sola index signature (`InventoryItem`) indican que el modelo ya es dinámico por diseño; tipar el contrato es un refactor de riesgo medio-alto y **sin síntoma observable** (no hay bugs asociados). YAGNI: no hacerlo de forma aislada. Atacar sólo los parámetros públicos cuando se toque cada función.
+- **Prioridad**: Baja.
+
+### 1.2 ✅ RESUELTO — Duplicación fila de planilla → objeto
+
+- **Evidencia**: helper puro `rowToObject(headers, row)` en `pureCalculations.ts`, re-exportado; reemplaza los 10 mapeos de `InventoryDashboard.tsx` y `UniversalImportModal.tsx`.
 - **Veredicto Ponytail**: paso 2 de la escalera (reutilizar). Un único helper puro `rowToObject(headers, row)` en `src/utils/` elimina la duplicación y centraliza la normalización de encabezados. Es el mismo patrón que ya usan `pureCalculations.ts`/`columnAliases.ts`.
 - **Prioridad**: Media — deuda real, bajo riesgo, ~10 líneas de helper.
 
@@ -59,18 +66,15 @@ Cada punto indica **evidencia reproducible** y **veredicto Ponytail** (YAGNI, re
 
 Estos puntos **deben** abordarse porque el propio repo los declara no negociables.
 
-### 2.1 Eliminar `any` injustificados
+### 2.1 ✅ COMPLETADO — `catch (e: any)` y `as any`
 
-- **Evidencia**: 283 ocurrencias de `: any`/`as any`/`<any>`; 51 `catch (e: any)`.
-- **Cita del guardrail**: *"tipado estricto en TypeScript sin `any` injustificados"*.
-- **Enfoque**: `catch (e: any)` → `catch (e: unknown)` + narrowing (patrón ya aplicado en `lib/sheets.ts`). Luego atacar por archivo, empezando por los peores: `InventoryDashboard.tsx` (28), `referenceResolver.ts` (27), `DashboardContext.tsx` (27).
-- **No hacer**: una sola pasada masiva de 283 cambios sin tests por medio. Hacerlo por módulo, con `tsc` entre cada uno.
+- **Evidencia**: 51 `catch` migrados a `unknown` + `getErrorMessage`. `as any`: **25 → 0** (uniones reales en `<select>`, `ViewKey` compartido, `emitFieldChange`, narrowing de torch/MSStream/AudioContext).
+- **Restante**: ~200 `: any` en firmas de datos dinámicos (`referenceResolver`, `DashboardContext`, `pureCalculations`). Ver 1.1-bis para el veredicto YAGNI.
 
-### 2.2 Cerrar la brecha de `AbortController`
+### 2.2 ✅ COMPLETADO — Brecha de timeout/abort
 
-- **Evidencia**: 6 `fetch`, solo 3 `AbortController`. Sin cobertura: `gmailService.ts` (1), `backendMirrorService.ts` (2).
-- **Cita del guardrail**: *"manejo de errores `try/catch` con `AbortController`"*.
-- **Enfoque**: reutilizar el helper de timeout/abort ya existente en `lib/sheets.ts` en lugar de reimplementarlo.
+- **Evidencia**: nuevo `fetchWithTimeout(input, init, timeoutMs)` en `src/lib/http.ts`. Los 4 `fetch` sin cobertura (`gmailService`, 2× `backendMirrorService`) y los 2 AbortController manuales de `sheets.ts` lo reutilizan. `fetchFromScript` mantiene su AbortController explícito porque reintenta y necesita distinguir `AbortError` por intento.
+- **Bug corregido de paso**: los AbortController manuales filtraban el `clearTimeout` en el camino de error (timer colgado); el `finally` del helper lo garantiza siempre.
 
 ### 2.3 Terminar de descomponer los monolitos
 
@@ -93,11 +97,10 @@ Aplico YAGNI también a las mejoras. Estas piezas están bien resueltas:
 
 ## 4. Orden de ejecución sugerido
 
-1. **1.1** bug del botón "Conteo" (1 línea, corrige funcionalidad rota).
-2. **2.3** extracción CAMPAIGN y LIST de `StockCountTerminal` (mecánico, bajo riesgo).
-3. **1.2** helper `rowToObject` y reemplazo en los 10 sitios.
-4. **2.1** `any` por módulo, empezando por `catch` sin tipo.
-5. **2.2** `AbortController` faltante.
-6. **1.4**, **1.3**, **1.5** según retorno y acuerdo previo.
+1. **2.3** descomposición restante de `StockCountTerminal` (LIST ≈310 líneas → COUNTING ≈1.510).
+2. **1.4** `window.confirm` → modales propios (7 sitios).
+3. **1.3** prefijos de `localStorage` (requiere migración).
+4. **1.5** ESLint/Prettier (acordar con el usuario antes de instalar).
+5. **1.1-bis** tipado incremental del contrato sólo si aparece un síntoma.
 
 **Invariante para todos**: `tsc --noEmit` + `npm test` + `npm run build` en verde antes de cada commit. No hay ESLint, así que `tsc` es la única red de seguridad automática.
