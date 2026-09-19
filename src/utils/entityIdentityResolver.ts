@@ -176,6 +176,12 @@ export function buildRowIdentityIndex(
   const fechaIdx = fechaCol ? headers.indexOf(fechaCol) : -1;
   const loteIdx = loteCol ? headers.indexOf(loteCol) : -1;
 
+  // Conserva la PRIMERA fila que define cada clave, para coincidir con el escaneo
+  // ascendente de matchRowIndexByIdentity cuando la clave está duplicada.
+  const setFirst = (key: string, sheetRowIndex: number) => {
+    if (!indexMap.has(key)) indexMap.set(key, sheetRowIndex);
+  };
+
   for (let r = 1; r < refreshedRows.length; r++) {
     const row = refreshedRows[r];
     const sheetRowIndex = r + 1;
@@ -183,15 +189,15 @@ export function buildRowIdentityIndex(
     // Direct key column
     if (keyColIdx >= 0) {
       const val = String(row[keyColIdx] || '').trim();
-      if (val) indexMap.set(val, sheetRowIndex);
+      if (val) setFirst(val, sheetRowIndex);
     }
     if (cuIdx >= 0) {
       const val = String(row[cuIdx] || '').trim();
-      if (val) indexMap.set(val, sheetRowIndex);
+      if (val) setFirst(val, sheetRowIndex);
     }
     if (idIdx >= 0) {
       const val = String(row[idIdx] || '').trim();
-      if (val) indexMap.set(val, sheetRowIndex);
+      if (val) setFirst(val, sheetRowIndex);
     }
 
     // Composite keys
@@ -202,19 +208,19 @@ export function buildRowIdentityIndex(
           const yVal = String(row[yIdx] || '').trim();
           const mVal = String(row[mIdx] || '').trim().padStart(2, '0');
           if (yVal && mVal) {
-            indexMap.set(`${skuVal}${yVal}${mVal}`, sheetRowIndex);
+            setFirst(`${skuVal}${yVal}${mVal}`, sheetRowIndex);
           }
         }
         if (fechaIdx >= 0) {
           const fVal = String(row[fechaIdx] || '').trim();
           if (fVal) {
-            indexMap.set(`${skuVal}::${fVal}`, sheetRowIndex);
+            setFirst(`${skuVal}::${fVal}`, sheetRowIndex);
           }
         }
         if (loteIdx >= 0) {
           const lVal = String(row[loteIdx] || '').trim();
           if (lVal) {
-            indexMap.set(`${skuVal}::${lVal}`, sheetRowIndex);
+            setFirst(`${skuVal}::${lVal}`, sheetRowIndex);
           }
         }
       }
@@ -225,8 +231,14 @@ export function buildRowIdentityIndex(
 }
 
 /**
- * Finds the latest row index for a given item identity in a refreshed rows dataset.
+ * Finds the row index for a given item identity in a refreshed rows dataset.
  * Helps prevent overwriting the wrong row if the spreadsheet was sorted or had rows inserted.
+ *
+ * Nota: con una clave duplicada (mismo CU_VC en dos filas), el orden del recorrido
+ * decide el resultado. El índice precargado conservaba la ÚLTIMA fila y el recorrido en
+ * vivo devolvía la PRIMERA, de modo que el mismo item podía reescribir una fila distinta
+ * según el camino. Ahora el escaneo ascendente manda y el índice (que guarda la primera
+ * coincidencia) solo actúa de respaldo, así que ambos caminos coinciden siempre.
  */
 export function matchRowIndexByIdentity(
   identity: EntityKeyInfo,
@@ -236,13 +248,7 @@ export function matchRowIndexByIdentity(
 ): number | null {
   if (!refreshedRows || refreshedRows.length <= 1) return null;
 
-  if (identity.keyValue) {
-    if (prebuiltIndex && prebuiltIndex.has(identity.keyValue)) {
-      return prebuiltIndex.get(identity.keyValue)!;
-    }
-  }
-
-  // If we have a concrete single key column (e.g., CU_VC, ID_VC, FOLIO)
+  // Single concrete key column (e.g., CU_VC, ID_VC, FOLIO)
   if (!identity.isSynthetic && identity.keyColumn && !identity.keyColumn.includes('+')) {
     const colIdx = headers.indexOf(identity.keyColumn);
     if (colIdx >= 0) {
@@ -252,10 +258,13 @@ export function matchRowIndexByIdentity(
           return r + 1; // 1-based index in Google Sheets
         }
       }
+      // La columna clave existe y se escaneó completa: el registro ya no está.
+      // No se cae al rowIndex obsoleto (sobreescribiría la fila que hoy ocupa ese índice).
+      return null;
     }
   }
 
-  // If composite key: SKU + YYYY + MM
+  // Composite key: SKU + YYYY + MM, SKU + FECHA_VC or SKU + LOTE
   if (!identity.isSynthetic && identity.keyColumn && identity.keyColumn.includes('+')) {
     const skuCol = findColumnBySemantic(headers, 'sku');
     const yCol = findColumnBySemantic(headers, 'anio');
@@ -300,6 +309,11 @@ export function matchRowIndexByIdentity(
         }
       }
     }
+  }
+
+  // Respaldo: clave que el escaneo no cubrió (p. ej. keyColumn ausente en la mutación)
+  if (identity.keyValue && prebuiltIndex && prebuiltIndex.has(identity.keyValue)) {
+    return prebuiltIndex.get(identity.keyValue)!;
   }
 
   // Fallback to original rowIndex if within bounds

@@ -27,7 +27,8 @@ import {
 
 import { 
   resolveItemIdentity, 
-  matchRowIndexByIdentity 
+  matchRowIndexByIdentity,
+  buildRowIdentityIndex
 } from './src/utils/entityIdentityResolver';
 
 import { 
@@ -173,6 +174,36 @@ console.log('\n--- 4. Pruebas de entityIdentityResolver.ts ---');
   ];
   const matchedRow = matchRowIndexByIdentity(idRes, refreshed2DRows, h);
   assert(matchedRow === 5, 'matchRowIndexByIdentity re-localiza fila con precisión (fila 5)');
+
+  // Clave duplicada: el índice caliente y el recorrido en vivo deben coincidir SIEMPRE
+  // en la misma fila, para no reescribir el registro equivocado.
+  const dupeRows = [
+    h,
+    ['AAA', '12', '2027'], // fila 2 (SKU, MES_VC, ANIO_VC)
+    ['BBB', '01', '2026'],
+    ['AAA', '12', '2027'], // fila 4 -> clave duplicada
+  ];
+  const dupeIdentity = {
+    keyColumn: 'SKU+ANIO+MES',
+    keyValue: 'AAA202712',
+    isSynthetic: false,
+    rowIndex: 0,
+  };
+  const hotIndex = buildRowIdentityIndex(dupeRows, h);
+  assert(hotIndex.get('AAA202712') === 2,
+    'buildRowIdentityIndex conserva la PRIMERA fila de una clave duplicada');
+  assert(matchRowIndexByIdentity(dupeIdentity, dupeRows, h, hotIndex) === 2,
+    'matchRowIndexByIdentity con índice caliente resuelve de forma determinista (fila 2)');
+  assert(matchRowIndexByIdentity(dupeIdentity, dupeRows, h) === 2,
+    'matchRowIndexByIdentity sin índice resuelve la MISMA fila que con índice (sin divergencia)');
+
+  // Regresión: columna clave ausente en la hoja debe caer al respaldo, no lanzar
+  const missingColRes = matchRowIndexByIdentity(
+    { keyColumn: 'COL_INEXISTENTE', keyValue: 'ZZZ', isSynthetic: false, rowIndex: 3 },
+    dupeRows, h
+  );
+  assert(missingColRes === 3,
+    'matchRowIndexByIdentity usa rowIndex de respaldo si la columna clave no existe en la hoja');
 }
 
 console.log('\n--- 5. Pruebas de referenceResolver.ts ---');
