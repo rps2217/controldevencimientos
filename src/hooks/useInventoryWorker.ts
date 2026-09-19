@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { InventoryItem, ViewKey } from '../types';
 import { WorkerMetricsResult, WorkerOutMessage } from '../workers/inventoryWorker';
 
@@ -79,6 +79,24 @@ export function useInventoryWorker({
     }
   }, []);
 
+  const buildFilterPayload = useCallback(() => ({
+    activeView,
+    searchTerm: (searchTerm.trim() || activeQuickChip || '').toLowerCase(),
+    eventFilter,
+    frcBodFilter,
+    frcBodCol,
+    eventResolutionFilter,
+    pmRadarFilter,
+    columnFilters,
+    dynamicMonthFilter,
+    dynamicMonthRange
+  }), [activeView, searchTerm, activeQuickChip, eventFilter, frcBodFilter, frcBodCol, eventResolutionFilter, pmRadarFilter, columnFilters, dynamicMonthFilter, dynamicMonthRange]);
+
+  // Ref always pointing at the latest payload builder: the dataset effect below must re-read it
+  // when data changes without re-running PROCESS_DATA on every filter change.
+  const buildFilterPayloadRef = useRef(buildFilterPayload);
+  buildFilterPayloadRef.current = buildFilterPayload;
+
   // Post PROCESS_DATA when dataset or structural headers change
   useEffect(() => {
     if (workerRef.current && isWorkerReady) {
@@ -94,44 +112,14 @@ export function useInventoryWorker({
       });
       
       // Immediately trigger FILTER_DATA so matchingIndices is refreshed for the new dataset
-      const effectiveSearch = (searchTerm.trim() || activeQuickChip || '').toLowerCase();
-      workerRef.current.postMessage({
-        type: 'FILTER_DATA',
-        payload: {
-          activeView,
-          searchTerm: effectiveSearch,
-          eventFilter,
-          frcBodFilter,
-          frcBodCol,
-          eventResolutionFilter,
-          pmRadarFilter,
-          columnFilters,
-          dynamicMonthFilter,
-          dynamicMonthRange
-        }
-      });
+      workerRef.current.postMessage({ type: 'FILTER_DATA', payload: buildFilterPayloadRef.current() });
     }
   }, [items, headers, frcBodCol, searchableHeaders, isWorkerReady]);
 
   // Post FILTER_DATA when filter criteria or search term changes
   useEffect(() => {
-    const effectiveSearch = (searchTerm.trim() || activeQuickChip || '').toLowerCase();
     if (workerRef.current && isWorkerReady) {
-      workerRef.current.postMessage({
-        type: 'FILTER_DATA',
-        payload: {
-          activeView,
-          searchTerm: effectiveSearch,
-          eventFilter,
-          frcBodFilter,
-          frcBodCol,
-          eventResolutionFilter,
-          pmRadarFilter,
-          columnFilters,
-          dynamicMonthFilter,
-          dynamicMonthRange
-        }
-      });
+      workerRef.current.postMessage({ type: 'FILTER_DATA', payload: buildFilterPayload() });
     }
   }, [
     activeView,
@@ -145,7 +133,8 @@ export function useInventoryWorker({
     columnFilters,
     dynamicMonthFilter,
     dynamicMonthRange,
-    isWorkerReady
+    isWorkerReady,
+    buildFilterPayload
   ]);
 
   return {

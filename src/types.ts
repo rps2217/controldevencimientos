@@ -253,26 +253,7 @@ export interface StockCountSession {
   auditor?: string;                // Nombre o firma del operario
   lastUpdated?: string;            // Timestamp de última mutación (ISO)
   sincronizadoNube?: boolean;      // Indicador si esta versión ya fue respaldada en la nube
-  manifestId?: string;             // ID único del manifiesto de entrega
 }
-
-export interface CountManifest {
-  manifestId: string;
-  campaignId?: string;
-  campaignName?: string;
-  sessionId: string;
-  sessionName: string;
-  ubicacion?: string;
-  deviceId: string;
-  auditor?: string;
-  totalSkus: number;
-  totalUnidades: number;
-  fechaInicio: string;
-  fechaCierre?: string;
-  estado: 'EN_CONTEO' | 'FINALIZADO_ENVIADO';
-  resumenSkus?: Array<{ sku: string; descripcion: string; cantidad: number }>;
-}
-
 export interface StockCountReconciliationItem {
   itemKey: string;                 // CU_VC (si aplica vencimiento) o SKU
   sku: string;

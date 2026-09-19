@@ -6,8 +6,7 @@ import {
   InventoryCampaign,
   CampaignSnapshotRecord,
   CampaignConsolidationMatrix,
-  CampaignAuditRow,
-  CountManifest
+  CampaignAuditRow
 } from '../types';
 import { findColumnBySemantic } from './columnAliases';
 import { parseLocaleNumber, getEndOfMonthDateForYm, formatDisplayDate } from './pureCalculations';
@@ -1267,51 +1266,6 @@ export function getOrCreateDeviceId(): string {
     return 'Terminal-Local';
   }
 }
-
-/**
- * Genera un manifiesto oficial de entrega a partir de una sesión de conteo por mueble
- */
-export function generateCountManifest(
-  session: StockCountSession,
-  campaign?: InventoryCampaign | null
-): CountManifest {
-  const deviceId = session.deviceId || getOrCreateDeviceId();
-  const manifestId = session.manifestId || `MAN-${session.id.replace(/[^a-zA-Z0-9]/g, '').slice(-8)}`;
-  
-  const skuMap = new Map<string, { sku: string; descripcion: string; cantidad: number }>();
-  for (const c of session.conteos) {
-    const existing = skuMap.get(c.sku);
-    if (existing) {
-      existing.cantidad += c.cantidad;
-    } else {
-      skuMap.set(c.sku, {
-        sku: c.sku,
-        descripcion: c.descripcion || '',
-        cantidad: c.cantidad
-      });
-    }
-  }
-
-  const totalUnidades = session.conteos.reduce((sum, c) => sum + c.cantidad, 0);
-
-  return {
-    manifestId,
-    campaignId: campaign?.id,
-    campaignName: campaign?.nombre,
-    sessionId: session.id,
-    sessionName: session.nombre,
-    ubicacion: session.ubicacion,
-    deviceId,
-    auditor: session.auditor,
-    totalSkus: skuMap.size,
-    totalUnidades,
-    fechaInicio: session.fechaInicio,
-    fechaCierre: session.fechaCierre,
-    estado: session.estado === 'COMPLETED' ? 'FINALIZADO_ENVIADO' : 'EN_CONTEO',
-    resumenSkus: Array.from(skuMap.values())
-  };
-}
-
 /**
  * Motor de Fusión y Consolidación Multi-dispositivo (Merge Engine)
  * Fusiona sin pérdida de datos las campañas y sesiones de conteo locales con las remotas de Google Sheets

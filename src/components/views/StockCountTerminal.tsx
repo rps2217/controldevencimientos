@@ -158,50 +158,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     }
   };
 
-  // TODO(ponytail): función sin invocador — cierra sesión y sube manifiesto. Requiere botón en la vista LIST o eliminar.
-  // Finalizar mueble y subir manifiesto oficial a la nube
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleFinishAndBackupSession = async (sessionToFinish: StockCountSession) => {
-    const confirmClose = await confirm({ title: 'Finalizar conteo', message: `¿Deseas finalizar el conteo de "${sessionToFinish.nombre}" y enviar su manifiesto oficial a la nube?`, confirmLabel: 'Finalizar y subir', variant: 'default' });
-    if (!confirmClose) return;
-
-    setIsSyncingCloud(true);
-    try {
-      const closedSession: StockCountSession = {
-        ...sessionToFinish,
-        estado: 'COMPLETED',
-        fechaCierre: new Date().toISOString(),
-        lastUpdated: new Date().toISOString(),
-        sincronizadoNube: true,
-        deviceId: sessionToFinish.deviceId || getOrCreateDeviceId()
-      };
-      const updatedSessions = sessions.map(s => s.id === sessionToFinish.id ? closedSession : s);
-      setSessions(updatedSessions);
-      saveStockCountSessionsToStorage(updatedSessions);
-
-      const res = await syncCampaignsWithCloud({
-        campaigns,
-        activeCampaignId: activeCampaignIdState,
-        sessions: updatedSessions
-      });
-
-      if (res && res.success) {
-        setCampaigns(res.mergedCampaigns);
-        setSessions(res.mergedSessions);
-        saveCampaignsToStorage(res.mergedCampaigns);
-        saveStockCountSessionsToStorage(res.mergedSessions);
-      }
-
-      playBeep('success');
-      showToast(`🎉 ¡${closedSession.nombre} finalizado y respaldado en la nube!`, 'success');
-      setViewState('LIST');
-    } catch (err: unknown) {
-      showToast(`Error al finalizar: ${getErrorMessage(err)}`, 'error');
-    } finally {
-      setIsSyncingCloud(false);
-    }
-  };
-
   // Auto-sync on mount to pull any fresh theoretical stock uploaded in the office PC
   useEffect(() => {
     handleCloudSync(true);

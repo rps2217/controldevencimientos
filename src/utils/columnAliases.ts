@@ -438,44 +438,6 @@ export function findColumnBySemantic(
 
   return matched;
 }
-
-/**
- * Extract a map of all detected semantic fields from headers
- */
-export function detectAllColumnSemantics(
-  headers: string[], 
-  customAliases?: Record<string, string[]>
-): Partial<Record<KnownFieldSemantic, string>> {
-  if (!headers || headers.length === 0) return {};
-
-  if (!customAliases) {
-    const cached = headerSemanticsCache.get(headers);
-    if (cached && Object.keys(cached).length >= 10) {
-      return cached;
-    }
-  }
-
-  const map: Partial<Record<KnownFieldSemantic, string>> = {};
-  const semantics: KnownFieldSemantic[] = [
-    'id', 'sku', 'descripcion', 'fecha_vc', 'fecha_retiro', 'mes', 'anio', 
-    'cantidad', 'lote', 'politica', 'dias_anticipacion', 'dias_retiro', 'tipo_evento', 
-    'frc_bod', 'observacion', 'proveedor', 'n_traspaso', 'telefono', 'email', 'categoria', 'mundo', 'pm', 'ubicacion'
-  ];
-
-  semantics.forEach(semantic => {
-    const matched = findColumnBySemantic(headers, semantic, customAliases);
-    if (matched) {
-      map[semantic] = matched;
-    }
-  });
-
-  if (!customAliases && typeof headers === 'object') {
-    headerSemanticsCache.set(headers, map);
-  }
-
-  return map;
-}
-
 /**
  * Helper to find phone/whatsapp column
  */

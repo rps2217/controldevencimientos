@@ -72,7 +72,21 @@ Cada punto indica **evidencia reproducible** y **veredicto Ponytail** (YAGNI, re
   4. `InventoryDashboard.tsx` — `handleSyncOfflineQueue` mostraba un toast `loading` con `duration: 0` que nunca se actualizaba (quedaba colgado para siempre). Ahora usa `updateToast`/`removeToast`.
   5. `barcodeGenerator.ts` — `isCodeC` se asignaba 3 veces y nunca se leía; `CODE_B_TO_C` nunca usado. Eliminados.
 - **Código muerto purgado**: ~120 líneas (imports, alias de contexto sin uso, estado vestigial `pageSize`/`totalPages`/`isViewMenuOpen`, el `useEffect` de "click outside" de dropdowns `#actions-dropdown`/`#view-dropdown` que ya no existen en el DOM, 21 props destructuradas sin uso).
-- **Pendiente de decisión del usuario**: `handleFinishAndBackupSession` en `StockCountTerminal.tsx` es funcionalidad real (~45 líneas: cierra sesión y sube manifiesto) que **nunca tuvo invocador** en ningún commit. Queda marcada con `TODO(ponytail)` + `eslint-disable`. Opciones: cablearla desde la vista LIST o eliminarla. **No es regresión de esta auditoría.**
+- **RESUELTO — `handleFinishAndBackupSession` eliminada**: se verificó que el flujo de cierre de sesión ya existe en otro punto del componente (`handleCloseSession`), por lo que la función nunca cableada era redundante. Eliminada junto a su único consumidor del cluster "manifiesto": `generateCountManifest`, el tipo `CountManifest` y el campo `Session.manifestId`. −106 líneas netas, sin cambio de conducta.
+
+---
+
+## 1-bis. Segunda pasada de código muerto (auditoría estricta)
+
+Barrido por análisis de símbolos exportados y locales, con verificación de cada candidato antes de borrar (ningún borrado por heurística sola):
+
+- `StorageKeyName` (`appStorage.ts`) — tipo exportado sin uso.
+- `copyItemsToClipboardTSV` y `downloadBlob` (`exportUtils.ts`) — sin uso; los sitios reales usan `copyTextToClipboard` y `URL.createObjectURL` locales.
+- `detectAllColumnSemantics` (`columnAliases.ts`) — sin uso. La caché `headerSemanticsCache` que parecía depender de ella **sí se conserva**: la usa `findColumnBySemantic`, que sigue vigente.
+- `generateCountManifest` + `CountManifest` + `manifestId` — flujo del "manifiesto" completo, huérfano tras eliminar la función anterior.
+- Falsos positivos descartados: `doGet`/`doPost` en `src/lib/sheets.ts` son plantillas de Apps Script embebidas en strings, no código ejecutable.
+
+**Duplicación real eliminada (`useInventoryWorker.ts`)**: el payload `FILTER_DATA` (10 campos) estaba escrito literal dos veces. Extraído a `buildFilterPayload` con `useCallback`. Detalle importante: el efecto de dataset usa `buildFilterPayloadRef` en lugar de añadir el callback a sus dependencias, porque incluirlo re-dispararía `PROCESS_DATA` (recómputo completo del worker) en cada cambio de filtro — regresión de rendimiento evitada. Advertencias `exhaustive-deps`: 23 → 22.
 
 ---
 

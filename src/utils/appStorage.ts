@@ -45,9 +45,6 @@ export const STORAGE_KEYS = {
   MODULE_STATES: 'app_module_states',
   TICKET_CONFIG: 'global_ticket_print_config',
 } as const;
-
-export type StorageKeyName = keyof typeof STORAGE_KEYS;
-
 /** Clave dinámica de caché L1 por pestaña de Google Sheets. */
 export const sheetCacheKey = (sheetTitle: string): string =>
   `appsheet_clone_cache_${sheetTitle}`;

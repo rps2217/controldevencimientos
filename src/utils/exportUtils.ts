@@ -87,45 +87,6 @@ export async function exportToExcel(
   const cleanFilename = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
   XLSX.writeFile(workbook, cleanFilename);
 }
-
-/**
- * Export array of items to tab-separated TSV clipboard string
- */
-export function copyItemsToClipboardTSV(headers: string[], items: any[], columnLabelsMap?: Record<string, string>): boolean {
-  if (!items || !items.length) return false;
-
-  const displayHeaders = headers.map(h => (columnLabelsMap && columnLabelsMap[h]) ? columnLabelsMap[h] : h);
-  const headerRow = displayHeaders.join('\t');
-  const dataRows = items.map(item =>
-    headers.map(h => {
-      let val = item[h];
-      if ((val === undefined || val === null) && columnLabelsMap && columnLabelsMap[h]) {
-        val = item[columnLabelsMap[h]];
-      }
-      if (val === null || val === undefined) return '';
-      return String(val).replace(/\t/g, ' ').replace(/\n/g, ' ');
-    }).join('\t')
-  );
-
-  const fullText = [headerRow, ...dataRows].join('\n');
-  return copyTextToClipboard(fullText);
-}
-
-/**
- * Clean, native Blob download utility (Paso 4 Ponytail: Native Web API)
- */
-export function downloadBlob(content: BlobPart, filename: string, mimeType = 'text/plain;charset=utf-8;'): void {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
 /**
  * Universal safe clipboard copy with fallback
  */
