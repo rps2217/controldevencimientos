@@ -60,6 +60,11 @@ import {
   migrateLegacyStorageKeys
 } from './src/utils/appStorage';
 
+import {
+  saveStockCountSessionsToStorageDebounced,
+  flushStockCountSessionsToStorage
+} from './src/utils/stockCountUtils';
+
 
 import { 
   SAMPLE_HEADERS, 
@@ -267,6 +272,34 @@ console.log('\n--- 11. Pruebas de appStorage.ts ---');
   migrateLegacyStorageKeys();
   assert(store.get(STORAGE_KEYS.SHEET_CONFIG) === 'CANONICA',
     'appStorage: la migración no sobreescribe la clave canónica existente');
+}
+
+console.log('\n--- 12. Pruebas de persistencia diferida de sesiones de conteo ---');
+{
+  const store = new Map<string, string>();
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+    setItem: (k: string, v: string) => { store.set(k, String(v)); },
+    removeItem: (k: string) => { store.delete(k); },
+  };
+
+  const sessions = [{ id: 's1', nombre: 'Lácteos', conteos: [] }] as any;
+
+  // Escritura diferida: aún no debe haber tocado localStorage
+  saveStockCountSessionsToStorageDebounced(sessions, 5000);
+  assert(store.get(STORAGE_KEYS.STOCK_COUNT_SESSIONS) === undefined,
+    'deferred: no escribe antes de cumplirse el retardo');
+
+  // El flush debe persistir la lectura pendiente aunque el timer no haya corrido
+  flushStockCountSessionsToStorage();
+  assert(store.get(STORAGE_KEYS.STOCK_COUNT_SESSIONS) === JSON.stringify(sessions),
+    'flush: persiste la lectura pendiente sin esperar el timer');
+
+  // Flush sin pendientes no debe lanzar ni reescribir
+  store.delete(STORAGE_KEYS.STOCK_COUNT_SESSIONS);
+  flushStockCountSessionsToStorage();
+  assert(store.get(STORAGE_KEYS.STOCK_COUNT_SESSIONS) === undefined,
+    'flush: sin pendientes es una operación no-op segura');
 }
 
 console.log(`\n========================================`);

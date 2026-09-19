@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'rea
 import { useNavigate } from 'react-router-dom';
 import { X, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2, Undo2 } from 'lucide-react';
 import { StockCountSession, StockCountEntry, InventoryItem, InventoryCampaign } from '../../types';
-import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorage, saveStockCountSessionsToStorageDebounced, loadCampaignsFromStorage, saveCampaignsToStorage, getActiveCampaignId, setActiveCampaignId, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
+import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorage, saveStockCountSessionsToStorageDebounced, flushStockCountSessionsToStorage, loadCampaignsFromStorage, saveCampaignsToStorage, getActiveCampaignId, setActiveCampaignId, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
 import { saveAuditRowsToDedicatedSheet, syncCampaignsWithCloud } from '../../lib/sheets';
 import { LazyFallback } from '../common/LazyFallback';
 import { MobileCameraBarcodeScanner } from './MobileCameraBarcodeScanner';
@@ -374,6 +374,20 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   useEffect(() => {
     saveStockCountSessionsToStorageDebounced(sessions, 300);
   }, [sessions]);
+
+  // Volcar de inmediato la escritura pendiente cuando la página puede descartarse
+  // (cambio de pestaña, app en segundo plano, cierre): en PDA esto es el caso común,
+  // no el borde. Sin esto, la última lectura se perdía en la ventana de 300ms.
+  useEffect(() => {
+    const flush = () => flushStockCountSessionsToStorage();
+    document.addEventListener('visibilitychange', flush);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', flush);
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
+  }, []);
 
   // Focus SKU input whenever switching to counting view
   useEffect(() => {

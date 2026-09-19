@@ -69,6 +69,7 @@ export function generateShortVcId(): string {
 
 
 let saveSessionsDebounceTimer: any = null;
+let pendingSessionsToSave: StockCountSession[] | null = null;
 
 /**
  * Loads saved count sessions from localStorage (IndexedDB fallback safe)
@@ -100,12 +101,31 @@ export function saveStockCountSessionsToStorage(sessions: StockCountSession[]): 
  * Non-blocking debounced persistence to prevent UI freeze during high-frequency barcode scanning
  */
 export function saveStockCountSessionsToStorageDebounced(sessions: StockCountSession[], delayMs: number = 300): void {
+  pendingSessionsToSave = sessions;
   if (saveSessionsDebounceTimer) {
     clearTimeout(saveSessionsDebounceTimer);
   }
   saveSessionsDebounceTimer = setTimeout(() => {
     saveStockCountSessionsToStorage(sessions);
+    pendingSessionsToSave = null;
+    saveSessionsDebounceTimer = null;
   }, delayMs);
+}
+
+/**
+ * Flushes any pending debounced write immediately. Call when the page may be
+ * discarded (tab hidden / closed, PDA app switched away) so the last reading is
+ * never lost to an un-fired timer.
+ */
+export function flushStockCountSessionsToStorage(): void {
+  if (saveSessionsDebounceTimer) {
+    clearTimeout(saveSessionsDebounceTimer);
+    saveSessionsDebounceTimer = null;
+  }
+  if (pendingSessionsToSave) {
+    saveStockCountSessionsToStorage(pendingSessionsToSave);
+    pendingSessionsToSave = null;
+  }
 }
 
 /**

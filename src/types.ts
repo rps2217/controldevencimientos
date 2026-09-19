@@ -213,7 +213,7 @@ export interface TableSlice {
 // ==========================================
 
 export type StockCountMode = 'BLIND' | 'DOCUMENT';
-export type StockCountStatus = 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED';
+export type StockCountStatus = 'IN_PROGRESS' | 'COMPLETED';
 
 export interface StockCountEntry {
   id: string;                      // Identificador local de la lectura
@@ -241,7 +241,7 @@ export interface StockCountSession {
   modo: StockCountMode;            // 'BLIND' o 'DOCUMENT'
   requiereVencimiento: boolean;    // Toggle MM/YYYY activable/desactivable a necesidad
   hojaOrigen: string;              // Pestaña de referencia (ej: 'main', 'products')
-  estado: StockCountStatus;        // 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED'
+  estado: StockCountStatus;        // 'IN_PROGRESS' | 'COMPLETED'
   fechaInicio: string;             // ISO
   fechaCierre?: string;            // ISO
   conteos: StockCountEntry[];      // Lecturas físicas registradas
