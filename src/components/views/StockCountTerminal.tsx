@@ -11,6 +11,8 @@ import { StockCountReconciliationView } from './StockCountReconciliationView';
 import { StockCountSessionsListView, NewSessionConfig } from './StockCountSessionsListView';
 import { CountNumpad } from './CountNumpad';
 import { MobileReadingsList } from './MobileReadingsList';
+import { LastScannedHeroCard } from './LastScannedHeroCard';
+import { MobileExpiryPrompt, MONTHS_LIST } from './MobileExpiryPrompt';
 import { buildMasterCatalogIndex } from '../../utils/referenceResolver';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { copyTextToClipboard } from '../../utils/exportUtils';
@@ -32,20 +34,6 @@ interface StockCountTerminalProps {
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
-const MONTHS_LIST = [
-  { val: '01', label: '01 - Ene' },
-  { val: '02', label: '02 - Feb' },
-  { val: '03', label: '03 - Mar' },
-  { val: '04', label: '04 - Abr' },
-  { val: '05', label: '05 - May' },
-  { val: '06', label: '06 - Jun' },
-  { val: '07', label: '07 - Jul' },
-  { val: '08', label: '08 - Ago' },
-  { val: '09', label: '09 - Sep' },
-  { val: '10', label: '10 - Oct' },
-  { val: '11', label: '11 - Nov' },
-  { val: '12', label: '12 - Dic' }
-];
 
 export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   sheetItems,
@@ -1551,92 +1539,26 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
 
                   {/* Expiry Prompt Modal / Step inside Mobile */}
                   {expiryPromptSku ? (
-                    <div className="bg-blue-50/95 dark:bg-slate-800 p-4 rounded-2xl border-2 border-blue-500 dark:border-blue-700 shadow-xl animate-in zoom-in-95 duration-150">
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 block">
-                            Fecha de Vencimiento
-                          </span>
-                          <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mt-0.5">
-                            ¿Cuándo vence este producto?
-                          </h3>
-                          <p className="text-xs text-slate-500 font-mono mt-0.5">
-                            SKU: {expiryPromptSku} • Cant: {countQuantity}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setExpiryPromptSku(null);
-                            playBeep('skip');
-                          }}
-                          className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-slate-400"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      {/* Year Selector */}
-                      <div className="mb-3">
-                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5 block">1. Selecciona Año</span>
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {yearsList.map(y => (
-                            <button
-                              key={y}
-                              type="button"
-                              onClick={() => {
-                                setTempYyyy(y);
-                                if (tempMm) {
-                                  commitCountEntry(expiryPromptSku, tempMm, y, false);
-                                }
-                              }}
-                              className={`py-2.5 rounded-xl text-xs font-black transition-all border cursor-pointer ${
-                                tempYyyy === y
-                                  ? 'bg-blue-600 border-blue-600 text-white shadow-md'
-                                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                              }`}
-                            >
-                              {y}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Month Selector */}
-                      <div className="mb-3">
-                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5 block">2. Selecciona Mes</span>
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {MONTHS_LIST.map(m => (
-                            <button
-                              key={m.val}
-                              type="button"
-                              onClick={() => {
-                                setTempMm(m.val);
-                                if (tempYyyy) {
-                                  commitCountEntry(expiryPromptSku, m.val, tempYyyy, false);
-                                }
-                              }}
-                              className={`py-2.5 rounded-xl text-xs font-black transition-all text-center border cursor-pointer ${
-                                tempMm === m.val
-                                  ? 'bg-blue-600 border-blue-600 text-white shadow-md'
-                                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                              }`}
-                            >
-                              {m.label.split(' - ')[0]}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => commitCountEntry(expiryPromptSku, undefined, undefined, true)}
-                        className="w-full py-3 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Calendar className="w-4 h-4 text-slate-500" />
-                        <span>Omitir Fecha (Sin Vencimiento)</span>
-                      </button>
-                    </div>
+                    <MobileExpiryPrompt
+                      sku={expiryPromptSku}
+                      quantity={countQuantity}
+                      yearsList={yearsList}
+                      tempYyyy={tempYyyy}
+                      tempMm={tempMm}
+                      onSelectYear={(y) => {
+                        setTempYyyy(y);
+                        if (tempMm) commitCountEntry(expiryPromptSku, tempMm, y, false);
+                      }}
+                      onSelectMonth={(m) => {
+                        setTempMm(m);
+                        if (tempYyyy) commitCountEntry(expiryPromptSku, m, tempYyyy, false);
+                      }}
+                      onSkip={() => commitCountEntry(expiryPromptSku, undefined, undefined, true)}
+                      onClose={() => {
+                        setExpiryPromptSku(null);
+                        playBeep('skip');
+                      }}
+                    />
                   ) : (
                     /* Mobile Scanner & Entry Form */
                     <form onSubmit={handleSkuScannedOrEntered} className="flex flex-col gap-3">
@@ -1916,59 +1838,11 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                     </form>
                   )}
 
-                  {/* Last Scanned Item Feedback Hero Card */}
-                  {lastScannedItem && (
-                    <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800 shadow-sm">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] uppercase font-black tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          Último Producto Registrado
-                        </span>
-                        <span className="text-[10px] text-emerald-600 font-mono">
-                          {new Date(lastScannedItem.timestamp).toLocaleTimeString('es-CL')}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="truncate pr-2 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono font-black text-sm text-emerald-900 dark:text-emerald-200">{lastScannedItem.sku}</span>
-                            {lastScannedItem.mm && lastScannedItem.yyyy && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-200/60 text-emerald-800">
-                                {lastScannedItem.mm}/{lastScannedItem.yyyy}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate mt-0.5">
-                            {lastScannedItem.descripcion}
-                          </p>
-                          <span className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400 mt-0.5 block">
-                            Acumulado: {lastScannedItem.totalAcumulado} unids ({lastScannedItem.scanCount} lecturas)
-                          </span>
-                        </div>
-
-                        {/* Quick adjustments directly on hero card */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleDecrementSkuQuantity(lastScannedItem.sku)}
-                            className="w-9 h-9 bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-xl text-emerald-800 dark:text-emerald-300 font-black flex items-center justify-center text-base active:scale-90 shadow-xs"
-                            title="Descontar 1 unidad"
-                          >
-                            -
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleIncrementSkuQuantity(lastScannedItem.sku)}
-                            className="w-9 h-9 bg-emerald-600 text-white rounded-xl font-black flex items-center justify-center text-base active:scale-90 shadow-xs"
-                            title="Sumar 1 unidad"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <LastScannedHeroCard
+                    entry={lastScannedItem}
+                    onIncrement={handleIncrementSkuQuantity}
+                    onDecrement={handleDecrementSkuQuantity}
+                  />
 
                 </div>
               )}

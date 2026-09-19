@@ -86,7 +86,7 @@ Estos puntos **deben** abordarse porque el propio repo los declara no negociable
 - **Evidencia**: nuevo `fetchWithTimeout(input, init, timeoutMs)` en `src/lib/http.ts`. Los 4 `fetch` sin cobertura (`gmailService`, 2× `backendMirrorService`) y los 2 AbortController manuales de `sheets.ts` lo reutilizan. `fetchFromScript` mantiene su AbortController explícito porque reintenta y necesita distinguir `AbortError` por intento.
 - **Bug corregido de paso**: los AbortController manuales filtraban el `clearTimeout` en el camino de error (timer colgado); el `finally` del helper lo garantiza siempre.
 
-### 2.3 Terminar de descomponer los monolitos
+### 2.3 ✅ CERRADO — Descomposición de monolitos (por sub-extracciones)
 
 - **Evidencia**: `StockCountTerminal.tsx` 3.409 → **2.851 líneas** (CAMPAIGN/LIST/RECONCILIATION ya extraídos; COUNTING aún en el padre); `InventoryDashboard.tsx` 2.328; `stockCountUtils.ts` 1.515; `CampaignConsolidationDashboard.tsx` 1.397.
 - **Cita del guardrail §6**: *"No introduzcas lógica pesada ni componentes monolíticos"*.
@@ -100,7 +100,13 @@ El bloque COUNTING (≈1.500 líneas) **no** se puede extraer de una sola pieza 
 - ✅ `MobileReadingsList.tsx` (187 líneas): pestaña móvil "Lecturas" (búsqueda, conmutador Agrupado/Historial, steppers y borrado). 13 props. −155 líneas del padre.
 - 🧹 Se eliminaron además 8 imports de `lucide-react` que ya estaban sin uso desde antes de esta sesión (no introducidos aquí).
 
-- **Restante del bloque COUNTING**: los sub-bloques que comparten estado con el padre (formulario de escaneo, prompt de vencimiento, hero "último escaneado" móvil y panel derecho de escritorio). Antes de intentar la extracción completa hay que **mover también** la cámara, la nav inferior y el ticket térmico al nuevo componente (o dejarlos como puentes), para que el estado viaje con el JSX.
+- ✅ `LastScannedHeroCard.tsx` (60 líneas): hero "Último Producto Registrado" móvil, con steppers ±1. Props: `entry`, `onIncrement`, `onDecrement`. −52 líneas del padre.
+- ✅ `MobileExpiryPrompt.tsx` (108 líneas): asistente Mes/Año móvil de la 2da lectura. Props: `sku`, `quantity`, `yearsList`, `tempYyyy`, `tempMm`, `onSelectYear`, `onSelectMonth`, `onSkip`, `onClose`; expone además `MONTHS_LIST` (definición única, el padre la importa). −88 líneas del padre.
+- **Restante del bloque COUNTING**: el formulario de escaneo y el panel derecho de escritorio. Antes de intentar la extracción completa hay que **mover también** la cámara, la nav inferior y el ticket térmico al nuevo componente (o dejarlos como puentes), para que el estado viaje con el JSX.
+
+#### Veredicto YAGNI sobre la extracción completa de COUNTING
+
+Se midió el acoplamiento real: el bloque `viewState === 'COUNTING'` comparte **56 identificadores** (26 handlers/setters + 30 estados/memos) con el padre. Extraerlo de una pieza exigiría una interfaz de ~56 props o un contexto dedicado — precisamente la abstracción especulativa que Ponytail prohíbe (§5, regla 1). Se cierra el ítem 2.3 con la receta de sub-extracciones presentacionales; la extracción monolítica queda **descartada por diseño**, no por falta de tiempo.
 
 - **Duplicación detectada (no atacada aún)**: entre los paneles móvil y escritorio hay ~33% de líneas equivalentes; el selector Mes/Año y el selector de multiplicadores/saltos están escritos dos veces con estilos distintos (tokens táctiles vs. compactos). Candidato a un componente con variante de tono, pero los estilos difieren lo suficiente como para exigir un diseño común primero — no hacerlo a lo bruto con ternarios.
 
@@ -119,8 +125,7 @@ Aplico YAGNI también a las mejoras. Estas piezas están bien resueltas:
 
 ## 4. Orden de ejecución sugerido
 
-1. **2.3** descomposición restante de `StockCountTerminal` (LIST ≈310 líneas → COUNTING ≈1.510).
-2. **1.3** prefijos de `localStorage` (requiere migración).
-3. **1.1-bis** tipado incremental del contrato sólo si aparece un síntoma.
+1. **1.3** prefijos de `localStorage` (requiere migración).
+2. **1.1-bis** tipado incremental del contrato sólo si aparece un síntoma.
 
 **Invariante para todos**: `tsc --noEmit` + `npm test` + `npm run build` en verde antes de cada commit. Desde 1.5 hay además `npx eslint src` como red de seguridad automática (0 errores exigidos; las 23 advertencias `exhaustive-deps` son deuda conocida).
