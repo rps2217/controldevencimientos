@@ -1,5 +1,4 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle } from 'lucide-react';
 import { InventoryItem, SheetConfig, SheetProperties } from '../../types';
 import { buildBulkActionContext, isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
@@ -43,6 +42,7 @@ export interface DashboardTopNavProps {
   latencyMs?: number | null;
   connectionStatus?: string;
   onOpenSyncAudit?: () => void;
+  onOpenStockCount?: () => void;
   failedCount?: number;
   // Executive Context & Actions props
   isRelationalActive?: boolean;
@@ -101,7 +101,7 @@ export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
   const setIsBulkImportOpen = props.setIsBulkImportOpen ?? dashboard.setIsBulkImportOpen;
   const setIsScriptModalOpen = props.setIsScriptModalOpen ?? dashboard.setIsScriptModalOpen;
   const onOpenViewConfig = props.onOpenViewConfig ?? (() => dashboard.setIsRightDrawerOpen?.(true));
-  const navigate = useNavigate();
+  const onOpenStockCount = props.onOpenStockCount ?? (() => dashboard.setIsStockCountOpen?.(true));
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Global Keyboard shortcut for search (Cmd+K / Ctrl+K)
@@ -324,7 +324,7 @@ export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
 
         {/* Conteo Físico Terminal */}
         <button
-          onClick={() => navigate('/conteo')}
+          onClick={onOpenStockCount}
           className="hidden md:flex h-10 items-center gap-1.5 px-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-2xs shrink-0 cursor-pointer active:scale-95"
           title="Módulo de conteo masivo de existencias físicas"
         >
