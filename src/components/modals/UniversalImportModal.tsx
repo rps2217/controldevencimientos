@@ -4,6 +4,7 @@ import { parseExcelBuffer, parseDelimitedText, detectDelimiter, generateSmartCol
 import { rowToObject } from '../../utils/pureCalculations';
 import { InventoryItem } from '../../types';
 import { reconcileImportWithInventory, ImportConsolidationMode } from '../../utils/cuVcConsolidator';
+import { getErrorMessage } from '../../utils/pureCalculations';
 
 interface UniversalImportModalProps {
   isOpen: boolean;
@@ -122,8 +123,8 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
         text: `Datos reconocidos con éxito: ${rows.length} filas y ${parsed.headers.length} columnas detectadas.`, 
         type: 'success' 
       });
-    } catch (err: any) {
-      setStatusMessage({ text: `Error al procesar el texto: ${err.message}`, type: 'error' });
+    } catch (err: unknown) {
+      setStatusMessage({ text: `Error al procesar el texto: ${getErrorMessage(err)}`, type: 'error' });
     }
   };
 
@@ -145,8 +146,8 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
         const text = await file.text();
         handleProcessText(text);
       }
-    } catch (err: any) {
-      setStatusMessage({ text: `Error al leer el archivo: ${err.message}`, type: 'error' });
+    } catch (err: unknown) {
+      setStatusMessage({ text: `Error al leer el archivo: ${getErrorMessage(err)}`, type: 'error' });
     } finally {
       setIsProcessing(false);
     }
@@ -181,8 +182,8 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
 
       await onImportConfirmed(mappedRowsList, consolidationMode);
       onClose();
-    } catch (err: any) {
-      setStatusMessage({ text: `Error al guardar los datos: ${err.message}`, type: 'error' });
+    } catch (err: unknown) {
+      setStatusMessage({ text: `Error al guardar los datos: ${getErrorMessage(err)}`, type: 'error' });
     } finally {
       setIsProcessing(false);
     }

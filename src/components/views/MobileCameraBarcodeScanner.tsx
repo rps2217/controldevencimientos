@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Camera, X, RefreshCw, Zap, Volume2, VolumeX, ShieldAlert } from 'lucide-react';
 import { playBeep } from '../../utils/stockCountUtils';
+import { getErrorMessage } from '../../utils/pureCalculations';
 
 interface MobileCameraBarcodeScannerProps {
   isOpen: boolean;
@@ -54,7 +55,7 @@ export const MobileCameraBarcodeScanner: React.FC<MobileCameraBarcodeScannerProp
         }
 
         const devices = await Html5Qrcode.getCameras().catch(err => {
-          const msg = String(err?.message || err || '');
+          const msg = getErrorMessage(err);
           if (msg.includes('NotAllowedError') || msg.includes('Permission') || msg.includes('not allowed')) {
             throw new Error('Permiso de cámara denegado o restringido en este contexto.');
           }
@@ -75,10 +76,10 @@ export const MobileCameraBarcodeScanner: React.FC<MobileCameraBarcodeScannerProp
           setScannerStatus('ERROR');
           setErrorMessage('No se detectaron cámaras en el dispositivo. Si usas un PDA con láser integrado, simplemente usa el botón físico de disparo con el cursor en el campo de texto.');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!isMounted) return;
         setScannerStatus('ERROR');
-        const errMsg = String(err?.message || err || '');
+        const errMsg = getErrorMessage(err);
         setErrorMessage(
           (errMsg.includes('Permission') || errMsg.includes('NotAllowedError') || errMsg.includes('not allowed') || errMsg.includes('denegado'))
             ? 'Permiso de cámara restringido o denegado en el navegador. Puedes ingresar o pistolear el código manualmente.' 
@@ -176,9 +177,9 @@ export const MobileCameraBarcodeScanner: React.FC<MobileCameraBarcodeScannerProp
         }
       } catch {}
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       setScannerStatus('ERROR');
-      setErrorMessage(err?.message || 'No se pudo iniciar el lector de cámara.');
+      setErrorMessage(err instanceof Error ? err.message : 'No se pudo iniciar el lector de cámara.');
     }
   };
 

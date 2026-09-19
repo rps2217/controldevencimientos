@@ -31,6 +31,7 @@ import {
   SlidersHorizontal
 } from 'lucide-react';
 import { read, utils } from 'xlsx';
+import { getErrorMessage } from '../../utils/pureCalculations';
 
 interface MobileErpSnapshotViewProps {
   campaigns: InventoryCampaign[];
@@ -188,8 +189,8 @@ export const MobileErpSnapshotView: React.FC<MobileErpSnapshotViewProps> = ({
       playBeep('success');
       showToast(`Foto ERP cargada: ${totalImported} SKUs (${newSkus} nuevos)`, 'success');
       onSyncCloud();
-    } catch (err: any) {
-      showToast(`Error al leer archivo: ${err.message || err}`, 'error');
+    } catch (err: unknown) {
+      showToast(`Error al leer archivo: ${getErrorMessage(err) || err}`, 'error');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

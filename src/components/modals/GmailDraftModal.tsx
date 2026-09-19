@@ -6,6 +6,7 @@ import {
   formatVirtualHeaderLabel,
   escapeHtml
 } from '../../lib/gmailService';
+import { getErrorMessage } from '../../utils/pureCalculations';
 
 declare global {
   interface Window {
@@ -164,7 +165,7 @@ export const GmailDraftModal: React.FC<GmailDraftModalProps> = ({
         });
         client.requestAccessToken();
         return;
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('GIS Error:', err);
       }
     }
@@ -190,13 +191,13 @@ export const GmailDraftModal: React.FC<GmailDraftModalProps> = ({
         bodyText: `${introText}${visibleColumns.length > 0 ? '\n\n[Ver tabla adjunta en HTML]\n\n' : '\n\n'}${footerText}`
       });
       setDraftSuccess('¡Borrador creado exitosamente en tu cuenta de Gmail!');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      if (err.message && (err.message.includes('401') || err.message.includes('Invalid Credentials'))) {
+      if (getErrorMessage(err) && (getErrorMessage(err).includes('401') || getErrorMessage(err).includes('Invalid Credentials'))) {
         setAccessToken(null);
         setErrorMessage('La sesión expiró. Por favor, vuelve a intentar autorizar.');
       } else {
-        setErrorMessage(err.message || 'Error al crear el borrador en Gmail.');
+        setErrorMessage(getErrorMessage(err) || 'Error al crear el borrador en Gmail.');
       }
     } finally {
       setIsCreatingDraft(false);

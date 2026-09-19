@@ -6,6 +6,7 @@ import { findColumnBySemantic } from '../../utils/columnAliases';
 import { findMasterProduct, getMasterProductSummary } from '../../utils/referenceResolver';
 import { parseLocaleNumber } from '../../utils/dateCalculations';
 import { playBeep, calculateLastDayOfMonthDateString, generateCuVc } from '../../utils/stockCountUtils';
+import { getErrorMessage } from '../../utils/pureCalculations';
 
 interface ScannedSessionItem {
   id: string;
@@ -160,7 +161,7 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
       }
 
       const devices = await Html5Qrcode.getCameras().catch(err => {
-        const msg = String(err?.message || err || '');
+        const msg = getErrorMessage(err);
         if (msg.includes('NotAllowedError') || msg.includes('Permission') || msg.includes('not allowed')) {
           throw new Error('Permiso de cámara denegado o restringido por el navegador.');
         }
@@ -224,9 +225,9 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
         setCameraStatus('ERROR');
         setCameraError('No se detectaron cámaras en el dispositivo. Usa el modo Láser PDA.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setCameraStatus('ERROR');
-      const errMsg = String(err?.message || err || '');
+      const errMsg = getErrorMessage(err);
       if (errMsg.includes('NotAllowedError') || errMsg.includes('Permission') || errMsg.includes('not allowed') || errMsg.includes('denegado')) {
         setCameraError('Permiso de cámara denegado o no disponible en este marco. Usa la entrada de texto Láser PDA.');
       } else {
@@ -394,9 +395,9 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
 
       // Reset for next pistoleo scan
       handleClearInput();
-    } catch (err: any) {
+    } catch (err: unknown) {
       triggerFeedback('error');
-      showToast(`Error al guardar: ${err.message}`, 'error', 'Error en Pistoleo');
+      showToast(`Error al guardar: ${getErrorMessage(err)}`, 'error', 'Error en Pistoleo');
     } finally {
       setIsSubmitting(false);
     }
@@ -410,9 +411,9 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
       triggerFeedback('success');
       showToast(`Lote (Fila #${matchedItem._rowIndex}) eliminado con éxito.`, 'success', 'Eliminación');
       handleClearInput();
-    } catch (err: any) {
+    } catch (err: unknown) {
       triggerFeedback('error');
-      showToast(`Error al eliminar: ${err.message}`, 'error', 'Error en Eliminación');
+      showToast(`Error al eliminar: ${getErrorMessage(err)}`, 'error', 'Error en Eliminación');
     } finally {
       setIsSubmitting(false);
     }

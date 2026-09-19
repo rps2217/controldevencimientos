@@ -1,4 +1,5 @@
 import type { SheetConfig, SheetMetadata, InventoryCampaign, StockCountSession } from '../types';
+import { getErrorMessage } from '../utils/pureCalculations';
 
 export const SPREADSHEET_ID = '1a4jGo-7pduH4fue73F_67sQYJS0LJqI7hiXYpyWVA8o';
 
@@ -10,10 +11,6 @@ export type SheetMatrix = SheetRow[];
 /** Configuración de la app tal como viaja en Script Properties (incluye claves extra del script). */
 export interface CloudConfig extends SheetConfig {
   CAMPAIGNS_DATA?: string;
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 function getScriptUrl(): string | null {
@@ -124,7 +121,7 @@ async function fetchFromScript<T = ScriptResponse>(
       lastError = err;
 
       const errName = err instanceof Error ? err.name : '';
-      const errMsg = errorMessage(err);
+      const errMsg = getErrorMessage(err);
       const isAbort = errName === 'AbortError';
       const isNetworkError = errMsg.includes('Failed to fetch') ||
         errMsg.includes('NetworkError') ||
@@ -401,7 +398,7 @@ export async function pingGoogleSheets(): Promise<{
       success: false,
       latencyMs,
       urlConfigured: true,
-      error: (err instanceof Error && err.name === 'AbortError') ? 'Tiempo de espera agotado (>6s)' : (errorMessage(err) || 'Error de conexión')
+      error: (err instanceof Error && err.name === 'AbortError') ? 'Tiempo de espera agotado (>6s)' : (getErrorMessage(err) || 'Error de conexión')
     };
   }
 }

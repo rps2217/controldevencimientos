@@ -8,6 +8,7 @@
 
 import { BackendMirrorConfig, InventoryItem } from '../types';
 import { OfflineMutation } from '../db/indexedDbService';
+import { getErrorMessage } from '../utils/pureCalculations';
 
 export interface MirrorTestResult {
   success: boolean;
@@ -124,12 +125,12 @@ class BackendMirrorService {
         this.addLog('test', 'error', result.message);
         return result;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       const latencyMs = Math.round(performance.now() - startTime);
-      const isTimeout = err.name === 'AbortError';
+      const isTimeout = err instanceof Error && err.name === 'AbortError';
       const message = isTimeout 
         ? `Tiempo de espera agotado (timeout de 6s). Verifique si el servidor está en línea.`
-        : `Fallo de conexión de red: ${err.message || 'No se pudo alcanzar el endpoint'}`;
+        : `Fallo de conexión de red: ${getErrorMessage(err) || 'No se pudo alcanzar el endpoint'}`;
 
       this.addLog('test', 'error', message);
       return {
@@ -185,9 +186,9 @@ class BackendMirrorService {
 
       this.addLog('mutation', 'ok', `Mutación [${mutation.type}] replicada al espejo (${mutation.sheetTitle})`);
       return { success: true };
-    } catch (err: any) {
-      this.addLog('mutation', 'error', `Fallo al replicar mutación al espejo: ${err.message}`);
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      this.addLog('mutation', 'error', `Fallo al replicar mutación al espejo: ${getErrorMessage(err)}`);
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -244,9 +245,9 @@ class BackendMirrorService {
 
       this.addLog('sync', 'ok', `Sincronizados ${items.length} registros con el espejo (${sheetTitle})`);
       return { mirroredCount: items.length };
-    } catch (err: any) {
-      this.addLog('sync', 'error', `Error en sincronización masiva a espejo: ${err.message}`);
-      return { mirroredCount: 0, error: err.message };
+    } catch (err: unknown) {
+      this.addLog('sync', 'error', `Error en sincronización masiva a espejo: ${getErrorMessage(err)}`);
+      return { mirroredCount: 0, error: getErrorMessage(err) };
     }
   }
 }

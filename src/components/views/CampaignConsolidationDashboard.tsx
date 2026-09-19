@@ -6,6 +6,7 @@ import { saveCampaignsToCloud, syncCampaignsWithCloud, saveAuditRowsToDedicatedS
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { parseDelimitedText, detectDelimiter } from '../../utils/universalImporter';
 import { CampaignQuickScanModal } from '../modals/CampaignQuickScanModal';
+import { getErrorMessage } from '../../utils/pureCalculations';
 
 interface CampaignConsolidationDashboardProps {
   campaigns: InventoryCampaign[];
@@ -264,8 +265,8 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
         'success',
         'Snapshot ERP Cargado y en Nube'
       );
-    } catch (e: any) {
-      showToast(`Error al procesar el snapshot: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      showToast(`Error al procesar el snapshot: ${getErrorMessage(e)}`, 'error');
     } finally {
       setIsProcessingSnapshot(false);
     }
@@ -336,11 +337,11 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
           'success',
           'Sincronizado'
         );
-      } catch (cloudErr: any) {
-        showToast(`Snapshot guardado localmente. Error en respaldo nube: ${cloudErr?.message || cloudErr}`, 'warning');
+      } catch (cloudErr: unknown) {
+        showToast(`Snapshot guardado localmente. Error en respaldo nube: ${getErrorMessage(cloudErr)}`, 'warning');
       }
-    } catch (err: any) {
-      showToast(`Error al leer archivo: ${err.message}`, 'error');
+    } catch (err: unknown) {
+      showToast(`Error al leer archivo: ${getErrorMessage(err)}`, 'error');
     } finally {
       setIsProcessingSnapshot(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -354,8 +355,8 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
       await exportCampaignReportToExcel(matrix, activeCampaign);
       playBeep('success');
       showToast('Reporte consolidado de campaña descargado en Excel (.xlsx)', 'success');
-    } catch (e: any) {
-      showToast(`Error al exportar: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      showToast(`Error al exportar: ${getErrorMessage(e)}`, 'error');
     }
   };
 
@@ -370,8 +371,8 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
       await exportDiscrepanciesForRecountSheet(matrix, activeCampaign.nombre);
       playBeep('success');
       showToast('Planilla de 2do conteo descargada en Excel (.xlsx)', 'success');
-    } catch (e: any) {
-      showToast(`Error al exportar: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      showToast(`Error al exportar: ${getErrorMessage(e)}`, 'error');
     }
   };
 
@@ -422,8 +423,8 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
       } else {
         showToast('No se pudo conectar a Google Sheets. Los datos locales permanecen seguros.', 'warning', 'Aviso de Red');
       }
-    } catch (e: any) {
-      showToast(`Error al sincronizar con la nube: ${e.message}`, 'error', 'Error');
+    } catch (e: unknown) {
+      showToast(`Error al sincronizar con la nube: ${getErrorMessage(e)}`, 'error', 'Error');
     } finally {
       setIsSyncingCloud(false);
     }
@@ -444,8 +445,8 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
         'success',
         'Auditoría Respaldada'
       );
-    } catch (e: any) {
-      showToast(`Error al guardar en hoja de auditoría: ${e.message}`, 'error', 'Error');
+    } catch (e: unknown) {
+      showToast(`Error al guardar en hoja de auditoría: ${getErrorMessage(e)}`, 'error', 'Error');
     } finally {
       setIsSavingToAuditSheet(false);
     }

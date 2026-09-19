@@ -21,6 +21,7 @@ import {
   detectPolicyActionType,
   createColumnsContext,
   rowToObject,
+  getErrorMessage,
   CalculationColumnsContext,
   ItemStatusCode,
   ItemActionType
@@ -44,7 +45,8 @@ export {
   getEventReason,
   detectPolicyActionType,
   createColumnsContext,
-  rowToObject
+  rowToObject,
+  getErrorMessage
 };
 export type { CalculationColumnsContext };
 

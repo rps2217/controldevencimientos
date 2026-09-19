@@ -361,9 +361,9 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
     try {
       onSaveSlice(newSlice);
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving slice:', err);
-      setErrors({ name: `Error al guardar slice: ${err?.message || 'Error desconocido'}` });
+      setErrors({ name: `Error al guardar slice: ${err instanceof Error ? err.message : 'Error desconocido'}` });
     }
   };
 

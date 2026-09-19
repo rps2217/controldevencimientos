@@ -4,6 +4,7 @@ import { appendRow, updateRow, deleteRow, getSheetData, pingGoogleSheets } from 
 import { matchRowIndexByIdentity, buildRowIdentityIndex } from '../utils/entityIdentityResolver';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { backendMirrorService } from '../services/backendMirrorService';
+import { getErrorMessage } from '../utils/pureCalculations';
 
 export type ConnectionHealthStatus = 'connected' | 'syncing' | 'offline' | 'unconfigured' | 'error';
 
@@ -156,11 +157,11 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
         setHealthErrorMessage(res.error || 'Error de respuesta en Apps Script');
         return { success: false, latencyMs: res.latencyMs, status: 'error', error: res.error };
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setConnectionStatus('error');
       setLatencyMs(null);
-      setHealthErrorMessage(err.message || 'Fallo de conexión');
-      return { success: false, latencyMs: 0, status: 'error', error: err.message };
+      setHealthErrorMessage(getErrorMessage(err) || 'Fallo de conexión');
+      return { success: false, latencyMs: 0, status: 'error', error: getErrorMessage(err) };
     }
   }, []);
 
@@ -405,11 +406,11 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
           await indexedDbService.removeMutation(mutation.id);
           await indexedDbService.updateAuditLogStatus(mutation.id, 'synced');
           successCount++;
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error(`[OfflineSync] Error procesando mutación ${mutation.id} (${mutation.type}):`, err);
-          errors.push(err.message || 'Error de sincronización');
-          await indexedDbService.updateMutationStatus(mutation.id, 'failed', err.message || 'Error en red');
-          await indexedDbService.updateAuditLogStatus(mutation.id, 'failed', err.message || 'Fallo de red');
+          errors.push(getErrorMessage(err) || 'Error de sincronización');
+          await indexedDbService.updateMutationStatus(mutation.id, 'failed', getErrorMessage(err) || 'Error en red');
+          await indexedDbService.updateAuditLogStatus(mutation.id, 'failed', getErrorMessage(err) || 'Fallo de red');
         }
       }
 

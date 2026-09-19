@@ -14,6 +14,7 @@ import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { copyTextToClipboard } from '../../utils/exportUtils';
 import { executeThermalPrint } from '../../utils/ticketUtils';
 import { TicketPrintView } from './TicketPrintView';
+import { getErrorMessage } from '../../utils/pureCalculations';
 
 const CampaignConsolidationDashboard = lazy(() => import('./CampaignConsolidationDashboard').then(m => ({ default: m.CampaignConsolidationDashboard })));
 
@@ -113,9 +114,9 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       } else if (!silent) {
         showToast('No se pudo conectar a Google Sheets.', 'warning');
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (!silent) {
-        showToast(`Error al consultar la nube: ${e.message}`, 'error');
+        showToast(`Error al consultar la nube: ${getErrorMessage(e)}`, 'error');
       }
     } finally {
       setIsSyncingCloud(false);
@@ -157,8 +158,8 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       } else {
         showToast('Guardado localmente. Se respaldará en la nube cuando haya conexión.', 'warning');
       }
-    } catch (err: any) {
-      showToast(`Error de respaldo: ${err.message}`, 'error');
+    } catch (err: unknown) {
+      showToast(`Error de respaldo: ${getErrorMessage(err)}`, 'error');
     } finally {
       setIsSyncingCloud(false);
     }
@@ -199,8 +200,8 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       playBeep('success');
       showToast(`🎉 ¡${closedSession.nombre} finalizado y respaldado en la nube!`, 'success');
       setViewState('LIST');
-    } catch (err: any) {
-      showToast(`Error al finalizar: ${err.message}`, 'error');
+    } catch (err: unknown) {
+      showToast(`Error al finalizar: ${getErrorMessage(err)}`, 'error');
     } finally {
       setIsSyncingCloud(false);
     }
@@ -1048,8 +1049,8 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
 
       await exportStockCountToExcel(currentSession, exportList);
       showToast(`Planilla de cuadratura exportada (${exportList.length} registros)`, 'success', 'Excel Generado');
-    } catch (e: any) {
-      showToast(`Error al exportar: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      showToast(`Error al exportar: ${getErrorMessage(e)}`, 'error');
     }
   };
 
@@ -1087,8 +1088,8 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       }));
 
       showToast(`Se han sincronizado ${rowsToSave.length} registros con la pestaña VENCIMIENTOS`, 'success', 'Sincronización Exitosa');
-    } catch (e: any) {
-      showToast(`Error al sincronizar: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      showToast(`Error al sincronizar: ${getErrorMessage(e)}`, 'error');
     } finally {
       setIsSyncingToSheet(false);
     }
@@ -1126,8 +1127,8 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
 
       playBeep('success');
       showToast(`¡Auditoría guardada exitosamente en la pestaña "${res.sheetName}" de Google Sheets! (La pestaña VENCIMIENTOS permanece intacta)`, 'success', 'Auditoría Guardada');
-    } catch (e: any) {
-      showToast(`Error al guardar en auditoría: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      showToast(`Error al guardar en auditoría: ${getErrorMessage(e)}`, 'error');
     } finally {
       setIsSyncingToSheet(false);
     }

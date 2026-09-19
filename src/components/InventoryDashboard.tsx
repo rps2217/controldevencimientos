@@ -36,6 +36,7 @@ import {
 
 // Helpers para almacenamiento persistente y configuración modular
 import { getStoredDemoItems, saveStoredDemoItems, mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
+import { getErrorMessage } from '../utils/pureCalculations';
 export { mergeCloudConfigs, type ModuleViewState };
 
 // Modals & Drawers & Sub-components
@@ -196,8 +197,8 @@ export const InventoryDashboard: React.FC = () => {
       } else if (res && res.errors && res.errors.length > 0) {
         showToast(`Hubo errores al sincronizar: ${res.errors.join(', ')}`, 'error', 'Sincronización Parcial');
       }
-    } catch (err: any) {
-      showToast(`Error sincronizando cola offline: ${err.message}`, 'error', 'Error de Sincronización');
+    } catch (err: unknown) {
+      showToast(`Error sincronizando cola offline: ${getErrorMessage(err)}`, 'error', 'Error de Sincronización');
     }
   };
 
@@ -451,8 +452,8 @@ export const InventoryDashboard: React.FC = () => {
       setConfigStorageMode('properties');
       setSyncSuccessMessage('¡Configuración guardada en la Nube con PropertiesService (Opción 2)!');
       setTimeout(() => setSyncSuccessMessage(null), 4000);
-    } catch (err: any) {
-      alert(`Error al guardar en PropertiesService: ${err.message}. Verifica haber pegado el código actualizado en Apps Script.`);
+    } catch (err: unknown) {
+      alert(`Error al guardar en PropertiesService: ${getErrorMessage(err)}. Verifica haber pegado el código actualizado en Apps Script.`);
     } finally {
       setIsSyncingCloud(false);
     }
@@ -468,8 +469,8 @@ export const InventoryDashboard: React.FC = () => {
       setConfigStorageMode('sheet');
       setSyncSuccessMessage('¡Configuración guardada con éxito en la pestaña ' + targetSheet + '!');
       setTimeout(() => setSyncSuccessMessage(null), 4000);
-    } catch (err: any) {
-      alert(`Error al guardar en la nube: ${err.message}`);
+    } catch (err: unknown) {
+      alert(`Error al guardar en la nube: ${getErrorMessage(err)}`);
     } finally {
       setIsSyncingCloud(false);
     }
@@ -1076,7 +1077,7 @@ export const InventoryDashboard: React.FC = () => {
       }
 
       setIsRelationalActive(hasRelational);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('Network or Apps Script error:', err);
 
       // Si ya tenemos items renderizados desde caché IndexedDB o estado local, conservarlos y marcar estado offline
@@ -1317,8 +1318,8 @@ export const InventoryDashboard: React.FC = () => {
         clearSheetsCache(activeSheet.title);
         await fetchData(sheetConfig, activeView, true);
       }
-    } catch (err: any) {
-      showToast(`Error al importar registros: ${err.message}`, 'error', 'Error de Importación');
+    } catch (err: unknown) {
+      showToast(`Error al importar registros: ${getErrorMessage(err)}`, 'error', 'Error de Importación');
     } finally {
       setIsSaving(false);
     }
@@ -1371,8 +1372,8 @@ export const InventoryDashboard: React.FC = () => {
       }
       showToast(`${rows.length} registros sincronizados exitosamente con ${targetTitle}`, 'success', 'Sincronización Completa');
       await fetchData(sheetConfig, activeView, true);
-    } catch (err: any) {
-      showToast(`Error durante sincronización: ${err.message}`, 'error', 'Error');
+    } catch (err: unknown) {
+      showToast(`Error durante sincronización: ${getErrorMessage(err)}`, 'error', 'Error');
     }
   };
 
@@ -1510,11 +1511,11 @@ export const InventoryDashboard: React.FC = () => {
         });
         showToast('Sin conexión con Google Sheets. Los cambios se guardaron localmente en la cola offline.', 'info', 'Modo Offline');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback
       setItems(originalItems);
       setAllMainItems(originalMainItems);
-      showToast(`Error guardando datos (rollback aplicado): ${err.message}`, 'error', 'Error');
+      showToast(`Error guardando datos (rollback aplicado): ${getErrorMessage(err)}`, 'error', 'Error');
     } finally {
       setIsSaving(false);
     }
@@ -1601,8 +1602,8 @@ export const InventoryDashboard: React.FC = () => {
         }
       }
       showToast('Cambios de pistoleo guardados en la nube', 'success', 'Sincronización');
-    } catch (err: any) {
-      showToast(`Error al guardar pistoleo: ${err.message}`, 'error', 'Error');
+    } catch (err: unknown) {
+      showToast(`Error al guardar pistoleo: ${getErrorMessage(err)}`, 'error', 'Error');
     } finally {
       setIsSaving(false);
     }
@@ -1659,10 +1660,10 @@ export const InventoryDashboard: React.FC = () => {
         }
         await fetchData(sheetConfig, activeView, true);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setItems(originalItems);
       setAllMainItems(originalMainItems);
-      showToast(`Error al eliminar fila: ${err.message}`, 'error', 'Error de Eliminación');
+      showToast(`Error al eliminar fila: ${getErrorMessage(err)}`, 'error', 'Error de Eliminación');
     } finally {
       setIsSaving(false);
     }
@@ -1808,9 +1809,9 @@ export const InventoryDashboard: React.FC = () => {
       setSelectedRowIds([]);
       await fetchData(sheetConfig, activeView, true);
       showToast(`¡Se actualizaron ${totalEdit} registros exitosamente con la información masiva!`, 'success', 'Edición Masiva');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setItems(originalItems);
-      showToast(`Error en actualización masiva: ${err.message}`, 'error', 'Error en Edición');
+      showToast(`Error en actualización masiva: ${getErrorMessage(err)}`, 'error', 'Error en Edición');
     } finally {
       setIsSaving(false);
     }
@@ -1889,10 +1890,10 @@ export const InventoryDashboard: React.FC = () => {
         await fetchData(sheetConfig, activeView, true);
         updateToast(toastId, `¡Se eliminaron ${count} registros exitosamente en Google Sheets!`, 'success', 'Eliminación Completada');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setItems(originalItems);
       setAllMainItems(originalMainItems);
-      showToast(`Error en eliminación masiva: ${err.message}`, 'error', 'Error de Eliminación');
+      showToast(`Error en eliminación masiva: ${getErrorMessage(err)}`, 'error', 'Error de Eliminación');
     } finally {
       setIsSaving(false);
     }

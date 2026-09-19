@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Camera, X, Scan, AlertCircle } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { getErrorMessage } from '../../utils/pureCalculations';
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -69,8 +70,8 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           stream.getTracks().forEach(track => track.stop());
-        } catch (mediaErr: any) {
-          const mediaMsg = String(mediaErr?.message || mediaErr || '');
+        } catch (mediaErr: unknown) {
+          const mediaMsg = getErrorMessage(mediaErr);
           if (mediaMsg.includes('NotAllowedError') || mediaMsg.includes('Permission') || mediaMsg.includes('not allowed')) {
             console.warn("Camera access denied or restricted in preview context:", mediaErr);
             if (isMounted) {
@@ -118,8 +119,8 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           () => {}
         );
         if (isMounted) setIsScanning(true);
-      } catch (err: any) {
-        const errMsg = String(err?.message || err || '');
+      } catch (err: unknown) {
+        const errMsg = getErrorMessage(err);
         console.warn('Scanner camera status:', errMsg);
         if (isMounted) {
           if (errMsg.includes('NotAllowedError') || errMsg.includes('Permission') || errMsg.includes('not allowed')) {

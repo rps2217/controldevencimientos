@@ -7,6 +7,7 @@ import {
   parseLocaleNumber, 
   formatLocaleNumber, 
   rowToObject,
+  getErrorMessage,
   getItemStatus, 
   getEventCategory, 
   getCategoryFromEventValue,
@@ -218,6 +219,13 @@ console.log('\n--- 9. Pruebas de rowToObject (pureCalculations.ts) ---');
 
   const numeric = rowToObject([101, 'DESC'], [0, null]);
   assert(numeric['101'] === '0' && numeric['DESC'] === '', 'rowToObject normaliza encabezados y valores nulos');
+}
+
+console.log('\n--- 10. Pruebas de getErrorMessage (pureCalculations.ts) ---');
+{
+  assert(getErrorMessage(new Error('fallo de red')) === 'fallo de red', 'getErrorMessage extrae .message de Error');
+  assert(getErrorMessage('texto plano') === 'texto plano', 'getErrorMessage convierte strings');
+  assert(getErrorMessage(null) === 'null', 'getErrorMessage maneja valores no-Error');
 }
 
 console.log(`\n========================================`);

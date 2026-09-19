@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { OfflineMutation, AuditLogEntry, indexedDbService } from '../../db/indexedDbService';
 import { ConnectionHealthStatus } from '../../hooks/useOfflineSync';
+import { getErrorMessage } from '../../utils/pureCalculations';
 
 interface SyncAuditModalProps {
   isOpen: boolean;
@@ -160,8 +161,8 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
       } else if (res && res.errors && res.errors.length > 0) {
         showToast(`Error al reintentar: ${res.errors.join(', ')}`, 'error');
       }
-    } catch (err: any) {
-      showToast(`Fallo al reintentar: ${err.message}`, 'error');
+    } catch (err: unknown) {
+      showToast(`Fallo al reintentar: ${getErrorMessage(err)}`, 'error');
     } finally {
       setActionInProgressId(null);
     }
@@ -178,8 +179,8 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
       } else if (res && res.errors && res.errors.length > 0) {
         showToast(`Reintento parcial con observaciones: ${res.errors.join(', ')}`, 'warning');
       }
-    } catch (err: any) {
-      showToast(`Error al reintentar conflictos: ${err.message}`, 'error');
+    } catch (err: unknown) {
+      showToast(`Error al reintentar conflictos: ${getErrorMessage(err)}`, 'error');
     }
   };
 
@@ -190,8 +191,8 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
     try {
       await forkMutationAsAppend(item.id);
       showToast('Registro convertido a anexo nuevo. Se sincronizará como nueva fila en Google Sheets.', 'success');
-    } catch (err: any) {
-      showToast(`Error al convertir a nuevo registro: ${err.message}`, 'error');
+    } catch (err: unknown) {
+      showToast(`Error al convertir a nuevo registro: ${getErrorMessage(err)}`, 'error');
     } finally {
       setActionInProgressId(null);
     }
@@ -207,8 +208,8 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
         await removeMutation(itemToDiscard.id);
       }
       showToast('Intento de sincronización descartado y respaldado en Auditoría.', 'info');
-    } catch (err: any) {
-      showToast(`Error al descartar registro: ${err.message}`, 'error');
+    } catch (err: unknown) {
+      showToast(`Error al descartar registro: ${getErrorMessage(err)}`, 'error');
     } finally {
       setItemToDiscard(null);
     }
@@ -224,8 +225,8 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
         await clearQueue();
         showToast('Cola de sincronización vaciada.', 'info');
       }
-    } catch (err: any) {
-      showToast(`Error al descartar conflictos: ${err.message}`, 'error');
+    } catch (err: unknown) {
+      showToast(`Error al descartar conflictos: ${getErrorMessage(err)}`, 'error');
     } finally {
       setIsConfirmDiscardAllOpen(false);
     }

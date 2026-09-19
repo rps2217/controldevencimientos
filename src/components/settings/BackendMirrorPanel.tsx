@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { SheetConfig, BackendMirrorConfig, InventoryItem } from '../../types';
 import { backendMirrorService, MirrorTestResult, MirrorLogEntry } from '../../services/backendMirrorService';
+import { getErrorMessage } from '../../utils/pureCalculations';
 
 interface BackendMirrorPanelProps {
   sheetConfig: SheetConfig;
@@ -52,11 +53,11 @@ export const BackendMirrorPanel: React.FC<BackendMirrorPanelProps> = ({
       const res = await backendMirrorService.testConnection(currentConfig);
       setTestResult(res);
       setLogs(backendMirrorService.getLogs());
-    } catch (e: any) {
+    } catch (e: unknown) {
       setTestResult({
         success: false,
         latencyMs: 0,
-        message: `Error al probar conexión: ${e.message}`
+        message: `Error al probar conexión: ${getErrorMessage(e)}`
       });
     } finally {
       setIsTesting(false);
@@ -86,8 +87,8 @@ export const BackendMirrorPanel: React.FC<BackendMirrorPanelProps> = ({
         setSyncStatusMsg(`¡Sincronización exitosa! ${res.mirroredCount} registros replicados.`);
       }
       setLogs(backendMirrorService.getLogs());
-    } catch (err: any) {
-      setSyncStatusMsg(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      setSyncStatusMsg(`Error: ${getErrorMessage(err)}`);
     } finally {
       setIsSyncingNow(false);
     }

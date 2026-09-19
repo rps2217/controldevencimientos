@@ -52,8 +52,8 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
     try {
       await onSave(item, traspasoInput.trim());
       onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Error al guardar el número de traspaso');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al guardar el número de traspaso');
     } finally {
       setIsSaving(false);
     }
