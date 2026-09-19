@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckCircle2, Clock3, AlertCircle, ArrowRight, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { X, CheckCircle2, Clock3, AlertCircle, Loader2 } from 'lucide-react';
 import { InventoryItem } from '../../types';
 import { findColumnBySemantic } from '../../utils/columnAliases';
-import { getEventCategory, EVENT_CATEGORIES, renderEventIcon } from '../../utils/dateCalculations';
+import { getEventCategory, EVENT_CATEGORIES } from '../../utils/dateCalculations';
 
 interface QuickTransferModalProps {
   isOpen: boolean;

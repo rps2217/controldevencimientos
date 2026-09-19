@@ -319,7 +319,7 @@ export function reconcileImportWithInventory(
         ? (basePrevQty + accumulatedAdded)
         : importedQty;
 
-      const updatedRowData = {
+      const updatedRowData: InventoryItem = {
         ...(alreadyUpdated ? alreadyUpdated.item : match.existingItem),
         ...row,
         _rowIndex: existingRowIndex

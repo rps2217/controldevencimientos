@@ -1,54 +1,15 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  X, Check, Plus, Minus, Trash2, Play, Pause, CheckCircle2, 
-  AlertTriangle, ArrowRight, RotateCcw, Download, Calendar, 
-  Package, Search, Eye, EyeOff, Sparkles, Layers, FileSpreadsheet, 
-  Tag, Barcode, Hash, MapPin, Sliders, ShieldCheck, Database,
-  ArrowUpRight, ArrowDownRight, ChevronRight, HelpCircle,
-  Lock, Unlock, ListTodo, Zap, Copy, MessageSquare, CheckCheck, Share2, FileWarning, Store,
-  Camera, Smartphone, Cloud, CloudDownload, CloudUpload, CloudOff, Loader2, RefreshCw,
-  Printer, Building2
-} from 'lucide-react';
-import { 
-  StockCountSession, 
-  StockCountEntry, 
-  StockCountMode, 
-  StockCountReconciliationItem, 
-  InventoryItem,
-  InventoryCampaign
-} from '../../types';
+import { X, Check, Plus, Minus, Trash2, Play, CheckCircle2, Download, Calendar, Search, EyeOff, Layers, FileSpreadsheet, Barcode, Hash, MapPin, ShieldCheck, Database, ChevronRight, Lock, Unlock, ListTodo, Zap, Copy, MessageSquare, CheckCheck, FileWarning, Store, Camera, Cloud, CloudUpload, CloudOff, Loader2, Printer, Building2 } from 'lucide-react';
+import { StockCountSession, StockCountEntry, StockCountMode, InventoryItem, InventoryCampaign } from '../../types';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { 
-  generateCuVc, 
-  calculateLastDayOfMonthDateString, 
-  reconcileStockCountSession, 
-  buildVencimientosRowFromCount,
-  buildAuditRowsFromSession,
-  loadStockCountSessionsFromStorage, 
-  saveStockCountSessionsToStorage, 
-  saveStockCountSessionsToStorageDebounced,
-  loadCampaignsFromStorage,
-  saveCampaignsToStorage,
-  getActiveCampaignId,
-  setActiveCampaignId,
-  exportStockCountToExcel,
-  generateShortVcId,
-  playBeep,
-  getOrCreateDeviceId,
-  generateCountManifest
-} from '../../utils/stockCountUtils';
-import { saveAuditRowsToDedicatedSheet, saveCampaignsToCloud, loadCampaignsFromCloud, syncCampaignsWithCloud } from '../../lib/sheets';
+import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorage, saveStockCountSessionsToStorageDebounced, loadCampaignsFromStorage, saveCampaignsToStorage, getActiveCampaignId, setActiveCampaignId, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
+import { saveAuditRowsToDedicatedSheet, syncCampaignsWithCloud } from '../../lib/sheets';
 import { CampaignConsolidationDashboard } from './CampaignConsolidationDashboard';
 import { MobileCameraBarcodeScanner } from './MobileCameraBarcodeScanner';
 import { MobileErpSnapshotView } from './MobileErpSnapshotView';
-import { 
-  searchMasterProducts, 
-  findMasterProduct, 
-  getMasterProductSummary,
-  buildMasterCatalogIndex
-} from '../../utils/referenceResolver';
-import { formatLocaleNumber, parseLocaleNumber } from '../../utils/pureCalculations';
+import { buildMasterCatalogIndex } from '../../utils/referenceResolver';
+import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { copyTextToClipboard } from '../../utils/exportUtils';
 import { executeThermalPrint } from '../../utils/ticketUtils';
 import { TicketPrintView } from './TicketPrintView';
@@ -59,7 +20,7 @@ interface StockCountTerminalProps {
   masterProducts: any[];
   activeSheetTitle: string;
   onSyncRowsToVencimientos: (rows: Record<string, any>[]) => Promise<void>;
-  showToast: (message: string, type: 'success' | 'error' | 'warning' | 'info', title?: string) => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info', title?: string) => void;
   onClose?: () => void;
 }
 

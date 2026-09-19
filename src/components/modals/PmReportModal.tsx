@@ -1,9 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Flame, X, CheckCircle2, CheckCheck, Copy, Download, 
-  Send, Building2, MessageSquare, Briefcase, FileText,
-  Filter
-} from 'lucide-react';
+import { Flame, X, CheckCircle2, CheckCheck, Copy, Download, Building2, MessageSquare, Briefcase, FileText, Filter } from 'lucide-react';
 import { InventoryItem } from '../../types';
 import { getItemStatus, formatDisplayDate } from '../../utils/dateCalculations';
 import { findColumnBySemantic } from '../../utils/columnAliases';

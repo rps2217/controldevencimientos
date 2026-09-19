@@ -1,17 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  X, 
-  Sliders, 
-  Eye, 
-  EyeOff, 
-  Layers, 
-  Sparkles, 
-  RotateCcw, 
-  Maximize2, 
-  Minimize2, 
-  Table, 
-  Database, 
-  FileSpreadsheet, 
+import {
+  X,
+  Sliders,
+  Eye,
+  EyeOff,
+  Layers,
+  Sparkles,
+  RotateCcw,
+  Maximize2,
+  Minimize2,
+  Table,
+  Database,
+  FileSpreadsheet,
   Settings2,
   CheckCircle2,
   Tag,
@@ -20,14 +20,12 @@ import {
   LayoutGrid,
   Pin,
   Settings,
-  // New icons for actions & reports
   Mail,
   MessageSquare,
   Flame,
   Printer,
   Barcode,
-  Download,
-  Share2
+  Download
 } from 'lucide-react';
 import { SheetConfig, TableSlice } from '../../types';
 import { BUILT_IN_SLICES } from '../../utils/sliceRegistry';
@@ -185,7 +183,7 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
   const visibleColumnsCount = allHeaders.length - hiddenColumns.length;
 
   // Available slices for this table
-  const tableBuiltInSlices = BUILT_IN_SLICES[activeTableKey] || [];
+  const tableBuiltInSlices = BUILT_IN_SLICES.filter(s => s.tableKey === activeTableKey);
   const tableCustomSlices = (customSlices || []).filter(s => s.tableKey === activeTableKey);
 
   return (
@@ -659,7 +657,7 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
                   </button>
 
                   {/* Slices Nativos */}
-                  {tableBuiltInSlices.map(slice => (
+                  {tableBuiltInSlices.map((slice: TableSlice) => (
                     <button
                       key={slice.id}
                       type="button"
@@ -956,7 +954,7 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
                     >
                       <span className="flex items-center gap-2">
                         <Database className="w-4 h-4 text-amber-600" />
-                        Espejo Backend / PostgreSQL Dual-Write
+                        Espejo Backend REST / Dual-Write
                       </span>
                       <span className="text-[10px] text-slate-400">Espejo →</span>
                     </button>

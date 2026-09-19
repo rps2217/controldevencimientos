@@ -1,16 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { 
-  InventoryItem, 
-  SheetConfig, 
-  SheetProperties, 
-  SpreadsheetMetadata, 
-  EventCategory, 
-  GlobalTicketConfig, 
-  ViewTicketConfig,
-  TableSlice,
-  SortConfig,
-  DynamicMonthRange
-} from '../types';
+import { InventoryItem, SheetConfig, SheetProperties, SpreadsheetMetadata, EventCategory, GlobalTicketConfig, ViewTicketConfig, TableSlice } from '../types';
 import { OfflineMutation, AuditLogEntry } from '../db/indexedDbService';
 import { ConnectionHealthStatus } from '../hooks/useOfflineSync';
 import { BulkActionContext } from '../utils/bulkActionsRegistry';
@@ -247,7 +236,7 @@ export interface DashboardContextType {
   // Table Container & Virtualization
   effectiveVisibleHeaders?: string[];
   visibleColumnMeta?: any[];
-  tableContainerRef?: React.RefObject<HTMLDivElement>;
+  tableContainerRef?: React.RefObject<HTMLDivElement | null>;
   getColWidth?: (headerId: string, label: string, type?: string) => number;
   handleStartResize?: (colId: string, startWidth: number, e: React.MouseEvent) => void;
   handleAutoFitColumn?: (colId: string, label: string) => void;
@@ -271,7 +260,7 @@ export interface DashboardContextType {
   columnFilters?: Record<string, string[]>;
   setColumnFilters?: React.Dispatch<React.SetStateAction<Record<string, string[]>>>;
   columnOptionsMap?: Record<string, any[]>;
-  frcBodCol?: string;
+  frcBodCol?: string | null;
   virtualRows?: any[];
   paginatedDisplayRows?: any[];
   paddingTop?: number;

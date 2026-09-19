@@ -44,11 +44,11 @@ const CATEGORY_FIELD_PATTERNS: Record<EventCategory, { relevant: RegExp[]; secon
     secondaryExcluded: [/cami[oó]n|patente|chofer|temperatura/i]
   },
   VENCIMIENTO_CERCANO: {
-    relevant: [/vencimiento|caducidad|expiraci[oó]n|retiro|pol[ií]tica|d[ií]as|mm|yyyy|mes|a[ñn]o|precio/i],
+    relevant: [/vencimiento|caducidad|expiraci[oó]n|retiro|pol[ií]tica|d[ií]as|mm|yyyy|mes|a[ñn]o/i],
     secondaryExcluded: [/cami[oó]n|patente|chofer|flete|cuarentena/i]
   },
   VENCIMIENTO: {
-    relevant: [/vencimiento|caducidad|expiraci[oó]n|retiro|pol[ií]tica|d[ií]as|mm|yyyy|mes|a[ñn]o|precio/i],
+    relevant: [/vencimiento|caducidad|expiraci[oó]n|retiro|pol[ií]tica|d[ií]as|mm|yyyy|mes|a[ñn]o/i],
     secondaryExcluded: [/cami[oó]n|patente|chofer|flete|cuarentena/i]
   }
 };

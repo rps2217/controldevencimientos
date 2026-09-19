@@ -1,15 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Sliders, 
-  Check, 
-  Ban, 
-  Sparkles, 
-  RotateCcw, 
-  Phone, 
-  Mail, 
-  Calendar, 
-  TableProperties
-} from 'lucide-react';
+import { Check, Ban, Sparkles, RotateCcw, Phone, Mail, Calendar, TableProperties } from 'lucide-react';
 import { SheetConfig, SpreadsheetMetadata } from '../../types';
 import { 
   ALL_BULK_ACTIONS, 

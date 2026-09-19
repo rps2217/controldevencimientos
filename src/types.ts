@@ -39,7 +39,6 @@ export interface TableGroupingSetting {
 
 export interface BackendMirrorConfig {
   enabled: boolean;
-  provider: 'custom_rest' | 'supabase' | 'firebase' | 'postgresql';
   endpointUrl: string;
   apiKey?: string;
   syncMode: 'dual_write' | 'mirror_first' | 'backup_only';

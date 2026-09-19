@@ -558,7 +558,7 @@ export function createNewCampaign(nombre: string, local?: string): InventoryCamp
 
 /**
  * Parses raw tabular rows from pharmacy ERP Excel/CSV export and imports them into a campaign snapshot
- * Supports the exact format: Local | Código SKU | Descripción | Proveedor | Stock | Inv. Inicial | Egreso | Ingreso | Venta | Stock Min | Stock Max | Stock Crítico | Precio de Lista
+ * Supports the exact format: Local | Código SKU | Descripción | Proveedor | Stock | Inv. Inicial | Egreso | Ingreso | Venta | Stock Min | Stock Max | Stock Crítico
  */
 export function importPharmacySnapshotToCampaign(
   campaign: InventoryCampaign,

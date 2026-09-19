@@ -45,7 +45,7 @@ export const VIRTUAL_COLUMNS: VirtualColumn[] = [
       if (!products || products.length === 0) return '-';
 
       const skuCol = findColumnBySemantic(headers, 'sku');
-      const rutCol = headers.find(h => /rut.*prov|prov.*rut|rut/i.test(h));
+      const rutCol = headers.find((h: string) => /rut.*prov|prov.*rut|rut/i.test(h));
       
       const itemSku = skuCol ? item[skuCol] : null;
       const itemRut = rutCol ? item[rutCol] : null;

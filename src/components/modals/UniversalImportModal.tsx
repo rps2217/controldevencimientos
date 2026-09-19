@@ -1,24 +1,8 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { 
-  FileSpreadsheet, Upload, Clipboard, CheckCircle2, AlertCircle, 
-  ArrowRight, Trash2, RefreshCw, Layers, Check, X, FileText, ChevronRight,
-  ShieldCheck, AlertTriangle, Sparkles, Filter
-} from 'lucide-react';
-import { 
-  parseExcelBuffer, 
-  parseDelimitedText, 
-  detectDelimiter, 
-  generateSmartColumnMappings, 
-  ColumnMappingSuggestion,
-  ParsedSpreadsheetResult
-} from '../../utils/universalImporter';
-import { findColumnBySemantic } from '../../utils/columnAliases';
+import { FileSpreadsheet, Upload, Clipboard, CheckCircle2, AlertCircle, ArrowRight, RefreshCw, Layers, Check, X, Sparkles, Filter } from 'lucide-react';
+import { parseExcelBuffer, parseDelimitedText, detectDelimiter, generateSmartColumnMappings, ParsedSpreadsheetResult } from '../../utils/universalImporter';
 import { InventoryItem } from '../../types';
-import { 
-  reconcileImportWithInventory, 
-  ImportConsolidationMode, 
-  ReconcileResult 
-} from '../../utils/cuVcConsolidator';
+import { reconcileImportWithInventory, ImportConsolidationMode } from '../../utils/cuVcConsolidator';
 
 interface UniversalImportModalProps {
   isOpen: boolean;

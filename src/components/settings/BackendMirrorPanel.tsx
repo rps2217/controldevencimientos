@@ -25,7 +25,6 @@ export const BackendMirrorPanel: React.FC<BackendMirrorPanelProps> = ({
 }) => {
   const currentConfig: BackendMirrorConfig = sheetConfig.backendMirror || {
     enabled: false,
-    provider: 'custom_rest',
     endpointUrl: '',
     apiKey: '',
     syncMode: 'dual_write',
@@ -103,13 +102,13 @@ export const BackendMirrorPanel: React.FC<BackendMirrorPanelProps> = ({
         </div>
         <div className="text-xs text-indigo-900 dark:text-indigo-200 space-y-1">
           <p className="font-bold text-sm text-indigo-950 dark:text-indigo-100 flex items-center gap-2">
-            Espejo de Backend y Transición Multi-Base de Datos
+            Espejo de Backend REST
             <span className="bg-indigo-200/60 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300 font-semibold px-2 py-0.5 rounded-full text-[10px]">
               Alta Concurrencia
             </span>
           </p>
           <p className="leading-relaxed">
-            Permite mantener una base de datos secundaria (PostgreSQL, Supabase o REST API) sincronizada en tiempo real junto con Google Sheets. 
+            Permite mantener una base de datos secundaria mediante un endpoint REST sincronizada en tiempo real junto con Google Sheets. 
             Esencial para conteos masivos en farmacia, reduciendo la latencia de guardado de <strong>~2.500ms</strong> a menos de <strong>150ms</strong> y evitando colisiones entre operadores.
           </p>
         </div>
@@ -150,24 +149,8 @@ export const BackendMirrorPanel: React.FC<BackendMirrorPanelProps> = ({
       {/* CONFIGURATION FORM */}
       <div className={`space-y-4 transition-opacity duration-200 ${currentConfig.enabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
         
-        {/* PROVIDER & SYNC MODE ROW */}
+        {/* SYNC MODE */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <Database className="w-3.5 h-3.5 text-blue-500" /> Proveedor de Base de Datos
-            </label>
-            <select
-              value={currentConfig.provider}
-              onChange={(e) => updateConfig({ provider: e.target.value as any })}
-              className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-              <option value="custom_rest">Custom REST API / Microservicio</option>
-              <option value="supabase">Supabase (PostgreSQL)</option>
-              <option value="postgresql">PostgreSQL Directo</option>
-              <option value="firebase">Firebase / Cloud Firestore</option>
-            </select>
-          </div>
-
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
               <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-500" /> Modo de Operación

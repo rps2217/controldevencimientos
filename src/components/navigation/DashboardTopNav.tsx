@@ -1,14 +1,7 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Menu, Search, X, FilterX, Scan, Download, ChevronDown, 
-  Mail, Flame, FileSpreadsheet, Printer, Barcode, RefreshCw, MessageSquare, Sliders, Settings, CheckCircle2,
-  Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Wifi, WifiOff, Upload, AlertTriangle
-} from 'lucide-react';
+import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle } from 'lucide-react';
 import { InventoryItem, SheetConfig, SheetProperties } from '../../types';
-import { VIRTUAL_COLUMNS } from '../../utils/virtualColumns';
-import { parseAnyDate } from '../../utils/dateCalculations';
-import { exportToExcel } from '../../utils/exportUtils';
 import { buildBulkActionContext, isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { useDashboard } from '../../context/DashboardContext';

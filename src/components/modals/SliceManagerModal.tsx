@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  X, Layers, Plus, Edit2, Trash2, Check, Sparkles, 
-  Search, SlidersHorizontal, ArrowRight, Eye, EyeOff, Shield, User,
-  CheckCircle2
-} from 'lucide-react';
+import { X, Layers, Plus, Edit2, Trash2, Sparkles, Search, Eye, EyeOff, Shield, User } from 'lucide-react';
 import { TableSlice } from '../../types';
 import { SliceIcon } from '../slices/SliceSelectorBar';
 import { SLICE_COLOR_CLASSES } from '../../utils/sliceRegistry';

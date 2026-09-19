@@ -5,7 +5,7 @@ import { parseAnyDate, parseLocaleNumber } from './pureCalculations';
  * Universal Multi-Type Column Comparator
  * Performs stable, intelligent type-aware sorting:
  * 1. Dates (native, ISO, DD/MM/YYYY, MM/YYYY, serial)
- * 2. Numbers (currency, floats, integers, formatted thousand strings)
+ * 2. Numbers (floats, integers, formatted thousand strings)
  * 3. Strings / Text (natural Spanish collation, numeric-aware like SKU-2 vs SKU-10)
  * 4. Empty / Null values cleanly placed at the bottom
  */
@@ -32,9 +32,9 @@ export function compareItemValues(a: any, b: any, direction: 'asc' | 'desc' = 'a
     }
   }
 
-  // 3. Check for Numeric values (including currency and thousand separators)
-  const isNumCandidateA = typeof a === 'number' || /^-?[$€£S/.]?\s*\d+([.,]\d+)*$/.test(String(a).trim());
-  const isNumCandidateB = typeof b === 'number' || /^-?[$€£S/.]?\s*\d+([.,]\d+)*$/.test(String(b).trim());
+  // 3. Check for Numeric values (including thousand separators)
+  const isNumCandidateA = typeof a === 'number' || /^-?\s*\d+([.,]\d+)*$/.test(String(a).trim());
+  const isNumCandidateB = typeof b === 'number' || /^-?\s*\d+([.,]\d+)*$/.test(String(b).trim());
 
   if (isNumCandidateA && isNumCandidateB) {
     const numA = typeof a === 'number' ? a : parseLocaleNumber(a, NaN);

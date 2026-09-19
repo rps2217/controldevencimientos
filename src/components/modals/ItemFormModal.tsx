@@ -1,9 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { 
-  X, Loader2, Sparkles, AlertCircle, Link2, Info, Search, 
-  Check, RotateCcw, Eye, EyeOff, Sliders, Plus, CheckCircle2, ChevronDown, Calendar,
-  AlertTriangle, ArrowRight, Layers, ShieldCheck, Clock, FileText
-} from 'lucide-react';
+import { X, Loader2, Sparkles, AlertCircle, Link2, Info, Search, Check, RotateCcw, Eye, EyeOff, Sliders, Plus, CheckCircle2, ChevronDown, Calendar, AlertTriangle, ArrowRight, Layers, ShieldCheck } from 'lucide-react';
 import { SheetProperties, InventoryItem, EventCategory, SheetConfig } from '../../types';
 import { 
   EVENT_CATEGORIES, 
@@ -693,7 +689,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                                           </span>
                                         </div>
                                         <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                                          {prod.provider || 'Sin proveedor'} {prod.price ? `• $${prod.price}` : ''}
+                                          {prod.provider || 'Sin proveedor'}
                                         </p>
                                       </div>
                                       <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold opacity-0 group-hover:opacity-100 shrink-0">
@@ -895,7 +891,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                         <input
                           type={
                             isDateTimeCol ? 'datetime-local' :
-                            colSchema?.type === 'number' || /^cant|unidades|stock|dias|precio/i.test(header) ? 'number' : 'text'
+                            colSchema?.type === 'number' || /^cant|unidades|stock|dias/i.test(header) ? 'number' : 'text'
                           }
                           name={header}
                           value={isDateTimeCol ? (formatInputDateTime(formData[header]) || formData[header] || '') : (formData[header] || '')}

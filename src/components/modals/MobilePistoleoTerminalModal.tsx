@@ -1,14 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Camera, X, Scan, Zap, Volume2, VolumeX, Plus, Minus, Search, 
-  Check, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, Layers, 
-  Barcode, Calendar, Sparkles, Trash2, Edit3, ArrowRight, ShieldCheck, Keyboard
-} from 'lucide-react';
+import { Camera, X, Scan, Zap, Volume2, VolumeX, Plus, Minus, Search, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, Layers, Barcode, Sparkles, Trash2, Edit3, ShieldCheck, Keyboard } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { InventoryItem } from '../../types';
 import { findColumnBySemantic } from '../../utils/columnAliases';
 import { findMasterProduct, getMasterProductSummary } from '../../utils/referenceResolver';
-import { parseLocaleNumber, parseAnyDate } from '../../utils/dateCalculations';
+import { parseLocaleNumber } from '../../utils/dateCalculations';
 import { playBeep, calculateLastDayOfMonthDateString, generateCuVc } from '../../utils/stockCountUtils';
 
 interface ScannedSessionItem {

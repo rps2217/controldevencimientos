@@ -71,7 +71,7 @@ Define las estructuras de datos fundamentales para los ítems de inventario, eve
 
 ### B. Motor de Detección Semántica (`src/utils/columnAliases.ts`)
 Resuelve el problema común de las hojas de cálculo con encabezados inconsistentes (ej. "F. Vto", "Fecha Vencimiento", "Vencimiento", "fecha_vc").
-- **`KnownFieldSemantic`**: Tipos semánticos estandarizados (`sku`, `descripcion`, `fecha_vc`, `fecha_retiro`, `cantidad`, `lote`, `politica`, `tipo_evento`, `precio`, `observacion`, `proveedor`, etc.).
+- **`KnownFieldSemantic`**: Tipos semánticos estandarizados (`sku`, `descripcion`, `fecha_vc`, `fecha_retiro`, `cantidad`, `lote`, `politica`, `tipo_evento`, `observacion`, `proveedor`, etc.).
 - **`FIELD_PATTERNS`**: Diccionario de expresiones regulares por campo semántico que cubre variaciones ortográficas, acentos y abreviaciones.
 - **`findColumnBySemantic(headers, semantic)`**: Busca en un arreglo de encabezados de columnas el que coincida semánticamente, permitiendo mapeo automático robusto.
 
@@ -83,7 +83,7 @@ Resuelve el problema común de las hojas de cálculo con encabezados inconsisten
   4. Formatos compactos (`YYYYMMDD`).
   5. Formatos Mes/Año (`MM/YYYY` - calcula último día del mes).
   6. Objetos `Date` nativos o cadenas de texto estándar.
-- **`parseLocaleNumber` / `formatLocaleNumber`**: Conversión y formateo robusto de valores numéricos monetarios o de stock que contengan comas y puntos decimales europeos/americanos.
+- **`parseLocaleNumber` / `formatLocaleNumber`**: Conversión y formateo robusto de valores numéricos de stock/cantidad que contengan comas y puntos decimales europeos/americanos.
 - **`getItemStatus(item, headers)`**: Calcula de manera inteligente el estado operativo de un ítem (ej. Vencido, Crítico por vencer, Próximo a retiro, En buen estado) comparando con la fecha actual.
 - **`getEventCategory(item, headers)`**: Clasifica automáticamente eventos e incidencias en categorías (`TRANSPORTE`, `DIFERENCIAS`, `MERMAS`, `CALIDAD`, etc.).
 
@@ -102,7 +102,7 @@ Resuelve el problema común de las hojas de cálculo con encabezados inconsisten
 ### F. Funcionalidades Avanzadas Estilo AppSheet (`Ref`, `Show_If` y `Valid_If`)
 - **Referencias Cruzadas y De-referenciación (`src/utils/referenceResolver.ts`)**:
   - `findMasterProduct` y `searchMasterProducts`: Búsqueda tolerante e interactiva en el catálogo maestro (`products`) por SKU, nombre, proveedor o categoría.
-  - `dereferenceMasterProduct`: Propagación atómica automática de campos maestros (Descripción, Proveedor, Costo/Precio, Categoría y Política) hacia las columnas correspondientes en la hoja activa al seleccionar o ingresar un SKU.
+  - `dereferenceMasterProduct`: Propagación atómica automática de campos maestros (Descripción, Proveedor, Categoría y Política) hacia las columnas correspondientes en la hoja activa al seleccionar o ingresar un SKU.
   - Sincronización instantánea de política comercial para el cálculo automático de la fecha de retiro preventivo.
   - Tarjeta de enlace maestro (`Ref: Catálogo Maestro`) visible tanto en el formulario (`ItemFormModal`) como en el panel de detalle (`ItemDetailDrawer`).
 - **Formularios Dinámicos y Reglas de Visibilidad (`src/utils/dynamicFormRules.ts`)**:
@@ -160,9 +160,9 @@ Resuelve el problema común de las hojas de cálculo con encabezados inconsisten
 - **Modularización de `InventoryDashboard.tsx`**:
   - **`FloatingBulkActionBar.tsx`**: Barra flotante contextual desacoplada para operaciones masivas (tickets, código de barras, exportación Excel, borrador Gmail, WhatsApp, edición en lote y eliminación).
   - **`DashboardModalsManager.tsx`**: Administrador centralizado de modales y drawers que libera al dashboard principal de sobrecarga de estado visual.
-- **Espejo de Backend / Multi-Database (`src/services/backendMirrorService.ts` & `BackendMirrorPanel.tsx`)**:
+- **Espejo de Backend REST (`src/services/backendMirrorService.ts` & `BackendMirrorPanel.tsx`)**:
   - Resuelve las limitaciones de latencia (~2.500ms en Google Apps Script) y la falta de bloqueos de concurrencia a nivel de fila durante conteos masivos en farmacia.
-  - Soporte para proveedores secundarios: Custom REST API, Supabase (PostgreSQL), PostgreSQL directo o Firebase / Firestore.
+  - Soporte para un backend espejo secundario vía endpoint REST personalizado.
   - Estrategias de sincronización: **Escritura Dual (Dual-Write)** en paralelo con Google Sheets, **Espejo Primero (Mirror-First)** para latencia sub-150ms con volcado asíncrono, o **Solo Respaldo (Backup-Only)**.
   - Telemetría en tiempo real, test de latencia de red, identificador único de terminal/dispositivo (`deviceId`) y resolución de conflictos por timestamp atómico (`last_write_wins`).
 
@@ -182,7 +182,7 @@ Resuelve el problema común de las hojas de cálculo con encabezados inconsisten
 ### M. Sistema de Campañas de Inventario Cíclico y Matriz de Consolidación (Farmacia en Movimiento)
 - **Propósito**: Auditorías de inventario completas en farmacias con stock en constante movimiento (atención al público simultánea), dividiendo el trabajo en múltiples días y sesiones por mueble/pasillo.
 - **Estructura de la Información de Farmacia**:
-  - Reconocimiento nativo de las columnas oficiales del ERP: `Local`, `Código SKU`, `Descripción`, `Proveedor`, `Stock`, `Inv. Inicial`, `Egreso`, `Ingreso`, `Venta`, `Stock Min`, `Stock Max`, `Stock Crítico`, `Precio de Lista`.
+  - Reconocimiento nativo de las columnas oficiales del ERP: `Local`, `Código SKU`, `Descripción`, `Proveedor`, `Stock`, `Inv. Inicial`, `Egreso`, `Ingreso`, `Venta`, `Stock Min`, `Stock Max`, `Stock Crítico`.
 - **Arquitectura de "Separación de Aguas" (4 Estados de Auditoría)**:
   1. 🟢 **Cuadrados / Validados (`VALIDADO_OK`)**: SKUs auditados cuyo stock físico coincide con el teórico (o validados manualmente por el operario).
   2. 🟡 **Discrepancias (`DISCREPANCIA`)**: SKUs con diferencias (faltantes o sobrantes) pendientes de revisión de ventas en caja o de una 2da vuelta de conteo.

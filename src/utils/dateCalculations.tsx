@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   Truck, FileSpreadsheet, PackageX, RotateCcw, Clock, AlertCircle, AlertTriangle, Clock3, Flame, CheckCircle2, Tag, ArrowLeftRight, Trash2
 } from 'lucide-react';
-import { InventoryItem, EventCategory, EventTypeDefinition, EventResolutionStatus } from '../types';
+import { InventoryItem, EventCategory, EventTypeDefinition } from '../types';
 import { 
   getCategoryFromEventValue,
   parseAnyDate,

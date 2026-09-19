@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  X, Layers, Sparkles, Tag, Check, Trash2, Sliders, 
-  Columns, Filter, ArrowUpDown, RefreshCw, Copy, 
-  Search, AlertTriangle, Flame, Clock, CheckCircle2, 
-  Truck, Scale, RotateCcw, ShieldCheck, Bookmark, FileText, Package,
-  ArrowUpAZ, ArrowDownZA
-} from 'lucide-react';
+import { X, Layers, Sparkles, Tag, Check, Trash2, Sliders, Columns, Filter, ArrowUpDown, RefreshCw, Copy, Search, Clock, CheckCircle2, Truck, ArrowUpAZ, ArrowDownZA } from 'lucide-react';
 import { 
   TableSlice, SliceFilterConfig, SliceColor, SortConfig, DynamicMonthRange 
 } from '../../types';

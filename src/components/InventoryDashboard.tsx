@@ -1,54 +1,16 @@
-import React, { useEffect, useState, useMemo, useRef, useDeferredValue, useCallback } from 'react';
-import { 
-  getSpreadsheetMetadata, 
-  getSheetData, 
-  getAllSheetsData,
-  appendRow, 
-  updateRow, 
-  deleteRow,
-  deleteRows,
-  saveCloudConfig,
-  loadCloudConfig,
-  getScriptPropertiesConfig,
-  saveScriptPropertiesConfig,
-  clearSheetsCache
-} from '../lib/sheets';
-import { 
-  InventoryItem, 
-  SpreadsheetMetadata, 
-  SheetProperties, 
-  SheetConfig, 
-  EventCategory,
-  SortConfig,
-  DynamicMonthRange
-} from '../types';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { getSpreadsheetMetadata, getAllSheetsData, appendRow, updateRow, deleteRow, deleteRows, saveCloudConfig, loadCloudConfig, getScriptPropertiesConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
+import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, EventCategory } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
 import { DashboardProvider, DashboardContextType } from '../context/DashboardContext';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { 
-  Plus, Edit2, Trash2, RefreshCw, Loader2, Database, AlertCircle, Package, 
-  FileSpreadsheet, Printer, Barcode, Settings, FileText, Search, X, Truck, RotateCcw, 
-  PackageX, Sparkles, Clock, Clock3, Flame, AlertTriangle, CheckCircle2, FilterX, 
-  Sliders, Link2, Download, CheckSquare, Square, Columns, Eye, EyeOff, ArrowUp, ArrowDown, Menu, Scan, GripVertical, Tag, Mail, MessageSquare, ChevronDown, Check, MoreVertical, Building2, Maximize2
-} from 'lucide-react';
+import { AlertCircle, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // Utilities & Hooks
-import { 
-  EVENT_CATEGORIES, 
-  renderEventIcon, 
-  parseAnyDate, 
-  formatInputDate,
-  formatInputDateTime,
-  getEventCategory, 
-  getItemStatus,
-  getCategoryFromEventValue,
-  getItemResolutionStatus,
-  parseLocaleNumber
-} from '../utils/dateCalculations';
+import { EVENT_CATEGORIES, getEventCategory, getItemStatus, parseLocaleNumber } from '../utils/dateCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
-import { resolveItemIdentity, matchRowIndexByIdentity } from '../utils/entityIdentityResolver';
-import { findMasterProduct, dereferenceMasterProduct, autoCalculateItemFormData } from '../utils/referenceResolver';
+import { resolveItemIdentity } from '../utils/entityIdentityResolver';
 import { 
   findExistingItemByCuVc, 
   reconcileImportWithInventory, 
@@ -57,7 +19,7 @@ import {
 import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
 import { useColumnResize } from '../hooks/useColumnResize';
 import { useColumnManager } from '../hooks/useColumnManager';
-import { useInventoryFiltering, handleFilterToggle, DisplayRow } from '../hooks/useInventoryFiltering';
+import { useInventoryFiltering, handleFilterToggle } from '../hooks/useInventoryFiltering';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { useModuleViewState } from '../hooks/useModuleViewState';
 import { indexedDbService } from '../db/indexedDbService';
@@ -71,17 +33,10 @@ import {
 } from '../data/sampleInventory';
 
 // Helpers para almacenamiento persistente y configuración modular
-import {
-  getStoredDemoItems,
-  saveStoredDemoItems,
-  mergeCloudConfigs,
-  ModuleViewState,
-  DEFAULT_MODULE_STATE
-} from '../utils/dashboardConfigUtils';
+import { getStoredDemoItems, saveStoredDemoItems, mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
 export { mergeCloudConfigs, type ModuleViewState };
 
 // Modals & Drawers & Sub-components
-import { InventoryTable } from './InventoryTable';
 import { Sidebar } from './navigation/Sidebar';
 import { DashboardTopNav } from './navigation/DashboardTopNav';
 import { DashboardPageHeader } from './navigation/DashboardPageHeader';
@@ -94,12 +49,6 @@ import { ZenModeOverlay } from './dashboard/ZenModeOverlay';
 import { DashboardMobileDrawer } from './dashboard/DashboardMobileDrawer';
 import { DashboardMobileFABs } from './dashboard/DashboardMobileFABs';
 import { DashboardTableContainer } from './dashboard/DashboardTableContainer';
-import { exportToExcel } from '../utils/exportUtils';
-import { EventResolutionCards } from './views/EventResolutionCards';
-import { EventFilterChips } from './views/EventFilterChips';
-import { PmRadarCards } from './views/PmRadarCards';
-import { ColumnFilterMenu } from './views/ColumnFilterMenu';
-import { InventoryTableRow } from './views/InventoryTableRow';
 import { ViewConfigControlDrawer } from './drawers/ViewConfigControlDrawer';
 import { usePrecomputedColumns } from '../hooks/usePrecomputedColumns';
 import { TicketPrintView } from './views/TicketPrintView';
@@ -109,11 +58,10 @@ import {
   saveTicketConfigToStorage,
   executeThermalPrint
 } from '../utils/ticketUtils';
-import { GlobalTicketConfig, ViewTicketConfig, TableSlice } from '../types';
+import { GlobalTicketConfig, ViewTicketConfig } from '../types';
 import { SkeletonLoader } from './common/SkeletonLoader';
 import { useToast } from './common/ToastContainer';
 import { useTableSlices } from '../hooks/useTableSlices';
-import { SliceSelectorBar } from './slices/SliceSelectorBar';
 
 export const InventoryDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -287,12 +235,12 @@ export const InventoryDashboard: React.FC = () => {
   const [quickTraspasoItem, setQuickTraspasoItem] = useState<InventoryItem | null>(null);
   const [isQuickTraspasoOpen, setIsQuickTraspasoOpen] = useState<boolean>(false);
 
-  const frcBodCol = useMemo(() => {
+  const frcBodCol = useMemo<string | null>(() => {
     return findColumnBySemantic(headers, 'frc_bod') || 
            headers.find(h => {
              const clean = h.trim().toLowerCase();
              return /frc.*bod|bodega|destino|warehouse|^bod$/i.test(clean) || clean.includes('bod');
-           });
+           }) || null;
   }, [headers]);
 
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false);
@@ -853,7 +801,7 @@ export const InventoryDashboard: React.FC = () => {
     if (activeView === 'products') {
       const providerCol = headers.find(h => /proveedor|marca|fabricante/i.test(h));
       const categoryCol = headers.find(h => /categor[ií]a|familia|tipo/i.test(h));
-      const chips = [];
+      const chips: string[] = [];
       
       if (providerCol) {
         const topProviders = Array.from(new Set(items.map(i => i[providerCol]))).filter(Boolean).slice(0, 3);
@@ -868,7 +816,7 @@ export const InventoryDashboard: React.FC = () => {
     if (activeView === 'events') {
       const respCol = headers.find(h => /responsable|usuario|creado_por|registrado/i.test(h));
       const originCol = headers.find(h => /origen|tienda|almac[eé]n/i.test(h));
-      const chips = [];
+      const chips: string[] = [];
       
       if (respCol) {
         const topResp = Array.from(new Set(items.map(i => i[respCol]))).filter(Boolean).slice(0, 2);
@@ -882,7 +830,7 @@ export const InventoryDashboard: React.FC = () => {
     }
     if (activeView === 'main') {
       const batchCol = headers.find(h => /lote|batch/i.test(h));
-      const chips = [];
+      const chips: string[] = [];
       if (batchCol) {
         // Just extract some common distinct batches if any
         const topBatches = Array.from(new Set(items.map(i => i[batchCol]))).filter(Boolean).slice(0, 3);
@@ -1046,8 +994,8 @@ export const InventoryDashboard: React.FC = () => {
       let targetSheetTitle = '';
       if (currentView === 'main' || currentView === 'analytics') targetSheetTitle = currentConfig.main || allSheets[0];
       else if (currentView === 'events') targetSheetTitle = currentConfig.events || eventsSheetTitle || '';
-      else if (currentView === 'products') targetSheetTitle = currentConfig.products;
-      else if (currentView === 'policies') targetSheetTitle = currentConfig.policies;
+      else if (currentView === 'products') targetSheetTitle = currentConfig.products || '';
+      else if (currentView === 'policies') targetSheetTitle = currentConfig.policies || '';
       else targetSheetTitle = currentView;
 
       const targetSheetProp = meta.sheets.find((s: any) => s.properties.title === targetSheetTitle)?.properties;

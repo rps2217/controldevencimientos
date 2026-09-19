@@ -1,7 +1,7 @@
 /**
- * Backend Mirroring & Multi-Database Synchronization Service
+ * Backend Mirroring REST Synchronization Service
  * 
- * Permite mantener un "Espejo de Backend" (PostgreSQL, Supabase, Firebase o REST API)
+ * Permite mantener un "Espejo de Backend" REST
  * en paralelo a Google Sheets, superando las limitaciones de latencia y concurrencia 
  * en operaciones críticas de alta frecuencia (como conteos masivos en farmacia).
  */

@@ -12,7 +12,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { InventoryItem, EventCategory } from '../../types';
+import { InventoryItem } from '../../types';
 import { getEventCategory, getItemStatus, parseAnyDate } from '../../utils/dateCalculations';
 import { findColumnBySemantic } from '../../utils/columnAliases';
 import { Activity, AlertTriangle, TrendingUp, PackageX } from 'lucide-react';

@@ -1,12 +1,5 @@
 import { findColumnBySemantic, KnownFieldSemantic } from '../utils/columnAliases';
-import { 
-  formatDisplayDate, 
-  parseAnyDate, 
-  getEventCategory, 
-  getItemStatus, 
-  getItemResolutionStatus,
-  EVENT_CATEGORIES 
-} from '../utils/dateCalculations';
+import { formatDisplayDate, parseAnyDate, getItemStatus, getItemResolutionStatus } from '../utils/dateCalculations';
 
 function createMimeMessage({
   to,
@@ -345,7 +338,6 @@ export function generateItemsHtmlTable(
       const isDateCol = findColumnBySemantic([header], 'fecha_vc', customAliases) !== null || findColumnBySemantic([header], 'fecha_retiro', customAliases) !== null || (/^fecha/i.test(header) && !/evento|incidencia|tipo/i.test(header));
       const isCantCol = findColumnBySemantic([header], 'cantidad', customAliases) !== null || /cant|stock|qty|unidades/i.test(header);
       const isTraspasoCol = findColumnBySemantic([header], 'n_traspaso', customAliases) !== null || /traspaso/i.test(header);
-      const isPriceCol = findColumnBySemantic([header], 'precio', customAliases) !== null || /precio|costo|val_unit/i.test(header);
       const isEventCol = findColumnBySemantic([header], 'tipo_evento', customAliases) !== null || /frc_even|evento|incidencia|motivo/i.test(header);
 
       // If description column is empty on this row, look up in products or allMainItems
@@ -419,9 +411,6 @@ export function generateItemsHtmlTable(
       if (isCantCol) {
         return `<td style="padding: 8px 12px; border: 1px solid #e2e8f0; text-align: center; font-weight: bold; color: #0f172a; white-space: nowrap;">${displayVal}</td>`;
       }
-      if (isPriceCol) {
-        return `<td style="padding: 8px 12px; border: 1px solid #e2e8f0; text-align: right; font-weight: 600; color: #0f172a; white-space: nowrap;">${displayVal.startsWith('$') ? displayVal : `$${displayVal}`}</td>`;
-      }
       if (isEventCol) {
         return `<td style="padding: 8px 12px; border: 1px solid #e2e8f0; font-size: 12px; font-weight: 500; color: #334155;">${displayVal}</td>`;
       }
@@ -442,9 +431,8 @@ export function generateItemsHtmlTable(
     const isVirtual = header.startsWith('_virtual_');
     const label = isVirtual ? formatVirtualHeaderLabel(header) : header;
     const isCant = findColumnBySemantic([header], 'cantidad', customAliases) !== null || /cant|stock|qty/i.test(header) || isVirtual;
-    const isPrice = findColumnBySemantic([header], 'precio', customAliases) !== null || /precio|costo/i.test(header);
     const isDate = findColumnBySemantic([header], 'fecha_vc', customAliases) !== null || findColumnBySemantic([header], 'fecha_retiro', customAliases) !== null || /^fecha/i.test(header);
-    const align = isCant || isDate ? 'text-align: center;' : isPrice ? 'text-align: right;' : 'text-align: left;';
+    const align = isCant || isDate ? 'text-align: center;' : 'text-align: left;';
     return `<th style="padding: 10px 12px; border: 1px solid #334155; ${align} white-space: nowrap; font-size: 12px; font-weight: bold; background-color: #0f172a; color: #ffffff;">${escapeHtml(label)}</th>`;
   }).join('');
 

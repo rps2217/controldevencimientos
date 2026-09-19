@@ -238,7 +238,7 @@ export function generateSmartColumnMappings(
 
   const allSemantics: KnownFieldSemantic[] = [
     'id', 'sku', 'descripcion', 'fecha_vc', 'fecha_retiro', 'mes', 'anio',
-    'cantidad', 'lote', 'politica', 'tipo_evento', 'frc_bod', 'precio',
+    'cantidad', 'lote', 'politica', 'tipo_evento', 'frc_bod',
     'observacion', 'proveedor', 'dias_anticipacion', 'dias_retiro',
     'n_traspaso', 'telefono', 'email', 'categoria', 'mundo', 'pm', 'ubicacion'
   ];

@@ -1,6 +1,5 @@
-import { TableSlice, InventoryItem, EventCategory } from '../types';
+import { TableSlice, InventoryItem } from '../types';
 import { getItemStatus, getEventCategory, getItemResolutionStatus } from './dateCalculations';
-import { findColumnBySemantic } from './columnAliases';
 
 export const BUILT_IN_SLICES: TableSlice[] = [
   // 1. Radar de Vencimientos (main)

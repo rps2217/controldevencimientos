@@ -7,7 +7,6 @@ export interface MasterProductSummary {
   sku: string;
   name: string;
   provider: string;
-  price: string;
   category: string;
   raw: any;
 }
@@ -526,21 +525,19 @@ export function getMasterProductSummary(
   customAliases?: Record<string, string[]>
 ): MasterProductSummary {
   if (!product) {
-    return { sku: '', name: '', provider: '', price: '', category: '', raw: null };
+    return { sku: '', name: '', provider: '', category: '', raw: null };
   }
 
   const keys = Object.keys(product);
   const skuCol = findColumnBySemantic(keys, 'sku', customAliases) || keys.find(k => /sku|código|codigo/i.test(k));
   const descCol = findColumnBySemantic(keys, 'descripcion', customAliases) || keys.find(k => /desc|nombre|name|producto/i.test(k));
   const provCol = findColumnBySemantic(keys, 'proveedor', customAliases) || keys.find(k => /prov|laboratorio|marca/i.test(k));
-  const priceCol = findColumnBySemantic(keys, 'precio', customAliases) || keys.find(k => /precio|costo|price|valor/i.test(k));
   const catCol = findColumnBySemantic(keys, 'categoria', customAliases) || keys.find(k => /categor|familia|rubro/i.test(k));
 
   return {
     sku: skuCol && product[skuCol] !== undefined ? String(product[skuCol]).trim() : (product.SKU || ''),
     name: descCol && product[descCol] !== undefined ? String(product[descCol]).trim() : (product.DESCRIPCION || ''),
     provider: provCol && product[provCol] !== undefined ? String(product[provCol]).trim() : (product.PROVEEDOR || ''),
-    price: priceCol && product[priceCol] !== undefined ? String(product[priceCol]).trim() : (product.PRECIO_COSTO || ''),
     category: catCol && product[catCol] !== undefined ? String(product[catCol]).trim() : (product.CATEGORIA || product.FAMILIA || ''),
     raw: product
   };
@@ -578,7 +575,6 @@ export function searchMasterProducts(
  * Maps:
  * - Master Description -> Target Description column
  * - Master Provider -> Target Provider column
- * - Master Price -> Target Price column
  * - Master Category -> Target Category column
  * - Master Policy -> Target Policy column
  */
@@ -644,12 +640,10 @@ export function dereferenceMasterProduct(
       val = getMasterVal('mundo', /mundo|zona|division|segmento|area/i);
     } else if (/pm|product_manager|responsable|comprador|gestor/i.test(cleanHeader)) {
       val = getMasterVal('pm', /pm|product_manager|responsable|comprador|gestor/i);
-    } else if (/precio|costo|price|valor/i.test(cleanHeader)) {
-      val = getMasterVal('precio', /precio|costo|price|valor/i);
     } else if (/categor|familia|rubro/i.test(cleanHeader)) {
       val = getMasterVal('categoria', /categor|familia|rubro|linea/i);
     } else {
-      for (const sem of ['sku', 'descripcion', 'proveedor', 'politica', 'dias_retiro', 'dias_anticipacion', 'mundo', 'pm', 'precio', 'categoria'] as KnownFieldSemantic[]) {
+      for (const sem of ['sku', 'descripcion', 'proveedor', 'politica', 'dias_retiro', 'dias_anticipacion', 'mundo', 'pm', 'categoria'] as KnownFieldSemantic[]) {
         const matchedTargetCol = findColumnBySemantic([targetHeader], sem, customAliases);
         if (matchedTargetCol) {
           val = getMasterVal(sem, new RegExp(sem, 'i'));
@@ -722,7 +716,7 @@ export function autoCalculateItemFormData(
   if (skuVal && products && products.length > 0) {
     masterProduct = findMasterProduct(skuVal, products, customAliases);
     if (masterProduct) {
-      // Auto dereference fields (Description, Provider, Price, Category, etc.) if empty or needed
+      // Auto dereference fields (Description, Provider, Category, etc.) if empty or needed
       const dereferenced = dereferenceMasterProduct(masterProduct, headers, customAliases);
       for (const [k, v] of Object.entries(dereferenced)) {
         if (v !== undefined && v !== null && String(v).trim() !== '') {

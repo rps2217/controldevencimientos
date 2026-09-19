@@ -16,7 +16,7 @@ export interface InventoryTableProps {
   visibleHeaders?: string[];
   visibleColumnMeta?: ColumnMetadata[];
   activeView?: string;
-  tableContainerRef?: React.RefObject<HTMLDivElement>;
+  tableContainerRef?: React.RefObject<HTMLDivElement | null>;
   getColWidth?: (headerId: string, label: string, type?: string) => number;
   handleStartResize?: (colId: string, startWidth: number, e: React.MouseEvent) => void;
   handleAutoFitColumn?: (colId: string, label: string) => void;
@@ -362,7 +362,7 @@ export const InventoryTable: React.FC<InventoryTableProps> = (props) => {
                             badgeClass: EVENT_CATEGORIES[cat].badgeText
                           }))}
                           selectedValues={eventFilter}
-                          onToggle={(val, isMulti) => setEventFilter(prev => handleFilterToggle(prev, val, isMulti))}
+                          onToggle={(val, isMulti) => setEventFilter((prev: string[]) => handleFilterToggle(prev, val, isMulti))}
                           onClear={() => setEventFilter([])}
                           alignRight={alignRight}
                         />

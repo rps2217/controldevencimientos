@@ -17,7 +17,7 @@ interface UseTableSlicesParams {
   saveConfig: (c: SheetConfig) => void;
   headers: string[];
   augmentedItems: InventoryItem[];
-  frcBodCol: string;
+  frcBodCol: string | null;
   activeSliceId: string | null;
   setActiveSliceId: (id: string | null) => void;
   clearAllFilters: () => void;

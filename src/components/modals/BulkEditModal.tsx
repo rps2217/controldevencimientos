@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, CheckCircle2, Edit2, Layers } from 'lucide-react';
+import { X, Edit2, Layers } from 'lucide-react';
 
 interface BulkEditModalProps {
   isOpen: boolean;

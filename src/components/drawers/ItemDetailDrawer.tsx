@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  Package, X, AlertCircle, CheckCircle2, Clock, Truck, FileSpreadsheet, PackageX, RotateCcw, Plus, ExternalLink, Edit2, Eye, EyeOff, SlidersHorizontal, Link2, Trash2, Barcode as BarcodeIcon 
-} from 'lucide-react';
+import { Package, X, AlertCircle, CheckCircle2, Clock, Plus, Edit2, Eye, EyeOff, SlidersHorizontal, Link2, Trash2, Barcode as BarcodeIcon } from 'lucide-react';
 import { InventoryItem, EventCategory } from '../../types';
 import { 
   EVENT_CATEGORIES, 

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Clock3, Truck, CheckCircle2, Tag, FileSpreadsheet, PackageX, RotateCcw, Building2 } from 'lucide-react';
-import { EventCategory } from '../../types';
 
 interface EventMetrics {
   vencimientoCercano: number;

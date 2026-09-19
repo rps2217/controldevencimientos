@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, X, Database, FileSpreadsheet, Package, FileText, CheckCircle2, Sliders, BookOpen, Plus, Trash2, Server } from 'lucide-react';
+import { Settings, X, Database, FileSpreadsheet, Package, FileText, CheckCircle2, Sliders, BookOpen, Plus, Server } from 'lucide-react';
 import { SheetConfig, SpreadsheetMetadata } from '../../types';
 import { TableBulkActionsPanel } from '../settings/TableBulkActionsPanel';
 import { BackendMirrorPanel } from '../settings/BackendMirrorPanel';
@@ -32,7 +32,6 @@ const SEMANTIC_FIELDS = [
   { key: 'proveedor', label: 'Proveedor / Laboratorio' },
   { key: 'telefono', label: 'Teléfono / WhatsApp / Contacto' },
   { key: 'email', label: 'Correo Electrónico / Email' },
-  { key: 'precio', label: 'Precio / Costo' },
   { key: 'id', label: 'ID / Folio' }
 ];
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Package, Link as LinkIcon, Settings2, CheckCircle2, Moon, Sun, Contrast, Check } from 'lucide-react';
+import { Link as LinkIcon, Settings2, CheckCircle2, Moon, Sun, Contrast, Check } from 'lucide-react';
 import InventoryDashboard from './components/InventoryDashboard';
 import { ToastProvider } from './components/common/ToastContainer';
 import { PWAReloadPrompt } from './components/pwa/PWAReloadPrompt';

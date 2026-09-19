@@ -1,7 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { Sidebar } from '../navigation/Sidebar';
-import { SheetProperties } from '../../types';
 import { useDashboard } from '../../context/DashboardContext';
 
 export interface DashboardMobileDrawerProps {

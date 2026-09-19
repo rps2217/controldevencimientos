@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, CheckCircle2, Flame, Clock3, AlertTriangle, ArrowLeftRight, Trash2, Sparkles } from 'lucide-react';
+import { Clock, CheckCircle2, Flame, Clock3, AlertTriangle, ArrowLeftRight, Trash2 } from 'lucide-react';
 
 interface PmMetrics {
   total: number;

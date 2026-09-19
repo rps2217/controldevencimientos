@@ -35,7 +35,7 @@ export interface DashboardModalsManagerProps {
   policies: any[];
   products: any[];
   sheetConfig: SheetConfig;
-  setSheetConfig: (c: SheetConfig) => void;
+  setSheetConfig: React.Dispatch<React.SetStateAction<SheetConfig>>;
   saveConfig: (c: SheetConfig) => void;
   
   // PM Report
@@ -160,7 +160,7 @@ export interface DashboardModalsManagerProps {
   setIsStockCountOpen: (open: boolean) => void;
   items: InventoryItem[];
   handleSyncRowsToVencimientos: (rows: Record<string, any>[]) => Promise<void>;
-  showToast: (msg: string, type: 'success' | 'error' | 'warning' | 'info', title?: string) => void;
+  showToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info', title?: string) => void;
 
   // Sync & Audit Modal
   isSyncAuditOpen: boolean;
@@ -539,9 +539,9 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
         headers={headers}
         currentFilters={currentFilters}
         currentSort={sortConfig}
-        currentGroupBy={groupByColumn}
+        currentGroupBy={groupByColumn ?? undefined}
         currentGroupByDirection={groupByDirection}
-        currentVisibleHeaders={visibleHeaders}
+        currentVisibleHeaders={visibleHeaders ?? undefined}
         editingSlice={editingSliceModalItem}
         onSaveSlice={handleSaveSlice}
         onDeleteSlice={handleDeleteSlice}

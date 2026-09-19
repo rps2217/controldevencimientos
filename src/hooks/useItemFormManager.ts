@@ -158,7 +158,7 @@ export function useItemFormManager({
       }
 
       // Type specific validation
-      if (effectiveType === 'number' || /^cant|unidades|stock|dias|precio/i.test(header)) {
+      if (effectiveType === 'number' || /^cant|unidades|stock|dias/i.test(header)) {
         fieldSchema = fieldSchema.refine((val: any) => {
           if (!isRequired && (!val || String(val).trim() === '' || String(val).trim() === '-')) return true;
           const num = parseLocaleNumber(val);

@@ -1,41 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { 
-  CheckCircle2, AlertTriangle, HelpCircle, Package, Search, 
-  ArrowRight, Download, RefreshCw, UploadCloud, FileSpreadsheet, 
-  Calendar, Layers, ShieldCheck, Tag, Trash2, Plus, Edit3, 
-  ChevronRight, ArrowUpRight, ArrowDownRight, MapPin, Store,
-  Check, X, FileCheck, Sliders, Eye, EyeOff, RotateCcw,
-  Sparkles, Zap, Share2, Cloud, CloudUpload, CloudDownload,
-  Database, Info, Loader2, Scan, MoreVertical
-} from 'lucide-react';
-import { 
-  InventoryCampaign, 
-  CampaignConsolidationMatrix, 
-  CampaignAuditRow, 
-  StockCountSession,
-  CampaignItemAuditStatus
-} from '../../types';
-import { 
-  computeCampaignConsolidationMatrix, 
-  importPharmacySnapshotToCampaign, 
-  markSkuAsClosedInCampaign, 
-  reopenSkuInCampaign, 
-  setCampaignManualSalesAdjustment, 
-  exportCampaignReportToExcel, 
-  exportDiscrepanciesForRecountSheet,
-  createNewCampaign,
-  saveCampaignsToStorage,
-  loadCampaignsFromStorage,
-  saveStockCountSessionsToStorage,
-  buildAuditRowsFromCampaignMatrix,
-  playBeep
-} from '../../utils/stockCountUtils';
-import { 
-  saveCampaignsToCloud, 
-  loadCampaignsFromCloud, 
-  syncCampaignsWithCloud,
-  saveAuditRowsToDedicatedSheet 
-} from '../../lib/sheets';
+import { CheckCircle2, AlertTriangle, HelpCircle, Package, Search, Download, RefreshCw, UploadCloud, FileSpreadsheet, Calendar, Layers, ShieldCheck, Plus, MapPin, Store, Check, RotateCcw, Zap, Cloud, Database, Loader2, Scan, MoreVertical } from 'lucide-react';
+import { InventoryCampaign, CampaignConsolidationMatrix, CampaignAuditRow, StockCountSession } from '../../types';
+import { computeCampaignConsolidationMatrix, importPharmacySnapshotToCampaign, markSkuAsClosedInCampaign, reopenSkuInCampaign, setCampaignManualSalesAdjustment, exportCampaignReportToExcel, exportDiscrepanciesForRecountSheet, createNewCampaign, saveCampaignsToStorage, saveStockCountSessionsToStorage, buildAuditRowsFromCampaignMatrix, playBeep } from '../../utils/stockCountUtils';
+import { saveCampaignsToCloud, syncCampaignsWithCloud, saveAuditRowsToDedicatedSheet } from '../../lib/sheets';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { parseDelimitedText, detectDelimiter } from '../../utils/universalImporter';
 import { CampaignQuickScanModal } from '../modals/CampaignQuickScanModal';
@@ -47,7 +14,7 @@ interface CampaignConsolidationDashboardProps {
   onUpdateCampaigns: (campaigns: InventoryCampaign[]) => void;
   onSelectCampaign: (id: string) => void;
   onStartTargetedRecount: (sessionName: string, skus: string[]) => void;
-  showToast: (message: string, type: 'success' | 'error' | 'warning' | 'info', title?: string) => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info', title?: string) => void;
   onSwitchToTerminal: (sku?: string) => void;
   onUpdateSessions?: (sessions: StockCountSession[]) => void;
   onNavigateToSessionList?: () => void;

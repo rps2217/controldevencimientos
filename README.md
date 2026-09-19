@@ -9,7 +9,7 @@ Aplicación web empresarial tipo AppSheet / Dashboard para la gestión integral 
 1. **Radar Comercial & Drenaje Preventivo PM:**
    - Detección automática de fechas de retiro vs políticas de canje por proveedor/marca.
    - Semaforización inteligente: *Retirar Inmediatamente*, *Próximo Retiro (<30 días)*, *Alerta Drenaje PM (<90 días)* y *En Tiempo*.
-   - Generador y copiado al portapapeles de solicitudes de precio especial/descuento para Product Managers.
+   - Generador y copiado al portapapeles de solicitudes de drenaje/retiro preventivo para Product Managers.
 
 2. **Motor Relacional (Master-Detail):**
    - Vinculación automática entre la tabla de Vencimientos, Catálogo de Productos y Políticas de Canje por clave SKU / Código.
@@ -28,7 +28,7 @@ Aplicación web empresarial tipo AppSheet / Dashboard para la gestión integral 
    - Compatibilidad con autenticación por PIN de 4 dígitos.
 
 5. **Editor de Estructura de Datos:**
-   - Configuración de tipos de campo (Texto, Número, Fecha, Moneda, Dropdown, Ref, Imagen, etc.).
+   - Configuración de tipos de campo (Texto, Número, Fecha, Dropdown, Ref, Imagen, etc.).
    - Asignación de claves primarias (ID Key) y columnas indexables para el buscador global.
 
 ---

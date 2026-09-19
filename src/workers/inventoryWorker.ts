@@ -1,4 +1,4 @@
-import { InventoryItem, EventCategory, SheetConfig } from '../types';
+import { InventoryItem, EventCategory } from '../types';
 import { 
   getEventCategory, 
   computeItemRawStatus, 
@@ -7,7 +7,6 @@ import {
   ItemStatusCode,
   ItemActionType 
 } from '../utils/pureCalculations';
-import { findColumnBySemantic } from '../utils/columnAliases';
 
 export interface WorkerNormalizedItem {
   index: number;

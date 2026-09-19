@@ -53,7 +53,7 @@ export const FloatingBulkActionBar: React.FC<FloatingBulkActionBarProps> = (prop
   const setIsBulkEditOpen = props.setIsBulkEditOpen ?? dashboard.setIsBulkEditOpen;
   const handleBulkDelete = props.handleBulkDelete ?? dashboard.handleBulkDelete;
   const setIsBulkActionsConfigOpen = props.setIsBulkActionsConfigOpen ?? dashboard.setIsBulkActionsConfigOpen;
-  const setSelectedRowIds = props.setSelectedRowIds ?? dashboard.setSelectedRowIds;
+  const setSelectedRowIds = props.setSelectedRowIds ?? dashboard.setSelectedRowIds ?? (() => {});
   const bulkActionCtx = props.bulkActionCtx ?? dashboard.bulkActionCtx ?? buildBulkActionContext(headers, activeView, activeView);
   if (selectedRowIds.length === 0 || activeView === 'schema' || activeView === 'analytics') {
     return null;

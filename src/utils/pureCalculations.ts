@@ -201,7 +201,7 @@ export function formatDisplayDate(dateVal: any, fallback = '-'): string {
 }
 
 /**
- * Robust number parsing supporting currency symbols, thousand commas/periods, and spaces
+ * Robust number parsing supporting thousand separators, decimal commas/periods, and spaces
  */
 export function parseLocaleNumber(val: any, fallback = 0): number {
   if (val === null || val === undefined) return fallback;
@@ -210,15 +210,15 @@ export function parseLocaleNumber(val: any, fallback = 0): number {
   let str = String(val).trim();
   if (!str) return fallback;
 
-  // Detect negative format (e.g., -100, -$100, (100))
+  // Detect negative format (e.g., -100, (100))
   let isNegative = false;
   if (str.startsWith('-') || (str.startsWith('(') && str.endsWith(')'))) {
     isNegative = true;
     str = str.replace(/^[\(-]+|[\)]+$/g, '').trim();
   }
 
-  // Strip out currencies, prefixes, and common unit suffixes
-  str = str.replace(/(S\/\.|\$|€|£|CLP|USD|UF|PEN|R\$|\bUN\b|\bUD\b|\bKG\b|%)/gi, '').trim();
+  // Strip common unit suffixes
+  str = str.replace(/(\bUN\b|\bUD\b|\bKG\b|%)/gi, '').trim();
   if (!str) return fallback;
 
   // Remove interior spaces (e.g., 1 250,50 -> 1250,50)
@@ -506,7 +506,7 @@ export function getItemResolutionStatus(item: InventoryItem, headers: string[], 
         status: 'REALIZADO',
         label: 'Realizado',
         traspasoNumber: str,
-        traspasoColumn: traspasoCol
+        traspasoColumn: traspasoCol || undefined
       };
     }
   }
@@ -516,7 +516,7 @@ export function getItemResolutionStatus(item: InventoryItem, headers: string[], 
     status: 'PENDIENTE',
     label: 'Pendiente',
     traspasoNumber: '',
-    traspasoColumn: traspasoCol
+    traspasoColumn: traspasoCol || undefined
   };
 }
 

@@ -1,8 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { 
-  Database, Key, Link2, Trash2, Plus, HelpCircle, 
-  ChevronRight, Sparkles, X, Info, Settings, ToggleLeft, Layers, Tag
-} from 'lucide-react';
+import { Database, Key, Link2, Trash2, Plus, HelpCircle, ChevronRight, Sparkles, X, Info, Settings, Layers, Tag } from 'lucide-react';
 import { SheetConfig, SpreadsheetMetadata, ColumnSchema, ColumnType } from '../../types';
 
 interface VisualSchemaDesignerProps {

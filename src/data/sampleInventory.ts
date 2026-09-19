@@ -4,7 +4,6 @@ export const SAMPLE_HEADERS = [
   "LOTE",
   "FECHA_VENCIMIENTO",
   "CANTIDAD",
-  "PRECIO_COSTO",
   "PROVEEDOR",
   "FRC_EVEN",
   "N_TRASPASO",
@@ -19,7 +18,6 @@ export const SAMPLE_ITEMS = [
     LOTE: "L-8821",
     FECHA_VENCIMIENTO: "2026-09-05",
     CANTIDAD: "320",
-    PRECIO_COSTO: "1.25",
     PROVEEDOR: "Lácteos del Sur S.A.",
     FRC_EVEN: "VENC. CERC.",
     N_TRASPASO: "TR-88190",
@@ -32,7 +30,6 @@ export const SAMPLE_ITEMS = [
     LOTE: "L-9012",
     FECHA_VENCIMIENTO: "2026-08-22",
     CANTIDAD: "85",
-    PRECIO_COSTO: "0.60",
     PROVEEDOR: "Lácteos del Sur S.A.",
     FRC_EVEN: "VENC. CERC.",
     N_TRASPASO: "",
@@ -45,7 +42,6 @@ export const SAMPLE_ITEMS = [
     LOTE: "L-3310",
     FECHA_VENCIMIENTO: "2027-03-15",
     CANTIDAD: "1250",
-    PRECIO_COSTO: "2.10",
     PROVEEDOR: "Pesquera Mar Azul",
     FRC_EVEN: "DET. PED",
     N_TRASPASO: "TR-99412",
@@ -58,7 +54,6 @@ export const SAMPLE_ITEMS = [
     LOTE: "L-5541",
     FECHA_VENCIMIENTO: "2028-01-10",
     CANTIDAD: "410",
-    PRECIO_COSTO: "5.80",
     PROVEEDOR: "Kimberly Clean",
     FRC_EVEN: "DIF. PED",
     N_TRASPASO: "",
@@ -71,7 +66,6 @@ export const SAMPLE_ITEMS = [
     LOTE: "L-7719",
     FECHA_VENCIMIENTO: "2026-08-21",
     CANTIDAD: "45",
-    PRECIO_COSTO: "1.80",
     PROVEEDOR: "Panificadora Central",
     FRC_EVEN: "CAL. INTER",
     N_TRASPASO: "TR-77210",
@@ -167,11 +161,11 @@ export const SAMPLE_EVENTS_ITEMS = [
 ];
 
 export const SAMPLE_PRODUCTS = [
-  { SKU: "SKU-1001", DESCRIPCION: "Leche Entera UHT 1L", PRECIO_COSTO: "1.25", PROVEEDOR: "Lácteos del Sur S.A." },
-  { SKU: "SKU-1002", DESCRIPCION: "Yogurt Batido Fresa 125g", PRECIO_COSTO: "0.60", PROVEEDOR: "Lácteos del Sur S.A." },
-  { SKU: "SKU-2045", DESCRIPCION: "Atún en Aceite Lata 140g", PRECIO_COSTO: "2.10", PROVEEDOR: "Pesquera Mar Azul" },
-  { SKU: "SKU-3091", DESCRIPCION: "Detergente Líquido 3L", PRECIO_COSTO: "5.80", PROVEEDOR: "Kimberly Clean" },
-  { SKU: "SKU-4022", DESCRIPCION: "Pan de Molde Integral 500g", PRECIO_COSTO: "1.80", PROVEEDOR: "Panificadora Central" }
+  { SKU: "SKU-1001", DESCRIPCION: "Leche Entera UHT 1L", PROVEEDOR: "Lácteos del Sur S.A." },
+  { SKU: "SKU-1002", DESCRIPCION: "Yogurt Batido Fresa 125g", PROVEEDOR: "Lácteos del Sur S.A." },
+  { SKU: "SKU-2045", DESCRIPCION: "Atún en Aceite Lata 140g", PROVEEDOR: "Pesquera Mar Azul" },
+  { SKU: "SKU-3091", DESCRIPCION: "Detergente Líquido 3L", PROVEEDOR: "Kimberly Clean" },
+  { SKU: "SKU-4022", DESCRIPCION: "Pan de Molde Integral 500g", PROVEEDOR: "Panificadora Central" }
 ];
 
 export const SAMPLE_POLICIES = [

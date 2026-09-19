@@ -9,8 +9,7 @@ import {
   getItemStatus, 
   getEventCategory, 
   getCategoryFromEventValue,
-  getItemResolutionStatus,
-  formatInputDate
+  getItemResolutionStatus
 } from './src/utils/dateCalculations';
 
 import { 
