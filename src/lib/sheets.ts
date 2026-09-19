@@ -1,5 +1,6 @@
 import type { SheetConfig, SheetMetadata, InventoryCampaign, StockCountSession } from '../types';
 import { getErrorMessage } from '../utils/pureCalculations';
+import { fetchWithTimeout } from './http';
 
 export const SPREADSHEET_ID = '1a4jGo-7pduH4fue73F_67sQYJS0LJqI7hiXYpyWVA8o';
 
@@ -358,20 +359,16 @@ export async function pingGoogleSheets(): Promise<{
   }
 
   const tStart = performance.now();
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 6000);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         action: 'getAppProperties',
         securityToken: getSecurityToken()
       }),
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    }, 6000);
     const tEnd = performance.now();
     const latencyMs = Math.round(tEnd - tStart);
 
@@ -391,7 +388,6 @@ export async function pingGoogleSheets(): Promise<{
 
     return { success: true, latencyMs, urlConfigured: true };
   } catch (err: unknown) {
-    clearTimeout(timeoutId);
     const tEnd = performance.now();
     const latencyMs = Math.round(tEnd - tStart);
     return {

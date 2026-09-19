@@ -1,5 +1,6 @@
 import { findColumnBySemantic, KnownFieldSemantic } from '../utils/columnAliases';
 import { formatDisplayDate, parseAnyDate, getItemStatus, getItemResolutionStatus } from '../utils/dateCalculations';
+import { fetchWithTimeout } from './http';
 
 function createMimeMessage({
   to,
@@ -46,7 +47,7 @@ export async function createGmailDraft(
   params: { to: string; subject: string; bodyHtml: string; bodyText?: string }
 ) {
   const rawMessage = createMimeMessage(params);
-  const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
+  const response = await fetchWithTimeout('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -57,7 +58,7 @@ export async function createGmailDraft(
         raw: rawMessage
       }
     })
-  });
+  }, 15000);
 
   if (!response.ok) {
     const errorData = await response.json();

@@ -9,6 +9,7 @@
 import { BackendMirrorConfig, InventoryItem } from '../types';
 import { OfflineMutation } from '../db/indexedDbService';
 import { getErrorMessage } from '../utils/pureCalculations';
+import { fetchWithTimeout } from '../lib/http';
 
 export interface MirrorTestResult {
   success: boolean;
@@ -83,9 +84,6 @@ class BackendMirrorService {
       // Validate URL format
       const url = new URL(config.endpointUrl);
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
-
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'X-Device-ID': this.deviceId,
@@ -96,13 +94,11 @@ class BackendMirrorService {
         headers['Authorization'] = `Bearer ${config.apiKey}`;
       }
 
-      const response = await fetch(url.toString(), {
+      const response = await fetchWithTimeout(url.toString(), {
         method: 'GET',
-        headers,
-        signal: controller.signal
-      });
+        headers
+      }, 6000);
 
-      clearTimeout(timeoutId);
       const latencyMs = Math.round(performance.now() - startTime);
 
       if (response.ok || response.status === 404 || response.status === 405) {
@@ -174,7 +170,7 @@ class BackendMirrorService {
         headers['Authorization'] = `Bearer ${config.apiKey}`;
       }
 
-      const res = await fetch(config.endpointUrl, {
+      const res = await fetchWithTimeout(config.endpointUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload)
@@ -233,11 +229,11 @@ class BackendMirrorService {
         reqHeaders['Authorization'] = `Bearer ${config.apiKey}`;
       }
 
-      const res = await fetch(config.endpointUrl, {
+      const res = await fetchWithTimeout(config.endpointUrl, {
         method: 'POST',
         headers: reqHeaders,
         body: JSON.stringify(payload)
-      });
+      }, 30000);
 
       if (!res.ok) {
         throw new Error(`HTTP ${res.status} al sincronizar espejo: ${res.statusText}`);
