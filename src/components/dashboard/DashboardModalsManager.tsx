@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { InventoryItem, SheetConfig, EventCategory, GlobalTicketConfig, ViewTicketConfig, TableSlice } from '../../types';
 import { ItemDetailDrawer } from '../drawers/ItemDetailDrawer';
 import { PmReportModal } from '../modals/PmReportModal';
@@ -18,11 +18,13 @@ import { BulkActionsConfigModal } from '../modals/BulkActionsConfigModal';
 import { SliceManagerModal } from '../modals/SliceManagerModal';
 import { SliceEditorModal } from '../modals/SliceEditorModal';
 import { SyncAuditModal } from '../modals/SyncAuditModal';
-import { StockCountTerminal } from '../views/StockCountTerminal';
+import { LazyFallback } from '../common/LazyFallback';
 import { ImportConsolidationMode } from '../../utils/cuVcConsolidator';
 import { OfflineMutation, AuditLogEntry } from '../../db/indexedDbService';
 import { ConnectionHealthStatus } from '../../hooks/useOfflineSync';
 import { useDashboard } from '../../context/DashboardContext';
+
+const StockCountTerminal = lazy(() => import('../views/StockCountTerminal').then(m => ({ default: m.StockCountTerminal })));
 
 export interface DashboardModalsManagerProps {
   // Master-Detail Drawer
@@ -551,15 +553,17 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
       {isStockCountOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
           <div className="w-full h-full max-w-7xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col">
-            <StockCountTerminal
-              sheetItems={items}
-              headers={headers}
-              masterProducts={products}
-              activeSheetTitle={activeSheet?.title || 'VENCIMIENTOS'}
-              onSyncRowsToVencimientos={handleSyncRowsToVencimientos}
-              showToast={showToast}
-              onClose={() => setIsStockCountOpen(false)}
-            />
+            <Suspense fallback={<LazyFallback />}>
+              <StockCountTerminal
+                sheetItems={items}
+                headers={headers}
+                masterProducts={products}
+                activeSheetTitle={activeSheet?.title || 'VENCIMIENTOS'}
+                onSyncRowsToVencimientos={handleSyncRowsToVencimientos}
+                showToast={showToast}
+                onClose={() => setIsStockCountOpen(false)}
+              />
+            </Suspense>
           </div>
         </div>
       )}

@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Check, Plus, Minus, Trash2, Play, CheckCircle2, Download, Calendar, Search, EyeOff, Layers, FileSpreadsheet, Barcode, Hash, MapPin, ShieldCheck, Database, ChevronRight, Lock, Unlock, ListTodo, Zap, Copy, MessageSquare, CheckCheck, FileWarning, Store, Camera, Cloud, CloudUpload, CloudOff, Loader2, Printer, Building2 } from 'lucide-react';
 import { StockCountSession, StockCountEntry, StockCountMode, InventoryItem, InventoryCampaign } from '../../types';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorage, saveStockCountSessionsToStorageDebounced, loadCampaignsFromStorage, saveCampaignsToStorage, getActiveCampaignId, setActiveCampaignId, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
 import { saveAuditRowsToDedicatedSheet, syncCampaignsWithCloud } from '../../lib/sheets';
-import { CampaignConsolidationDashboard } from './CampaignConsolidationDashboard';
+import { LazyFallback } from '../common/LazyFallback';
 import { MobileCameraBarcodeScanner } from './MobileCameraBarcodeScanner';
 import { MobileErpSnapshotView } from './MobileErpSnapshotView';
 import { buildMasterCatalogIndex } from '../../utils/referenceResolver';
@@ -13,6 +13,8 @@ import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { copyTextToClipboard } from '../../utils/exportUtils';
 import { executeThermalPrint } from '../../utils/ticketUtils';
 import { TicketPrintView } from './TicketPrintView';
+
+const CampaignConsolidationDashboard = lazy(() => import('./CampaignConsolidationDashboard').then(m => ({ default: m.CampaignConsolidationDashboard })));
 
 interface StockCountTerminalProps {
   sheetItems: InventoryItem[];
@@ -1415,32 +1417,34 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
               onOpenDesktopView={() => setForceDesktopCampaignView(true)}
             />
           ) : (
-            <CampaignConsolidationDashboard
-              campaigns={campaigns}
-              activeCampaignId={activeCampaignIdState}
-              sessions={sessions}
-              onUpdateCampaigns={handleUpdateCampaigns}
-              onSelectCampaign={handleSelectCampaign}
-              onStartTargetedRecount={handleStartTargetedRecount}
-              showToast={showToast}
-              onUpdateSessions={setSessions}
-              onNavigateToSessionList={() => setViewState('LIST')}
-              onSwitchToTerminal={(targetSku) => {
-                if (targetSku) {
-                  setScannedSku(targetSku);
-                  handleSkuChange(targetSku);
-                }
-                if (currentSession && currentSession.estado !== 'COMPLETED') {
-                  setViewState('COUNTING');
-                } else if (sessions.length > 0) {
-                  const inProgress = sessions.find(s => s.estado !== 'COMPLETED') || sessions[0];
-                  setActiveSessionId(inProgress.id);
-                  setViewState('COUNTING');
-                } else {
-                  setViewState('LIST');
-                }
-              }}
-            />
+            <Suspense fallback={<LazyFallback />}>
+              <CampaignConsolidationDashboard
+                campaigns={campaigns}
+                activeCampaignId={activeCampaignIdState}
+                sessions={sessions}
+                onUpdateCampaigns={handleUpdateCampaigns}
+                onSelectCampaign={handleSelectCampaign}
+                onStartTargetedRecount={handleStartTargetedRecount}
+                showToast={showToast}
+                onUpdateSessions={setSessions}
+                onNavigateToSessionList={() => setViewState('LIST')}
+                onSwitchToTerminal={(targetSku) => {
+                  if (targetSku) {
+                    setScannedSku(targetSku);
+                    handleSkuChange(targetSku);
+                  }
+                  if (currentSession && currentSession.estado !== 'COMPLETED') {
+                    setViewState('COUNTING');
+                  } else if (sessions.length > 0) {
+                    const inProgress = sessions.find(s => s.estado !== 'COMPLETED') || sessions[0];
+                    setActiveSessionId(inProgress.id);
+                    setViewState('COUNTING');
+                  } else {
+                    setViewState('LIST');
+                  }
+                }}
+              />
+            </Suspense>
           )
         )}
 

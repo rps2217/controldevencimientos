@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { getSpreadsheetMetadata, getAllSheetsData, appendRow, updateRow, deleteRow, deleteRows, saveCloudConfig, loadCloudConfig, getScriptPropertiesConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
 import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, EventCategory } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
@@ -42,7 +42,7 @@ import { DashboardTopNav } from './navigation/DashboardTopNav';
 import { DashboardPageHeader } from './navigation/DashboardPageHeader';
 import { DashboardFilterPanels } from './views/DashboardFilterPanels';
 import { SchemaEditorView } from './views/SchemaEditorView';
-import { AnalyticsDashboard } from './views/AnalyticsDashboard';
+import { LazyFallback } from './common/LazyFallback';
 import { FloatingBulkActionBar } from './dashboard/FloatingBulkActionBar';
 import { DashboardModalsManager } from './dashboard/DashboardModalsManager';
 import { ZenModeOverlay } from './dashboard/ZenModeOverlay';
@@ -62,6 +62,8 @@ import { GlobalTicketConfig, ViewTicketConfig } from '../types';
 import { SkeletonLoader } from './common/SkeletonLoader';
 import { useToast } from './common/ToastContainer';
 import { useTableSlices } from '../hooks/useTableSlices';
+
+const AnalyticsDashboard = lazy(() => import('./views/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 
 export const InventoryDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -2273,7 +2275,9 @@ export const InventoryDashboard: React.FC = () => {
               activeView={activeView}
             />
           ) : activeView === 'analytics' ? (
-            <AnalyticsDashboard items={filteredItems} headers={headers} />
+            <Suspense fallback={<LazyFallback />}>
+              <AnalyticsDashboard items={filteredItems} headers={headers} />
+            </Suspense>
           ) : !activeSheet && !loading ? (
             <div className="h-full w-full flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50 dark:bg-slate-900/60">
               <div className="text-center max-w-sm">
