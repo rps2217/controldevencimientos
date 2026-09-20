@@ -11,6 +11,8 @@ interface TicketPrintViewProps {
   config: ViewTicketConfig;
   activeView?: string;
   mode?: 'standard' | 'barcode';
+  /** Identificador del contenedor imprimible. Debe ser único por instancia. */
+  domId?: string;
 }
 
 export const TicketPrintView: React.FC<TicketPrintViewProps> = ({ 
@@ -18,7 +20,8 @@ export const TicketPrintView: React.FC<TicketPrintViewProps> = ({
   headers, 
   config,
   activeView = 'main',
-  mode = 'standard'
+  mode = 'standard',
+  domId = 'thermal-ticket-root'
 }) => {
   if (!items || items.length === 0) return null;
 
@@ -66,7 +69,8 @@ export const TicketPrintView: React.FC<TicketPrintViewProps> = ({
 
   return (
     <div 
-      id="thermal-ticket-root"
+      id={domId}
+      data-print-ticket-root="true"
       className={`hidden print:block text-black font-mono leading-tight print:bg-white print:text-black ${
         is58mm ? 'w-[56mm] p-1' : 'w-[76mm] p-2'
       }`}

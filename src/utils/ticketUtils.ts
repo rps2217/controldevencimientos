@@ -208,6 +208,19 @@ export function executeThermalPrint(options: ThermalPrintOptions = {}): void {
 
   if (onBeforePrint) onBeforePrint();
 
+  // Puede haber más de un ticket montado a la vez (dashboard y terminal de conteo).
+  // El CSS de impresión destapa todo .print:block, así que sin esto se imprimirían
+  // ambos. Se ocultan todos los tickets y se destapa únicamente el solicitado.
+  const otherTickets = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-print-ticket-root="true"]')
+  ).filter(node => node.id !== elementId);
+  const otherTicketsPrevDisplay = otherTickets.map(node => node.style.display);
+  otherTickets.forEach(node => { node.style.display = 'none'; });
+
+  const restoreOtherTickets = () => {
+    otherTickets.forEach((node, i) => { node.style.display = otherTicketsPrevDisplay[i]; });
+  };
+
   // Give React 100ms to mount/update the ticket DOM if needed
   setTimeout(() => {
     const el = document.getElementById(elementId);
@@ -296,6 +309,7 @@ export function executeThermalPrint(options: ThermalPrintOptions = {}): void {
       if (styleTag && styleTag.parentNode) {
         styleTag.parentNode.removeChild(styleTag);
       }
+      restoreOtherTickets();
       window.removeEventListener('afterprint', cleanup);
       if (onAfterPrint) onAfterPrint();
     };

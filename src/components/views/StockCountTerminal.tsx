@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { X, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2, Undo2 } from 'lucide-react';
 import { StockCountSession, StockCountEntry, InventoryItem, InventoryCampaign } from '../../types';
@@ -35,6 +36,8 @@ interface StockCountTerminalProps {
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
+/** Id del contenedor térmico de este terminal; debe ser único en el documento. */
+const STOCKCOUNT_TICKET_DOM_ID = 'thermal-ticket-root-stockcount';
 
 export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   sheetItems,
@@ -959,7 +962,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     setTicketPrintMode('standard');
 
     executeThermalPrint({
-      elementId: 'thermal-ticket-root',
+      elementId: STOCKCOUNT_TICKET_DOM_ID,
       paperWidth: '80mm',
       orientation: 'portrait',
       cutMarginMm: 2
@@ -2710,34 +2713,39 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
           </div>
         )}
 
-        {/* Hidden thermal ticket container for provider audit printing */}
-        <div style={{ display: 'none' }}>
-          <div id="thermal-ticket-root">
-            <TicketPrintView
-              items={itemsToPrintList}
-              headers={['SKU', 'DESCRIPCION', 'CANTIDAD CONTADA', 'CANTIDAD TEORICA', 'DIFERENCIA', 'PROVEEDOR']}
-              config={{
-                general: {
-                  title: `AUDITORÍA PROVEEDOR - ${selectedProviderFilter === 'ALL' ? 'GENERAL' : selectedProviderFilter}`,
-                  paperWidth: '80mm',
-                  orientation: 'portrait',
-                  showDateTime: true,
-                  showTotalCount: true
-                },
-                columns: {
-                  SKU: { show: true, bold: true, size: 12 },
-                  DESCRIPCION: { show: true, bold: false, size: 11 },
-                  'CANTIDAD CONTADA': { show: true, bold: true, size: 11 },
-                  'CANTIDAD TEORICA': { show: true, bold: false, size: 10 },
-                  DIFERENCIA: { show: true, bold: true, size: 11 },
-                  PROVEEDOR: { show: true, bold: false, size: 10 }
-                }
-              }}
-              activeView="main"
-              mode={ticketPrintMode}
-            />
-          </div>
-        </div>
+        {/*
+          El ticket de auditoría se portaliza a document.body: el overlay del terminal
+          es .fixed y el CSS de impresión oculta .fixed !important, de modo que dentro
+          del overlay el ticket nunca llegaba a imprimirse y acababa imprimiendo el
+          ticket del dashboard. El id es propio de esta instancia para no colisionar.
+        */}
+        {createPortal(
+          <TicketPrintView
+            domId={STOCKCOUNT_TICKET_DOM_ID}
+            items={itemsToPrintList}
+            headers={['SKU', 'DESCRIPCION', 'CANTIDAD CONTADA', 'CANTIDAD TEORICA', 'DIFERENCIA', 'PROVEEDOR']}
+            config={{
+              general: {
+                title: `AUDITORÍA PROVEEDOR - ${selectedProviderFilter === 'ALL' ? 'GENERAL' : selectedProviderFilter}`,
+                paperWidth: '80mm',
+                orientation: 'portrait',
+                showDateTime: true,
+                showTotalCount: true
+              },
+              columns: {
+                SKU: { show: true, bold: true, size: 12 },
+                DESCRIPCION: { show: true, bold: false, size: 11 },
+                'CANTIDAD CONTADA': { show: true, bold: true, size: 11 },
+                'CANTIDAD TEORICA': { show: true, bold: false, size: 10 },
+                DIFERENCIA: { show: true, bold: true, size: 11 },
+                PROVEEDOR: { show: true, bold: false, size: 10 }
+              }
+            }}
+            activeView="main"
+            mode={ticketPrintMode}
+          />,
+          document.body
+        )}
       </div>
   );
 };
