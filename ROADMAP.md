@@ -507,3 +507,57 @@ justifique; evaluar `manualChunks`. **No añadir `manualChunks` sin medir antes.
   (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9). Revisar alternativa en Fase 6.
 - 20 warnings de `react-hooks/exhaustive-deps` preexistentes, varios ligados a la
   inestabilidad del contexto (Fase 1 los cierra).
+
+---
+
+## Auditoría Ponytail (2026-09-19)
+
+Barrido del repo contra la Escalera de Decisiones. Resultado global: **el árbol está
+sano**; la deuda grande ya está inventariada en las fases de arriba y no aparecieron
+patologías nuevas. Lo verificado y lo descartado:
+
+**Lo que se corrigió en esta pasada**
+- Rama remota stale `ponytail-audit-strict-types`: ancestro de `main` (19 commits
+  atrás), residuo del PR #1 ya fusionado. Eliminada. Era la causa de la confusión
+  "duplicación de acciones en push". Regla operativa: `git push origin main`, nada más.
+- Verificación E2E de la agrupación por columna (`groupcheck.cjs`), que era el último
+  cabo suelto de la solicitud original (b).
+
+**Reutilización (escalón 2) — sin hallazgos nuevos**
+- `dateCalculations.tsx` parecía una capa de re-export redundante sobre
+  `pureCalculations.ts`, pero es la fachada legítima: 16 consumidores la usan de forma
+  mixta (funciones puras + badges de UI como `EVENT_CATEGORIES`). No se toca.
+- El bloque `JSON.parse` de `indexedDbService.getSetting` es el fallback genérico
+  ya cubierto por Fase 4; los de `lib/sheets.ts` son red (ver arriba).
+- `InventoryDashboard.tsx:1660` tiene una normalización inline `findHeader` que
+  **parece** duplicar `normalizeHeaderString`, pero **no son equivalentes**: la inline
+  elimina separadores (`[\s\-_]+` → `''`) y la del helper los convierte en `_`. Unificar
+  cambiaría el matching. Se deja como está a propósito.
+
+**Código muerto (escalón 1) — nada accionable**
+- Se descartaron ~13 exports marcados inicialmente como "muertos": todos tienen
+  consumidor interno o en tests (`encodeCode128`, `consolidateBatchByCuVc`,
+  `itemMatchesSlice`, `FAILED_ATTEMPTS_THRESHOLD`, `FIELD_PATTERNS`,
+  `normalizeHeaderString`, etc.). Solo son `export` de conveniencia, no residuos.
+- 0 `TODO`/`FIXME`; 1 solo `console.log` en `src`.
+
+**Dependencias (escalón 5) — todas justificadas**
+- Las 12 dependencias declaradas tienen uso real en `src`. No hay paquetes zombis.
+- `dist/` está correctamente ignorado en git (0 archivos versionados).
+
+**Riesgo de seguridad confirmado (no nuevo)**
+- `xlsx@0.18.5`: 2 avisos de severidad alta (**Prototype Pollution** GHSA-4r6h-8v6p-xvw6 y
+  **ReDoS** GHSA-5pgg-2g8v-p4x9), **sin fix disponible**. Se usa en 9 archivos de
+  importación/exportación. La mitigación correcta es dejar de procesar libros xlsx
+  arbitrarios de terceros; migrar a un parser mantenido es trabajo de Fase 6. Vía
+  correcta si se retoma: reemplazar `xlsx` por lectura propia de CSV que ya existe.
+- `npm audit --omit=dev`: 1 vulnerabilidad alta, la anterior. Sin hallazgos adicionales.
+
+**Tipado estricto — deuda de `any` cuantificada**
+- 201 usos de `any`/`as any`/`<any>` en `src`. Concentrados en `referenceResolver.ts`
+  (27), `DashboardContext.tsx` (21), `DashboardModalsManager.tsx` (17). Reducirlos es
+  candidato natural para la Fase 2 (migración de contexto), no un trabajo suelto.
+
+**Monolitos (escalón 7) — ya en Fase 5**
+- Sin cambios: `StockCountTerminal.tsx` (2.751), `InventoryDashboard.tsx` (2.190),
+  `stockCountUtils.ts` (1.475). No se dividen sin motivo: la Fase 5 lo cubre.
