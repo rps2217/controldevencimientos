@@ -373,6 +373,31 @@ React DevTools en la UI, no este hook.
 `useInventoryActions`/`useDashboardModals`. Con la observación resuelta, no queda palanca
 grande conocida en el tecleo, así que la prioridad pasa a la Fase 4 restante.
 
+#### Re-auditoría Ponytail — corroboración con señales independientes (Fase 1.3)
+
+Se re-midió el tecleo con tres señales que **no** dependen del hook de DevTools, para
+cerrar la palanca sin reabrirla:
+
+| Señal (build de producción, sin StrictMode) | Resultado |
+| --- | --- |
+| `PerformanceObserver` de `longtask` al teclear 8 caracteres | **0 tareas largas**, peor frame **42 ms** |
+| Mutaciones DOM reales por propagación de búsqueda | **31 atributos**, **0** nodos de fila |
+| Latencia percibida (última tecla → la tabla cambia de filas) | **~205 ms** (≈ el debounce de 250 ms) |
+
+Las tres coinciden con la conclusión anterior: **no hay jank de tecleo**. El "5 commits y
+6.166 fibras por tecla" que el hook reporta en el peor caso es el artefacto de atribución
+ya descrito, no trabajo real.
+
+Se evaluó y **descartó** el refactor propuesto para esta fase (envolver en `useCallback`
+los handlers del `value` y/o particionar el contexto): los handlers inestables no son el
+disparador del re-render (lo es `searchTerm`, miembro del contexto), así que cambiar su
+identidad no mueve la métrica percibida, y particionar por frecuencia de cambio agrega
+superficie de estado sin beneficio medido. Aplica la Escalera de Ponytail: si no mejora lo
+medido, no se escribe.
+
+**Consecuencia**: la palanca de tecleo queda cerrada con evidencia; la Fase 1.3 se reduce a
+la extracción de hooks antes listada, que es trabajo de mantenibilidad, no de performance.
+
 ### Fase 4 — Puerta única de persistencia (**iniciada**)
 
 Corrección de la premisa del plan: **no son "20 archivos saltándose `STORAGE_KEYS`"**.
