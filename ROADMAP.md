@@ -147,21 +147,83 @@ Lección de método: la instrumentación por fibra sola induce a error. Toda
 conclusión sobre "quién re-renderiza" debe confirmarse con un contador en el
 cuerpo del componente (verdad de terreno) antes de escribirla.
 
+#### Nuevo hallazgo medido: la vista de impresión se renderizaba siempre (Fase 1.1-bis)
+
+Al medir el escenario opuesto —**teclear en la búsqueda**, que sí mueve datos— apareció
+el coste dominante de la app y no tenía nada que ver con el contexto:
+
+| Métrica (teclear 4 caracteres) | Antes | Después |
+| --- | --- | --- |
+| Trabajo total | **1.032 ms** (~100 ms por tecla) | **796 ms** |
+| `TicketPrintView` | **434 ms, 10 renders** | **0 ms** |
+
+**Causa**: `InventoryDashboard` montaba `TicketPrintView` siempre, con *todas* las filas
+filtradas por defecto (400 ítems), oculto solo por la clase `hidden`. `display:none` no
+evita que React construya el árbol: cada tecla reconstruía ~1.500 fibras de ticket
+invisible. El propio comentario del código decía "HIDDEN UNLESS PRINTING", pero el
+`items` por defecto contradecía la intención.
+
+**Fix (2 líneas)**: `items={itemsToPrintList ?? []}`. Al arrancar en `null`, la vista no
+se monta y se monta sola al imprimir. No es una idea nueva: es el patrón que
+`StockCountTerminal` **ya usaba** (`useState<InventoryItem[]>([])`). Se alineó el
+dashboard a la convención existente.
+
+**Por qué la impresión no se rompe** (verificado, no asumido): `handlePrintTicket` hace
+`setItemsToPrintList(items)` y después llama a `executeThermalPrint`, que mide el DOM
+dentro de un `setTimeout(120ms)`. React agrupa ambos `setState` y hace commit antes de
+que corra ese temporizador, así que el ticket ya está montado. Comprobado interceptando
+`window.print()` en Chromium: al dispararse, `#thermal-ticket-root` existe y contiene
+"REPORTE VENCIMIENTOS… Total ítems: 1… [SKU-1000]… Lote: L-9000".
+
+**Limitación conocida (documentada, no arreglada)**: `itemsToPrintList` nunca se limpia,
+así que **después de imprimir una vez el ticket queda montado** y el coste reaparece
+(proporcional a los ítems impresos, no a las 400 filas). No se limpia en `onAfterPrint`
+a propósito: varios navegadores disparan `afterprint` antes de rasterizar y se arriesga
+una impresión en blanco, que es un fallo peor que el rendimiento. Candidato futuro.
+
+**Residual (siguiente cuello, Fase 3)**: quedan ~200 ms por tecla porque el dashboard
+re-renderiza su cuerpo entero y arrastra la tabla. Atacarlo es trabajo de Fase 3
+(monolito de 53 `useState`), no del contexto.
+
+#### Verificación de la Fase 1.2: memoizar el value NO sirve por sí solo (medido)
+
+Se intentó primero lo que pedía el plan (1.2: envolver el value en `useMemo`) y **se
+descartó con evidencia** antes de escribirlo. Se instrumentó el value con un contador de
+miembros cambiados por render:
+
+- **Abrir "Vistas & Ajustes": 0 renders del dashboard y 0 de los 220 miembros cambian.**
+  Tras 1.1 el panel ya no toca el dashboard en absoluto.
+- **Teclear: 14 renders y 233 cambios de miembros** (unos 16 por render).
+
+Esos 16 no son ruido: **9 son handlers sin `useCallback`** (`handleSave`,
+`handleApplyBulkEdit`, `handlePrintTicket`, `handleBulkDelete`, `handleSyncOfflineQueue`,
+`handleStartResize`, `handleAutoFitColumn`, `handleResetColWidths`, `handleSaveTicketConfig`)
+más `otherSheets`, que se deriva en cada render.
+
+Conclusión: un `useMemo` con 220 dependencias solo estabiliza el value si **ninguna**
+cambia, y en escritura cambian 16 fuentes por render. **1.2 aislado no puede rendir.**
+El orden correcto es: sacar los flags de UI del value (1.1, hecho) → estabilizar o
+extraer las ~9 funciones → *entonces* memoizar. Se evitó escribir un `useMemo` inútil
+y frágil (220 dependencias es una deuda que se pudre sola).
+
 #### Pendiente de la Fase 1 (1.2 y 1.3)
 
-- **1.2 — Envolver el value en `useMemo`.** Sigue sin hacerse: el literal de
-  ~224 miembros se recrea en cada render. Con 1.1 ya hecho, ahora sí rinde.
+- **1.2 — Envolver el value en `useMemo`.** No se hizo, y la medición explica por qué:
+  con 220 dependencias y 16 fuentes inestables por render, rinde ~0 por sí solo. Antes hay
+  que estabilizar o extraer las ~9 funciones sin `useCallback` (ver la sección anterior).
 - **1.3 — Particionar por frecuencia de cambio** (`DataContext`, `ViewContext`,
   `ActionsContext`, `FlagsContext`) y memoizar los consumidores grandes
   (`InventoryTable`, `DashboardFilterPanels`) con `React.memo`.
 - Los flags de modales restantes (docenas) siguen en el value: la misma cirugía
   de 1.1 aplica a cada uno, y es el siguiente candidato por volumen.
 
-Criterio de aceptación (reformulado con la verdad de terreno): abrir/cerrar
-"Vistas & Ajustes" deja `InventoryTable` en **0 renders** (cumplido) y el trabajo
-por commit por debajo de ~100 ms (cumplido: 70.6 ms). Medir siempre con
-`tests/perf/profile.cjs`, que reporta `tableRenders`/`rowRenders` reales además
-del análisis por fibra.
+Criterio de aceptación (con verdad de terreno): abrir/cerrar "Vistas & Ajustes" deja el
+dashboard en **0 renders** (cumplido) y `InventoryTable` en **0 renders** (cumplido).
+El coste de escritura (teclear) bajó de ~1.032 ms a ~796 ms solo quitando el ticket
+invisible, y **sigue siendo el verdadero cuello** (~200 ms por tecla por el re-render del
+monolito). Medir siempre con `tests/perf/profile.cjs`, que reporta `tableRenders`/`rowRenders`
+reales además del análisis por fibra, y `tests/perf/ctxdiff.cjs` para el recambio de miembros
+del value. La impresión se verifica con `tests/perf/printcheck.cjs`.
 
 Nota sobre jsdom: `tests/baseline.probe.tsx` sirve para contar commits, pero sus
 milisegundos no son extrapolables (la tabla virtualizada mide 0 sin

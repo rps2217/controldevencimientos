@@ -2270,7 +2270,7 @@ export const InventoryDashboard: React.FC = () => {
 
     {/* HIDDEN UNLESS PRINTING: TICKET PRINT VIEW */}
     <TicketPrintView 
-      items={itemsToPrintList || (selectedRowIds.length > 0 ? filteredItems.filter(i => selectedRowIds.includes(i._rowIndex as number)) : filteredItems)} 
+      items={itemsToPrintList ?? []} 
       headers={headers} 
       config={globalTicketConfig[activeView] || sheetConfig.ticketPrintConfig?.[activeView] || {}} 
       activeView={activeView}

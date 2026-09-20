@@ -184,6 +184,34 @@ class CDP {
     await sleep(250);
   }
 
+  // Escenario de tecleo: caso opuesto al anterior. Abrir un panel NO cambia el
+  // value (0 renders tras Fase 1.1); escribir SI cambia datos y filtros. Mide el
+  // coste percibido real de cada tecla y si memoizar el value lo bajaria.
+  async function typeSearch(text) {
+    const focused = await cdp.eval(`(() => {
+      const i = [...document.querySelectorAll('input')].find(x => /buscar|search/i.test(x.placeholder || ''));
+      if (!i) return false;
+      i.focus();
+      return true;
+    })()`);
+    if (!focused) return false;
+    for (const ch of text) {
+      await cdp.send('Input.dispatchKeyEvent', { type: 'char', text: ch });
+      await sleep(80);
+    }
+    return true;
+  }
+  for (let i = 0; i < REPS; i++) {
+    const before = await cdp.eval(`document.querySelectorAll('[data-index]').length`);
+    let typed = false;
+    await measure(`teclear busqueda #${i + 1}`, async () => { typed = await typeSearch('PARA'); return typed; });
+    report.actions[report.actions.length - 1].rowsBefore = before;
+    report.actions[report.actions.length - 1].rowsAfter = await cdp.eval(`document.querySelectorAll('[data-index]').length`);
+    // Limpiar para dejar el estado como estaba y no contaminar la vuelta siguiente.
+    await cdp.eval(`(() => { const b = [...document.querySelectorAll('button')].find(x => /Limpiar b/.test(x.getAttribute('title') || '')); if (b) b.click(); })()`);
+    await sleep(300);
+  }
+
   report.consoleErrors = cdp.consoleErrors.slice(0, 20);
   fs.writeFileSync(OUT, JSON.stringify(report, null, 2));
   console.log('Resultado escrito en ' + OUT);
