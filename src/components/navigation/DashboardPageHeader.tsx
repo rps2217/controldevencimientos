@@ -6,6 +6,7 @@ import { SheetProperties, TableSlice } from '../../types';
 import { SLICE_COLOR_CLASSES } from '../../utils/sliceRegistry';
 import { SliceIcon } from '../slices/SliceSelectorBar';
 import { useDashboard } from '../../context/DashboardContext';
+import { useRightDrawer } from '../../context/RightDrawerContext';
 
 export interface DashboardPageHeaderProps {
   activeView?: string;
@@ -52,6 +53,7 @@ export interface DashboardPageHeaderProps {
 
 export const DashboardPageHeader: React.FC<DashboardPageHeaderProps> = (props) => {
   const dashboard = useDashboard();
+  const rightDrawer = useRightDrawer();
 
   const activeView = props.activeView ?? dashboard.activeView;
   const setIsBulkImportOpen = props.setIsBulkImportOpen ?? dashboard.setIsBulkImportOpen;
@@ -60,7 +62,7 @@ export const DashboardPageHeader: React.FC<DashboardPageHeaderProps> = (props) =
     dashboard.setIsSliceModalOpen?.(true);
   });
   const onOpenSliceManager = props.onOpenSliceManager ?? (() => dashboard.setIsSliceManagerOpen?.(true));
-  const onOpenViewConfig = props.onOpenViewConfig ?? (() => dashboard.setIsRightDrawerOpen?.(true));
+  const onOpenViewConfig = props.onOpenViewConfig ?? (() => rightDrawer.setIsRightDrawerOpen(true));
   const slices = props.slices ?? dashboard.visibleTableSlices ?? dashboard.currentTableSlices ?? [];
   const activeSliceId = props.activeSliceId ?? dashboard.activeSliceId ?? null;
   const onSelectSlice = props.onSelectSlice ?? dashboard.handleSelectSlice ?? (() => {});

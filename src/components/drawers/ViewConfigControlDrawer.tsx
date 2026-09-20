@@ -34,6 +34,7 @@ import { parseAnyDate } from '../../utils/dateCalculations';
 import { exportToExcel } from '../../utils/exportUtils';
 import { buildBulkActionContext, isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
 import { useDashboard } from '../../context/DashboardContext';
+import { useRightDrawer } from '../../context/RightDrawerContext';
 
 import { STORAGE_KEYS } from '../../utils/appStorage';
 export interface ViewConfigControlDrawerProps {
@@ -105,9 +106,10 @@ const DENSITY_OPTIONS = [
 
 export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (props) => {
   const dashboard = useDashboard();
+  const rightDrawer = useRightDrawer();
 
-  const isOpen = props.isOpen ?? dashboard.isRightDrawerOpen ?? false;
-  const onClose = props.onClose ?? (() => dashboard.setIsRightDrawerOpen?.(false));
+  const isOpen = props.isOpen ?? rightDrawer.isRightDrawerOpen ?? false;
+  const onClose = props.onClose ?? (() => rightDrawer.setIsRightDrawerOpen(false));
   const allHeaders = useMemo(
     () => props.allHeaders ?? dashboard.headers ?? [],
     [props.allHeaders, dashboard.headers]

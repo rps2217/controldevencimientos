@@ -181,8 +181,6 @@ export interface DashboardContextType {
   columnLabelsMap?: Record<string, string>;
 
   // View & Presentation Controls
-  isRightDrawerOpen?: boolean;
-  setIsRightDrawerOpen?: (open: boolean) => void;
   isZenMode?: boolean;
   setIsZenMode?: (zen: boolean) => void;
   tableDensity?: 'comfortable' | 'compact' | 'ultra';

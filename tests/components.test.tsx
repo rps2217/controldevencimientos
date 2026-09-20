@@ -11,6 +11,7 @@
 import React from 'react';
 import { mount, makeContext, teardownDom } from './harness';
 import { DashboardProvider } from '../src/context/DashboardContext';
+import { RightDrawerProvider } from '../src/context/RightDrawerContext';
 import { ViewConfigControlDrawer } from '../src/components/drawers/ViewConfigControlDrawer';
 
 let passed = 0;
@@ -34,7 +35,6 @@ async function testGroupingWiring() {
 
   const calls: string[] = [];
   const ctx = makeContext({
-    isRightDrawerOpen: true,
     headers: HEADERS,
     activeView: 'main',
     groupByColumn: 'none',
@@ -45,9 +45,11 @@ async function testGroupingWiring() {
 
   // Montaje idéntico al de la app: sin props, solo contexto.
   const view = await mount(
-    <DashboardProvider value={ctx}>
-      <ViewConfigControlDrawer />
-    </DashboardProvider>
+    <RightDrawerProvider initialOpen>
+      <DashboardProvider value={ctx}>
+        <ViewConfigControlDrawer />
+      </DashboardProvider>
+    </RightDrawerProvider>
   );
 
   // El valor mostrado viene del contexto.
@@ -71,7 +73,6 @@ async function testGroupingDirectionToggle() {
 
   const calls: string[] = [];
   const ctx = makeContext({
-    isRightDrawerOpen: true,
     headers: HEADERS,
     activeView: 'main',
     groupByColumn: 'PROVEEDOR',
@@ -81,9 +82,11 @@ async function testGroupingDirectionToggle() {
   });
 
   const view = await mount(
-    <DashboardProvider value={ctx}>
-      <ViewConfigControlDrawer />
-    </DashboardProvider>
+    <RightDrawerProvider initialOpen>
+      <DashboardProvider value={ctx}>
+        <ViewConfigControlDrawer />
+      </DashboardProvider>
+    </RightDrawerProvider>
   );
 
   // El botón de dirección se renderiza como icono (sin texto) y expone su
@@ -110,16 +113,17 @@ async function testDrawerClosedRendersNothing() {
   console.log('\n--- 3. El drawer cerrado no monta el selector ---');
 
   const ctx = makeContext({
-    isRightDrawerOpen: false,
     headers: HEADERS,
     activeView: 'main',
     groupByColumn: 'none',
   });
 
   const view = await mount(
-    <DashboardProvider value={ctx}>
-      <ViewConfigControlDrawer />
-    </DashboardProvider>
+    <RightDrawerProvider>
+      <DashboardProvider value={ctx}>
+        <ViewConfigControlDrawer />
+      </DashboardProvider>
+    </RightDrawerProvider>
   );
 
   assert(view.container.querySelectorAll('select').length === 0,

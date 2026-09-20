@@ -315,7 +315,6 @@ export const InventoryDashboard: React.FC = () => {
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [whatsAppModalItems, setWhatsAppModalItems] = useState<any[]>([]);
   const [isBulkActionsConfigOpen, setIsBulkActionsConfigOpen] = useState(false);
-  const [isRightDrawerOpen, setIsRightDrawerOpen] = useState<boolean>(false);
   const [tableDensity, setTableDensity] = useState<'comfortable' | 'compact' | 'ultra'>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.TABLE_DENSITY);
@@ -2069,8 +2068,6 @@ export const InventoryDashboard: React.FC = () => {
     columnLabelsMap,
 
     // View & Presentation Controls
-    isRightDrawerOpen,
-    setIsRightDrawerOpen,
     isZenMode,
     setIsZenMode,
     tableDensity,

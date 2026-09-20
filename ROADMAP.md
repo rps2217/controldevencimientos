@@ -94,44 +94,74 @@ Conclusiones (corrigen el diagnóstico previo, que era una suposición):
    value del contexto cambie en cada render": el value ya cambia siempre.
 4. **El estado de UI vive en el value.** `isRightDrawerOpen` / `setIsRightDrawerOpen`
    son miembros del contexto (2072-2073), igual que docenas de flags de modales.
-   Abrir el panel cambia una dependencia del value y arrastra a todos los
-   consumidores: **las 25 filas visibles (`tr`=26, `td`=151) re-renderizan** al
-   abrir un panel que no muestra datos.
+   Abrir el panel cambia una dependencia del value y **`InventoryTable` se
+   re-renderiza dos veces por acción** (confirmado con contador en el cuerpo del
+   componente; ver "Correcciones al diagnóstico" más abajo).
 5. **La partición del contexto rinde poco por sí sola.** Ningún consumidor grande
    está en `React.memo` (`InventoryTable`, `ViewConfigControlDrawer`,
    `DashboardTopNav`, `DashboardFilterPanels`) y `DashboardTableContainer`
    tampoco, y es hijo directo del dashboard. La cascada del padre los
    re-renderiza con independencia del contexto.
 
-#### Consecuencia para el plan: la Fase 1 se reformula
+#### Ejecutado: 1.1 — sacar el estado de UI del value (medido)
 
-Extraer el estado de UI del value y repartir el contexto en 4 no sirve de nada
-mientras el dashboard siga re-renderizando su cuerpo entero en cada cambio de
-cualquier flag. El orden correcto es el inverso al planteado:
+Se implementó **1.1** con el alcance mínimo que cierra la causa raíz medida, sin
+tocar las otras ~200 entradas del value:
 
-- **1.1 — Aislar el estado de UI de los modales/drawers.** Agrupar los flags de
-  UI en un único `useReducer`/objeto de estado (o moverlos a los componentes que
-  los poseen: el drawer puede poseer su propio `isOpen` con `children` para no
-  desmontar). Objetivo: que `isRightDrawerOpen` deje de formar parte del value.
-- **1.2 — Extraer el cuerpo a un componente memoizado.** Con el value estable y
-  el estado de UI fuera, envolver los consumidores grandes en `React.memo`.
-- **1.3 — Envolver el value en `useMemo`** y recién entonces particionar por
-  frecuencia de cambio (`DataContext`, `ViewContext`, `ActionsContext`,
-  `FlagsContext`). Particionar antes de 1.1 y 1.2 no produce mejora medible.
+- Nuevo `src/context/RightDrawerContext.tsx`: `RightDrawerProvider` posee
+  `isRightDrawerOpen` y `useRightDrawer()` lo expone con fallback no-op.
+- `App.tsx` envuelve `<InventoryDashboard />` en `RightDrawerProvider`.
+- `InventoryDashboard` **ya no declara** el `useState` ni lo publica en el value;
+  los 3 abridores (`DashboardPageHeader`, `DashboardTopNav`, `ZenModeOverlay`) y
+  el `ViewConfigControlDrawer` lo leen del contexto nuevo.
 
-Hecho en esta fase (higiene válida, sin mejora medible atribuible):
-- `useItemFormManager`: 6 handlers en `useCallback` + objeto de retorno en
-  `useMemo` (alimenta ~10 miembros del contexto).
-- `saveConfig` y `fetchData` a `useCallback` (deuda que el lint ya marcaba).
-- `handleDelete` a `useCallback`: único handler de fila sin memoizar.
-- `onOpenWhatsApp` / `onOpenEmail` extraídos del literal del contexto: eran
-  flechas inline pasadas a cada fila del literal.
+Resultado medido con el mismo instrumento, 4 repeticiones, conteos estables:
 
-Criterio de aceptación de la Fase 1 (medido con el instrumento de arriba):
-abrir/cerrar "Vistas & Ajustes" debe dejar de re-renderizar `InventoryTable` y
-las filas (`tr`+`td` ≈ 0), y el commit debe bajar de ~1700 a un orden de cientos
-de fibras. Medir antes y después con el mismo comando; no dar por bueno ningún
-cambio sin esa comparación.
+| Métrica (abrir/cerrar "Vistas & Ajustes") | `c4a66c7` | HEAD con 1.1 |
+| --- | --- | --- |
+| Commits por acción | 1 | 1 |
+| `InventoryTable` renderiza | **2 de 2 veces** | **0 de 2 veces** |
+| Filas (`InventoryTableRow`) | 0 | 0 |
+| Trabajo por commit (suma de self-time) | **270 ms** | **70.6 ms** (−74%) |
+
+#### Correcciones al diagnóstico anterior (la medición las desmiente)
+
+1. **"Las 25 filas re-renderizan al abrir el panel" era falso.** Un contador
+   temporal dentro de `InventoryTableRow` devolvió `0` renders tanto en `c4a66c7`
+   como en HEAD. El `tr`=26 observado era un **artefacto de atribución**:
+   `actualDuration` es inclusiva del subárbol y React la hereda en subárboles que
+   no re-renderizan, así que un `<tr>` saltado aparece como "renderizado". El
+   instrumento ahora calcula **self-time** (resta la duración de los hijos) y
+   expone `commitsDetail` por commit; el hook además ya no trunca `byName` a 25
+   entradas, que ocultaba componentes grandes en la lista.
+2. **"`DashboardProvider` ~210 ms" medía el subárbol, no el provider.** Con
+   self-time, `DashboardProvider` cuesta ~0 ms y `InventoryDashboard` ~0 ms: el
+   costo real estaba repartido entre el drawer, el top nav y el page header.
+3. **El ganador real es `InventoryTable` (2r → 0r)**, no las filas. La tabla se
+   re-renderizaba dos veces por acción porque su padre directo
+   (`DashboardTableContainer`, no memoizado) y ella misma consumen `useDashboard`
+   y el value cambiaba al abrir el panel. Al dejar de cambiar el value, React
+   corta la cascada.
+
+Lección de método: la instrumentación por fibra sola induce a error. Toda
+conclusión sobre "quién re-renderiza" debe confirmarse con un contador en el
+cuerpo del componente (verdad de terreno) antes de escribirla.
+
+#### Pendiente de la Fase 1 (1.2 y 1.3)
+
+- **1.2 — Envolver el value en `useMemo`.** Sigue sin hacerse: el literal de
+  ~224 miembros se recrea en cada render. Con 1.1 ya hecho, ahora sí rinde.
+- **1.3 — Particionar por frecuencia de cambio** (`DataContext`, `ViewContext`,
+  `ActionsContext`, `FlagsContext`) y memoizar los consumidores grandes
+  (`InventoryTable`, `DashboardFilterPanels`) con `React.memo`.
+- Los flags de modales restantes (docenas) siguen en el value: la misma cirugía
+  de 1.1 aplica a cada uno, y es el siguiente candidato por volumen.
+
+Criterio de aceptación (reformulado con la verdad de terreno): abrir/cerrar
+"Vistas & Ajustes" deja `InventoryTable` en **0 renders** (cumplido) y el trabajo
+por commit por debajo de ~100 ms (cumplido: 70.6 ms). Medir siempre con
+`tests/perf/profile.cjs`, que reporta `tableRenders`/`rowRenders` reales además
+del análisis por fibra.
 
 Nota sobre jsdom: `tests/baseline.probe.tsx` sirve para contar commits, pero sus
 milisegundos no son extrapolables (la tabla virtualizada mide 0 sin

@@ -152,10 +152,12 @@ class CDP {
   }
 
   async function measure(name, clickExpr) {
-    await cdp.eval('window.__probe.reset()');
+    await cdp.eval('window.__probe.reset(); window.__tblRenders=0; window.__rowRenders=0;');
     const interacted = await clickExpr();
     await sleep(600);
     const s = JSON.parse(await cdp.eval('JSON.stringify(window.__probe.snapshot())'));
+    const tc = parseInt(await cdp.eval('String(window.__tblRenders)'), 10);
+    const rc = parseInt(await cdp.eval('String(window.__rowRenders)'), 10);
     const cells = s.byName.filter(x => /^(tr|td|div|button)$/.test(x.name)).reduce((a, x) => a + x.renders, 0);
     report.actions.push({
       name, interacted,
@@ -165,6 +167,9 @@ class CDP {
       domRenders: cells,
       top: s.byName.slice(0, 10),
       all: s.byName,
+      commitDetail: s.commitsDetail,
+      tableRenders: tc,
+      rowRenders: rc,
     });
   }
 

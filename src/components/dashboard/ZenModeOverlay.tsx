@@ -1,6 +1,7 @@
 import React from 'react';
 import { Maximize2, Search, X, Sliders } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
+import { useRightDrawer } from '../../context/RightDrawerContext';
 
 export interface ZenModeOverlayProps {
   isZenMode?: boolean;
@@ -12,11 +13,12 @@ export interface ZenModeOverlayProps {
 
 export const ZenModeOverlay: React.FC<ZenModeOverlayProps> = (props) => {
   const dashboard = useDashboard();
+  const rightDrawer = useRightDrawer();
 
   const isZenMode = props.isZenMode ?? dashboard.isZenMode ?? false;
   const searchTerm = props.searchTerm ?? dashboard.searchTerm ?? '';
   const setSearchTerm = props.setSearchTerm ?? dashboard.setSearchTerm;
-  const onOpenSettings = props.onOpenSettings ?? (() => dashboard.setIsRightDrawerOpen?.(true));
+  const onOpenSettings = props.onOpenSettings ?? (() => rightDrawer.setIsRightDrawerOpen(true));
   const onExitZenMode = props.onExitZenMode ?? (() => {
     dashboard.setIsZenMode?.(false);
     dashboard.showToast?.('Modo Zen desactivado', 'info', 'Enfoque');

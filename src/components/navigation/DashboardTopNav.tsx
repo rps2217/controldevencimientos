@@ -3,6 +3,7 @@ import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sl
 import { InventoryItem, SheetConfig, SheetProperties } from '../../types';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { useDashboard } from '../../context/DashboardContext';
+import { useRightDrawer } from '../../context/RightDrawerContext';
 
 export interface DashboardTopNavProps {
   isMobileMenuOpen?: boolean;
@@ -55,6 +56,7 @@ export interface DashboardTopNavProps {
 
 export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
   const dashboard = useDashboard();
+  const rightDrawer = useRightDrawer();
 
   const setIsMobileMenuOpen = props.setIsMobileMenuOpen ?? (() => {});
   const activeView = props.activeView ?? dashboard.activeView;
@@ -84,7 +86,7 @@ export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
   const handleOpenModal = props.handleOpenModal ?? dashboard.handleOpenModal;
   const setIsBulkImportOpen = props.setIsBulkImportOpen ?? dashboard.setIsBulkImportOpen;
   const setIsScriptModalOpen = props.setIsScriptModalOpen ?? dashboard.setIsScriptModalOpen;
-  const onOpenViewConfig = props.onOpenViewConfig ?? (() => dashboard.setIsRightDrawerOpen?.(true));
+  const onOpenViewConfig = props.onOpenViewConfig ?? (() => rightDrawer.setIsRightDrawerOpen(true));
   const onOpenStockCount = props.onOpenStockCount ?? (() => dashboard.setIsStockCountOpen?.(true));
   const searchInputRef = useRef<HTMLInputElement>(null);
 

@@ -6,6 +6,7 @@ import { ToastProvider } from './components/common/ToastContainer';
 import { ConfirmProvider } from './components/common/ConfirmDialog';
 import { PWAReloadPrompt } from './components/pwa/PWAReloadPrompt';
 import { AppLogo } from './components/common/AppLogo';
+import { RightDrawerProvider } from './context/RightDrawerContext';
 
 import { STORAGE_KEYS } from './utils/appStorage';
 export type ThemeMode = 'light' | 'dark-slate' | 'dark-gray';
@@ -297,7 +298,9 @@ export default function App() {
                   </div>
                 </nav>
                 <main className="flex-1 flex flex-col overflow-hidden print:overflow-visible print:h-auto print:min-h-0 print:block">
-                  <InventoryDashboard />
+                  <RightDrawerProvider>
+                    <InventoryDashboard />
+                  </RightDrawerProvider>
                 </main>
                 <PWAReloadPrompt />
               </>

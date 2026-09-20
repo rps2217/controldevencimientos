@@ -41,6 +41,25 @@ export default tseslint.config(
     }
   },
   {
+    // Harness de perfilado: se ejecuta en Node (WebSocket, process) y además
+    // se inyecta en el navegador como script crudo (localStorage, console), así
+    // que necesita ambos entornos de globals. Es herramienta de medición, no
+    // código de la app: no aplican las reglas de módulos TS.
+    files: ['tests/perf/**/*.{js,cjs,mjs}'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'commonjs',
+      globals: { ...globals.browser, ...globals.node }
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-expressions': 'off',
+      'no-unused-vars': 'off',
+      'no-empty': ['error', { allowEmptyCatch: true }],
+    }
+  },
+  {
     // Deuda técnica congelada (Fase 2). Estos archivos todavía usan el patrón
     // doble-camino; la lista solo puede ENCOGER. Al migrar uno, quitar su línea.
     files: [
