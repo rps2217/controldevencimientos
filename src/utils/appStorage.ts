@@ -6,6 +6,8 @@
  * La unificación de prefijos se aplica sólo al nombre canónico en código; el
  * cambio de string en sí exigiría migración y no aporta valor operativo.
  */
+import { z } from 'zod';
+
 export const STORAGE_KEYS = {
   // Configuración de conexión con Google Sheets
   SCRIPT_URL: 'appsheet_clone_scriptUrl',
@@ -51,6 +53,78 @@ export const sheetCacheKey = (sheetTitle: string): string =>
 
 /** Clave dinámica de ítems de demostración por vista. */
 export const demoItemsKey = (view: string): string => `app_demo_items_${view}`;
+
+/**
+ * Lectura validada de una clave de localStorage.
+ *
+ * Cierra el fallo real de los `JSON.parse` sueltos: parsear sin validar acepta
+ * basura con la forma equivocada (p. ej. `{"Hoja": "texto"}` donde se espera
+ * `{"Hoja": {col: ancho}}`), y el error se manifiesta después, lejos de la causa,
+ * al indexar en profundidad o al reventar dentro de un `useMemo`/render.
+ *
+ * No se usa el `T` declarado por el llamante como fuente de verdad: el tipo se
+ * *aplica* validando con el esquema. Así el dato no puede mentir sobre su forma.
+ *
+ * Ante dato inválido se devuelve el fallback en lugar de lanzar: un valor
+ * corrupto en preferencias no debe impedir arrancar la aplicación. Quien quiera
+ * saber si hubo descarte puede usar `readStorageValidated`.
+ */
+export function readStorage<T>(key: string, schema: z.ZodType, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    const parsed = schema.safeParse(JSON.parse(raw));
+    return parsed.success ? (parsed.data as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Igual que `readStorage` pero informa si el dato almacenado se descartó. */
+export function readStorageValidated<T>(
+  key: string,
+  schema: z.ZodType,
+  fallback: T
+): { value: T; valid: boolean } {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return { value: fallback, valid: true }; // ausente != corrupto
+    const parsed = schema.safeParse(JSON.parse(raw));
+    return parsed.success ? { value: parsed.data as T, valid: true } : { value: fallback, valid: false };
+  } catch {
+    return { value: fallback, valid: false };
+  }
+}
+
+/** Escritura tolerante: en modo privado o cuota llena no debe tumbar la acción. */
+export function writeStorage(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Storage no disponible o lleno: la app sigue con estado en memoria.
+  }
+}
+
+// --- Esquemas de las estructuras persistidas en localStorage ---
+
+/** Preferencias de presentación: `{ [hoja]: { [columna]: ancho } }`. */
+export const preferencesObjectSchema = z.record(z.string(), z.record(z.string(), z.number()));
+export type PreferencesObject = z.infer<typeof preferencesObjectSchema>;
+
+/** Órdenes y columnas ocultas: `{ [hoja]: [columna, ...] }`. */
+export const stringArrayMapSchema = z.record(z.string(), z.array(z.string()));
+export type StringArrayMap = z.infer<typeof stringArrayMapSchema>;
+
+/**
+ * Estado de vista por módulo: `{ [vista]: { ...campos } }`.
+ *
+ * Se valida sólo la forma del contenedor, no cada campo. Los consumidores hacen
+ * `{ ...DEFAULT_MODULE_STATE, ...parsed[vista] }`, así que un campo ausente o
+ * extra no rompe nada; lo que sí rompía era tener una cadena o un array donde se
+ * espera un objeto (esparcir un string mete índices como si fueran campos).
+ */
+export const moduleStatesSchema = z.record(z.string(), z.record(z.string(), z.unknown()));
+export type ModuleStates = z.infer<typeof moduleStatesSchema>;
 
 /**
  * Migración de claves heredadas ejecutada una sola vez al arranque.

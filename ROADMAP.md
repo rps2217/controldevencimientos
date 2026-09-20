@@ -239,10 +239,50 @@ Migrar los 11 archivos a leer **solo** del contexto. Al terminar, `grep -c "?? d
 Extraer a hooks: `useInventoryData`, `useDashboardViewState`, `useInventoryActions`,
 `useDashboardModals`. Objetivo: componente orquestador ≤400 líneas.
 
-### Fase 4 — Puerta única de persistencia
+**Por qué esta fase es ahora la de mayor ganancia real, y no el contexto**: se midió que
+estabilizar los handlers del `value` **no mejora el tecleo**. El disparador del re-render
+del shell es `searchTerm`, que es miembro del `value`: mientras eso sea así, ningún
+`useMemo` puede estabilizarlo, y tocar 9 handlers que **escriben datos** (con riesgo de
+closures obsoletos) no pagaría. El tecleo cuesta ~190 ms por pulsación porque el shell
+entero (top-nav, sidebar, tarjetas KPI, tabla) se rehace con cada tecla. La palanca es
+mover `searchTerm` y el resto del estado de vista al componente que los consume, no
+estabilizar el contrato del contexto. Ver la sección "Verificación de la Fase 1.2" para
+el desglose medido.
 
-20 archivos acceden a `localStorage` saltándose `STORAGE_KEYS`; 28 `JSON.parse` sin
-validar, con `zod` instalado. Centralizar y validar en el borde. Paralelizable con Fase 3.
+### Fase 4 — Puerta única de persistencia (**iniciada**)
+
+Corrección de la premisa del plan: **no son "20 archivos saltándose `STORAGE_KEYS`"**.
+Sólo **2** archivos usan `localStorage` sin `STORAGE_KEYS` (`ErrorBoundary.tsx` y
+`dashboardConfigUtils.ts`); la puerta de claves ya estaba bastante establecida. El riesgo
+real son los **28 `JSON.parse` sueltos**, 12 de ellos sin validación.
+
+**Hecho — puerta única de lectura validada (`src/utils/appStorage.ts`)**, reutilizando el
+`zod` ya instalado y ya usado en `useItemFormManager`:
+
+- `readStorage(clave, esquema, fallback)` — parsea y **valida con esquema**. Devuelve el
+  fallback si el dato está corrupto en vez de lanzar: una preferencia dañada no debe
+  impedir arrancar. El tipo no se toma del llamante (eso mentiría); se aplica validando.
+- `readStorageValidated(...)` — igual, pero informa `valid`. Distingue **"ausente"** de
+  **"corrupto"**: es lo que permite limpiar o avisar sin confundir el primer arranque.
+- `writeStorage(clave, valor)` — escritura tolerante (modo privado / cuota llena).
+- Esquemas reutilizables: `preferencesObjectSchema`, `stringArrayMapSchema`, `moduleStatesSchema`.
+
+**Migrados** (`useColumnResize`, `useColumnManager`, `useModuleViewState`): 5 lecturas y
+5 escrituras. `useColumnResize` era el caso más expuesto: `colWidths[hoja][col]` indexaba
+en profundidad sobre un `any` sin comprobar forma.
+
+**Evidencia de que el cambio protege (medido, no asumido)**: con el código anterior, un
+localStorage con varias claves corruptas a la vez **rompía el arranque** —
+`TypeError: Cannot read properties of null (reading 'main')` en `useColumnManager` y la
+app no montaba. Con la puerta validada, los 6 escenarios de corrupción (forma inválida,
+JSON malformado, array donde se espera mapa, valor no-objeto, combinación) montan sin un
+solo error. Reproducible con `tests/perf/corruptcheck.cjs` (que sirve como prueba de
+regresión real, no de laboratorio) y con 9 aserciones nuevas en `test-modules.ts`.
+
+**Pendiente de Fase 4**: migrar los `JSON.parse` de datos operativos (cola offline,
+sesiones de conteo, caché) para los que sí existe esquema en `types.ts`; no todos merecen
+validación completa (los DTO de red ya se validan aguas abajo). Los 2 archivos con acceso
+directo, revisar aparte. Paralelizable con Fase 3.
 
 ### Fase 5 — Dividir monolitos
 

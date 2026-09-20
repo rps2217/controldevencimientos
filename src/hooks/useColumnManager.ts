@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { SheetConfig, ViewKey } from '../types';
 import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
 
-import { STORAGE_KEYS } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, writeStorage, stringArrayMapSchema, type StringArrayMap } from '../utils/appStorage';
 export interface ManageableColumn {
   id: string;
   label: string;
@@ -39,28 +39,18 @@ export function useColumnManager({
   sheetConfig
 }: UseColumnManagerOptions): UseColumnManagerReturn {
   // Load column orders and hidden columns from localStorage
-  const [columnOrders, setColumnOrders] = useState<Record<string, string[]>>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.COL_ORDERS);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [columnOrders, setColumnOrders] = useState<StringArrayMap>(() =>
+    readStorage(STORAGE_KEYS.COL_ORDERS, stringArrayMapSchema, {})
+  );
 
-  const [hiddenColumns, setHiddenColumns] = useState<Record<string, string[]>>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.HIDDEN_COLS);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [hiddenColumns, setHiddenColumns] = useState<StringArrayMap>(() =>
+    readStorage(STORAGE_KEYS.HIDDEN_COLS, stringArrayMapSchema, {})
+  );
 
   // Persist preferences
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.COL_ORDERS, JSON.stringify(columnOrders));
+      writeStorage(STORAGE_KEYS.COL_ORDERS, columnOrders);
     } catch (e) {
       console.warn('LocalStorage save error:', e);
     }
@@ -68,7 +58,7 @@ export function useColumnManager({
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.HIDDEN_COLS, JSON.stringify(hiddenColumns));
+      writeStorage(STORAGE_KEYS.HIDDEN_COLS, hiddenColumns);
     } catch (e) {
       console.warn('LocalStorage save error:', e);
     }

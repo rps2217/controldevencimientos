@@ -75,6 +75,13 @@ import {
   sheetCacheKey,
   demoItemsKey,
   migrateLegacyStorageKeys
+,
+  readStorage,
+  readStorageValidated,
+  writeStorage,
+  preferencesObjectSchema,
+  stringArrayMapSchema,
+  moduleStatesSchema
 } from './src/utils/appStorage';
 
 import {
@@ -326,6 +333,56 @@ console.log('\n--- 11. Pruebas de appStorage.ts ---');
   migrateLegacyStorageKeys();
   assert(store.get(STORAGE_KEYS.SHEET_CONFIG) === 'CANONICA',
     'appStorage: la migración no sobreescribe la clave canónica existente');
+
+  // --- Puerta única de lectura validada ---
+  // El fallo real: JSON.parse suelto acepta basura con la forma equivocada y el
+  // error aparece mucho después, al indexar en profundidad o dentro de un render.
+  store.clear();
+  store.set(STORAGE_KEYS.COL_WIDTHS, JSON.stringify({ 'Hoja 1': 'texto-en-vez-de-objeto' }));
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.COL_WIDTHS, preferencesObjectSchema, {})) === '{}',
+    'readStorage: descarta un mapa de anchos con forma inválida (valor string)'
+  );
+
+  store.set(STORAGE_KEYS.COL_WIDTHS, 'esto no es JSON {{{');
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.COL_WIDTHS, preferencesObjectSchema, {})) === '{}',
+    'readStorage: descarta JSON malformado sin lanzar'
+  );
+
+  store.set(STORAGE_KEYS.COL_WIDTHS, JSON.stringify({ 'Hoja 1': { SKU: 120 } }));
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.COL_WIDTHS, preferencesObjectSchema, {})) === '{"Hoja 1":{"SKU":120}}',
+    'readStorage: conserva un mapa de anchos válido'
+  );
+
+  store.delete(STORAGE_KEYS.COL_WIDTHS);
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.COL_WIDTHS, preferencesObjectSchema, { fallback: true })) === '{"fallback":true}',
+    'readStorage: clave ausente devuelve el fallback'
+  );
+
+  // readStorageValidated distingue "ausente" de "corrupto": es lo que permite
+  // alertar o limpiar sin confundir un primer arranque con un dato dañado.
+  store.set(STORAGE_KEYS.COL_ORDERS, JSON.stringify(['no', 'es', 'un', 'mapa']));
+  const corrupted = readStorageValidated(STORAGE_KEYS.COL_ORDERS, stringArrayMapSchema, {});
+  assert(corrupted.valid === false,
+    'readStorageValidated: marca como corrupto un estado con forma inválida');
+  store.delete(STORAGE_KEYS.COL_ORDERS);
+  const missing = readStorageValidated(STORAGE_KEYS.COL_ORDERS, stringArrayMapSchema, {});
+  assert(missing.valid === true,
+    'readStorageValidated: una clave ausente NO se considera corrupta');
+
+  store.set(STORAGE_KEYS.MODULE_STATES, JSON.stringify({ main: 'texto' }));
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.MODULE_STATES, moduleStatesSchema, {})) === '{}',
+    'readStorage: descarta un estado de módulo cuyo valor no es objeto (esparcirlo metería índices como campos)'
+  );
+
+  store.clear();
+  writeStorage(STORAGE_KEYS.COL_ORDERS, { 'Hoja 1': ['SKU'] });
+  assert(store.get(STORAGE_KEYS.COL_ORDERS) === '{"Hoja 1":["SKU"]}',
+    'writeStorage: serializa el valor en la clave indicada');
 }
 
 console.log('\n--- 12. Pruebas de persistencia diferida de sesiones de conteo ---');

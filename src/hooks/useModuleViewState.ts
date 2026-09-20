@@ -2,7 +2,10 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { SortConfig, DynamicMonthRange } from '../types';
 import { ModuleViewState, DEFAULT_MODULE_STATE } from '../utils/dashboardConfigUtils';
 
-import { STORAGE_KEYS } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, moduleStatesSchema } from '../utils/appStorage';
+
+/** Mapa de estados de vista por módulo. El esquema valida la forma en runtime. */
+type ModuleStateMap = Record<string, Partial<ModuleViewState>>;
 export interface UseModuleViewStateOptions {
   activeView: string;
   storageKey?: string;
@@ -12,26 +15,14 @@ export function useModuleViewState({
   activeView,
   storageKey = STORAGE_KEYS.MODULE_STATES
 }: UseModuleViewStateOptions) {
-  const [moduleStates, setModuleStates] = useState<Record<string, ModuleViewState>>(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [moduleStates, setModuleStates] = useState<ModuleStateMap>(() =>
+    readStorage<ModuleStateMap>(storageKey, moduleStatesSchema, {})
+  );
 
-  const initialModuleState = useMemo(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed['main']) return { ...DEFAULT_MODULE_STATE, ...parsed['main'] };
-      }
-    } catch {
-      // ignore
-    }
-    return DEFAULT_MODULE_STATE;
+  const initialModuleState = useMemo<ModuleViewState>(() => {
+    const parsed = readStorage<ModuleStateMap>(storageKey, moduleStatesSchema, {});
+    const main = parsed['main'] as Partial<ModuleViewState> | undefined;
+    return main ? { ...DEFAULT_MODULE_STATE, ...main } : DEFAULT_MODULE_STATE;
   }, [storageKey]);
 
   const [searchTerm, setSearchTerm] = useState(initialModuleState.searchTerm);
