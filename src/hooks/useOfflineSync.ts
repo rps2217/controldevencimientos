@@ -6,8 +6,9 @@ import { findColumnBySemantic } from '../utils/columnAliases';
 import { backendMirrorService } from '../services/backendMirrorService';
 import { getErrorMessage } from '../utils/pureCalculations';
 import { isFailedMutation, sortQueueFifo } from '../utils/offlineQueueUtils';
+import type { SheetConfig } from '../types';
 
-import { STORAGE_KEYS } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, sheetConfigShapeSchema } from '../utils/appStorage';
 export type ConnectionHealthStatus = 'connected' | 'syncing' | 'offline' | 'unconfigured' | 'error';
 
 function getMutationDescription(mutation: {
@@ -202,14 +203,15 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
 
       // Real-time mirror replication if enabled
       try {
-        const savedConfigStr = localStorage.getItem(STORAGE_KEYS.SHEET_CONFIG);
-        if (savedConfigStr) {
-          const parsed = JSON.parse(savedConfigStr);
-          if (parsed?.backendMirror?.enabled) {
-            backendMirrorService.mirrorMutation(parsed.backendMirror, created).catch(mErr => {
-              console.warn('[OfflineSync] Immediate mirror replication warning:', mErr);
-            });
-          }
+        const parsed = readStorage<SheetConfig>(
+          STORAGE_KEYS.SHEET_CONFIG,
+          sheetConfigShapeSchema,
+          {}
+        );
+        if (parsed?.backendMirror?.enabled) {
+          backendMirrorService.mirrorMutation(parsed.backendMirror, created).catch(mErr => {
+            console.warn('[OfflineSync] Immediate mirror replication warning:', mErr);
+          });
         }
       } catch (e) {
         // Non-blocking mirror operation

@@ -3,7 +3,7 @@
  * Reemplaza el frágil límite de 5MB de localStorage por una base de datos local
  * asíncrona, robusta y capaz de almacenar cientos de miles de registros y colas de mutación.
  */
-import { STORAGE_KEYS, sheetCacheKey } from '../utils/appStorage';
+import { STORAGE_KEYS, sheetCacheKey, readStorage, objectArraySchema } from '../utils/appStorage';
 import { isFailedMutation } from '../utils/offlineQueueUtils';
 
 export interface CachedSheetData {
@@ -750,12 +750,7 @@ class IndexedDbService {
   }
 
   private getLocalStorageAuditLog(): AuditLogEntry[] {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.AUDIT_LOG);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    return readStorage<AuditLogEntry[]>(STORAGE_KEYS.AUDIT_LOG, objectArraySchema, []);
   }
 
   // ==========================================
@@ -876,12 +871,7 @@ class IndexedDbService {
   }
 
   private getLocalStorageQueue(): OfflineMutation[] {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.OFFLINE_QUEUE);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    return readStorage<OfflineMutation[]>(STORAGE_KEYS.OFFLINE_QUEUE, objectArraySchema, []);
   }
 }
 

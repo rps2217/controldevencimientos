@@ -356,10 +356,26 @@ quiere evitar; lo que rompía el arranque era `null`/array, y eso se corta igual
 comprueba que la tabla monta con 23 filas y **cero** errores de consola; contra el código
 anterior falla. 7 aserciones nuevas en `test-modules.ts` (138 pasan, 0 fallan).
 
-**Pendiente de Fase 4**: migrar los `JSON.parse` de datos operativos (cola offline,
-sesiones de conteo, caché) para los que sí existe esquema en `types.ts`; no todos merecen
-validación completa (los DTO de red ya se validan aguas abajo). Los 2 archivos con acceso
-directo, revisar aparte. Paralelizable con Fase 3.
+**Datos operativos migrados** (misma clase de fallo, verificado contra el código anterior):
+
+- `dashboardConfigUtils.getStoredDemoItems`: un objeto suelto en vez de lista rompía el
+  filtrado con `TypeError: sample.forEach is not a function` en `useInventoryFiltering`.
+- `indexedDbService`: cola offline (`OFFLINE_QUEUE`) y bitácora (`AUDIT_LOG`) devolvían
+  `null` como lista; reventaba en `req.onsuccess (reading 'length')`.
+- `stockCountUtils`: sesiones de conteo y campañas. Ya tenían guarda `Array.isArray`, pero
+  compartían el JSON.parse suelto; ahora usan la misma puerta (mismo comportamiento válido,
+  sin el parse crudo).
+- `useOfflineSync`: la config para el espejo de backend se lee por la puerta.
+- `ItemDetailDrawer`: campos ocultos, mapa de booleanos.
+
+Esquemas nuevos compartidos: `objectArraySchema` (lista de objetos planos) y
+`booleanMapSchema`. Validan **contenedor y forma de cada elemento**, no sus campos: estos
+DTO evolucionan entre versiones y algunos los escribe la nube; lo que revienta es un
+`null`, un objeto suelto o una lista de escalares donde se espera una lista de objetos.
+
+**Pendiente de Fase 4**: los `JSON.parse` de caché por pestaña (`sheetCacheKey`) y los DTO
+de red (`lib/sheets.ts`), que ya se validan aguas abajo; los 2 archivos con acceso directo
+a `localStorage`, revisar aparte.
 
 ### Fase 5 — Dividir monolitos
 

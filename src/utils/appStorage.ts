@@ -110,6 +110,20 @@ export function writeStorage(key: string, value: unknown): void {
 /** Lista de cadenas (p. ej. IDs de slice ocultos). */
 export const stringArraySchema = z.array(z.string());
 
+/**
+ * Lista de objetos planos (cola offline, bitacora de auditoria, items demo).
+ *
+ * Se valida el contenedor y que cada elemento sea objeto, no sus campos: estos
+ * DTO evolucionan entre versiones y algunos los escribe la nube. Un `null`, un
+ * objeto suelto o una lista de escalares donde se espera una lista de objetos es
+ * lo que rompe: quien consume hace `.map`/`.filter` o lo pasa a un estado de
+ * tabla, y revienta lejos de la causa.
+ */
+export const objectArraySchema = z.array(z.record(z.string(), z.unknown()));
+
+/** Mapa de campos booleanos (p. ej. campos ocultos del panel de detalle). */
+export const booleanMapSchema = z.record(z.string(), z.boolean());
+
 /** Preferencias de presentación: `{ [hoja]: { [columna]: ancho } }`. */
 export const preferencesObjectSchema = z.record(z.string(), z.record(z.string(), z.number()));
 export type PreferencesObject = z.infer<typeof preferencesObjectSchema>;

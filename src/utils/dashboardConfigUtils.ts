@@ -3,17 +3,11 @@ import { SheetConfig, TableSlice, SortConfig, DynamicMonthRange } from '../types
 /**
  * Helpers para almacenamiento persistente en Modo Demostración / Offline
  */
-import { demoItemsKey } from '../utils/appStorage';
+import { demoItemsKey, readStorage, objectArraySchema } from '../utils/appStorage';
 export const getStoredDemoItems = (view: string, defaultItems: any[]) => {
-  try {
-    const raw = localStorage.getItem(demoItemsKey(view));
-    if (raw !== null) {
-      return JSON.parse(raw);
-    }
-  } catch (e) {
-    console.warn('Error al leer ítems demo de localStorage:', e);
-  }
-  return defaultItems;
+  // Sin validar, un objeto suelto o un null persistido se devolvia como lista de
+  // items y reventaba al hacer .map/.filter o al alimentar el estado de la tabla.
+  return readStorage<any[]>(demoItemsKey(view), objectArraySchema, defaultItems);
 };
 
 export const saveStoredDemoItems = (view: string, items: any[]) => {

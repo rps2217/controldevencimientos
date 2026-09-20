@@ -84,7 +84,9 @@ import {
   moduleStatesSchema,
   stringArraySchema,
   sheetConfigShapeSchema,
-  tableDensitySchema
+  tableDensitySchema,
+  objectArraySchema,
+  booleanMapSchema
 } from './src/utils/appStorage';
 
 import {
@@ -424,6 +426,42 @@ console.log('\n--- 11. Pruebas de appStorage.ts ---');
   store.set(STORAGE_KEYS.TABLE_DENSITY, 'gigante');
   assert(tableDensitySchema.safeParse(store.get(STORAGE_KEYS.TABLE_DENSITY)).success === false,
     'tableDensitySchema: rechaza un valor no admitido');
+
+  // objectArraySchema: listas de objetos operativos (cola offline, bitacora,
+  // campanas, sesiones, items demo). Un null o un objeto suelto se devolvia como
+  // lista y reventaba en el primer `.map`/`.filter` del consumidor.
+  store.set(STORAGE_KEYS.OFFLINE_QUEUE, 'null');
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.OFFLINE_QUEUE, objectArraySchema, [])) === '[]',
+    'readStorage: descarta una cola offline null'
+  );
+  store.set(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify({ id: 'm1' }));
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.OFFLINE_QUEUE, objectArraySchema, [])) === '[]',
+    'readStorage: descarta una cola offline que es objeto suelto, no lista'
+  );
+  store.set(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify([1, 2, 3]));
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.OFFLINE_QUEUE, objectArraySchema, [])) === '[]',
+    'readStorage: descarta una lista de escalares donde se esperan mutaciones'
+  );
+  store.set(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify([{ id: 'm1', action: 'update' }]));
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.OFFLINE_QUEUE, objectArraySchema, [])) === '[{"id":"m1","action":"update"}]',
+    'readStorage: conserva una cola offline valida, aunque falten campos del DTO'
+  );
+
+  // booleanMapSchema: campos ocultos del panel de detalle.
+  store.set(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS, JSON.stringify({ SKU: 'si' }));
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS, booleanMapSchema, {})) === '{}',
+    'readStorage: descarta un mapa de ocultos con valores no booleanos'
+  );
+  store.set(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS, JSON.stringify({ SKU: true }));
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS, booleanMapSchema, {})) === '{"SKU":true}',
+    'readStorage: conserva un mapa de ocultos valido'
+  );
 
   store.clear();
   writeStorage(STORAGE_KEYS.COL_ORDERS, { 'Hoja 1': ['SKU'] });

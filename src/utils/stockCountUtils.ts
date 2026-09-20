@@ -17,7 +17,7 @@ import { exportToExcel } from './exportUtils';
  * Generates the composed natural unique key CU_VC: SKU + YYYY + MM
  * e.g. SKU: "2000210218569", YYYY: "2027", MM: "12" -> "2000210218569202712"
  */
-import { STORAGE_KEYS } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, objectArraySchema } from '../utils/appStorage';
 export function generateCuVc(
   sku: string | number, 
   yyyy?: string | number, 
@@ -75,15 +75,11 @@ let pendingSessionsToSave: StockCountSession[] | null = null;
  * Loads saved count sessions from localStorage (IndexedDB fallback safe)
  */
 export function loadStockCountSessionsFromStorage(): StockCountSession[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.STOCK_COUNT_SESSIONS);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.warn('Error loading stock count sessions from storage:', e);
-    return [];
-  }
+  return readStorage<StockCountSession[]>(
+    STORAGE_KEYS.STOCK_COUNT_SESSIONS,
+    objectArraySchema,
+    []
+  );
 }
 
 /**
@@ -505,15 +501,7 @@ export async function exportStockCountToExcel(
  * Loads all saved inventory campaigns from storage
  */
 export function loadCampaignsFromStorage(): InventoryCampaign[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.CAMPAIGNS);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.warn('Error loading campaigns from storage:', e);
-    return [];
-  }
+  return readStorage<InventoryCampaign[]>(STORAGE_KEYS.CAMPAIGNS, objectArraySchema, []);
 }
 
 /**

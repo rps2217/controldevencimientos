@@ -56,6 +56,12 @@ function httpReq(method, u) {
       localStorage.setItem('app_table_density', 'gigante');
       localStorage.setItem('appsheet_hidden_slice_ids', JSON.stringify('vencidos'));
       localStorage.setItem('app_zen_mode', 'null');
+      // Datos operativos: antes se devolvian tal cual y reventaban al consumirlos.
+      localStorage.setItem('appsheet_clone_offline_queue', 'null');
+      localStorage.setItem('app_demo_items_main', JSON.stringify({ no: 'es-lista' }));
+      localStorage.setItem('app_stock_count_sessions_v1', JSON.stringify([1, 2, 3]));
+      localStorage.setItem('app_inventory_campaigns_v1', JSON.stringify('campana-suelta'));
+      localStorage.setItem('appsheet_detail_hidden_fields', JSON.stringify({ SKU: 'si' }));
     } catch(e){}
   ` });
   await send('Page.navigate', { url: process.argv[2] });

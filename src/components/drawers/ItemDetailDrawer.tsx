@@ -15,7 +15,7 @@ import { findColumnBySemantic } from '../../utils/columnAliases';
 import { findMasterProduct, getMasterProductSummary } from '../../utils/referenceResolver';
 import { Barcode } from '../common/Barcode';
 
-import { STORAGE_KEYS } from '../../utils/appStorage';
+import { STORAGE_KEYS, readStorage, booleanMapSchema } from '../../utils/appStorage';
 interface ItemDetailDrawerProps {
   product: InventoryItem | null;
   onClose: () => void;
@@ -40,15 +40,9 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   products = [],
   customAliases
 }) => {
-  const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS);
-      return saved ? JSON.parse(saved) : {};
-    } catch (err) {
-      console.warn('Error loading detail drawer hidden fields:', err);
-      return {};
-    }
-  });
+  const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>(() =>
+    readStorage<Record<string, boolean>>(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS, booleanMapSchema, {})
+  );
   const [isConfiguringFields, setIsConfiguringFields] = useState(false);
 
   const toggleFieldVisibility = (key: string) => {
