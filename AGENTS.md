@@ -326,7 +326,29 @@ PR. Node 22. Sin secrets.
 ### Pendiente al momento de escribir esto
 
 1. **Solicitudes originales del usuario**:
-   - (a) **Duplicación de acciones en dev/push a GitHub**: sin investigar.
+   - (a) **Duplicación de acciones en dev/push a GitHub**: **CERRADA**. La queja
+     original ("duplicas tus acciones tanto en dev como en los push") era sobre las
+     acciones del *agente*, no un defecto de la app. Evidencia y causa raíz:
+     - **Push a dos refs**: se empujaba el mismo commit a `main` *y* a la rama
+       `ponytail-audit-strict-types` → dos deployments en Vercel (producción +
+       preview) por un solo cambio. La rama quedó como residuo tras el PR #1, que ya
+       se había fusionado.
+     - **Rama remota stale**: `ponytail-audit-strict-types` (`b664b6e`) era
+       **ancestro directo de `main`**; `git merge-base --is-ancestor` lo confirma y
+       `main` iba 19 commits por delante. Cero trabajo en riesgo. **Eliminada** vía
+       API (204). El remoto hoy solo tiene `main`. Esa rama fantasma era la fuente de
+       la confusión "¿qué queda por mergear?".
+     - **StrictMode**: en dev React invoca dos veces render/efectos/updaters a
+       propósito. Los efectos de arranque (`useOfflineSync`) son lecturas idempotentes
+       con limpieza correcta, así que el doble disparo no duplica acciones reales. No
+       se toca: es comportamiento esperado.
+     - **TicketPrintView**: ya no puede imprimirse por duplicado. El `TicketPrintView`
+       del dashboard devuelve `null` sin ítems y el del terminal se portaliza con
+       `domId` propio (`STOCKCOUNT_TICKET_DOM_ID`), no con `#thermal-ticket-root`.
+     - **CI**: un único workflow registrado (`verify.yml`), un run por commit.
+       Verificado por API: 4/4 commits con exactamente 1 run. Sin duplicación de CI.
+     - **Regla para no repetirlo**: `git push origin main` y **nada más**. No empujar
+       el mismo commit a una segunda rama; no dejar ramas de PR tras el merge.
    - (b) **Agrupación de filas por columna en "Vistas y Ajustes"**: **CERRADA**. El
      cableado funcionaba y ahora hay verificación de punta a punta en navegador con
      `tests/perf/groupcheck.cjs` (10 pasos: el selector existe, arranca en `none`,
