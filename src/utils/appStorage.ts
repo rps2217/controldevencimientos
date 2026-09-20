@@ -107,6 +107,9 @@ export function writeStorage(key: string, value: unknown): void {
 
 // --- Esquemas de las estructuras persistidas en localStorage ---
 
+/** Lista de cadenas (p. ej. IDs de slice ocultos). */
+export const stringArraySchema = z.array(z.string());
+
 /** Preferencias de presentación: `{ [hoja]: { [columna]: ancho } }`. */
 export const preferencesObjectSchema = z.record(z.string(), z.record(z.string(), z.number()));
 export type PreferencesObject = z.infer<typeof preferencesObjectSchema>;
@@ -125,6 +128,24 @@ export type StringArrayMap = z.infer<typeof stringArrayMapSchema>;
  */
 export const moduleStatesSchema = z.record(z.string(), z.record(z.string(), z.unknown()));
 export type ModuleStates = z.infer<typeof moduleStatesSchema>;
+
+/**
+ * Configuración de hoja: se valida sólo que sea un objeto plano.
+ *
+ * No se valida campo a campo a propósito. El esquema declarado es enorme, tiene
+ * campos que evolucionan entre versiones y algunos los escribe la nube vía
+ * PropertiesService; exigirlos aquí descartaría configuración válida de usuarios
+ * de versiones anteriores, que es justo el daño que se quiere evitar. Lo que sí
+ * revienta el arranque es un `null` o un array donde se espera un objeto (el
+ * fallo real documentado fue `JSON.parse("null")`), y eso lo corta esta forma.
+ */
+export const sheetConfigShapeSchema = z.record(z.string(), z.unknown());
+
+/**
+ * Densidad de la tabla: se guarda como cadena cruda, no como JSON, así que se
+ * valida contra los valores admitidos en vez de parsearla.
+ */
+export const tableDensitySchema = z.enum(['comfortable', 'compact', 'ultra']);
 
 /**
  * Migración de claves heredadas ejecutada una sola vez al arranque.

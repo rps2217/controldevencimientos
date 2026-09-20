@@ -1,7 +1,7 @@
 import { TableSlice, InventoryItem } from '../types';
 import { getItemStatus, getEventCategory, getItemResolutionStatus } from './dateCalculations';
 
-import { STORAGE_KEYS } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, stringArraySchema } from '../utils/appStorage';
 export const BUILT_IN_SLICES: TableSlice[] = [
   // 1. Radar de Vencimientos (main)
   {
@@ -175,8 +175,13 @@ export function saveCustomSlices(slices: TableSlice[]): void {
 
 export function loadHiddenSliceIds(sheetConfigHidden?: string[]): string[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.HIDDEN_SLICE_IDS);
-    const localHidden: string[] = raw ? JSON.parse(raw) : [];
+    // Si el dato guardado no es un array de cadenas (p. ej. un string suelto),
+    // `[...localHidden]` lo desparramaba en caracteres sueltos como IDs ocultos.
+    const localHidden = readStorage<string[]>(
+      STORAGE_KEYS.HIDDEN_SLICE_IDS,
+      stringArraySchema,
+      []
+    );
     const configHidden = Array.isArray(sheetConfigHidden) ? sheetConfigHidden : [];
     // Combine unique hidden IDs
     const combined = Array.from(new Set([...localHidden, ...configHidden]));

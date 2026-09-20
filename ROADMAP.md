@@ -275,11 +275,30 @@ los filtros" lo vacía dejando la tabla coherente. Es el caso de mayor riesgo de
 controlado: si la sincronización externa fallara, el texto quedaría en pantalla mientras
 la tabla ya no filtra.
 
+#### Observación abierta — resuelta (era un artefacto de medición)
+
+Se investigó si el raíz se re-renderizaba de verdad al teclear. **No lo hace**: con el
+debounce, las 4 teclas no provocan ninguna ejecución del cuerpo de `InventoryDashboard`;
+las 4 pasadas reales (×2 por StrictMode) llegan ~250 ms después, al propagarse el valor.
+
+El perfilador **sí listaba** `InventoryDashboard` en cada commit de tecleo, y eso llevó a
+una contradicción útil: un contador dentro del cuerpo del componente (que sólo corre si
+React ejecuta la función de render) decía cero renders durante el tecleo, mientras el
+hook de DevTools decía uno por tecla. Volcando los campos del fiber en esos commits se
+entendió: llegan con `lanes=0` y `childLanes=0`, es decir, el componente no se re-renderiza
+por sí mismo; el hook lo cuenta igual porque `walkOne` suma fibras con `actualDuration > 0`,
+y una fibra con bailout conserva la duración de su pasada anterior.
+
+**Consecuencia para medir**: las cifras de `self`/`renders` **por componente** del hook
+están infladas por esa atribución; sirven para commits (que son reales) y para el total,
+pero no para decidir qué componente renderizó. Un filtro por `actualStartTime >= 0`, que
+en teoría descartaría las fibras con bailout, **no** corrige el problema en React 19. Para
+saber si un componente renderiza de verdad, instrumentar su cuerpo o usar el Profiler de
+React DevTools en la UI, no este hook.
+
 **Pendiente de esta fase**: la extracción de `useInventoryData`/`useDashboardViewState`/
-`useInventoryActions`/`useDashboardModals`. Queda una observación abierta: en cada commit
-de tecleo el perfilador sigue listando `InventoryDashboard`, lo que no se ha podido
-atribuir con certeza (¿render real del raíz o atribución del commit por el perfilador?).
-Antes de hacer más cambios de rendimiento, instrumentar eso.
+`useInventoryActions`/`useDashboardModals`. Con la observación resuelta, no queda palanca
+grande conocida en el tecleo, así que la prioridad pasa a la Fase 4 restante.
 
 ### Fase 4 — Puerta única de persistencia (**iniciada**)
 
@@ -310,6 +329,32 @@ app no montaba. Con la puerta validada, los 6 escenarios de corrupción (forma i
 JSON malformado, array donde se espera mapa, valor no-objeto, combinación) montan sin un
 solo error. Reproducible con `tests/perf/corruptcheck.cjs` (que sirve como prueba de
 regresión real, no de laboratorio) y con 9 aserciones nuevas en `test-modules.ts`.
+
+**Corrección de la premisa**: el `null` de `SHEET_CONFIG` **sí era un bug real de
+arranque**, no sólo "forma inesperada". Con `appsheet_clone_config = "null"`, el dashboard
+hacía `sheetConfig.ticketPrintConfig` sobre `null` y **la app no montaba**
+(`TypeError: Cannot read properties of null`, verificado con `startupcorruption.cjs` contra
+el código anterior: 0 filas y el error boundary atrapando la excepción). Reparado.
+
+**Migrados también** (arranque del dashboard y preferencias):
+
+- `InventoryDashboard`: `SHEET_CONFIG` (esquema de forma, sólo objeto plano),
+  `ZEN_MODE` (`z.boolean()`) y `TABLE_DENSITY` (cadena cruda —no JSON— validada contra
+  los tres valores admitidos; antes un valor basura pasaba tal cual).
+- `ticketUtils`: `TICKET_CONFIG` devolvía `null`/array como config y reventaba al leer un
+  campo. Ahora exige forma de objeto.
+- `sliceRegistry`: `HIDDEN_SLICE_IDS` se leía sin guarda; un string suelto (en vez de un
+  array) se desparramaba en **caracteres sueltos como IDs ocultos** con `[...localHidden]`.
+
+**Esquema de forma, no campo a campo, a propósito**: `sheetConfigShapeSchema` sólo exige
+un objeto plano. Validar sus ~18 campos descartaría configuración válida de versiones
+anteriores (y campos que escribe la nube vía PropertiesService), que es el daño que se
+quiere evitar; lo que rompía el arranque era `null`/array, y eso se corta igual.
+
+**Evidencia**: `tests/perf/startupcorruption.cjs` siembra `SHEET_CONFIG=null`,
+`TABLE_DENSITY=gigante`, `HIDDEN_SLICE_IDS="vencidos"` y `ZEN_MODE=null` a la vez y
+comprueba que la tabla monta con 23 filas y **cero** errores de consola; contra el código
+anterior falla. 7 aserciones nuevas en `test-modules.ts` (138 pasan, 0 fallan).
 
 **Pendiente de Fase 4**: migrar los `JSON.parse` de datos operativos (cola offline,
 sesiones de conteo, caché) para los que sí existe esquema en `types.ts`; no todos merecen

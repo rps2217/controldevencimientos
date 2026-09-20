@@ -81,7 +81,10 @@ import {
   writeStorage,
   preferencesObjectSchema,
   stringArrayMapSchema,
-  moduleStatesSchema
+  moduleStatesSchema,
+  stringArraySchema,
+  sheetConfigShapeSchema,
+  tableDensitySchema
 } from './src/utils/appStorage';
 
 import {
@@ -378,6 +381,49 @@ console.log('\n--- 11. Pruebas de appStorage.ts ---');
     JSON.stringify(readStorage(STORAGE_KEYS.MODULE_STATES, moduleStatesSchema, {})) === '{}',
     'readStorage: descarta un estado de módulo cuyo valor no es objeto (esparcirlo metería índices como campos)'
   );
+
+  // SHEET_CONFIG: el fallo real era `JSON.parse("null")` devolviendo null, que
+  // reventaba al primer acceso a sheetConfig.schema durante el arranque.
+  store.set(STORAGE_KEYS.SHEET_CONFIG, 'null');
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.SHEET_CONFIG, sheetConfigShapeSchema, {})) === '{}',
+    'readStorage: descarta un SheetConfig null en vez de devolverlo como configuración'
+  );
+  store.set(STORAGE_KEYS.SHEET_CONFIG, JSON.stringify(['Hoja 1']));
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.SHEET_CONFIG, sheetConfigShapeSchema, {})) === '{}',
+    'readStorage: descarta un SheetConfig con forma de array'
+  );
+  // Un SheetConfig legítimo trae campos anidados que no se validan a propósito:
+  // exigirlos descartaría configuración válida de versiones anteriores.
+  store.set(STORAGE_KEYS.SHEET_CONFIG, JSON.stringify({ main: 'VENCIMIENTOS', schema: { main: { SKU: { type: 'text' } } }, campoFuturo: 1 }));
+  const cfgRead = readStorage<Record<string, unknown>>(STORAGE_KEYS.SHEET_CONFIG, sheetConfigShapeSchema, {});
+  assert(
+    cfgRead.main === 'VENCIMIENTOS' && cfgRead.campoFuturo === 1,
+    'readStorage: conserva un SheetConfig válido, incluidos campos desconocidos'
+  );
+
+  // HIDDEN_SLICE_IDS: un string suelto se desparramaba en caracteres sueltos
+  // como IDs ocultos al hacer `[...localHidden]`.
+  store.set(STORAGE_KEYS.HIDDEN_SLICE_IDS, JSON.stringify('vencidos'));
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.HIDDEN_SLICE_IDS, stringArraySchema, [])) === '[]',
+    'readStorage: descarta IDs de slice oculto que no son array de cadenas'
+  );
+  store.set(STORAGE_KEYS.HIDDEN_SLICE_IDS, JSON.stringify(['vencidos', 'criticos']));
+  assert(
+    JSON.stringify(readStorage(STORAGE_KEYS.HIDDEN_SLICE_IDS, stringArraySchema, [])) === '["vencidos","criticos"]',
+    'readStorage: conserva una lista válida de IDs de slice ocultos'
+  );
+
+  // TABLE_DENSITY: se guarda como cadena cruda (no JSON), así que se valida
+  // contra los valores admitidos en lugar de parsearse.
+  store.set(STORAGE_KEYS.TABLE_DENSITY, 'ultra');
+  assert(tableDensitySchema.safeParse(store.get(STORAGE_KEYS.TABLE_DENSITY)).data === 'ultra',
+    'tableDensitySchema: acepta un valor admitido');
+  store.set(STORAGE_KEYS.TABLE_DENSITY, 'gigante');
+  assert(tableDensitySchema.safeParse(store.get(STORAGE_KEYS.TABLE_DENSITY)).success === false,
+    'tableDensitySchema: rechaza un valor no admitido');
 
   store.clear();
   writeStorage(STORAGE_KEYS.COL_ORDERS, { 'Hoja 1': ['SKU'] });

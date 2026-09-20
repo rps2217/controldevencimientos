@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
+import { z } from 'zod';
 import { getSpreadsheetMetadata, getAllSheetsData, appendRow, updateRow, deleteRow, deleteRows, saveCloudConfig, loadCloudConfig, getScriptPropertiesConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
 import type { SheetRow } from '../lib/sheets';
 import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, EventCategory, ViewKey } from '../types';
@@ -32,7 +33,7 @@ import {
   SAMPLE_PRODUCTS, 
   SAMPLE_POLICIES 
 } from '../data/sampleInventory';
-import { STORAGE_KEYS } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, sheetConfigShapeSchema, tableDensitySchema } from '../utils/appStorage';
 
 // Helpers para almacenamiento persistente y configuración modular
 import { getStoredDemoItems, saveStoredDemoItems, mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
@@ -254,14 +255,9 @@ export const InventoryDashboard: React.FC = () => {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
   // Sheet configuration state
-  const [sheetConfig, setSheetConfig] = useState<SheetConfig>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.SHEET_CONFIG);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [sheetConfig, setSheetConfig] = useState<SheetConfig>(() =>
+    readStorage<SheetConfig>(STORAGE_KEYS.SHEET_CONFIG, sheetConfigShapeSchema, {})
+  );
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -316,12 +312,8 @@ export const InventoryDashboard: React.FC = () => {
   const [whatsAppModalItems, setWhatsAppModalItems] = useState<any[]>([]);
   const [isBulkActionsConfigOpen, setIsBulkActionsConfigOpen] = useState(false);
   const [tableDensity, setTableDensity] = useState<'comfortable' | 'compact' | 'ultra'>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.TABLE_DENSITY);
-      return (saved as 'comfortable' | 'compact' | 'ultra') || 'compact';
-    } catch {
-      return 'compact';
-    }
+    const parsed = tableDensitySchema.safeParse(localStorage.getItem(STORAGE_KEYS.TABLE_DENSITY));
+    return parsed.success ? parsed.data : 'compact';
   });
 
   useEffect(() => {
@@ -501,14 +493,9 @@ export const InventoryDashboard: React.FC = () => {
   }, [activeSheet?.title, sheetConfig.schema, sheetConfig.userVirtualColumns]);
 
   const [isSummaryView, setIsSummaryView] = useState<boolean>(false);
-  const [isZenMode, setIsZenMode] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.ZEN_MODE);
-      return saved !== null ? JSON.parse(saved) : false;
-    } catch {
-      return false;
-    }
-  });
+  const [isZenMode, setIsZenMode] = useState<boolean>(() =>
+    readStorage<boolean>(STORAGE_KEYS.ZEN_MODE, z.boolean(), false)
+  );
 
   useEffect(() => {
     try {

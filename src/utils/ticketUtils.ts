@@ -7,7 +7,8 @@ import {
 } from '../types';
 import { findColumnBySemantic } from './columnAliases';
 
-import { STORAGE_KEYS } from '../utils/appStorage';
+import { z } from 'zod';
+import { STORAGE_KEYS, readStorage } from '../utils/appStorage';
 /**
  * Returns default general ticket settings based on the view
  */
@@ -158,15 +159,13 @@ export function normalizeTicketConfig(
  * Loads ticket configs from localStorage
  */
 export function loadTicketConfigFromStorage(): GlobalTicketConfig {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEYS.TICKET_CONFIG);
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch (e) {
-    console.error('Failed to load global ticket config from storage', e);
-  }
-  return {};
+  // Sin validar, un `null` persistido se devolvia como config y reventaba mas
+  // tarde al leer sus campos. Se exige forma de objeto.
+  return readStorage<GlobalTicketConfig>(
+    STORAGE_KEYS.TICKET_CONFIG,
+    z.record(z.string(), z.unknown()),
+    {}
+  );
 }
 
 /**
