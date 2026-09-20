@@ -87,6 +87,25 @@ const KEY_MODULE_STATES = 'app_module_states';
   `);
   results.push({ caso: 'varias claves corruptas a la vez', montada: r.mounted, errores: r.errors.length, detalle: r.errors[0] });
 
+  // 7. Cache L1 de hoja con rows:null (Fase 4 restante). El fallback offline
+  //    hacia JSON.parse crudo y devolvia forma mentida; el consumidor hace
+  //    rows.map y revienta en el arranque sin red.
+  const KEY_CACHE = 'appsheet_clone_cache_Vencimientos_Inventario';
+  r = await loadWith(`localStorage.setItem('${KEY_CACHE}', JSON.stringify({ rows: null, timestamp: '2024-01-01' }));`);
+  results.push({ caso: 'cache de hoja con rows:null', montada: r.mounted, errores: r.errors.length, detalle: r.errors[0] });
+
+  // 8. Cache L1 con rows como lista de escalares (deberia degradar a vacio)
+  r = await loadWith(`localStorage.setItem('${KEY_CACHE}', JSON.stringify({ rows: [1,2,3] }));`);
+  results.push({ caso: 'cache de hoja con rows de escalares', montada: r.mounted, errores: r.errors.length, detalle: r.errors[0] });
+
+  // 9. Cache L1 con JSON malformado
+  r = await loadWith(`localStorage.setItem('${KEY_CACHE}', '{roto');`);
+  results.push({ caso: 'cache de hoja con JSON malformado', montada: r.mounted, errores: r.errors.length, detalle: r.errors[0] });
+
+  // 10. Cache L1 valido (control): debe conservarse, no descartarse por el esquema
+  r = await loadWith(`localStorage.setItem('${KEY_CACHE}', JSON.stringify({ rows: [['SKU','FECHA_VC'],['A1','2026-01-01']], timestamp: '2024-01-01' }));`);
+  results.push({ caso: 'cache de hoja valido (control)', montada: r.mounted, errores: r.errors.length, detalle: r.errors[0] });
+
   console.log(JSON.stringify(results, null, 2));
   try{ws.close();}catch(e){} die(0);
 })().catch(e => { console.error('Fallo:', e.message); process.exit(1); });

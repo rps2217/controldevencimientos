@@ -86,7 +86,8 @@ import {
   sheetConfigShapeSchema,
   tableDensitySchema,
   objectArraySchema,
-  booleanMapSchema
+  booleanMapSchema,
+  cachedSheetSchema
 } from './src/utils/appStorage';
 
 import {
@@ -461,6 +462,31 @@ console.log('\n--- 11. Pruebas de appStorage.ts ---');
   assert(
     JSON.stringify(readStorage(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS, booleanMapSchema, {})) === '{"SKU":true}',
     'readStorage: conserva un mapa de ocultos valido'
+  );
+
+  // cachedSheetSchema: cache L1 de hoja (fallback offline). Tenia JSON.parse crudo
+  // y devolvia forma mentida; el consumidor hace rows.map y reventaba en el
+  // arranque sin red (medido: "headers.find is not a function").
+  const cacheKey = sheetCacheKey('Vencimientos_Inventario');
+  store.set(cacheKey, JSON.stringify({ rows: 1, timestamp: 't' }));
+  assert(
+    readStorage(cacheKey, cachedSheetSchema.nullable(), null) === null,
+    'cachedSheetSchema: descarta un cache con rows no-lista'
+  );
+  store.set(cacheKey, JSON.stringify({ rows: [1, 2, 3], timestamp: 't' }));
+  assert(
+    readStorage(cacheKey, cachedSheetSchema.nullable(), null) === null,
+    'cachedSheetSchema: descarta un cache con filas que no son listas de celdas'
+  );
+  store.set(cacheKey, '{roto');
+  assert(
+    readStorage(cacheKey, cachedSheetSchema.nullable(), null) === null,
+    'cachedSheetSchema: descarta un cache con JSON malformado'
+  );
+  store.set(cacheKey, JSON.stringify({ rows: [['SKU'], ['A1']] }));
+  assert(
+    JSON.stringify(readStorage(cacheKey, cachedSheetSchema.nullable(), null)) === '{"rows":[["SKU"],["A1"]]}',
+    'cachedSheetSchema: conserva un cache valido aunque falte timestamp (entrada de version anterior)'
   );
 
   store.clear();

@@ -291,11 +291,12 @@ monolito). Medir siempre con `tests/perf/profile.cjs`, que reporta `tableRenders
 reales además del análisis por fibra. La impresión se verifica con
 `tests/perf/printcheck.cjs`.
 
-Nota (auditoría Ponytail): `tests/perf/ctxdiff.cjs` quedó **obsoleto**. Dependía de
-`window.__ctxPrev`/`__ctxRenders`, instrumentación que se retiró del código de
-producción al cerrar el diagnóstico de Fase 1, así que ahora reporta `members: 0` y
-acciones vacías. Para medir coste de interacción usar `modals.cjs` (commits + long
-tasks) y `profile.cjs` (renders reales de tabla/fila).
+Nota (auditoría Ponytail): `tests/perf/ctxdiff.cjs` se **retiró**. Dependía de
+`window.__ctxPrev`/`__ctxRenders`, instrumentación que se eliminó del código de
+producción al cerrar el diagnóstico de Fase 1, así que reportaba `members: 0` y
+acciones vacías: un instrumento muerto. Para medir coste de interacción usar
+`modals.cjs` (commits + long tasks) y `profile.cjs` (renders reales de tabla/fila),
+más `corruptcheck.cjs`/`startupcorruption.cjs` para robustez de arranque.
 
 Nota sobre jsdom: `tests/baseline.probe.tsx` sirve para contar commits, pero sus
 milisegundos no son extrapolables (la tabla virtualizada mide 0 sin
@@ -448,6 +449,35 @@ DTO evolucionan entre versiones y algunos los escribe la nube; lo que revienta e
 **Pendiente de Fase 4**: los `JSON.parse` de caché por pestaña (`sheetCacheKey`) y los DTO
 de red (`lib/sheets.ts`), que ya se validan aguas abajo; los 2 archivos con acceso directo
 a `localStorage`, revisar aparte.
+
+#### Hecho: caché L1 validada, escritura de demo y reset sin pérdida (Fase 4, cierre)
+
+Tres cabos sueltos de la fase, los tres en el camino de arranque:
+
+- **`indexedDbService.getLocalStorageFallback`** hacía `JSON.parse` crudo y devolvía el
+  resultado con un tipo mentido (`{ rows: any[][] }`). Un `rows: [1,2,3]` (lista de
+  escalares) pasaba el parse y reventaba en `InventoryDashboard` con
+  **`TypeError: headers.find is not a function`**, dejando la app sin montar. Ahora usa
+  `readStorage` con `cachedSheetSchema` (valida contenedor y que cada fila sea lista de
+  celdas). `timestamp` es opcional a propósito: entradas de versiones anteriores pueden no
+  traerlo y siguen siendo caché válido.
+- **`saveStoredDemoItems`** escribía con `localStorage.setItem` directo; pasa por
+  `writeStorage`.
+- **`ErrorBoundary.handleClearStorageAndReload`** ("Restablecer Datos Locales") hacía
+  `localStorage.clear()`, que **borra el respaldo de la cola offline**. En modo privado
+  (sin IndexedDB) ese respaldo *es* la cola, así que el botón de recuperación podía
+  destruir mutaciones sin sincronizar. Ahora preserva `OFFLINE_QUEUE` y `AUDIT_LOG`
+  alrededor del `clear()`.
+
+**Evidencia (la sonda no es vacía)**: `tests/perf/corruptcheck.cjs` gana 4 casos de caché.
+Contra el código anterior, el caso `rows` de escalares da `montada: false` con 2 errores de
+consola (`headers.find is not a function`); contra el corregido, los 10 casos montan con
+**cero** errores. Se fijó también un control de caché válido, para no confundir "descarta
+basura" con "descarta todo". 4 aserciones nuevas en `test-modules.ts` (148 pasan, 0 fallan).
+
+Pendiente real que queda: los 8 `JSON.parse` de **`lib/sheets.ts`** son **respuestas de
+red** (Web App de Apps Script), no almacenamiento local: validarlas con esquema es otro
+trabajo, y hoy se validan aguas abajo. No se tocaron para no ampliar el alcance.
 
 ### Fase 5 — Dividir monolitos
 

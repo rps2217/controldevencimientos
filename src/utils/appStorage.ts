@@ -128,6 +128,21 @@ export const booleanMapSchema = z.record(z.string(), z.boolean());
 export const preferencesObjectSchema = z.record(z.string(), z.record(z.string(), z.number()));
 export type PreferencesObject = z.infer<typeof preferencesObjectSchema>;
 
+/**
+ * Caché L1 de una hoja (fallback a localStorage cuando IndexedDB no está).
+ *
+ * Se valida el contenedor y la forma de `rows` (lista de listas de celdas):
+ * quien consume hace `rows.map` y luego indexa la fila, así que un `rows: null`
+ * o una lista de escalares revienta lejos de la causa, en el arranque offline.
+ * `timestamp` es opcional a propósito: entradas de versiones anteriores pueden
+ * no traerlo y no por eso dejan de ser caché válido; el consumidor lo rellena.
+ */
+export const cachedSheetSchema = z.object({
+  rows: z.array(z.array(z.unknown())),
+  timestamp: z.string().optional(),
+});
+export type CachedSheetFallback = z.infer<typeof cachedSheetSchema>;
+
 /** Órdenes y columnas ocultas: `{ [hoja]: [columna, ...] }`. */
 export const stringArrayMapSchema = z.record(z.string(), z.array(z.string()));
 export type StringArrayMap = z.infer<typeof stringArrayMapSchema>;
@@ -141,7 +156,6 @@ export type StringArrayMap = z.infer<typeof stringArrayMapSchema>;
  * espera un objeto (esparcir un string mete índices como si fueran campos).
  */
 export const moduleStatesSchema = z.record(z.string(), z.record(z.string(), z.unknown()));
-export type ModuleStates = z.infer<typeof moduleStatesSchema>;
 
 /**
  * Configuración de hoja: se valida sólo que sea un objeto plano.

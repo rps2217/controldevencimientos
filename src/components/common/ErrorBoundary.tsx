@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
+import { STORAGE_KEYS } from '../../utils/appStorage';
 
 interface Props {
   children: ReactNode;
@@ -34,8 +35,15 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private handleClearStorageAndReload = () => {
     try {
+      // `localStorage.clear()` borraría el respaldo de la cola offline. En modo
+      // privado (sin IndexedDB) ese respaldo *es* la cola, así que se preserva
+      // para no perder mutaciones aún sin sincronizar.
+      const pending = localStorage.getItem(STORAGE_KEYS.OFFLINE_QUEUE);
+      const audit = localStorage.getItem(STORAGE_KEYS.AUDIT_LOG);
       localStorage.clear();
       sessionStorage.clear();
+      if (pending) localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, pending);
+      if (audit) localStorage.setItem(STORAGE_KEYS.AUDIT_LOG, audit);
     } catch {
       // ignore
     }

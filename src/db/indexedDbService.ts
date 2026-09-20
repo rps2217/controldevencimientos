@@ -3,7 +3,7 @@
  * Reemplaza el frágil límite de 5MB de localStorage por una base de datos local
  * asíncrona, robusta y capaz de almacenar cientos de miles de registros y colas de mutación.
  */
-import { STORAGE_KEYS, sheetCacheKey, readStorage, objectArraySchema } from '../utils/appStorage';
+import { STORAGE_KEYS, sheetCacheKey, readStorage, writeStorage, objectArraySchema, cachedSheetSchema, type CachedSheetFallback } from '../utils/appStorage';
 import { isFailedMutation } from '../utils/offlineQueueUtils';
 
 export interface CachedSheetData {
@@ -211,14 +211,10 @@ class IndexedDbService {
     }
 
     // Fallback safe localStorage si IndexedDB falla
-    try {
-      localStorage.setItem(sheetCacheKey(sheetTitle), JSON.stringify({
-        rows,
-        timestamp: payload.timestamp
-      }));
-    } catch (e) {
-      console.warn('localStorage quota excedido al intentar guardar cache:', e);
-    }
+    writeStorage(sheetCacheKey(sheetTitle), {
+      rows,
+      timestamp: payload.timestamp
+    });
   }
 
   /**
@@ -859,15 +855,9 @@ class IndexedDbService {
 
   // Helpers internos
   private getLocalStorageFallback(key: string): { rows: any[][]; timestamp: string } | null {
-    try {
-      const cached = localStorage.getItem(key);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch {
-      // Ignore
-    }
-    return null;
+    const cached = readStorage<CachedSheetFallback | null>(key, cachedSheetSchema.nullable(), null);
+    if (!cached) return null;
+    return { rows: cached.rows, timestamp: cached.timestamp || new Date().toISOString() };
   }
 
   private getLocalStorageQueue(): OfflineMutation[] {
