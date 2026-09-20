@@ -239,15 +239,47 @@ Migrar los 11 archivos a leer **solo** del contexto. Al terminar, `grep -c "?? d
 Extraer a hooks: `useInventoryData`, `useDashboardViewState`, `useInventoryActions`,
 `useDashboardModals`. Objetivo: componente orquestador ≤400 líneas.
 
-**Por qué esta fase es ahora la de mayor ganancia real, y no el contexto**: se midió que
-estabilizar los handlers del `value` **no mejora el tecleo**. El disparador del re-render
-del shell es `searchTerm`, que es miembro del `value`: mientras eso sea así, ningún
-`useMemo` puede estabilizarlo, y tocar 9 handlers que **escriben datos** (con riesgo de
-closures obsoletos) no pagaría. El tecleo cuesta ~190 ms por pulsación porque el shell
-entero (top-nav, sidebar, tarjetas KPI, tabla) se rehace con cada tecla. La palanca es
-mover `searchTerm` y el resto del estado de vista al componente que los consume, no
-estabilizar el contrato del contexto. Ver la sección "Verificación de la Fase 1.2" para
-el desglose medido.
+**Por qué esta fase importa, y no estabilizar callbacks**: se midió que memoizar los
+handlers del `value` **no mejora el tecleo**. El disparador es `searchTerm`, miembro del
+`value`: mientras sea así, ningún `useMemo` lo estabiliza, y tocar 9 handlers que
+**escriben datos** (riesgo de closures obsoletos) no paga. El coste del tecleo está en el
+re-render en cascada del shell, no en la identidad de los callbacks.
+
+#### Hecho — buscador con respuesta inmediata y propagación diferida
+
+`useDebouncedSearch` (`src/hooks/useDebouncedSearch.ts`), aplicado en `DashboardTopNav` y
+`ZenModeOverlay`. El input deja de estar controlado por el estado del contexto: refleja
+la tecla al instante (estado local) y sólo el valor diferido dispara el re-render caro.
+`useDeferredValue` no resuelve esto —difiere el render del propio componente, no el
+re-render en cascada hacia arriba—, por eso no se reutilizó.
+
+Medido en A/B contra el código anterior (mismo dataset, 25 filas, perfilador CDP):
+
+| Métrica | Antes | Después |
+|---|---|---|
+| Commits al teclear "PARA" | 14 / 16 | 8 / 10 |
+| Trabajo del perfilador | 771 / 775 ms | 486 / 631 ms |
+| Latencia por tecla (mediana) | 29 ms | 22 ms |
+| Latencia por tecla (p95) | 69 ms | 22 ms |
+
+Honestidad sobre estos números: **22 ms es el suelo de `requestAnimationFrame`**, no
+trabajo real, así que la mediana no demuestra por sí sola una mejora; el dato que sí la
+demuestra es el p95 (69→22, ya sin picos de jank) y la caída de commits y trabajo. En un
+dataset de 25 filas el tecleo ya era tolerable; el ahorro escala con el tamaño de la
+tabla, que es donde el commit de ~79 fibras pesa.
+
+La corrección funcional se verificó con `tests/perf/searchcheck.cjs`, que es una prueba de
+comportamiento, no de milisegundos: escribe un SKU existente (la tabla pasa de 23 a 1
+fila), confirma que el texto permanece en el input y que el botón global "Limpiar todos
+los filtros" lo vacía dejando la tabla coherente. Es el caso de mayor riesgo del input no
+controlado: si la sincronización externa fallara, el texto quedaría en pantalla mientras
+la tabla ya no filtra.
+
+**Pendiente de esta fase**: la extracción de `useInventoryData`/`useDashboardViewState`/
+`useInventoryActions`/`useDashboardModals`. Queda una observación abierta: en cada commit
+de tecleo el perfilador sigue listando `InventoryDashboard`, lo que no se ha podido
+atribuir con certeza (¿render real del raíz o atribución del commit por el perfilador?).
+Antes de hacer más cambios de rendimiento, instrumentar eso.
 
 ### Fase 4 — Puerta única de persistencia (**iniciada**)
 

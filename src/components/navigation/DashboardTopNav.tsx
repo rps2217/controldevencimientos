@@ -1,9 +1,10 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle } from 'lucide-react';
 import { InventoryItem, SheetConfig, SheetProperties } from '../../types';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { useDashboard } from '../../context/DashboardContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
+import { useDebouncedSearch } from '../../hooks/useDebouncedSearch';
 
 export interface DashboardTopNavProps {
   isMobileMenuOpen?: boolean;
@@ -64,6 +65,13 @@ export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
   const searchableHeaders = props.searchableHeaders ?? dashboard.searchableHeaders ?? [];
   const searchTerm = props.searchTerm ?? dashboard.searchTerm ?? '';
   const setSearchTerm = props.setSearchTerm ?? dashboard.setSearchTerm;
+  const searchValue = props.searchTerm ?? dashboard.searchTerm ?? '';
+  const {
+    inputRef: searchInputRef,
+    typed: typedSearch,
+    onChange: commitSearch,
+    clear: clearSearch
+  } = useDebouncedSearch(searchValue, setSearchTerm);
   const hasActiveFilters = props.hasActiveFilters ?? dashboard.hasActiveFilters ?? false;
   const clearAllFilters = props.clearAllFilters ?? dashboard.clearAllFilters ?? (() => {});
   const setIsScannerOpen = props.setIsScannerOpen ?? dashboard.setIsScannerOpen;
@@ -88,8 +96,6 @@ export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
   const setIsScriptModalOpen = props.setIsScriptModalOpen ?? dashboard.setIsScriptModalOpen;
   const onOpenViewConfig = props.onOpenViewConfig ?? (() => rightDrawer.setIsRightDrawerOpen(true));
   const onOpenStockCount = props.onOpenStockCount ?? (() => dashboard.setIsStockCountOpen?.(true));
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
   // Global Keyboard shortcut for search (Cmd+K / Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -194,23 +200,23 @@ export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
             <input
               ref={searchInputRef}
               type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              defaultValue={searchTerm}
+              onChange={(e) => commitSearch(e.target.value)}
               placeholder={activeView === 'analytics' ? "Buscar y filtrar métricas..." : `Buscar en ${searchableHeaders.length} columnas...`}
               className="w-full bg-transparent pl-2.5 pr-2 py-2 text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none"
             />
 
             {/* Keyboard shortcut indicator */}
-            {!searchTerm && (
+            {!typedSearch && (
               <kbd className="hidden md:inline-block px-1.5 py-0.5 text-[9px] font-mono text-slate-400 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md mr-2 shadow-2xs">
                 ⌘K
               </kbd>
             )}
 
             {/* Clear search button */}
-            {searchTerm && (
+            {typedSearch && (
               <button
-                onClick={() => setSearchTerm('')}
+                onClick={clearSearch}
                 className="w-7 h-7 flex items-center justify-center mr-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-full transition-colors cursor-pointer"
                 title="Limpiar búsqueda"
               >

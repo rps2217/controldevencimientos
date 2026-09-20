@@ -2,6 +2,7 @@ import React from 'react';
 import { Maximize2, Search, X, Sliders } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
+import { useDebouncedSearch } from '../../hooks/useDebouncedSearch';
 
 export interface ZenModeOverlayProps {
   isZenMode?: boolean;
@@ -18,6 +19,12 @@ export const ZenModeOverlay: React.FC<ZenModeOverlayProps> = (props) => {
   const isZenMode = props.isZenMode ?? dashboard.isZenMode ?? false;
   const searchTerm = props.searchTerm ?? dashboard.searchTerm ?? '';
   const setSearchTerm = props.setSearchTerm ?? dashboard.setSearchTerm;
+  const {
+    inputRef: searchInputRef,
+    typed: typedSearch,
+    onChange: commitSearch,
+    clear: clearSearch
+  } = useDebouncedSearch(searchTerm, setSearchTerm);
   const onOpenSettings = props.onOpenSettings ?? (() => rightDrawer.setIsRightDrawerOpen(true));
   const onExitZenMode = props.onExitZenMode ?? (() => {
     dashboard.setIsZenMode?.(false);
@@ -38,16 +45,17 @@ export const ZenModeOverlay: React.FC<ZenModeOverlayProps> = (props) => {
       <div className="relative flex-1 sm:w-72 md:w-96 lg:w-[420px]">
         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
+          ref={searchInputRef}
           type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          defaultValue={searchTerm}
+          onChange={(e) => commitSearch(e.target.value)}
           placeholder="Buscar SKU, producto, vencimiento, proveedor..."
           className="w-full pl-9 pr-8 py-1.5 text-xs rounded-xl bg-slate-800/90 text-white placeholder:text-slate-400 border border-slate-700 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all shadow-inner"
           autoFocus
         />
-        {searchTerm && (
+        {typedSearch && (
           <button
-            onClick={() => setSearchTerm('')}
+            onClick={clearSearch}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
             title="Limpiar búsqueda"
           >
