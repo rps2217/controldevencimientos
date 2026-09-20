@@ -141,6 +141,8 @@ export interface DashboardContextType {
   sortConfig: any;
   groupByColumn: string | null;
   groupByDirection: 'asc' | 'desc';
+  handleSetGroupByColumn?: (col: string) => void;
+  handleSetGroupByDirection?: (dir: 'asc' | 'desc') => void;
   handleSaveSlice: (slice: TableSlice) => void;
 
   // Stock Count Terminal

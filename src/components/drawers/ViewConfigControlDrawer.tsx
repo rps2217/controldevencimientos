@@ -146,10 +146,14 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
   const onOpenBackendMirror = props.onOpenBackendMirror;
   const totalItemsCount = props.totalItemsCount ?? dashboard.items?.length ?? 0;
   const filteredItemsCount = props.filteredItemsCount ?? dashboard.filteredItems?.length ?? 0;
-  const groupByColumn = props.groupByColumn ?? dashboard.groupByColumn ?? '';
-  const setGroupByColumn = props.setGroupByColumn ?? (() => {});
+  const groupByColumn = props.groupByColumn ?? dashboard.groupByColumn ?? 'none';
+  const setGroupByColumn = props.setGroupByColumn ?? dashboard.handleSetGroupByColumn;
   const groupByDirection = props.groupByDirection ?? dashboard.groupByDirection ?? 'asc';
-  const onToggleGroupByDirection = props.onToggleGroupByDirection;
+  const onToggleGroupByDirection = props.onToggleGroupByDirection ?? (
+    dashboard.handleSetGroupByDirection
+      ? () => dashboard.handleSetGroupByDirection?.(dashboard.groupByDirection === 'desc' ? 'asc' : 'desc')
+      : undefined
+  );
   const isSummaryView = props.isSummaryView ?? dashboard.isSummaryView ?? false;
   const onToggleSummaryView = props.onToggleSummaryView ?? (() => dashboard.handleToggleSummaryView?.());
   const areFiltersVisible = props.areFiltersVisible ?? dashboard.areFiltersVisible ?? true;
@@ -387,7 +391,7 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
                     <div className="relative flex-1">
                       <select
                         value={groupByColumn}
-                        onChange={(e) => setGroupByColumn(e.target.value)}
+                        onChange={(e) => setGroupByColumn?.(e.target.value)}
                         className="w-full text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer appearance-none"
                       >
                         <option value="none">Sin agrupar (Lista plana)</option>

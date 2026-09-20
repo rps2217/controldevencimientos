@@ -2014,6 +2014,8 @@ export const InventoryDashboard: React.FC = () => {
     sortConfig,
     groupByColumn,
     groupByDirection,
+    handleSetGroupByColumn,
+    handleSetGroupByDirection,
     handleSaveSlice,
 
     isStockCountOpen,
