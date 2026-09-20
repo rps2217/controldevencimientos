@@ -52,9 +52,40 @@ la verificación existente.
 
 ### Fase 1 — Contexto: memoizar y particionar
 
-Causa raíz de la duplicación en dev y del warning de `saveConfig`.
+Diagnóstico corregido (medido, no supuesto):
+
+1. **Estabilizar handlers primero es obligatorio.** El value del contexto se
+   recrea en cada render y muchos de sus miembros vienen de hooks sin
+   `useCallback`. Memoizar el value sin estabilizarlos no tendría efecto, porque
+   las dependencias cambiarían en cada render.
+2. **La partición del contexto rinde poco por sí sola.** Ningún consumidor
+   grande está envuelto en `React.memo` (`InventoryTable`,
+   `ViewConfigControlDrawer`, `DashboardTopNav`, `DashboardFilterPanels`) y
+   `DashboardTableContainer` —que tampoco está memoizado— es hijo directo del
+   dashboard. La cascada del padre los re-renderiza con independencia del
+   contexto. Para que la partición sirva, el `memo` de esos consumidores debe
+   ir junto a ella.
+3. **El costo real está en las filas.** `InventoryTableRow` sí está memoizado y
+   recibe handlers como props; cualquier prop inestable anula su `React.memo` y
+   re-renderiza **todas** las filas visibles.
+
+Hecho en esta fase:
+- `useItemFormManager`: 6 handlers en `useCallback` + objeto de retorno en
+  `useMemo` (alimenta ~10 miembros del contexto).
+- `saveConfig` y `fetchData` a `useCallback` (deuda que el lint ya marcaba y que
+  hacía cambiar de identidad a los `useCallback` que los dependen).
+- `handleDelete` a `useCallback`: único handler de fila sin memoizar.
+- `onOpenWhatsApp` / `onOpenEmail` extraídos del literal del contexto: eran
+  flechas inline pasadas a cada fila.
+
 Partir los 224 miembros por **frecuencia de cambio**: `DataContext`, `ViewContext`,
-`ActionsContext`, `FlagsContext`. Cada value en `useMemo`; `saveConfig` en `useCallback`.
+`ActionsContext`, `FlagsContext`. Cada value en `useMemo`, y envolver en
+`React.memo` los consumidores grandes que hoy no lo están.
+
+Medición: el conteo de commits se puede automatizar con
+`tests/baseline.probe.tsx`, pero **sus milisegundos no son extrapolables al
+navegador** (la tabla virtualizada mide 0 en jsdom). La decisión de rendimiento
+debe tomarse con React DevTools Profiler en el navegador, no con esa sonda.
 Disparador de escape: migrar `ViewContext` a `useSyncExternalStore` **solo** si el
 profiler muestra que el cuerpo de la tabla sigue re-renderizando.
 
