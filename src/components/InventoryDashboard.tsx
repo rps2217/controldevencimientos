@@ -24,6 +24,8 @@ import { useColumnResize } from '../hooks/useColumnResize';
 import { useColumnManager } from '../hooks/useColumnManager';
 import { useInventoryFiltering, handleFilterToggle } from '../hooks/useInventoryFiltering';
 import { useOfflineSync } from '../hooks/useOfflineSync';
+import { useCloudConfigSync } from '../hooks/useCloudConfigSync';
+import { useTicketPrinting } from '../hooks/useTicketPrinting';
 import { useModuleViewState } from '../hooks/useModuleViewState';
 import { indexedDbService } from '../db/indexedDbService';
 import { 
@@ -58,12 +60,6 @@ import { ViewConfigControlDrawer } from './drawers/ViewConfigControlDrawer';
 import { usePrecomputedColumns } from '../hooks/usePrecomputedColumns';
 import { TicketPrintView } from './views/TicketPrintView';
 import { buildBulkActionContext, isActionEnabledForTable } from '../utils/bulkActionsRegistry';
-import { 
-  loadTicketConfigFromStorage, 
-  saveTicketConfigToStorage,
-  executeThermalPrint
-} from '../utils/ticketUtils';
-import { GlobalTicketConfig, ViewTicketConfig, ViewTicketSettings, TicketGeneralSettings } from '../types';
 import { SkeletonLoader } from './common/SkeletonLoader';
 import { useToast } from './common/ToastContainer';
 import { useConfirm } from './common/ConfirmDialog';
@@ -94,10 +90,6 @@ export const InventoryDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   
   // Storage & Cloud Sync Status
-  const [hasCloudConfigSheet, setHasCloudConfigSheet] = useState<boolean>(false);
-  const [cloudConfigSheetName, setCloudConfigSheetName] = useState<string>('_CONFIG_APP');
-  const [configStorageMode, setConfigStorageMode] = useState<'properties' | 'sheet' | 'local'>('local');
-  const [syncSuccessMessage, setSyncSuccessMessage] = useState<string | null>(null);
 
   // Advanced features: Pagination, Offline Cache & Concurrency
   const [pageSize] = useState<number | 'all'>(100);
@@ -260,6 +252,18 @@ export const InventoryDashboard: React.FC = () => {
     readStorage<SheetConfig>(STORAGE_KEYS.SHEET_CONFIG, sheetConfigShapeSchema, {})
   );
 
+  const {
+    hasCloudConfigSheet,
+    setHasCloudConfigSheet,
+    cloudConfigSheetName,
+    setCloudConfigSheetName,
+    configStorageMode,
+    setConfigStorageMode,
+    syncSuccessMessage,
+    handlePushPropertiesConfig,
+    handlePushCloudConfig
+  } = useCloudConfigSync(sheetConfig, setIsSyncingCloud);
+
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
@@ -295,11 +299,6 @@ export const InventoryDashboard: React.FC = () => {
   });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [globalTicketConfig, setGlobalTicketConfig] = useState<GlobalTicketConfig>(() => {
-    return loadTicketConfigFromStorage();
-  });
-  const [ticketPrintMode, setTicketPrintMode] = useState<'standard' | 'barcode'>('standard');
-  const [itemsToPrintList, setItemsToPrintList] = useState<InventoryItem[] | null>(null);
   const [tableDensity, setTableDensity] = useState<'comfortable' | 'compact' | 'ultra'>(() => {
     const parsed = tableDensitySchema.safeParse(localStorage.getItem(STORAGE_KEYS.TABLE_DENSITY));
     return parsed.success ? parsed.data : 'compact';
@@ -318,58 +317,6 @@ export const InventoryDashboard: React.FC = () => {
     return buildBulkActionContext(headers, activeView, activeSheet?.title);
   }, [headers, activeView, activeSheet?.title]);
 
-  // Sync ticket print config if sheetConfig updates from cloud
-  useEffect(() => {
-    if (sheetConfig.ticketPrintConfig) {
-      setGlobalTicketConfig(prev => ({
-        ...prev,
-        ...sheetConfig.ticketPrintConfig
-      }));
-    }
-  }, [sheetConfig.ticketPrintConfig]);
-
-  const handleSaveTicketConfig = (view: string, viewConfig: ViewTicketConfig) => {
-    setGlobalTicketConfig(prev => {
-      const updated = { ...prev, [view]: viewConfig };
-      saveTicketConfigToStorage(updated);
-      
-      const updatedSheetConfig: SheetConfig = {
-        ...sheetConfig,
-        ticketPrintConfig: updated
-      };
-      setSheetConfig(updatedSheetConfig);
-      saveConfig(updatedSheetConfig);
-
-      showToast(`Configuración de ticket para "${view}" guardada exitosamente`, 'success', 'Ticket Térmico');
-      return updated;
-    });
-    setIsTicketConfigOpen(false);
-  };
-
-  const handlePrintTicket = (itemsToPrint: InventoryItem[], mode: 'standard' | 'barcode' = 'standard') => {
-    if (itemsToPrint.length === 0) {
-      alert("No hay registros para imprimir.");
-      return;
-    }
-    setItemsToPrintList(itemsToPrint);
-    setTicketPrintMode(mode);
-
-    // Retrieve active thermal config to pass exact paperWidth, orientation and cutMarginMm
-    const activeConfig = globalTicketConfig[activeView] || sheetConfig.ticketPrintConfig?.[activeView];
-    const generalSettings: TicketGeneralSettings =
-      (activeConfig as ViewTicketSettings)?.general ?? (activeConfig as TicketGeneralSettings) ?? {};
-    const paperWidth = generalSettings.paperWidth || '80mm';
-    const orientation = generalSettings.orientation || 'portrait';
-    const cutMarginMm = generalSettings.cutMarginMm !== undefined ? Number(generalSettings.cutMarginMm) : 2;
-
-    // Execute thermal print with precise height calculation and explicit vertical orientation
-    executeThermalPrint({
-      elementId: 'thermal-ticket-root',
-      paperWidth,
-      orientation,
-      cutMarginMm
-    });
-  };
 
   // Column Resizing Custom Hook
   const activeSheetKey = activeSheet?.title || activeView;
@@ -412,37 +359,20 @@ export const InventoryDashboard: React.FC = () => {
     }
   }, [cloudConfigSheetName, hasCloudConfigSheet]);
 
-  // Push config to Google Apps Script PropertiesService (Option 2 - Zero Extra Sheets)
-  const handlePushPropertiesConfig = async () => {
-    try {
-      setIsSyncingCloud(true);
-      await saveScriptPropertiesConfig(sheetConfig);
-      setConfigStorageMode('properties');
-      setSyncSuccessMessage('¡Configuración guardada en la Nube con PropertiesService (Opción 2)!');
-      setTimeout(() => setSyncSuccessMessage(null), 4000);
-    } catch (err: unknown) {
-      alert(`Error al guardar en PropertiesService: ${getErrorMessage(err)}. Verifica haber pegado el código actualizado en Apps Script.`);
-    } finally {
-      setIsSyncingCloud(false);
-    }
-  };
-
-  // Push config to Google Sheet hidden tab (Option 1)
-  const handlePushCloudConfig = async () => {
-    try {
-      setIsSyncingCloud(true);
-      const targetSheet = cloudConfigSheetName || '_CONFIG_APP';
-      await saveCloudConfig(sheetConfig, targetSheet);
-      setHasCloudConfigSheet(true);
-      setConfigStorageMode('sheet');
-      setSyncSuccessMessage('¡Configuración guardada con éxito en la pestaña ' + targetSheet + '!');
-      setTimeout(() => setSyncSuccessMessage(null), 4000);
-    } catch (err: unknown) {
-      alert(`Error al guardar en la nube: ${getErrorMessage(err)}`);
-    } finally {
-      setIsSyncingCloud(false);
-    }
-  };
+  const {
+    globalTicketConfig,
+    ticketPrintMode,
+    itemsToPrintList,
+    handleSaveTicketConfig,
+    handlePrintTicket
+  } = useTicketPrinting({
+    sheetConfig,
+    setSheetConfig,
+    saveConfig,
+    activeView,
+    showToast,
+    closeTicketConfig: () => setIsTicketConfigOpen(false)
+  });
 
   // Centralized Column Manager Hook
   const {

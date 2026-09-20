@@ -398,6 +398,31 @@ medido, no se escribe.
 **Consecuencia**: la palanca de tecleo queda cerrada con evidencia; la Fase 1.3 se reduce a
 la extracción de hooks antes listada, que es trabajo de mantenibilidad, no de performance.
 
+#### Hecho: `useCloudConfigSync` y `useTicketPrinting` (1.3, cortes por cohesión)
+
+Los cortes por "frecuencia de cambio" (`DataContext`/`ViewContext`/…) se descartaron por no
+mover lo medido. La extracción se hizo por **cohesión de dominio**, que sí reduce el archivo
+sin riesgo de comportamiento:
+
+- **`useCloudConfigSync`** (68 líneas): los 4 estados de la configuración en la nube
+  (`hasCloudConfigSheet`, `cloudConfigSheetName`, `configStorageMode`, `syncSuccessMessage`)
+  y los dos empujes (PropertiesService y pestaña `_CONFIG_APP`). El estado vive en el hook
+  porque `fetchData` y los handlers comparten el dato de *dónde se encontró* la configuración,
+  que decide a dónde se reescribe; los setters se exponen para que la carga lo registre.
+- **`useTicketPrinting`** (89 líneas): estado e impresión del ticket térmico. Al invocarlo
+  **después** de `saveConfig` y recibirla por parámetro, desaparece la TDZ que impedía
+  envolver `handleSaveTicketConfig` en `useCallback`.
+
+`InventoryDashboard.tsx`: **2.190 → 2.120 líneas**. El diff neto es de −70 (28 inserciones,
+98 borrados). Sin cambios de comportamiento: `npm run verify` verde y los E2E
+`printcheck`, `modals`, `groupcheck` y `searchcheck` en OK sobre el build de producción.
+Además baja de 9 a 8 las advertencias `exhaustive-deps` del archivo (una se va con el código
+movido), y no se añade ninguna.
+
+Queda pendiente el resto de la extracción (`useInventoryData`, `useDashboardViewState`,
+`useInventoryActions`, `useDashboardModals`), a abordar con el mismo criterio: cortes
+cohesionados, cada uno verificado contra `verify` + los E2E aplicables.
+
 ### Fase 4 — Puerta única de persistencia (**iniciada**)
 
 Corrección de la premisa del plan: **no son "20 archivos saltándose `STORAGE_KEYS`"**.
