@@ -52,42 +52,90 @@ la verificación existente.
 
 ### Fase 1 — Contexto: memoizar y particionar
 
-Diagnóstico corregido (medido, no supuesto):
+#### Medición en navegador real (Chromium 152 via CDP, sin Playwright)
 
-1. **Estabilizar handlers primero es obligatorio.** El value del contexto se
-   recrea en cada render y muchos de sus miembros vienen de hooks sin
-   `useCallback`. Memoizar el value sin estabilizarlos no tendría efecto, porque
-   las dependencias cambiarían en cada render.
-2. **La partición del contexto rinde poco por sí sola.** Ningún consumidor
-   grande está envuelto en `React.memo` (`InventoryTable`,
-   `ViewConfigControlDrawer`, `DashboardTopNav`, `DashboardFilterPanels`) y
-   `DashboardTableContainer` —que tampoco está memoizado— es hijo directo del
-   dashboard. La cascada del padre los re-renderiza con independencia del
-   contexto. Para que la partición sirva, el `memo` de esos consumidores debe
-   ir junto a ella.
-3. **El costo real está en las filas.** `InventoryTableRow` sí está memoizado y
-   recibe handlers como props; cualquier prop inestable anula su `React.memo` y
-   re-renderiza **todas** las filas visibles.
+Instrumento: `tests/perf/profile.cjs` inyecta el hook de React DevTools antes del
+primer script de la página, siembra 400 filas en `localStorage` y, tras esperar
+estado ocioso, mide por acción: commits, fibras renderizadas y `actualDuration`
+por componente. Uso:
 
-Hecho en esta fase:
+```bash
+npx vite --port=3000 --host=127.0.0.1 &
+node tests/perf/profile.cjs http://127.0.0.1:3000/ /tmp/perf.json 4
+node tests/perf/inspect.cjs http://127.0.0.1:3000/   # volcar el DOM si algo no cuadra
+```
+
+Acción medida: **abrir/cerrar el panel lateral "Vistas & Ajustes"**, que es UI
+pura y no toca datos. Cualquier re-render de filas aquí es memoización rota.
+Resultado con 400 ítems (25 filas visibles), medido 4 veces con conteos estables:
+
+| Métrica | `c4a66c7` (antes) | HEAD (tras estabilizar handlers) |
+| --- | --- | --- |
+| Commits por apertura | 1 | 1 |
+| Fibras renderizadas | ~1700 | ~1700 |
+| `DashboardProvider` | ~210 ms | ~214 ms |
+| `InventoryTable` | ~12 ms | ~12 ms |
+| Celdas `tr`+`td` | 181 | 177 |
+
+Conclusiones (corrigen el diagnóstico previo, que era una suposición):
+
+1. **Estabilizar handlers fue correcto pero no movió la aguja.** HEAD y `c4a66c7`
+   son indistinguibles dentro del ruido. Los props estables no ayudan si el
+   consumidor se re-renderiza igual por la cascada del padre.
+2. **`InventoryDashboard` es un componente monolítico de ~2.200 líneas con 54
+   `useState`.** Abrir un panel de UI re-renderiza el dashboard **entero**: 1
+   commit, ~1700 fibras, `InventoryDashboard` 39 ms y `DashboardProvider` 37 ms
+   (con 400 filas, ~214 ms). El coste no está en las filas ni en las props, está
+   en el cuerpo del dashboard.
+3. **La memoización del value del contexto es imposible hoy, y esa es la causa
+   raíz del warning de `saveConfig`.** El value de `DashboardProvider` no va en
+   `useMemo`; es un literal de ~224 miembros construido en línea (línea ~2050) y
+   se recrea en cada render. Por eso el lint señala `saveConfig` "causa que el
+   value del contexto cambie en cada render": el value ya cambia siempre.
+4. **El estado de UI vive en el value.** `isRightDrawerOpen` / `setIsRightDrawerOpen`
+   son miembros del contexto (2072-2073), igual que docenas de flags de modales.
+   Abrir el panel cambia una dependencia del value y arrastra a todos los
+   consumidores: **las 25 filas visibles (`tr`=26, `td`=151) re-renderizan** al
+   abrir un panel que no muestra datos.
+5. **La partición del contexto rinde poco por sí sola.** Ningún consumidor grande
+   está en `React.memo` (`InventoryTable`, `ViewConfigControlDrawer`,
+   `DashboardTopNav`, `DashboardFilterPanels`) y `DashboardTableContainer`
+   tampoco, y es hijo directo del dashboard. La cascada del padre los
+   re-renderiza con independencia del contexto.
+
+#### Consecuencia para el plan: la Fase 1 se reformula
+
+Extraer el estado de UI del value y repartir el contexto en 4 no sirve de nada
+mientras el dashboard siga re-renderizando su cuerpo entero en cada cambio de
+cualquier flag. El orden correcto es el inverso al planteado:
+
+- **1.1 — Aislar el estado de UI de los modales/drawers.** Agrupar los flags de
+  UI en un único `useReducer`/objeto de estado (o moverlos a los componentes que
+  los poseen: el drawer puede poseer su propio `isOpen` con `children` para no
+  desmontar). Objetivo: que `isRightDrawerOpen` deje de formar parte del value.
+- **1.2 — Extraer el cuerpo a un componente memoizado.** Con el value estable y
+  el estado de UI fuera, envolver los consumidores grandes en `React.memo`.
+- **1.3 — Envolver el value en `useMemo`** y recién entonces particionar por
+  frecuencia de cambio (`DataContext`, `ViewContext`, `ActionsContext`,
+  `FlagsContext`). Particionar antes de 1.1 y 1.2 no produce mejora medible.
+
+Hecho en esta fase (higiene válida, sin mejora medible atribuible):
 - `useItemFormManager`: 6 handlers en `useCallback` + objeto de retorno en
   `useMemo` (alimenta ~10 miembros del contexto).
-- `saveConfig` y `fetchData` a `useCallback` (deuda que el lint ya marcaba y que
-  hacía cambiar de identidad a los `useCallback` que los dependen).
+- `saveConfig` y `fetchData` a `useCallback` (deuda que el lint ya marcaba).
 - `handleDelete` a `useCallback`: único handler de fila sin memoizar.
 - `onOpenWhatsApp` / `onOpenEmail` extraídos del literal del contexto: eran
-  flechas inline pasadas a cada fila.
+  flechas inline pasadas a cada fila del literal.
 
-Partir los 224 miembros por **frecuencia de cambio**: `DataContext`, `ViewContext`,
-`ActionsContext`, `FlagsContext`. Cada value en `useMemo`, y envolver en
-`React.memo` los consumidores grandes que hoy no lo están.
+Criterio de aceptación de la Fase 1 (medido con el instrumento de arriba):
+abrir/cerrar "Vistas & Ajustes" debe dejar de re-renderizar `InventoryTable` y
+las filas (`tr`+`td` ≈ 0), y el commit debe bajar de ~1700 a un orden de cientos
+de fibras. Medir antes y después con el mismo comando; no dar por bueno ningún
+cambio sin esa comparación.
 
-Medición: el conteo de commits se puede automatizar con
-`tests/baseline.probe.tsx`, pero **sus milisegundos no son extrapolables al
-navegador** (la tabla virtualizada mide 0 en jsdom). La decisión de rendimiento
-debe tomarse con React DevTools Profiler en el navegador, no con esa sonda.
-Disparador de escape: migrar `ViewContext` a `useSyncExternalStore` **solo** si el
-profiler muestra que el cuerpo de la tabla sigue re-renderizando.
+Nota sobre jsdom: `tests/baseline.probe.tsx` sirve para contar commits, pero sus
+milisegundos no son extrapolables (la tabla virtualizada mide 0 sin
+`ResizeObserver`). Para latencias, el instrumento CDP.
 
 ### Fase 2 — Eliminar el doble camino
 
