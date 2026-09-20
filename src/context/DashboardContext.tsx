@@ -49,50 +49,28 @@ export interface DashboardContextType {
   isSaving: boolean;
 
   // PM Report
-  isPmReportOpen: boolean;
-  setIsPmReportOpen: (open: boolean) => void;
   drainageReportItems: InventoryItem[];
 
   // Script Code Modal
-  isScriptModalOpen: boolean;
-  setIsScriptModalOpen: (open: boolean) => void;
 
   // Global Config Modal
-  isConfigOpen: boolean;
-  setIsConfigOpen: (open: boolean) => void;
 
   // Barcode Scanner Modal
-  isScannerOpen: boolean;
-  setIsScannerOpen: (open: boolean) => void;
   searchTerm: string;
   setSearchTerm: (code: string) => void;
 
   // Mobile Pistoleo Terminal
-  isMobilePistoleoOpen: boolean;
-  setIsMobilePistoleoOpen: (open: boolean) => void;
   handleSavePistoleoItem: (formData: Record<string, string>, targetExistingItem?: InventoryItem) => Promise<void>;
 
   // Bulk Edit Modal
-  isBulkEditOpen: boolean;
-  setIsBulkEditOpen: (open: boolean) => void;
   selectedRowIds: number[];
   handleApplyBulkEdit: (values: { frc_n: string; n_traspaso: string; tipo_evento: string; frc_bod: string }) => Promise<void>;
 
   // Gmail Modal
-  isGmailModalOpen: boolean;
-  setIsGmailModalOpen: (open: boolean) => void;
-  gmailModalItems: any[];
-  setGmailModalItems: (items: any[]) => void;
 
   // WhatsApp Modal
-  isWhatsAppModalOpen: boolean;
-  setIsWhatsAppModalOpen: (open: boolean) => void;
-  whatsAppModalItems: any[];
-  setWhatsAppModalItems: (items: any[]) => void;
 
   // Column Manager Modal
-  isColumnManagerOpen: boolean;
-  setIsColumnManagerOpen: (open: boolean) => void;
   allManageableColumns: any[];
   toggleVisibility: (col: string) => void;
   moveColumn: (colId: string, direction: 'up' | 'down') => void;
@@ -101,26 +79,16 @@ export interface DashboardContextType {
   handleColumnDrop: (draggedCol: string, targetCol: string) => void;
 
   // Quick Traspaso Modal
-  isQuickTraspasoOpen: boolean;
-  setIsQuickTraspasoOpen: (open: boolean) => void;
-  quickTraspasoItem: InventoryItem | null;
-  setQuickTraspasoItem: (item: InventoryItem | null) => void;
   handleSaveQuickTraspaso: (targetItem: InventoryItem, traspasoNumber: string) => Promise<void>;
 
   // Ticket Config Modal
-  isTicketConfigOpen: boolean;
-  setIsTicketConfigOpen: (open: boolean) => void;
   globalTicketConfig: GlobalTicketConfig;
   handleSaveTicketConfig: (view: string, viewConfig: ViewTicketConfig) => void;
 
   // Bulk Import Modal
-  isBulkImportOpen: boolean;
-  setIsBulkImportOpen: (open: boolean) => void;
   handleUniversalImportConfirmed: (importedRows: Record<string, any>[], mode?: any) => Promise<void>;
 
   // Bulk Actions Config Modal
-  isBulkActionsConfigOpen: boolean;
-  setIsBulkActionsConfigOpen: (open: boolean) => void;
 
   // Slices & Views
   isSliceManagerOpen: boolean;
@@ -146,13 +114,9 @@ export interface DashboardContextType {
   handleSaveSlice: (slice: TableSlice) => void;
 
   // Stock Count Terminal
-  isStockCountOpen: boolean;
-  setIsStockCountOpen: (open: boolean) => void;
   handleSyncRowsToVencimientos: (rows: Record<string, any>[]) => Promise<void>;
 
   // Sync Audit & Offline State
-  isSyncAuditOpen: boolean;
-  setIsSyncAuditOpen: (open: boolean) => void;
   offlineQueue: OfflineMutation[];
   auditLog: AuditLogEntry[];
   isOffline: boolean;

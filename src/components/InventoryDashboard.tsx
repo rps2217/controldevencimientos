@@ -4,6 +4,7 @@ import { getSpreadsheetMetadata, getAllSheetsData, appendRow, updateRow, deleteR
 import type { SheetRow } from '../lib/sheets';
 import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, EventCategory, ViewKey } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
+import { useModalsActions } from '../context/ModalsContext';
 import { DashboardProvider, DashboardContextType } from '../context/DashboardContext';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AlertCircle, Package } from 'lucide-react';
@@ -71,6 +72,13 @@ import { useTableSlices } from '../hooks/useTableSlices';
 const AnalyticsDashboard = lazy(() => import('./views/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 
 export const InventoryDashboard: React.FC = () => {
+  // Acciones de modales: identidad estable, no suscriben al estado.
+  const {
+    setIsConfigOpen, setIsScriptModalOpen, setIsTicketConfigOpen,
+    openQuickTraspaso: handleOpenQuickTraspaso,
+    openWhatsApp: handleOpenWhatsApp,
+    openEmail: handleOpenEmail,
+  } = useModalsActions();
   const { showToast, updateToast, removeToast } = useToast();
   const confirm = useConfirm();
   const [metadata, setMetadata] = useState<SpreadsheetMetadata | null>(null);
@@ -84,20 +92,16 @@ export const InventoryDashboard: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isStockCountOpen, setIsStockCountOpen] = useState<boolean>(false);
   
   // Storage & Cloud Sync Status
   const [hasCloudConfigSheet, setHasCloudConfigSheet] = useState<boolean>(false);
   const [cloudConfigSheetName, setCloudConfigSheetName] = useState<string>('_CONFIG_APP');
   const [configStorageMode, setConfigStorageMode] = useState<'properties' | 'sheet' | 'local'>('local');
   const [syncSuccessMessage, setSyncSuccessMessage] = useState<string | null>(null);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Advanced features: Pagination, Offline Cache & Concurrency
   const [pageSize] = useState<number | 'all'>(100);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [isSyncAuditOpen, setIsSyncAuditOpen] = useState<boolean>(false);
 
   // Local-First IndexedDB Offline Sync Hook with Transition Refs
   const prevIsOfflineRef = useRef<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false);
@@ -239,8 +243,6 @@ export const InventoryDashboard: React.FC = () => {
   } = useModuleViewState({ activeView });
 
   const [selectedRowIds, setSelectedRowIds] = useState<number[]>([]);
-  const [quickTraspasoItem, setQuickTraspasoItem] = useState<InventoryItem | null>(null);
-  const [isQuickTraspasoOpen, setIsQuickTraspasoOpen] = useState<boolean>(false);
 
   const frcBodCol = useMemo<string | null>(() => {
     return findColumnBySemantic(headers, 'frc_bod') || 
@@ -250,7 +252,6 @@ export const InventoryDashboard: React.FC = () => {
            }) || null;
   }, [headers]);
 
-  const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false);
   const [draggedCol, setDraggedCol] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
@@ -263,9 +264,6 @@ export const InventoryDashboard: React.FC = () => {
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
   const [areFiltersVisible, setAreFiltersVisible] = useState<boolean>(false);
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const [isScriptModalOpen, setIsScriptModalOpen] = useState(false);
-  const [isPmReportOpen, setIsPmReportOpen] = useState(false);
   const [isSchemaLoading, setIsSchemaLoading] = useState(false);
 
   const {
@@ -297,20 +295,11 @@ export const InventoryDashboard: React.FC = () => {
   });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
-  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
-  const [isMobilePistoleoOpen, setIsMobilePistoleoOpen] = useState(false);
   const [globalTicketConfig, setGlobalTicketConfig] = useState<GlobalTicketConfig>(() => {
     return loadTicketConfigFromStorage();
   });
-  const [isTicketConfigOpen, setIsTicketConfigOpen] = useState(false);
   const [ticketPrintMode, setTicketPrintMode] = useState<'standard' | 'barcode'>('standard');
   const [itemsToPrintList, setItemsToPrintList] = useState<InventoryItem[] | null>(null);
-  const [isGmailModalOpen, setIsGmailModalOpen] = useState(false);
-  const [gmailModalItems, setGmailModalItems] = useState<any[]>([]);
-  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
-  const [whatsAppModalItems, setWhatsAppModalItems] = useState<any[]>([]);
-  const [isBulkActionsConfigOpen, setIsBulkActionsConfigOpen] = useState(false);
   const [tableDensity, setTableDensity] = useState<'comfortable' | 'compact' | 'ultra'>(() => {
     const parsed = tableDensitySchema.safeParse(localStorage.getItem(STORAGE_KEYS.TABLE_DENSITY));
     return parsed.success ? parsed.data : 'compact';
@@ -1670,25 +1659,6 @@ export const InventoryDashboard: React.FC = () => {
     setFrcBodFilter(prev => handleFilterToggle(prev, bodVal, isMulti));
   }, []);
 
-  const handleOpenQuickTraspaso = useCallback((item: InventoryItem) => {
-    setQuickTraspasoItem(item);
-    setIsQuickTraspasoOpen(true);
-  }, []);
-
-  // Estas dos acciones se pasan a CADA fila de la tabla. Definirlas como
-  // flechas inline en el value rompía el React.memo de InventoryTableRow y
-  // forzaba el re-render de todas las filas visibles en cada render del
-  // dashboard.
-  const handleOpenWhatsApp = useCallback((item: InventoryItem) => {
-    setWhatsAppModalItems([item]);
-    setIsWhatsAppModalOpen(true);
-  }, []);
-
-  const handleOpenEmail = useCallback((item: InventoryItem) => {
-    setGmailModalItems([item]);
-    setIsGmailModalOpen(true);
-  }, []);
-
   const handleApplyBulkEdit = async (values: { frc_n: string; n_traspaso: string; tipo_evento: string; frc_bod: string }) => {
     if (!activeSheet || selectedRowIds.length === 0) return;
 
@@ -1928,42 +1898,20 @@ export const InventoryDashboard: React.FC = () => {
     handleSave,
     isSaving,
 
-    isPmReportOpen,
-    setIsPmReportOpen,
     drainageReportItems,
 
-    isScriptModalOpen,
-    setIsScriptModalOpen,
 
-    isConfigOpen,
-    setIsConfigOpen,
 
-    isScannerOpen,
-    setIsScannerOpen,
     searchTerm,
     setSearchTerm,
 
-    isMobilePistoleoOpen,
-    setIsMobilePistoleoOpen,
     handleSavePistoleoItem,
 
-    isBulkEditOpen,
-    setIsBulkEditOpen,
     selectedRowIds,
     handleApplyBulkEdit,
 
-    isGmailModalOpen,
-    setIsGmailModalOpen,
-    gmailModalItems,
-    setGmailModalItems,
 
-    isWhatsAppModalOpen,
-    setIsWhatsAppModalOpen,
-    whatsAppModalItems,
-    setWhatsAppModalItems,
 
-    isColumnManagerOpen,
-    setIsColumnManagerOpen,
     allManageableColumns,
     toggleVisibility,
     moveColumn,
@@ -1971,23 +1919,13 @@ export const InventoryDashboard: React.FC = () => {
     resetColumnOrder,
     handleColumnDrop,
 
-    isQuickTraspasoOpen,
-    setIsQuickTraspasoOpen,
-    quickTraspasoItem,
-    setQuickTraspasoItem,
     handleSaveQuickTraspaso,
 
-    isTicketConfigOpen,
-    setIsTicketConfigOpen,
     globalTicketConfig,
     handleSaveTicketConfig,
 
-    isBulkImportOpen,
-    setIsBulkImportOpen,
     handleUniversalImportConfirmed,
 
-    isBulkActionsConfigOpen,
-    setIsBulkActionsConfigOpen,
 
     isSliceManagerOpen,
     setIsSliceManagerOpen,
@@ -2021,12 +1959,8 @@ export const InventoryDashboard: React.FC = () => {
     handleSetGroupByDirection,
     handleSaveSlice,
 
-    isStockCountOpen,
-    setIsStockCountOpen,
     handleSyncRowsToVencimientos,
 
-    isSyncAuditOpen,
-    setIsSyncAuditOpen,
     offlineQueue,
     auditLog,
     isOffline,
@@ -2083,8 +2017,6 @@ export const InventoryDashboard: React.FC = () => {
     isSidebarCollapsed,
     setIsSidebarCollapsed,
     otherSheets,
-    isMobileMenuOpen,
-    setIsMobileMenuOpen,
 
     // Filter Panels & Metrics
     quickChips,

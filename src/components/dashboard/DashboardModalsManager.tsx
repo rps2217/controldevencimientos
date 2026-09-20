@@ -23,6 +23,7 @@ import { ImportConsolidationMode } from '../../utils/cuVcConsolidator';
 import { OfflineMutation, AuditLogEntry } from '../../db/indexedDbService';
 import { ConnectionHealthStatus } from '../../hooks/useOfflineSync';
 import { useDashboard } from '../../context/DashboardContext';
+import { useModalsActions, useModalsState } from '../../context/ModalsContext';
 
 const StockCountTerminal = lazy(() => import('../views/StockCountTerminal').then(m => ({ default: m.StockCountTerminal })));
 
@@ -201,11 +202,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     sheetConfig,
     setSheetConfig,
     saveConfig,
-    isPmReportOpen,
-    setIsPmReportOpen,
     drainageReportItems,
-    isScriptModalOpen,
-    setIsScriptModalOpen,
     isModalOpen,
     handleCloseModal,
     editingItem,
@@ -221,52 +218,24 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     handleSave,
     isSaving,
     handleBatchFormUpdate,
-    isConfigOpen,
-    setIsConfigOpen,
     metadata,
     fetchData,
-    isScannerOpen,
-    setIsScannerOpen,
     setSearchTerm,
-    isMobilePistoleoOpen,
-    setIsMobilePistoleoOpen,
     handleSavePistoleoItem,
-    isBulkEditOpen,
-    setIsBulkEditOpen,
     selectedRowIds,
     handleApplyBulkEdit,
-    isGmailModalOpen,
-    setIsGmailModalOpen,
-    gmailModalItems,
-    setGmailModalItems,
     filteredItems,
     visibleHeaders,
-    isWhatsAppModalOpen,
-    setIsWhatsAppModalOpen,
-    whatsAppModalItems,
-    setWhatsAppModalItems,
-    isColumnManagerOpen,
-    setIsColumnManagerOpen,
     allManageableColumns,
     toggleVisibility,
     moveColumn,
     showAllColumns,
     resetColumnOrder,
     handleColumnDrop,
-    isQuickTraspasoOpen,
-    setIsQuickTraspasoOpen,
-    quickTraspasoItem,
-    setQuickTraspasoItem,
     handleSaveQuickTraspaso,
-    isTicketConfigOpen,
-    setIsTicketConfigOpen,
     globalTicketConfig,
     handleSaveTicketConfig,
-    isBulkImportOpen,
-    setIsBulkImportOpen,
     handleUniversalImportConfirmed,
-    isBulkActionsConfigOpen,
-    setIsBulkActionsConfigOpen,
     isSliceManagerOpen,
     setIsSliceManagerOpen,
     currentTableSlices,
@@ -286,13 +255,9 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     groupByColumn,
     groupByDirection,
     handleSaveSlice,
-    isStockCountOpen,
-    setIsStockCountOpen,
     items,
     handleSyncRowsToVencimientos,
     showToast,
-    isSyncAuditOpen,
-    setIsSyncAuditOpen,
     offlineQueue,
     auditLog,
     isOffline,
@@ -312,6 +277,25 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     clearQueue,
     clearAuditLog,
   } = { ...context, ...props };
+
+  // Estado y acciones de modales vienen del contexto dedicado (Fase 1.3), no del
+  // value del dashboard: abrir un modal ya no re-renderiza el cuerpo del dashboard.
+  const modalsState = useModalsState();
+  const modalsActions = useModalsActions();
+  const {
+    isPmReportOpen, isScriptModalOpen, isConfigOpen, isScannerOpen,
+    isMobilePistoleoOpen, isBulkEditOpen, isGmailModalOpen, gmailModalItems,
+    isWhatsAppModalOpen, whatsAppModalItems, isColumnManagerOpen,
+    isQuickTraspasoOpen, quickTraspasoItem, isTicketConfigOpen, isBulkImportOpen,
+    isBulkActionsConfigOpen, isStockCountOpen, isSyncAuditOpen,
+  } = modalsState;
+  const {
+    setIsPmReportOpen, setIsScriptModalOpen, setIsConfigOpen, setIsScannerOpen,
+    setIsMobilePistoleoOpen, setIsBulkEditOpen, setIsGmailModalOpen, setGmailModalItems,
+    setIsWhatsAppModalOpen, setWhatsAppModalItems, setIsColumnManagerOpen,
+    setIsQuickTraspasoOpen, setQuickTraspasoItem, setIsTicketConfigOpen,
+    setIsBulkImportOpen, setIsBulkActionsConfigOpen, setIsStockCountOpen, setIsSyncAuditOpen,
+  } = modalsActions;
 
   return (
     <>

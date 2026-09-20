@@ -3,6 +3,7 @@ import {
   Database, FileSpreadsheet, Package, FileText, TableProperties, List, Settings, PanelLeftClose, PanelLeftOpen, PieChart, Barcode
 } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
+import { useModalsActions } from '../../context/ModalsContext';
 
 interface SidebarItemProps {
   key?: string;
@@ -54,6 +55,7 @@ export interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = (props) => {
   const dashboard = useDashboard();
+  const modalsActions = useModalsActions();
 
   const isSidebarCollapsed = props.isSidebarCollapsed ?? dashboard.isSidebarCollapsed ?? false;
   const setIsSidebarCollapsed = props.setIsSidebarCollapsed ?? dashboard.setIsSidebarCollapsed ?? (() => {});
@@ -61,8 +63,8 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
   const setActiveView = props.setActiveView ?? dashboard.setActiveView;
   const setSelectedProduct = props.setSelectedProduct ?? dashboard.setSelectedProduct;
   const otherSheets = props.otherSheets ?? dashboard.otherSheets ?? [];
-  const onOpenConfig = props.onOpenConfig ?? (() => dashboard.setIsConfigOpen(true));
-  const onOpenStockCount = props.onOpenStockCount ?? (() => dashboard.setIsStockCountOpen?.(true));
+  const onOpenConfig = props.onOpenConfig ?? (() => modalsActions.setIsConfigOpen(true));
+  const onOpenStockCount = props.onOpenStockCount ?? (() => modalsActions.setIsStockCountOpen?.(true));
   return (
     <div className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 z-20 transition-all duration-300`}>
       <div className={`p-4 border-b border-slate-100 dark:border-slate-800 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>

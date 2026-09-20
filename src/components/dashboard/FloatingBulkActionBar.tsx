@@ -8,6 +8,7 @@ import { VIRTUAL_COLUMNS } from '../../utils/virtualColumns';
 import { parseAnyDate } from '../../utils/pureCalculations';
 import { exportToExcel } from '../../utils/exportUtils';
 import { useDashboard } from '../../context/DashboardContext';
+import { useModalsActions } from '../../context/ModalsContext';
 
 export interface FloatingBulkActionBarProps {
   selectedRowIds?: number[];
@@ -34,6 +35,7 @@ export interface FloatingBulkActionBarProps {
 
 export const FloatingBulkActionBar: React.FC<FloatingBulkActionBarProps> = (props) => {
   const dashboard = useDashboard();
+  const modalsActions = useModalsActions();
 
   const selectedRowIds = props.selectedRowIds ?? dashboard.selectedRowIds ?? [];
   const filteredItems = props.filteredItems ?? dashboard.filteredItems ?? [];
@@ -45,14 +47,14 @@ export const FloatingBulkActionBar: React.FC<FloatingBulkActionBarProps> = (prop
   const products = props.products ?? dashboard.products ?? [];
   const policies = props.policies ?? dashboard.policies ?? [];
   const handlePrintTicket = props.handlePrintTicket ?? dashboard.handlePrintTicket;
-  const setIsTicketConfigOpen = props.setIsTicketConfigOpen ?? dashboard.setIsTicketConfigOpen;
-  const setIsGmailModalOpen = props.setIsGmailModalOpen ?? dashboard.setIsGmailModalOpen;
-  const setWhatsAppModalItems = props.setWhatsAppModalItems ?? dashboard.setWhatsAppModalItems;
-  const setIsWhatsAppModalOpen = props.setIsWhatsAppModalOpen ?? dashboard.setIsWhatsAppModalOpen;
-  const setIsPmReportOpen = props.setIsPmReportOpen ?? dashboard.setIsPmReportOpen;
-  const setIsBulkEditOpen = props.setIsBulkEditOpen ?? dashboard.setIsBulkEditOpen;
+  const setIsTicketConfigOpen = props.setIsTicketConfigOpen ?? modalsActions.setIsTicketConfigOpen;
+  const setIsGmailModalOpen = props.setIsGmailModalOpen ?? modalsActions.setIsGmailModalOpen;
+  const setWhatsAppModalItems = props.setWhatsAppModalItems ?? modalsActions.setWhatsAppModalItems;
+  const setIsWhatsAppModalOpen = props.setIsWhatsAppModalOpen ?? modalsActions.setIsWhatsAppModalOpen;
+  const setIsPmReportOpen = props.setIsPmReportOpen ?? modalsActions.setIsPmReportOpen;
+  const setIsBulkEditOpen = props.setIsBulkEditOpen ?? modalsActions.setIsBulkEditOpen;
   const handleBulkDelete = props.handleBulkDelete ?? dashboard.handleBulkDelete;
-  const setIsBulkActionsConfigOpen = props.setIsBulkActionsConfigOpen ?? dashboard.setIsBulkActionsConfigOpen;
+  const setIsBulkActionsConfigOpen = props.setIsBulkActionsConfigOpen ?? modalsActions.setIsBulkActionsConfigOpen;
   const setSelectedRowIds = props.setSelectedRowIds ?? dashboard.setSelectedRowIds ?? (() => {});
   const bulkActionCtx = props.bulkActionCtx ?? dashboard.bulkActionCtx ?? buildBulkActionContext(headers, activeView, activeView);
   if (selectedRowIds.length === 0 || activeView === 'schema' || activeView === 'analytics') {

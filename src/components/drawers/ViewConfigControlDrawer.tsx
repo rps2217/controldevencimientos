@@ -34,6 +34,7 @@ import { parseAnyDate } from '../../utils/dateCalculations';
 import { exportToExcel } from '../../utils/exportUtils';
 import { buildBulkActionContext, isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
 import { useDashboard } from '../../context/DashboardContext';
+import { useModalsActions } from '../../context/ModalsContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
 
 import { STORAGE_KEYS } from '../../utils/appStorage';
@@ -106,6 +107,7 @@ const DENSITY_OPTIONS = [
 
 export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (props) => {
   const dashboard = useDashboard();
+  const modalsActions = useModalsActions();
   const rightDrawer = useRightDrawer();
 
   const isOpen = props.isOpen ?? rightDrawer.isRightDrawerOpen ?? false;
@@ -142,8 +144,8 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
   const tableDensity = props.tableDensity ?? dashboard.tableDensity ?? 'comfortable';
   const onChangeTableDensity = props.onChangeTableDensity ?? ((d) => dashboard.setTableDensity?.(d));
   const sheetConfig = props.sheetConfig ?? dashboard.sheetConfig;
-  const onOpenGlobalConfig = props.onOpenGlobalConfig ?? (() => dashboard.setIsConfigOpen?.(true));
-  const onOpenBulkActionsConfig = props.onOpenBulkActionsConfig ?? (() => dashboard.setIsBulkActionsConfigOpen?.(true));
+  const onOpenGlobalConfig = props.onOpenGlobalConfig ?? (() => modalsActions.setIsConfigOpen?.(true));
+  const onOpenBulkActionsConfig = props.onOpenBulkActionsConfig ?? (() => modalsActions.setIsBulkActionsConfigOpen?.(true));
   const onOpenSchemaEditor = props.onOpenSchemaEditor ?? (() => dashboard.setActiveView?.('schema'));
   const onOpenBackendMirror = props.onOpenBackendMirror;
   const totalItemsCount = props.totalItemsCount ?? dashboard.items?.length ?? 0;
@@ -164,7 +166,7 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
   const onToggleStickyColumns = props.onToggleStickyColumns ?? (() => dashboard.handleToggleStickyColumns?.());
   const hasCustomColWidths = props.hasCustomColWidths ?? dashboard.hasCustomColWidths ?? false;
   const handleResetColWidths = props.handleResetColWidths ?? (() => dashboard.handleResetColWidths?.());
-  const onOpenTicketConfig = props.onOpenTicketConfig ?? (() => dashboard.setIsTicketConfigOpen?.(true));
+  const onOpenTicketConfig = props.onOpenTicketConfig ?? (() => modalsActions.setIsTicketConfigOpen?.(true));
   const activeSheetTitle = props.activeSheetTitle ?? dashboard.activeSheet?.title;
   const filteredItems = props.filteredItems ?? dashboard.filteredItems ?? [];
   const products = props.products ?? dashboard.products ?? [];
@@ -172,9 +174,9 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
   const drainageReportItems = props.drainageReportItems ?? dashboard.drainageReportItems ?? [];
   const visibleHeaders = props.visibleHeaders ?? dashboard.visibleHeaders ?? [];
   const handlePrintTicket = props.handlePrintTicket ?? dashboard.handlePrintTicket;
-  const setIsGmailModalOpen = props.setIsGmailModalOpen ?? dashboard.setIsGmailModalOpen;
-  const setIsWhatsAppModalOpen = props.setIsWhatsAppModalOpen ?? dashboard.setIsWhatsAppModalOpen;
-  const setIsPmReportOpen = props.setIsPmReportOpen ?? dashboard.setIsPmReportOpen;
+  const setIsGmailModalOpen = props.setIsGmailModalOpen ?? modalsActions.setIsGmailModalOpen;
+  const setIsWhatsAppModalOpen = props.setIsWhatsAppModalOpen ?? modalsActions.setIsWhatsAppModalOpen;
+  const setIsPmReportOpen = props.setIsPmReportOpen ?? modalsActions.setIsPmReportOpen;
   const [activeTab, setActiveTab] = useState<'view' | 'columns' | 'slices' | 'actions' | 'system'>('view');
   const [columnSearch, setColumnSearch] = useState('');
 

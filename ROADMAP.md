@@ -214,8 +214,48 @@ y frágil (220 dependencias es una deuda que se pudre sola).
 - **1.3 — Particionar por frecuencia de cambio** (`DataContext`, `ViewContext`,
   `ActionsContext`, `FlagsContext`) y memoizar los consumidores grandes
   (`InventoryTable`, `DashboardFilterPanels`) con `React.memo`.
-- Los flags de modales restantes (docenas) siguen en el value: la misma cirugía
-  de 1.1 aplica a cada uno, y es el siguiente candidato por volumen.
+
+#### Hecho: flags de modales extraídos a `ModalsContext` (1.3, primer corte)
+
+Los 19 flags de los modales de UI pura (`isConfigOpen`, `isPmReportOpen`,
+`isBulkImportOpen`, `isStockCountOpen`, `quickTraspasoItem`…) vivían en el value
+del dashboard. Se extrajeron a `src/context/ModalsContext.tsx`, montado dentro de
+`RightDrawerProvider` en `App.tsx`.
+
+El diseño separa **estado** de **acciones** a propósito:
+
+- `ModalsStateContext`: cambia al abrir/cerrar. Solo lo leen los dos componentes
+  que de verdad pintan según el flag (`DashboardModalsManager`,
+  `DashboardMobileDrawer`).
+- `ModalsActionsContext`: bundle de setters de `useState` (identidad estable por
+  contrato de React) más tres acciones compuestas (`openQuickTraspaso`,
+  `openWhatsApp`, `openEmail`). Los componentes que solo *abren* modales (el
+  dashboard, `DashboardTopNav`, `FloatingBulkActionBar`, `Sidebar`…) consumen solo
+  esto, de modo que abrir un modal no los re-renderiza.
+
+Medición en Chromium real (`tests/perf/modals.cjs`, sin contadores en el código de
+la app), abrir "Configuración global":
+
+| Métrica | Antes | Después |
+| --- | --- | --- |
+| Renders del dashboard | 2 | **0** |
+| Renders de `InventoryTable` | 2 | **0** |
+| Long tasks | 54 ms | **ninguna** |
+| Commits | 1 | 1 |
+| Encabezado visible del modal | — | "Configuración General y Diccionario" |
+
+El último script ya no instrumenta los componentes: reporta commits y long tasks
+del hook, más el encabezado visible para no medir un gesto que no abrió nada. El
+hook por fibra atribuye mal los bailouts, así que los conteos de renders quedan como
+evidencia histórica del diagnóstico, no como instrumento permanente.
+
+**Bug latente corregido de paso**: `DashboardTopNav` hacía
+`props.setIsMobileMenuOpen ?? (() => {})` y el dashboard nunca le pasaba la prop, así
+que el botón de menú móvil era un no-op silencioso. Ahora cae en
+`modalsActions.setIsMobileMenuOpen` y el drawer sí abre.
+
+El neto es **−100 líneas** (178 borradas, 78 añadidas): el value del dashboard pierde
+38 entradas y deja de recrear 19 `useState`.
 
 Criterio de aceptación (con verdad de terreno): abrir/cerrar "Vistas & Ajustes" deja el
 dashboard en **0 renders** (cumplido) y `InventoryTable` en **0 renders** (cumplido).

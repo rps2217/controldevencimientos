@@ -5,6 +5,7 @@ import { EventResolutionCards } from './EventResolutionCards';
 import { EventFilterChips } from './EventFilterChips';
 import { PmRadarCards } from './PmRadarCards';
 import { useDashboard } from '../../context/DashboardContext';
+import { useModalsActions } from '../../context/ModalsContext';
 
 export interface DashboardFilterPanelsProps {
   areFiltersVisible?: boolean;
@@ -34,6 +35,7 @@ export interface DashboardFilterPanelsProps {
 
 export const DashboardFilterPanels: React.FC<DashboardFilterPanelsProps> = (props) => {
   const dashboard = useDashboard();
+  const modalsActions = useModalsActions();
 
   const areFiltersVisible = props.areFiltersVisible ?? dashboard.areFiltersVisible ?? false;
   const quickChips = props.quickChips ?? dashboard.quickChips ?? [];
@@ -56,7 +58,7 @@ export const DashboardFilterPanels: React.FC<DashboardFilterPanelsProps> = (prop
   const pmRadarFilter = props.pmRadarFilter ?? dashboard.pmRadarFilter ?? [];
   const setPmRadarFilter = props.setPmRadarFilter ?? dashboard.setPmRadarFilter ?? (() => {});
   const pmMetrics = props.pmMetrics ?? dashboard.pmMetrics;
-  const onOpenBulkImport = props.onOpenBulkImport ?? (() => dashboard.setIsBulkImportOpen(true));
+  const onOpenBulkImport = props.onOpenBulkImport ?? (() => modalsActions.setIsBulkImportOpen(true));
   const onOpenNewItemModal = props.onOpenNewItemModal ?? (() => dashboard.handleOpenModal());
 
   if (!areFiltersVisible) return null;

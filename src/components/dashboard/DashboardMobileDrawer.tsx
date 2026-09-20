@@ -2,6 +2,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { Sidebar } from '../navigation/Sidebar';
 import { useDashboard } from '../../context/DashboardContext';
+import { useModalsActions, useModalsState } from '../../context/ModalsContext';
 
 export interface DashboardMobileDrawerProps {
   isOpen?: boolean;
@@ -16,15 +17,17 @@ export interface DashboardMobileDrawerProps {
 
 export const DashboardMobileDrawer: React.FC<DashboardMobileDrawerProps> = (props) => {
   const dashboard = useDashboard();
+  const modalsActions = useModalsActions();
+  const modalsState = useModalsState();
 
-  const isOpen = props.isOpen ?? (dashboard.isMobileMenuOpen && !dashboard.isZenMode);
-  const onClose = props.onClose ?? (() => dashboard.setIsMobileMenuOpen?.(false));
+  const isOpen = props.isOpen ?? (modalsState.isMobileMenuOpen && !dashboard.isZenMode);
+  const onClose = props.onClose ?? (() => modalsActions.setIsMobileMenuOpen?.(false));
   const activeView = props.activeView ?? dashboard.activeView;
   const setActiveView = props.setActiveView ?? dashboard.setActiveView;
   const setSelectedProduct = props.setSelectedProduct ?? dashboard.setSelectedProduct;
   const otherSheets = props.otherSheets ?? dashboard.otherSheets ?? [];
-  const onOpenConfig = props.onOpenConfig ?? (() => dashboard.setIsConfigOpen(true));
-  const onOpenStockCount = props.onOpenStockCount ?? (() => dashboard.setIsStockCountOpen?.(true));
+  const onOpenConfig = props.onOpenConfig ?? (() => modalsActions.setIsConfigOpen(true));
+  const onOpenStockCount = props.onOpenStockCount ?? (() => modalsActions.setIsStockCountOpen?.(true));
 
   if (!isOpen) return null;
 

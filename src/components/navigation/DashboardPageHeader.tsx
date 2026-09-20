@@ -6,6 +6,7 @@ import { SheetProperties, TableSlice } from '../../types';
 import { SLICE_COLOR_CLASSES } from '../../utils/sliceRegistry';
 import { SliceIcon } from '../slices/SliceSelectorBar';
 import { useDashboard } from '../../context/DashboardContext';
+import { useModalsActions } from '../../context/ModalsContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
 
 export interface DashboardPageHeaderProps {
@@ -53,10 +54,11 @@ export interface DashboardPageHeaderProps {
 
 export const DashboardPageHeader: React.FC<DashboardPageHeaderProps> = (props) => {
   const dashboard = useDashboard();
+  const modalsActions = useModalsActions();
   const rightDrawer = useRightDrawer();
 
   const activeView = props.activeView ?? dashboard.activeView;
-  const setIsBulkImportOpen = props.setIsBulkImportOpen ?? dashboard.setIsBulkImportOpen;
+  const setIsBulkImportOpen = props.setIsBulkImportOpen ?? modalsActions.setIsBulkImportOpen;
   const onOpenCreateSlice = props.onOpenCreateSlice ?? (() => {
     dashboard.setEditingSliceModalItem?.(null);
     dashboard.setIsSliceModalOpen?.(true);

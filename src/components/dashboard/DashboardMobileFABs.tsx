@@ -2,6 +2,7 @@ import React from 'react';
 import { Barcode, Plus } from 'lucide-react';
 import { SheetProperties } from '../../types';
 import { useDashboard } from '../../context/DashboardContext';
+import { useModalsActions } from '../../context/ModalsContext';
 
 export interface DashboardMobileFABsProps {
   isZenMode?: boolean;
@@ -13,11 +14,12 @@ export interface DashboardMobileFABsProps {
 
 export const DashboardMobileFABs: React.FC<DashboardMobileFABsProps> = (props) => {
   const dashboard = useDashboard();
+  const modalsActions = useModalsActions();
 
   const isZenMode = props.isZenMode ?? dashboard.isZenMode ?? false;
   const activeView = props.activeView ?? dashboard.activeView;
   const activeSheet = props.activeSheet ?? dashboard.activeSheet;
-  const onOpenPistoleo = props.onOpenPistoleo ?? (() => dashboard.setIsMobilePistoleoOpen?.(true));
+  const onOpenPistoleo = props.onOpenPistoleo ?? (() => modalsActions.setIsMobilePistoleoOpen?.(true));
   const onOpenNewItem = props.onOpenNewItem ?? (() => dashboard.handleOpenModal());
 
   if (isZenMode || activeView === 'schema' || activeView === 'analytics' || !activeSheet) {

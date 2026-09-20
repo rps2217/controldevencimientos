@@ -3,6 +3,7 @@ import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sl
 import { InventoryItem, SheetConfig, SheetProperties } from '../../types';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { useDashboard } from '../../context/DashboardContext';
+import { useModalsActions } from '../../context/ModalsContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
 import { useDebouncedSearch } from '../../hooks/useDebouncedSearch';
 
@@ -57,9 +58,10 @@ export interface DashboardTopNavProps {
 
 export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
   const dashboard = useDashboard();
+  const modalsActions = useModalsActions();
   const rightDrawer = useRightDrawer();
 
-  const setIsMobileMenuOpen = props.setIsMobileMenuOpen ?? (() => {});
+  const setIsMobileMenuOpen = props.setIsMobileMenuOpen ?? modalsActions.setIsMobileMenuOpen;
   const activeView = props.activeView ?? dashboard.activeView;
   const activeSheetTitle = props.activeSheetTitle ?? dashboard.activeSheet?.title;
   const searchableHeaders = props.searchableHeaders ?? dashboard.searchableHeaders ?? [];
@@ -74,8 +76,8 @@ export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
   } = useDebouncedSearch(searchValue, setSearchTerm);
   const hasActiveFilters = props.hasActiveFilters ?? dashboard.hasActiveFilters ?? false;
   const clearAllFilters = props.clearAllFilters ?? dashboard.clearAllFilters ?? (() => {});
-  const setIsScannerOpen = props.setIsScannerOpen ?? dashboard.setIsScannerOpen;
-  const setIsMobilePistoleoOpen = props.setIsMobilePistoleoOpen ?? dashboard.setIsMobilePistoleoOpen;
+  const setIsScannerOpen = props.setIsScannerOpen ?? modalsActions.setIsScannerOpen;
+  const setIsMobilePistoleoOpen = props.setIsMobilePistoleoOpen ?? modalsActions.setIsMobilePistoleoOpen;
   const filteredItems = props.filteredItems ?? dashboard.filteredItems ?? [];
   const sheetConfig = props.sheetConfig ?? dashboard.sheetConfig;
   const isOffline = props.isOffline ?? dashboard.isOffline ?? false;
@@ -86,16 +88,16 @@ export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
   const fetchData = props.fetchData ?? dashboard.fetchData;
   const loading = props.loading ?? dashboard.loading ?? false;
   const latencyMs = props.latencyMs ?? dashboard.latencyMs;
-  const onOpenSyncAudit = props.onOpenSyncAudit ?? (() => dashboard.setIsSyncAuditOpen?.(true));
+  const onOpenSyncAudit = props.onOpenSyncAudit ?? (() => modalsActions.setIsSyncAuditOpen?.(true));
   const failedCount = props.failedCount ?? dashboard.failedCount ?? 0;
   const isRelationalActive = props.isRelationalActive ?? dashboard.isRelationalActive ?? false;
   const activeSheet = props.activeSheet ?? dashboard.activeSheet;
   const isModalOpen = props.isModalOpen ?? dashboard.isModalOpen ?? false;
   const handleOpenModal = props.handleOpenModal ?? dashboard.handleOpenModal;
-  const setIsBulkImportOpen = props.setIsBulkImportOpen ?? dashboard.setIsBulkImportOpen;
-  const setIsScriptModalOpen = props.setIsScriptModalOpen ?? dashboard.setIsScriptModalOpen;
+  const setIsBulkImportOpen = props.setIsBulkImportOpen ?? modalsActions.setIsBulkImportOpen;
+  const setIsScriptModalOpen = props.setIsScriptModalOpen ?? modalsActions.setIsScriptModalOpen;
   const onOpenViewConfig = props.onOpenViewConfig ?? (() => rightDrawer.setIsRightDrawerOpen(true));
-  const onOpenStockCount = props.onOpenStockCount ?? (() => dashboard.setIsStockCountOpen?.(true));
+  const onOpenStockCount = props.onOpenStockCount ?? (() => modalsActions.setIsStockCountOpen?.(true));
   // Global Keyboard shortcut for search (Cmd+K / Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
