@@ -1,7 +1,7 @@
 import { TableSlice, InventoryItem } from '../types';
 import { getItemStatus, getEventCategory, getItemResolutionStatus } from './dateCalculations';
 
-import { STORAGE_KEYS, readStorage, stringArraySchema } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, stringArraySchema, objectArraySchema } from '../utils/appStorage';
 export const BUILT_IN_SLICES: TableSlice[] = [
   // 1. Radar de Vencimientos (main)
   {
@@ -154,15 +154,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
 
 
 export function loadCustomSlices(): TableSlice[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.CUSTOM_SLICES);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.warn('Error loading custom slices from localStorage:', err);
-    return [];
-  }
+  return readStorage<TableSlice[]>(STORAGE_KEYS.CUSTOM_SLICES, objectArraySchema, []);
 }
 
 export function saveCustomSlices(slices: TableSlice[]): void {
