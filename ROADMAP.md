@@ -307,7 +307,7 @@ milisegundos no son extrapolables (la tabla virtualizada mide 0 sin
 Migrar los 11 archivos a leer **solo** del contexto. Al terminar, `grep -c "?? dashboard\."`
 = 0 y la lista de `overrides` en `eslint.config.mjs` debe quedar vacía.
 
-### Fase 3 — Delgazar `InventoryDashboard.tsx` (2.275 líneas, 54 `useState`)
+### Fase 3 — Delgazar `InventoryDashboard.tsx` (~2.190 líneas, ~34 `useState`)
 
 Extraer a hooks: `useInventoryData`, `useDashboardViewState`, `useInventoryActions`,
 `useDashboardModals`. Objetivo: componente orquestador ≤400 líneas.

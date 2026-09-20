@@ -262,4 +262,86 @@ Para garantizar un código limpio, sin sobreingeniería (*anti-bloat*) y con el 
 5. **Robustez en Hojas de Cálculo**: Siempre que proceses datos tabulares externos, utiliza el motor de `columnAliases.ts` en lugar de buscar nombres de columnas fijos (`item['SKU']`), garantizando tolerancia a variaciones en los archivos del usuario.
 6. **Aplicar la Escalera de Ponytail**: Antes de escribir una sola línea de código, pregúntate si puedes reutilizar lo que ya existe o resolverlo con la menor cantidad de código posible.
 7. **Leer del contexto, no de dos sitios**: `ViewConfigControlDrawer` y `DashboardPageHeader` se montan **sin props**; su única ruta real de datos es `useDashboard()`. El patrón `props.X ?? dashboard.X` da dos caminos para el mismo valor y ya causó un bug real (el fallback `?? (() => {})` del selector de agrupación dejaba la acción en un no-op silencioso). ESLint lo prohíbe en código nuevo; hay una lista congelada en `eslint.config.mjs` que solo puede encoger.
-8. **Antes de tocar el contexto o el dashboard**: ejecuta `npm run verify`. El contexto (`DashboardContext`) expone 224 miembros y `InventoryDashboard.tsx` tiene 54 `useState`; el plan de reforma está en `ROADMAP.md` y debe seguirse por fases.
+8. **Antes de tocar el contexto o el dashboard**: ejecuta `npm run verify`. El contexto (`DashboardContextType`) declara ~180 miembros y `InventoryDashboard.tsx` tiene ~34 `useState`; el plan de reforma está en `ROADMAP.md` y debe seguirse por fases.
+
+---
+
+## 7. Estado Operativo y Continuidad
+
+Esta sección es memoria para el próximo agente. El **plan vigente es `ROADMAP.md`**
+(fases 0–6) y manda sobre `PLAN_CONTINUIDAD.md`, que describe una auditoría Ponytail
+anterior ya absorbida. Antes de escribir código, leer `ROADMAP.md`; la escalera de
+Ponytail (§5) sigue siendo obligatoria.
+
+### Comandos
+
+| Comando | Qué hace |
+|---|---|
+| `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Es el gate real. |
+| `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx`. |
+| `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
+| `npm run build` | Build de producción. |
+
+### Arneses de medición (`tests/perf/`, requieren Chromium y un dev server)
+
+Son pruebas de comportamiento, no solo de milisegundos. Se ejecutan así:
+`node tests/perf/<script>.cjs http://127.0.0.1:3001/`.
+
+| Script | Para qué sirve |
+|---|---|
+| `modals.cjs` | Abrir modales: commits, long tasks y encabezado visible. |
+| `profile.cjs` | Renders reales de tabla/fila (tecleo). |
+| `corruptcheck.cjs` | LocalStorage corrupto no rompe el arranque. |
+| `startupcorruption.cjs` | Igual, sembrando varias claves a la vez. |
+| `searchcheck.cjs` | El buscador filtra y se sincroniza con el contexto. |
+| `printcheck.cjs` | La vista de impresión. |
+
+`tests/perf/ctxdiff.cjs` **se retiró** (dependía de instrumentación ya eliminada).
+
+### Robustez de arranque: la puerta de persistencia
+
+Toda lectura de `localStorage` debe pasar por `readStorage`/`readStorageValidated`
+(`src/utils/appStorage.ts`), y toda escritura por `writeStorage`. El motivo está
+medido: un valor con forma equivocada pasaba el `JSON.parse` y reventaba lejos de la
+causa, dejando la app sin montar. Los esquemas (`cachedSheetSchema`,
+`objectArraySchema`, `sheetConfigShapeSchema`, `moduleStatesSchema`, …) validan
+**contenedor y forma de cada elemento**, no cada campo: esos DTO evolucionan entre
+versiones y algunos los escribe la nube.
+
+Al añadir una clave nueva: definir el esquema en `appStorage.ts`, no parsear a mano.
+
+### Invariante no negociable
+
+La **cola offline** (`OFFLINE_QUEUE`) y su respaldo en `localStorage` no se tocan sin
+necesidad. Hay un caso real resuelto: el botón "Restablecer Datos Locales" del
+`ErrorBoundary` hacía `localStorage.clear()` y borraba la cola; ahora preserva
+`OFFLINE_QUEUE` y `AUDIT_LOG`.
+
+### CI
+
+`.github/workflows/verify.yml` corre `npm ci && npm run verify` en push a `main` y en
+PR. Node 22. Sin secrets.
+
+### Pendiente al momento de escribir esto
+
+1. **Solicitudes originales del usuario**, aún sin cerrar:
+   - (a) **Duplicación de acciones en dev/push a GitHub**: sin investigar.
+   - (b) **Agrupación de filas por columna en "Vistas y Ajustes"**: el cableado
+     funciona (el drawer se monta sin props y cae en `dashboard.handleSetGroupByColumn`)
+     y `tests/components.test.tsx` cubre la regresión (3 casos, incluido "la selección no
+     se pierde en un no-op silencioso"). Queda **verificarlo de punta a punta en
+     navegador**, porque el drawer aún usa el patrón `props.X ?? dashboard.X` que causó el
+     bug original (ver punto 2). Nota: `ViewConfigControlDrawer.tsx:152-153` es el sitio
+     exacto; si ni la prop ni la acción del contexto existen, `setGroupByColumn` queda
+     `undefined` — esa es la clase de no-op silencioso que el bug original explotó.
+2. **Fase 2** — migrar los 11 archivos del patrón `props.X ?? dashboard.X` a leer solo
+   del contexto. La lista está en `eslint.config.mjs` (`overrides`) y **solo puede
+   encoger**.
+3. **Fase 3** — extracción de `useInventoryData`/`useDashboardViewState`/
+   `useInventoryActions`/`useDashboardModals`. Prioridad baja: se midió que no queda
+   palanca grande en el tecleo.
+4. **Fase 4** — los 8 `JSON.parse` de `lib/sheets.ts` son **respuestas de red**, no
+   almacenamiento local; validarlas con esquema es trabajo aparte y se dejó fuera de
+   alcance a propósito.
+5. **Fases 5 y 6** — dividir monolitos y rendimiento/empaquetado. No añadir
+   `manualChunks` sin medir antes.

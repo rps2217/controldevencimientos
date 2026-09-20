@@ -1,10 +1,24 @@
 # Plan de Continuidad — Auditoría Ponytail
 
+> **AVISO (2026-09): documento histórico.** Esta auditoría **ya fue absorbida** por el
+> plan de reforma vigente en `ROADMAP.md` (fases 0–6). El estado operativo, los comandos
+> y los pendientes actuales están en **`AGENTS.md` §7** y en `ROADMAP.md`. No reabrir los
+> puntos de este archivo marcados como resueltos; consúltese el ROADMAP para lo que queda.
+
 Estado tras la rama `ponytail-audit-strict-types` (commits `7650255`, `a823189`, `4a7e8ff`, `57cbae7`,
 más `rowToObject`, `getErrorMessage`, `fetchWithTimeout` y eliminación total de `as any`).
 Verificado: `tsc --noEmit` limpio · 42/42 tests · build OK.
 
 Cada punto indica **evidencia reproducible** y **veredicto Ponytail** (YAGNI, reutilizar, mínimo código efectivo).
+
+### Continuación posterior (resumen de la sesión más reciente)
+
+Al momento de archivar este documento, el plan vigente era `ROADMAP.md` con:
+CI mínimo en `.github/workflows/verify.yml`; Fase 1.3 con dos cortes hechos (flags de
+modales y de Slices extraídos a `ModalsContext`); Fase 4 cerrada salvo los DTO de red de
+`lib/sheets.ts`; y pendientes las solicitudes originales del usuario (duplicación de
+acciones en dev/push, y agrupación de filas por columna en "Vistas y Ajustes"). El detalle
+está en `ROADMAP.md` y `AGENTS.md` §7.
 
 ---
 
