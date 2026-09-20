@@ -405,7 +405,10 @@ export const InventoryDashboard: React.FC = () => {
     items
   });
 
-  const saveConfig = (newConfig: SheetConfig) => {
+  // `saveConfig` se redefine en cada render, lo que hace cambiar de identidad a
+  // los dos useCallback que lo listan como dependencia (handleSetGroupByColumn /
+  // handleSetGroupByDirection). Estabilizarlo corta esa cadena.
+  const saveConfig = useCallback((newConfig: SheetConfig) => {
     const configWithTimestamp: SheetConfig = {
       ...newConfig,
       updatedAt: new Date().toISOString()
@@ -427,7 +430,7 @@ export const InventoryDashboard: React.FC = () => {
         }
       });
     }
-  };
+  }, [cloudConfigSheetName, hasCloudConfigSheet]);
 
   // Push config to Google Apps Script PropertiesService (Option 2 - Zero Extra Sheets)
   const handlePushPropertiesConfig = async () => {
@@ -822,7 +825,7 @@ export const InventoryDashboard: React.FC = () => {
     return [];
   }, [items, headers, activeView]);
 
-  const fetchData = async (currentConfig = sheetConfig, currentView = activeView, forceRefresh = false) => {
+  const fetchData = useCallback(async (currentConfig = sheetConfig, currentView = activeView, forceRefresh = false) => {
     let hasRenderedCache = false;
     try {
       const scriptUrl = localStorage.getItem(STORAGE_KEYS.SCRIPT_URL);
@@ -1104,7 +1107,7 @@ export const InventoryDashboard: React.FC = () => {
       setLoading(false);
       setIsBackgroundSyncing(false);
     }
-  };
+  }, [sheetConfig, activeView, showToast, items.length, policies.length, products.length]);
 
   const handleSaveQuickTraspaso = async (targetItem: InventoryItem, traspasoNumber: string) => {
     const traspasoCol = findColumnBySemantic(headers, 'n_traspaso') || 'N_TRASPASO';
@@ -1585,7 +1588,7 @@ export const InventoryDashboard: React.FC = () => {
     }
   };
 
-  const handleDelete = async (item: InventoryItem) => {
+  const handleDelete = useCallback(async (item: InventoryItem) => {
     if (!activeSheet) return;
     const confirmed = await confirm({ title: 'Eliminar fila', message: `¿Estás seguro de que deseas eliminar la fila ${item._rowIndex}? Esta acción no se puede deshacer.`, confirmLabel: 'Eliminar' });
     if (!confirmed) return;
@@ -1643,7 +1646,7 @@ export const InventoryDashboard: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [activeSheet, items, allMainItems, activeView, headers, sheetConfig, confirm, showToast, fetchData, setItems, setAllMainItems, enqueueMutation]);
 
   const handleSelectRow = useCallback((rowIndex: number, selected: boolean) => {
     setSelectedRowIds(prev => selected ? [...prev, rowIndex] : prev.filter(id => id !== rowIndex));
@@ -1684,6 +1687,20 @@ export const InventoryDashboard: React.FC = () => {
   const handleOpenQuickTraspaso = useCallback((item: InventoryItem) => {
     setQuickTraspasoItem(item);
     setIsQuickTraspasoOpen(true);
+  }, []);
+
+  // Estas dos acciones se pasan a CADA fila de la tabla. Definirlas como
+  // flechas inline en el value rompía el React.memo de InventoryTableRow y
+  // forzaba el re-render de todas las filas visibles en cada render del
+  // dashboard.
+  const handleOpenWhatsApp = useCallback((item: InventoryItem) => {
+    setWhatsAppModalItems([item]);
+    setIsWhatsAppModalOpen(true);
+  }, []);
+
+  const handleOpenEmail = useCallback((item: InventoryItem) => {
+    setGmailModalItems([item]);
+    setIsGmailModalOpen(true);
   }, []);
 
   const handleApplyBulkEdit = async (values: { frc_n: string; n_traspaso: string; tipo_evento: string; frc_bod: string }) => {
@@ -2120,14 +2137,8 @@ export const InventoryDashboard: React.FC = () => {
     onEventFilterClick: handleEventFilterClick,
     onFrcBodFilterClick: handleFrcBodFilterClick,
     onOpenQuickTraspaso: handleOpenQuickTraspaso,
-    onOpenWhatsApp: (item: InventoryItem) => {
-      setWhatsAppModalItems([item]);
-      setIsWhatsAppModalOpen(true);
-    },
-    onOpenEmail: (item: InventoryItem) => {
-      setGmailModalItems([item]);
-      setIsGmailModalOpen(true);
-    },
+    onOpenWhatsApp: handleOpenWhatsApp,
+    onOpenEmail: handleOpenEmail,
     isWhatsAppEnabled: isActionEnabledForTable('whatsapp', bulkActionCtx, sheetConfig),
     isEmailEnabled: isActionEnabledForTable('gmail', bulkActionCtx, sheetConfig),
     draggedCol,

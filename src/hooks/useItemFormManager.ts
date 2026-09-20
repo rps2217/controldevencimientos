@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { z } from 'zod';
 import { InventoryItem, SheetConfig, SheetProperties, EventCategory } from '../types';
 import { findColumnBySemantic } from '../utils/columnAliases';
@@ -32,7 +32,7 @@ export function useItemFormManager({
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [selectedEventCategory, setSelectedEventCategory] = useState<EventCategory>('VENCIMIENTO');
 
-  const handleSelectEventCategory = (cat: EventCategory) => {
+  const handleSelectEventCategory = useCallback((cat: EventCategory) => {
     setSelectedEventCategory(cat);
     const eventCol = findColumnBySemantic(headers, 'tipo_evento') || headers.find(h => /^frc(_|\s)?even/i.test(h.trim()));
     if (eventCol) {
@@ -41,9 +41,9 @@ export function useItemFormManager({
         [eventCol]: EVENT_CATEGORIES[cat].rawCode || EVENT_CATEGORIES[cat].name
       }));
     }
-  };
+  }, [headers]);
 
-  const handleOpenModal = (item?: InventoryItem, prefillSku?: string, initialCategory?: EventCategory) => {
+  const handleOpenModal = useCallback((item?: InventoryItem, prefillSku?: string, initialCategory?: EventCategory) => {
     if (onBeforeOpen) onBeforeOpen();
     setFormErrors({});
     if (item) {
@@ -105,16 +105,16 @@ export function useItemFormManager({
       setFormData(calculatedData);
     }
     setIsModalOpen(true);
-  };
+  }, [onBeforeOpen, headers, activeSheet, sheetConfig, products, policies, eventFilter]);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
     setEditingItem(null);
     setFormData({});
     setFormErrors({});
-  };
+  }, []);
 
-  const validateForm = (): Record<string, string> => {
+  const validateForm = useCallback((): Record<string, string> => {
     const errors: Record<string, string> = {};
     if (!activeSheet) return errors;
 
@@ -240,9 +240,9 @@ export function useItemFormManager({
     }
 
     return errors;
-  };
+  }, [activeSheet, sheetConfig, activeView, headers, selectedEventCategory, formData]);
 
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     let newForm = { ...formData, [name]: value };
     
@@ -272,9 +272,9 @@ export function useItemFormManager({
 
     newForm = autoCalculateItemFormData(newForm, headers, products, policies, sheetConfig);
     setFormData(newForm);
-  };
+  }, [formData, formErrors, headers, sheetConfig, products, policies]);
 
-  const handleBatchFormUpdate = (updates: Record<string, string>) => {
+  const handleBatchFormUpdate = useCallback((updates: Record<string, string>) => {
     let newForm = { ...formData, ...updates };
 
     const skuCol = findColumnBySemantic(headers, 'sku', sheetConfig?.customAliases) || 
@@ -303,9 +303,12 @@ export function useItemFormManager({
 
     newForm = autoCalculateItemFormData(newForm, headers, products, policies, sheetConfig);
     setFormData(newForm);
-  };
+  }, [formData, formErrors, headers, sheetConfig, products, policies]);
 
-  return {
+  // El objeto se recreaba en cada render y alimenta ~10 miembros del contexto.
+  // Devolver una referencia estable es requisito para que el value del
+  // DashboardContext pueda memoizarse (Fase 1).
+  return useMemo(() => ({
     isModalOpen,
     setIsModalOpen,
     editingItem,
@@ -322,5 +325,9 @@ export function useItemFormManager({
     validateForm,
     handleFormChange,
     handleBatchFormUpdate
-  };
+  }), [
+    isModalOpen, editingItem, formData, formErrors, selectedEventCategory,
+    handleOpenModal, handleCloseModal, handleSelectEventCategory, validateForm,
+    handleFormChange, handleBatchFormUpdate
+  ]);
 }

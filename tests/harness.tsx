@@ -41,6 +41,29 @@ export function setupDom(): JSDOM {
   expose('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 0));
   expose('cancelAnimationFrame', (id: number) => clearTimeout(id));
   expose('IS_REACT_ACT_ENVIRONMENT', true);
+  // localStorage/sessionStorage viven en dom.window pero NO se promueven solos
+  // a globalThis en Node; el código las usa como global (appStorage, hooks).
+  expose('localStorage', dom.window.localStorage);
+  expose('sessionStorage', dom.window.sessionStorage);
+
+  // jsdom no implementa estas APIs, y el árbol las usa (usePWAInstall,
+  // virtualización, medición de columnas). Son stubs neutros: aquí solo se
+  // mide cuántas veces re-renderiza un componente, no su geometría.
+  dom.window.matchMedia = ((query: string) => ({
+    matches: false, media: query, onchange: null,
+    addListener: () => {}, removeListener: () => {},
+    addEventListener: () => {}, removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as any;
+
+  class ObserverStub {
+    observe() {} unobserve() {} disconnect() {}
+    takeRecords() { return []; }
+  }
+  (dom.window as any).ResizeObserver = ObserverStub;
+  (dom.window as any).IntersectionObserver = ObserverStub;
+  expose('ResizeObserver', ObserverStub);
+  expose('IntersectionObserver', ObserverStub);
 
   return dom;
 }
