@@ -294,6 +294,7 @@ Son pruebas de comportamiento, no solo de milisegundos. Se ejecutan así:
 | `corruptcheck.cjs` | LocalStorage corrupto no rompe el arranque. |
 | `startupcorruption.cjs` | Igual, sembrando varias claves a la vez. |
 | `searchcheck.cjs` | El buscador filtra y se sincroniza con el contexto. |
+| `groupcheck.cjs` | Agrupación por columna de punta a punta (solicitud original b). |
 | `printcheck.cjs` | La vista de impresión. |
 
 `tests/perf/ctxdiff.cjs` **se retiró** (dependía de instrumentación ya eliminada).
@@ -324,16 +325,16 @@ PR. Node 22. Sin secrets.
 
 ### Pendiente al momento de escribir esto
 
-1. **Solicitudes originales del usuario**, aún sin cerrar:
+1. **Solicitudes originales del usuario**:
    - (a) **Duplicación de acciones en dev/push a GitHub**: sin investigar.
-   - (b) **Agrupación de filas por columna en "Vistas y Ajustes"**: el cableado
-     funciona (el drawer se monta sin props y cae en `dashboard.handleSetGroupByColumn`)
-     y `tests/components.test.tsx` cubre la regresión (3 casos, incluido "la selección no
-     se pierde en un no-op silencioso"). Queda **verificarlo de punta a punta en
-     navegador**, porque el drawer aún usa el patrón `props.X ?? dashboard.X` que causó el
-     bug original (ver punto 2). Nota: `ViewConfigControlDrawer.tsx:152-153` es el sitio
-     exacto; si ni la prop ni la acción del contexto existen, `setGroupByColumn` queda
-     `undefined` — esa es la clase de no-op silencioso que el bug original explotó.
+   - (b) **Agrupación de filas por columna en "Vistas y Ajustes"**: **CERRADA**. El
+     cableado funcionaba y ahora hay verificación de punta a punta en navegador con
+     `tests/perf/groupcheck.cjs` (10 pasos: el selector existe, arranca en `none`,
+     la columna es elegible, elegirla produce "Agrupado en N grupos (PROVEEDOR)", se
+     renderiza la cabecera con el valor real, el botón de orden existe, alternarlo
+     reordena los grupos, y volver a `none` desactiva). La sonda **no es vacía**: con
+     el no-op reintroducido en `ViewConfigControlDrawer.tsx:153` fallan 4 pasos.
+     El patrón doble-camino sigue ahí (ver punto 2), pero ya no oculta el objetivo.
 2. **Fase 2** — migrar los 11 archivos del patrón `props.X ?? dashboard.X` a leer solo
    del contexto. La lista está en `eslint.config.mjs` (`overrides`) y **solo puede
    encoger**.
