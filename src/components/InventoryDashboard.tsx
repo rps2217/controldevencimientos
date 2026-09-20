@@ -675,12 +675,6 @@ export const InventoryDashboard: React.FC = () => {
   const {
     customSlices,
     hiddenSliceIds,
-    isSliceModalOpen,
-    setIsSliceModalOpen,
-    isSliceManagerOpen,
-    setIsSliceManagerOpen,
-    editingSliceModalItem,
-    setEditingSliceModalItem,
     currentTableSlices,
     visibleTableSlices,
     activeSlice,
@@ -1927,20 +1921,14 @@ export const InventoryDashboard: React.FC = () => {
     handleUniversalImportConfirmed,
 
 
-    isSliceManagerOpen,
-    setIsSliceManagerOpen,
     currentTableSlices,
     sliceCounts,
     activeSliceId,
     hiddenSliceIds,
     handleSelectSlice,
-    setEditingSliceModalItem,
     handleDeleteSlice,
     handleToggleSliceVisibility,
     handleSetBulkVisibility,
-    isSliceModalOpen,
-    setIsSliceModalOpen,
-    editingSliceModalItem,
     currentFilters: {
       searchTerm,
       quickChip: activeQuickChip,

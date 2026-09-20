@@ -91,20 +91,14 @@ export interface DashboardContextType {
   // Bulk Actions Config Modal
 
   // Slices & Views
-  isSliceManagerOpen: boolean;
-  setIsSliceManagerOpen: (open: boolean) => void;
   currentTableSlices: TableSlice[];
   sliceCounts: Record<string, number>;
   activeSliceId: string | null;
   hiddenSliceIds: string[];
   handleSelectSlice: (slice: TableSlice | null) => void;
-  setEditingSliceModalItem: (slice: TableSlice | null) => void;
   handleDeleteSlice: (sliceId: string) => void;
   handleToggleSliceVisibility: (sliceId: string) => void;
   handleSetBulkVisibility: (sliceIds: string[], visible: boolean) => void;
-  isSliceModalOpen: boolean;
-  setIsSliceModalOpen: (open: boolean) => void;
-  editingSliceModalItem: TableSlice | null;
   currentFilters: any;
   sortConfig: any;
   groupByColumn: string | null;

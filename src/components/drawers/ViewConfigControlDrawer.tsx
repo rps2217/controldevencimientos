@@ -132,8 +132,7 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
   });
   const customSlices = props.customSlices ?? dashboard.customSlices ?? [];
   const onOpenSliceEditor = props.onOpenSliceEditor ?? ((slice?: TableSlice) => {
-    dashboard.setEditingSliceModalItem?.(slice || null);
-    dashboard.setIsSliceModalOpen?.(true);
+    modalsActions.openSliceEditor(slice || null);
   });
   const isZenMode = props.isZenMode ?? dashboard.isZenMode ?? false;
   const onToggleZenMode = props.onToggleZenMode ?? (() => {

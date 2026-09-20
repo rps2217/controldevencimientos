@@ -257,13 +257,45 @@ que el botón de menú móvil era un no-op silencioso. Ahora cae en
 El neto es **−100 líneas** (178 borradas, 78 añadidas): el value del dashboard pierde
 38 entradas y deja de recrear 19 `useState`.
 
+#### Hecho: flags de Slices extraídos a `ModalsContext` (1.3, segundo corte)
+
+Los tres flags del gestor/editor de Slices (`isSliceManagerOpen`, `isSliceModalOpen`,
+`editingSliceModalItem`) tenían el mismo perfil que los de modales: los lee
+únicamente `DashboardModalsManager`, y nadie los consulta dentro de `useTableSlices`
+(solo se declaraban y devolvían). Pero al vivir en `useTableSlices`, que corre en el
+cuerpo de `InventoryDashboard`, cambiarlos re-renderiza el dashboard entero (2.202
+líneas) igual que antes de la Fase 1.
+
+Se movieron a `ModalsContext` y se añadió la acción compuesta `openSliceEditor`, que
+sustituye el par `setEditingSliceModalItem` + `setIsSliceModalOpen` repetido en tres
+consumidores. El hook deja de declararlos y el value del dashboard pierde 6 entradas.
+
+Medición en Chromium real (`tests/perf/modals.cjs`), abrir "Administrador de Vistas
+(Slices)" con el encabezado verificado como montado:
+
+| Métrica | Antes | Después |
+| --- | --- | --- |
+| Long tasks | 60 ms | **ninguna** |
+| Commits | 1 | 1 |
+| Encabezado visible del modal | "Administrador de Vistas (Slices)" | igual |
+
+El mismo script cubre en una sola corrida "Configuración global", "Acción PM" (que
+requiere seleccionar filas para que se monte la barra flotante) y el gestor de Slices;
+las tres cerraron con **1 commit y ninguna long task**.
+
 Criterio de aceptación (con verdad de terreno): abrir/cerrar "Vistas & Ajustes" deja el
 dashboard en **0 renders** (cumplido) y `InventoryTable` en **0 renders** (cumplido).
 El coste de escritura (teclear) bajó de ~1.032 ms a ~796 ms solo quitando el ticket
 invisible, y **sigue siendo el verdadero cuello** (~200 ms por tecla por el re-render del
 monolito). Medir siempre con `tests/perf/profile.cjs`, que reporta `tableRenders`/`rowRenders`
-reales además del análisis por fibra, y `tests/perf/ctxdiff.cjs` para el recambio de miembros
-del value. La impresión se verifica con `tests/perf/printcheck.cjs`.
+reales además del análisis por fibra. La impresión se verifica con
+`tests/perf/printcheck.cjs`.
+
+Nota (auditoría Ponytail): `tests/perf/ctxdiff.cjs` quedó **obsoleto**. Dependía de
+`window.__ctxPrev`/`__ctxRenders`, instrumentación que se retiró del código de
+producción al cerrar el diagnóstico de Fase 1, así que ahora reporta `members: 0` y
+acciones vacías. Para medir coste de interacción usar `modals.cjs` (commits + long
+tasks) y `profile.cjs` (renders reales de tabla/fila).
 
 Nota sobre jsdom: `tests/baseline.probe.tsx` sirve para contar commits, pero sus
 milisegundos no son extrapolables (la tabla virtualizada mide 0 sin

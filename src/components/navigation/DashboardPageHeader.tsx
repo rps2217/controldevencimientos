@@ -59,11 +59,8 @@ export const DashboardPageHeader: React.FC<DashboardPageHeaderProps> = (props) =
 
   const activeView = props.activeView ?? dashboard.activeView;
   const setIsBulkImportOpen = props.setIsBulkImportOpen ?? modalsActions.setIsBulkImportOpen;
-  const onOpenCreateSlice = props.onOpenCreateSlice ?? (() => {
-    dashboard.setEditingSliceModalItem?.(null);
-    dashboard.setIsSliceModalOpen?.(true);
-  });
-  const onOpenSliceManager = props.onOpenSliceManager ?? (() => dashboard.setIsSliceManagerOpen?.(true));
+  const onOpenCreateSlice = props.onOpenCreateSlice ?? (() => modalsActions.openSliceEditor(null));
+  const onOpenSliceManager = props.onOpenSliceManager ?? (() => modalsActions.setIsSliceManagerOpen(true));
   const onOpenViewConfig = props.onOpenViewConfig ?? (() => rightDrawer.setIsRightDrawerOpen(true));
   const slices = props.slices ?? dashboard.visibleTableSlices ?? dashboard.currentTableSlices ?? [];
   const activeSliceId = props.activeSliceId ?? dashboard.activeSliceId ?? null;

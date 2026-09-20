@@ -136,22 +136,16 @@ export interface DashboardModalsManagerProps {
   setIsBulkActionsConfigOpen: (open: boolean) => void;
 
   // Slice Management
-  isSliceManagerOpen: boolean;
-  setIsSliceManagerOpen: (open: boolean) => void;
   currentTableSlices: TableSlice[];
   sliceCounts: Record<string, number>;
   activeSliceId: string | null;
   hiddenSliceIds: string[];
   handleSelectSlice: (slice: TableSlice | null) => void;
-  setEditingSliceModalItem: (slice: TableSlice | null) => void;
   handleDeleteSlice: (sliceId: string) => void;
   handleToggleSliceVisibility: (sliceId: string) => void;
   handleSetBulkVisibility: (sliceIds: string[], visible: boolean) => void;
 
   // Slice Editor
-  isSliceModalOpen: boolean;
-  setIsSliceModalOpen: (open: boolean) => void;
-  editingSliceModalItem: TableSlice | null;
   currentFilters: any;
   sortConfig: any;
   groupByColumn: string;
@@ -236,20 +230,14 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     globalTicketConfig,
     handleSaveTicketConfig,
     handleUniversalImportConfirmed,
-    isSliceManagerOpen,
-    setIsSliceManagerOpen,
     currentTableSlices,
     sliceCounts,
     activeSliceId,
     hiddenSliceIds,
     handleSelectSlice,
-    setEditingSliceModalItem,
     handleDeleteSlice,
     handleToggleSliceVisibility,
     handleSetBulkVisibility,
-    isSliceModalOpen,
-    setIsSliceModalOpen,
-    editingSliceModalItem,
     currentFilters,
     sortConfig,
     groupByColumn,
@@ -289,6 +277,8 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     isQuickTraspasoOpen, quickTraspasoItem, isTicketConfigOpen, isBulkImportOpen,
     isBulkActionsConfigOpen, isStockCountOpen, isSyncAuditOpen,
   } = modalsState;
+  // Slices: UI pura, movida a ModalsContext en el segundo corte de Fase 1.3.
+  const { isSliceManagerOpen, isSliceModalOpen, editingSliceModalItem } = modalsState;
   const {
     setIsPmReportOpen, setIsScriptModalOpen, setIsConfigOpen, setIsScannerOpen,
     setIsMobilePistoleoOpen, setIsBulkEditOpen, setIsGmailModalOpen, setGmailModalItems,
@@ -296,6 +286,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     setIsQuickTraspasoOpen, setQuickTraspasoItem, setIsTicketConfigOpen,
     setIsBulkImportOpen, setIsBulkActionsConfigOpen, setIsStockCountOpen, setIsSyncAuditOpen,
   } = modalsActions;
+  const { setIsSliceManagerOpen, setIsSliceModalOpen, setEditingSliceModalItem } = modalsActions;
 
   return (
     <>

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { InventoryItem } from '../types';
+import { InventoryItem, TableSlice } from '../types';
 
 /**
  * Estado de apertura de los modales y paneles de UI del dashboard.
@@ -40,6 +40,9 @@ interface ModalsState {
   isStockCountOpen: boolean;
   isSyncAuditOpen: boolean;
   isMobileMenuOpen: boolean;
+  isSliceManagerOpen: boolean;
+  isSliceModalOpen: boolean;
+  editingSliceModalItem: TableSlice | null;
 }
 
 interface ModalsActions {
@@ -62,6 +65,12 @@ interface ModalsActions {
   setIsStockCountOpen: (open: boolean) => void;
   setIsSyncAuditOpen: (open: boolean) => void;
   setIsMobileMenuOpen: (open: boolean) => void;
+  setIsSliceManagerOpen: (open: boolean) => void;
+  setIsSliceModalOpen: (open: boolean) => void;
+  setEditingSliceModalItem: (slice: TableSlice | null) => void;
+
+  /** Abre el editor de slices con el slice a editar (o null para crear). */
+  openSliceEditor: (slice: TableSlice | null) => void;
 
   /** Abre traspaso con el item ya cargado. Identidad estable: se pasa a cada fila. */
   openQuickTraspaso: (item: InventoryItem) => void;
@@ -79,7 +88,8 @@ const NOOP_STATE: ModalsState = {
   whatsAppModalItems: [], isColumnManagerOpen: false, isQuickTraspasoOpen: false,
   quickTraspasoItem: null, isTicketConfigOpen: false, isBulkImportOpen: false,
   isBulkActionsConfigOpen: false, isStockCountOpen: false, isSyncAuditOpen: false,
-  isMobileMenuOpen: false,
+  isMobileMenuOpen: false, isSliceManagerOpen: false, isSliceModalOpen: false,
+  editingSliceModalItem: null,
 };
 
 export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -102,6 +112,9 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isStockCountOpen, setIsStockCountOpen] = useState(false);
   const [isSyncAuditOpen, setIsSyncAuditOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSliceManagerOpen, setIsSliceManagerOpen] = useState(false);
+  const [isSliceModalOpen, setIsSliceModalOpen] = useState(false);
+  const [editingSliceModalItem, setEditingSliceModalItem] = useState<TableSlice | null>(null);
 
   const state = useMemo<ModalsState>(() => ({
     isPmReportOpen, isScriptModalOpen, isConfigOpen, isScannerOpen,
@@ -109,13 +122,20 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isWhatsAppModalOpen, whatsAppModalItems, isColumnManagerOpen,
     isQuickTraspasoOpen, quickTraspasoItem, isTicketConfigOpen, isBulkImportOpen,
     isBulkActionsConfigOpen, isStockCountOpen, isSyncAuditOpen, isMobileMenuOpen,
+    isSliceManagerOpen, isSliceModalOpen, editingSliceModalItem,
   }), [
     isPmReportOpen, isScriptModalOpen, isConfigOpen, isScannerOpen,
     isMobilePistoleoOpen, isBulkEditOpen, isGmailModalOpen, gmailModalItems,
     isWhatsAppModalOpen, whatsAppModalItems, isColumnManagerOpen,
     isQuickTraspasoOpen, quickTraspasoItem, isTicketConfigOpen, isBulkImportOpen,
     isBulkActionsConfigOpen, isStockCountOpen, isSyncAuditOpen, isMobileMenuOpen,
+    isSliceManagerOpen, isSliceModalOpen, editingSliceModalItem,
   ]);
+
+  const openSliceEditor = useCallback((slice: TableSlice | null) => {
+    setEditingSliceModalItem(slice);
+    setIsSliceModalOpen(true);
+  }, []);
 
   const openQuickTraspaso = useCallback((item: InventoryItem) => {
     setQuickTraspasoItem(item);
@@ -141,8 +161,9 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsQuickTraspasoOpen, setQuickTraspasoItem, setIsTicketConfigOpen,
     setIsBulkImportOpen, setIsBulkActionsConfigOpen, setIsStockCountOpen,
     setIsSyncAuditOpen, setIsMobileMenuOpen,
-    openQuickTraspaso, openWhatsApp, openEmail,
-  }), [openQuickTraspaso, openWhatsApp, openEmail]);
+    setIsSliceManagerOpen, setIsSliceModalOpen, setEditingSliceModalItem,
+    openSliceEditor, openQuickTraspaso, openWhatsApp, openEmail,
+  }), [openSliceEditor, openQuickTraspaso, openWhatsApp, openEmail]);
 
   return (
     <ModalsActionsContext.Provider value={actions}>
@@ -170,5 +191,7 @@ const NOOP_ACTIONS: ModalsActions = {
   setWhatsAppModalItems: noop, setIsColumnManagerOpen: noop, setIsQuickTraspasoOpen: noop,
   setQuickTraspasoItem: noop, setIsTicketConfigOpen: noop, setIsBulkImportOpen: noop,
   setIsBulkActionsConfigOpen: noop, setIsStockCountOpen: noop, setIsSyncAuditOpen: noop,
-  setIsMobileMenuOpen: noop, openQuickTraspaso: noop, openWhatsApp: noop, openEmail: noop,
+  setIsMobileMenuOpen: noop, setIsSliceManagerOpen: noop, setIsSliceModalOpen: noop,
+  setEditingSliceModalItem: noop, openSliceEditor: noop,
+  openQuickTraspaso: noop, openWhatsApp: noop, openEmail: noop,
 };

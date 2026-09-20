@@ -98,7 +98,44 @@ function req(method, p) {
   ];
   await ev2(`(() => { const b = [...document.querySelectorAll('button')].find(x => /cerrar|close/i.test((x.getAttribute('title') || '') + ' ' + (x.getAttribute('aria-label') || ''))); if (b) b.click(); })()`);
   await sleep(400);
-  results.push(await measure('abrir Accion PM', () => clickButton('Acción PM|Reporte PM')));
+
+  // "Accion PM" vive en la barra flotante, que solo se monta con filas
+  // seleccionadas. Se marca "Seleccionar todos" para hacerla aparecer. Se usa
+  // .click() directo: el checkbox vive bajo el encabezado sticky y el clic por
+  // coordenadas no siempre aterriza en el.
+  const selected = await ev2(`(() => {
+    const c = [...document.querySelectorAll('input[type=checkbox]')].find(x => /Seleccionar todos/i.test(x.getAttribute('title') || ''));
+    if (!c) return false;
+    c.click();
+    return true;
+  })()`);
+  await sleep(800);
+  results.push(await measure('abrir Accion PM (seleccion=' + selected + ')', () => ev2(`(() => {
+    const b = [...document.querySelectorAll('button')].find(x => /Acción PM/.test((x.getAttribute('title') || '') + ' ' + (x.textContent || '')));
+    if (!b) return false;
+    b.click();
+    return true;
+  })()`)));
+
+  // Cerrar el modal PM para no medir sobre una pila de modales.
+  await ev2(`(() => { const b = [...document.querySelectorAll('button')].find(x => /cerrar|close/i.test((x.getAttribute('title') || '') + ' ' + (x.getAttribute('aria-label') || ''))); if (b) b.click(); })()`);
+  await sleep(500);
+
+  // Fase 1.3 (segundo corte): el gestor de Slices es UI pura; sus flags vivian
+  // en useTableSlices (dentro del cuerpo del dashboard), asi que abrirlo
+  // re-renderiza el dashboard entero.
+  results.push(await measure('abrir Gestor de Slices', () => ev2(`(() => {
+    const b = [...document.querySelectorAll('button')].find(x => /Administrar vistas guardadas/i.test(x.getAttribute('title') || ''));
+    if (!b) return false;
+    b.click();
+    return true;
+  })()`)));
+  // Confirmar que el gestor efectivamente monto, no solo que el clic ocurrio.
+  const sliceVisible = await ev2(`(() => {
+    const h = [...document.querySelectorAll('h2,h3')].map(x => (x.textContent || '').trim());
+    return JSON.stringify(h.filter(Boolean));
+  })()`);
+  console.log('Encabezados visibles tras abrir gestor de Slices:', sliceVisible);
 
   console.log(JSON.stringify({ url: URL_APP, results }, null, 2));
   try { ws.close(); } catch (e) {}

@@ -69,9 +69,6 @@ export function useTableSlices({
 }: UseTableSlicesParams) {
   const [customSlices, setCustomSlices] = useState<TableSlice[]>(() => loadCustomSlices());
   const [hiddenSliceIds, setHiddenSliceIds] = useState<string[]>(() => loadHiddenSliceIds(sheetConfig.hiddenSliceIds));
-  const [isSliceModalOpen, setIsSliceModalOpen] = useState(false);
-  const [isSliceManagerOpen, setIsSliceManagerOpen] = useState(false);
-  const [editingSliceModalItem, setEditingSliceModalItem] = useState<TableSlice | null>(null);
 
   // Sync hidden slice IDs if sheetConfig updates from cloud
   useEffect(() => {
@@ -251,12 +248,6 @@ export function useTableSlices({
   return {
     customSlices,
     hiddenSliceIds,
-    isSliceModalOpen,
-    setIsSliceModalOpen,
-    isSliceManagerOpen,
-    setIsSliceManagerOpen,
-    editingSliceModalItem,
-    setEditingSliceModalItem,
     currentTableSlices,
     visibleTableSlices,
     activeSlice,
