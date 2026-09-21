@@ -105,6 +105,31 @@ export function writeStorage(key: string, value: unknown): void {
   }
 }
 
+/**
+ * Lectura/escritura de valores guardados como cadena cruda (sin JSON).
+ * `TABLE_DENSITY` se persiste así desde antes de la puerta validada; estos
+ * accesores permiten validarlo contra un esquema sin cambiar el formato en
+ * disco, que sería perder la preferencia ya elegida por el usuario.
+ */
+export function readRawStorage<T>(key: string, schema: z.ZodType, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    const parsed = schema.safeParse(raw);
+    return parsed.success ? (parsed.data as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeRawStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage no disponible o lleno: la app sigue con estado en memoria.
+  }
+}
+
 // --- Esquemas de las estructuras persistidas en localStorage ---
 
 /** Lista de cadenas (p. ej. IDs de slice ocultos). */

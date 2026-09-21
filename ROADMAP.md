@@ -460,12 +460,16 @@ Siguiente corte por cohesión: los flags de **chrome** sin relación con los dat
 ciclo de carga de datos.
 
 Ganancia colateral de la Fase 4: la densidad de tabla persistía con `localStorage` crudo
-(`safeParse` a mano y un `setItem` en `try/catch`); ahora pasa por la puerta
-`readStorage`/`writeStorage` como el resto. Se unifica el camino sin cambiar el formato
-almacenado, así que la configuración existente se sigue leyendo.
+(`safeParse` a mano y un `setItem` en `try/catch`); ahora pasa por la puerta de
+`appStorage`. **Ojo con el formato**: la densidad se guardaba como **cadena cruda**
+(`ultra`), no como JSON, así que enviarla por `readStorage`/`writeStorage` habría hecho
+`JSON.parse("ultra")` → fallback silencioso y habría perdido la preferencia ya elegida.
+En vez de migrar el formato en disco (riesgo sin beneficio), se añadieron
+`readRawStorage`/`writeRawStorage` a la puerta, que validan contra el esquema sin
+reinterpretar el contenido. 4 aserciones nuevas en `test-modules.ts` lo fijan.
 
 `InventoryDashboard.tsx`: **2.120 → 2.081 líneas** (39 menos; el hook nuevo tiene 96).
-`tsc` limpio, ESLint sin errores (20 warnings preexistentes), 148 + 7 pruebas en verde y
+`tsc` limpio, ESLint sin errores (20 warnings preexistentes), 152 + 7 pruebas en verde y
 los E2E `groupcheck`, `modals` y `searchcheck` en OK sobre el build de producción.
 
 ### Fase 4 — Puerta única de persistencia (**iniciada**)

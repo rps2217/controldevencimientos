@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { z } from 'zod';
-import { STORAGE_KEYS, readStorage, writeStorage, tableDensitySchema } from '../utils/appStorage';
-
-export interface TableDensity {
-  tableDensity: 'comfortable' | 'compact' | 'ultra';
-  setTableDensity: (density: 'comfortable' | 'compact' | 'ultra') => void;
-}
+import { STORAGE_KEYS, readStorage, writeStorage, readRawStorage, writeRawStorage, tableDensitySchema } from '../utils/appStorage';
 
 /**
  * Estado de "chrome" del dashboard: sidebar, visibilidad de filtros, modo Zen,
@@ -29,7 +24,7 @@ export const useDashboardChromeState = ({
   const [isSummaryView, setIsSummaryView] = useState<boolean>(false);
 
   const [tableDensity, setTableDensity] = useState<'comfortable' | 'compact' | 'ultra'>(() =>
-    readStorage<'comfortable' | 'compact' | 'ultra'>(
+    readRawStorage<'comfortable' | 'compact' | 'ultra'>(
       STORAGE_KEYS.TABLE_DENSITY,
       tableDensitySchema,
       'compact'
@@ -37,7 +32,7 @@ export const useDashboardChromeState = ({
   );
 
   useEffect(() => {
-    writeStorage(STORAGE_KEYS.TABLE_DENSITY, tableDensity);
+    writeRawStorage(STORAGE_KEYS.TABLE_DENSITY, tableDensity);
   }, [tableDensity]);
 
   const [isZenMode, setIsZenMode] = useState<boolean>(() =>

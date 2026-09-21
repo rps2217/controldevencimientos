@@ -85,6 +85,8 @@ import {
   stringArraySchema,
   sheetConfigShapeSchema,
   tableDensitySchema,
+  readRawStorage,
+  writeRawStorage,
   objectArraySchema,
   booleanMapSchema,
   cachedSheetSchema
@@ -427,6 +429,22 @@ console.log('\n--- 11. Pruebas de appStorage.ts ---');
   store.set(STORAGE_KEYS.TABLE_DENSITY, 'gigante');
   assert(tableDensitySchema.safeParse(store.get(STORAGE_KEYS.TABLE_DENSITY)).success === false,
     'tableDensitySchema: rechaza un valor no admitido');
+
+  // readRawStorage debe leer el formato crudo que quedó en disco. Si se leyera
+  // con JSON.parse ("ultra" no es JSON válido), la preferencia ya elegida se
+  // perdería silenciosamente en cada arranque.
+  store.set(STORAGE_KEYS.TABLE_DENSITY, 'ultra');
+  assert(readRawStorage<'comfortable' | 'compact' | 'ultra'>(STORAGE_KEYS.TABLE_DENSITY, tableDensitySchema, 'compact') === 'ultra',
+    'readRawStorage: recupera la densidad cruda existente, sin reinterpretarla como JSON');
+  store.set(STORAGE_KEYS.TABLE_DENSITY, 'gigante');
+  assert(readRawStorage<'comfortable' | 'compact' | 'ultra'>(STORAGE_KEYS.TABLE_DENSITY, tableDensitySchema, 'compact') === 'compact',
+    'readRawStorage: un valor corrupto cae en el fallback');
+  store.delete(STORAGE_KEYS.TABLE_DENSITY);
+  assert(readRawStorage<'comfortable' | 'compact' | 'ultra'>(STORAGE_KEYS.TABLE_DENSITY, tableDensitySchema, 'compact') === 'compact',
+    'readRawStorage: clave ausente devuelve el fallback');
+  writeRawStorage(STORAGE_KEYS.TABLE_DENSITY, 'comfortable');
+  assert(store.get(STORAGE_KEYS.TABLE_DENSITY) === 'comfortable',
+    'writeRawStorage: escribe la cadena cruda, sin comillas de JSON');
 
   // objectArraySchema: listas de objetos operativos (cola offline, bitacora,
   // campanas, sesiones, items demo). Un null o un objeto suelto se devolvia como
