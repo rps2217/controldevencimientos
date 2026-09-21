@@ -2,61 +2,37 @@ import React from 'react';
 import { 
   Printer, Settings, Barcode, Mail, MessageSquare, Download, Flame, Edit2, Trash2, Sliders, X 
 } from 'lucide-react';
-import { InventoryItem, SheetConfig } from '../../types';
-import { isActionEnabledForTable, BulkActionContext, buildBulkActionContext } from '../../utils/bulkActionsRegistry';
+import { isActionEnabledForTable, buildBulkActionContext } from '../../utils/bulkActionsRegistry';
 import { VIRTUAL_COLUMNS } from '../../utils/virtualColumns';
 import { parseAnyDate } from '../../utils/pureCalculations';
 import { exportToExcel } from '../../utils/exportUtils';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
 
-export interface FloatingBulkActionBarProps {
-  selectedRowIds?: number[];
-  filteredItems?: InventoryItem[];
-  activeView?: string;
-  bulkActionCtx?: BulkActionContext;
-  sheetConfig?: SheetConfig;
-  headers?: string[];
-  visibleHeaders?: string[];
-  columnLabelsMap?: Record<string, string>;
-  products?: any[];
-  policies?: any[];
-  handlePrintTicket?: (items: InventoryItem[], mode: 'standard' | 'barcode') => void;
-  setIsTicketConfigOpen?: (open: boolean) => void;
-  setIsGmailModalOpen?: (open: boolean) => void;
-  setWhatsAppModalItems?: (items: any[]) => void;
-  setIsWhatsAppModalOpen?: (open: boolean) => void;
-  setIsPmReportOpen?: (open: boolean) => void;
-  setIsBulkEditOpen?: (open: boolean) => void;
-  handleBulkDelete?: () => void;
-  setIsBulkActionsConfigOpen?: (open: boolean) => void;
-  setSelectedRowIds?: ((ids: number[]) => void) | React.Dispatch<React.SetStateAction<number[]>>;
-}
-
-export const FloatingBulkActionBar: React.FC<FloatingBulkActionBarProps> = (props) => {
+export const FloatingBulkActionBar: React.FC = () => {
   const dashboard = useDashboard();
   const modalsActions = useModalsActions();
 
-  const selectedRowIds = props.selectedRowIds ?? dashboard.selectedRowIds ?? [];
-  const filteredItems = props.filteredItems ?? dashboard.filteredItems ?? [];
-  const activeView = props.activeView ?? dashboard.activeView;
-  const sheetConfig = props.sheetConfig ?? dashboard.sheetConfig;
-  const headers = props.headers ?? dashboard.headers ?? [];
-  const visibleHeaders = props.visibleHeaders ?? dashboard.visibleHeaders ?? [];
-  const columnLabelsMap = props.columnLabelsMap ?? dashboard.columnLabelsMap ?? {};
-  const products = props.products ?? dashboard.products ?? [];
-  const policies = props.policies ?? dashboard.policies ?? [];
-  const handlePrintTicket = props.handlePrintTicket ?? dashboard.handlePrintTicket;
-  const setIsTicketConfigOpen = props.setIsTicketConfigOpen ?? modalsActions.setIsTicketConfigOpen;
-  const setIsGmailModalOpen = props.setIsGmailModalOpen ?? modalsActions.setIsGmailModalOpen;
-  const setWhatsAppModalItems = props.setWhatsAppModalItems ?? modalsActions.setWhatsAppModalItems;
-  const setIsWhatsAppModalOpen = props.setIsWhatsAppModalOpen ?? modalsActions.setIsWhatsAppModalOpen;
-  const setIsPmReportOpen = props.setIsPmReportOpen ?? modalsActions.setIsPmReportOpen;
-  const setIsBulkEditOpen = props.setIsBulkEditOpen ?? modalsActions.setIsBulkEditOpen;
-  const handleBulkDelete = props.handleBulkDelete ?? dashboard.handleBulkDelete;
-  const setIsBulkActionsConfigOpen = props.setIsBulkActionsConfigOpen ?? modalsActions.setIsBulkActionsConfigOpen;
-  const setSelectedRowIds = props.setSelectedRowIds ?? dashboard.setSelectedRowIds ?? (() => {});
-  const bulkActionCtx = props.bulkActionCtx ?? dashboard.bulkActionCtx ?? buildBulkActionContext(headers, activeView, activeView);
+  const selectedRowIds = dashboard.selectedRowIds ?? [];
+  const filteredItems = dashboard.filteredItems ?? [];
+  const activeView = dashboard.activeView;
+  const sheetConfig = dashboard.sheetConfig;
+  const headers = dashboard.headers ?? [];
+  const visibleHeaders = dashboard.visibleHeaders ?? [];
+  const columnLabelsMap = dashboard.columnLabelsMap ?? {};
+  const products = dashboard.products ?? [];
+  const policies = dashboard.policies ?? [];
+  const handlePrintTicket = dashboard.handlePrintTicket;
+  const setIsTicketConfigOpen = modalsActions.setIsTicketConfigOpen;
+  const setIsGmailModalOpen = modalsActions.setIsGmailModalOpen;
+  const setWhatsAppModalItems = modalsActions.setWhatsAppModalItems;
+  const setIsWhatsAppModalOpen = modalsActions.setIsWhatsAppModalOpen;
+  const setIsPmReportOpen = modalsActions.setIsPmReportOpen;
+  const setIsBulkEditOpen = modalsActions.setIsBulkEditOpen;
+  const handleBulkDelete = dashboard.handleBulkDelete;
+  const setIsBulkActionsConfigOpen = modalsActions.setIsBulkActionsConfigOpen;
+  const setSelectedRowIds = dashboard.setSelectedRowIds ?? (() => {});
+  const bulkActionCtx = dashboard.bulkActionCtx ?? buildBulkActionContext(headers, activeView, activeView);
   if (selectedRowIds.length === 0 || activeView === 'schema' || activeView === 'analytics') {
     return null;
   }

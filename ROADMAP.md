@@ -1,6 +1,6 @@
 # Plan de Reforma Arquitectónica
 
-Estado: **Fase 0 completada**. Fases 1–6 pendientes.
+Estado: **Fases 0 y 2 completadas**; Fases 1 (1.3 en curso), 3–6 pendientes.
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
 Protocolo Ponytail: cada fase busca el código mínimo efectivo, sin dependencias nuevas salvo justificación explícita.
 
@@ -42,7 +42,7 @@ refactorizar a la vez multiplica el riesgo.
 - [x] Pruebas de caracterización del cableado de agrupación (`tests/components.test.tsx`).
       Verificado que **fallan** si se reintroduce el no-op silencioso.
 - [x] Regla ESLint `no-restricted-syntax` que prohíbe `props.X ?? dashboard.X` en código
-      nuevo, con la lista actual de 11 archivos congelada en `overrides`.
+      nuevo, con la lista de archivos pendientes congelada en `overrides` (hoy solo `Sidebar`).
 - [x] Script `npm run verify` = `tsc --noEmit && eslint src tests && npm test`.
 
 Nota: el DOM se instala con guarda de idempotencia y **solo** en las pruebas que lo
@@ -302,10 +302,38 @@ Nota sobre jsdom: `tests/baseline.probe.tsx` sirve para contar commits, pero sus
 milisegundos no son extrapolables (la tabla virtualizada mide 0 sin
 `ResizeObserver`). Para latencias, el instrumento CDP.
 
-### Fase 2 — Eliminar el doble camino
+### Fase 2 — Eliminar el doble camino · COMPLETADA (10 de 11)
 
-Migrar los 11 archivos a leer **solo** del contexto. Al terminar, `grep -c "?? dashboard\."`
-= 0 y la lista de `overrides` en `eslint.config.mjs` debe quedar vacía.
+Migrar los 11 archivos a leer **solo** del contexto. Resultado: **168 → 6** ocurrencias
+de `props.X ?? dashboard.X`; la lista de `overrides` pasa de 11 archivos a **1**.
+
+**Hecho**: migrados `InventoryTable` (59), `DashboardTopNav` (23), `ViewConfigControlDrawer`
+(22), `DashboardFilterPanels` (21), `FloatingBulkActionBar` (13), `DashboardTableContainer`
+(8), `DashboardPageHeader` (6), `DashboardMobileDrawer` (4), `DashboardMobileFABs` (3) y
+`ZenModeOverlay` (3). Todos se renderizan sin props (o, en el caso de la tabla, el
+contenedor dejó de reenviar `{...props}`), así que la ruta por props era código muerto.
+
+Se eliminaron además las interfaces `*Props` que quedaron huérfanas y los imports de tipos
+que solo existían para declararlas. Las 3 advertencias `useMemo` que quedaban en
+`InventoryTable`/`ViewConfigControlDrawer` salen de sus listas de dependencias.
+
+**Desviación honesta del objetivo "= 0"**: `Sidebar` **no** migra. `DashboardMobileDrawer`
+le pasa props con comportamiento propio —su `setActiveView` además cierra el menú móvil—,
+así que necesita la ruta por props *y* el contexto. Es doble camino legítimo, no deuda.
+Eliminarlo exigiría o bien que el drawer duplique el menú, o bien un contexto nuevo para un
+solo consumidor: superficie añadida sin beneficio medido. Se documenta y se deja. La meta
+"lista vacía" se relaja a "solo la excepción justificada".
+
+**Hallazgo colateral (código muerto real)**: `ViewConfigControlDrawer` tenía el botón
+"Espejo Backend REST / Dual-Write" tras `props.onOpenBackendMirror &&`, prop que **nadie
+pasaba y sin fallback de contexto**: nunca se renderizó. El acceso al espejo sigue en la
+pestaña correspondiente de `GlobalConfigModal`, así que el botón se eliminó (y el icono
+`Database` con él). Era el único prop de todo el repo con la forma `= props.X;` sin fallback.
+
+**Evidencia**: `npm run verify` verde (148 unitarias + 7 de componente, 0 fallos), 0 errores
+de ESLint, build PWA OK. E2E sobre el build de producción: `groupcheck`, `modals`,
+`printcheck` y `searchcheck` en OK. Diff neto **−332 líneas** (242 inserciones, 574 borrados)
+en 11 archivos.
 
 ### Fase 3 — Delgazar `InventoryDashboard.tsx` (~2.190 líneas, ~34 `useState`)
 

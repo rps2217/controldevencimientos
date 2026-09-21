@@ -2,71 +2,27 @@ import React from 'react';
 import { 
   Sliders, Plus, Layers, SlidersHorizontal, Upload
 } from 'lucide-react';
-import { SheetProperties, TableSlice } from '../../types';
 import { SLICE_COLOR_CLASSES } from '../../utils/sliceRegistry';
 import { SliceIcon } from '../slices/SliceSelectorBar';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
 
-export interface DashboardPageHeaderProps {
-  activeView?: string;
-  isRelationalActive?: boolean;
-  setIsBulkImportOpen?: (open: boolean) => void;
-  onOpenCreateSlice?: () => void;
-  onOpenSliceManager?: () => void;
-  activeSlice?: TableSlice | null;
-  onOpenViewConfig?: () => void;
-  // Slices integration
-  slices?: TableSlice[];
-  activeSliceId?: string | null;
-  onSelectSlice?: (slice: TableSlice | null) => void;
-  sliceCounts?: Record<string, number>;
-  totalItemsCount?: number;
-  
-  // Keep standard props as optional for interface compatibility
-  isViewMenuOpen?: boolean;
-  setIsViewMenuOpen?: (open: boolean) => void;
-  groupByColumn?: string;
-  setGroupByColumn?: (col: string) => void;
-  groupByDirection?: 'asc' | 'desc';
-  onToggleGroupByDirection?: () => void;
-  visibleHeaders?: string[];
-  setIsColumnManagerOpen?: (open: boolean) => void;
-  areFiltersVisible?: boolean;
-  setAreFiltersVisible?: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsTicketConfigOpen?: (open: boolean) => void;
-  hasCustomColWidths?: boolean;
-  handleResetColWidths?: () => void;
-  isSummaryView?: boolean;
-  onToggleSummaryView?: () => void;
-  isZenMode?: boolean;
-  onToggleZenMode?: () => void;
-  onOpenStockCount?: () => void;
-  onToggleStickyColumns?: () => void;
-  isStickyEnabled?: boolean;
-  activeSheet?: SheetProperties | null;
-  isModalOpen?: boolean;
-  handleOpenModal?: () => void;
-  onEditSlice?: (slice: TableSlice) => void;
-  setIsScriptModalOpen?: (open: boolean) => void;
-}
-
-export const DashboardPageHeader: React.FC<DashboardPageHeaderProps> = (props) => {
+export const DashboardPageHeader: React.FC = () => {
   const dashboard = useDashboard();
   const modalsActions = useModalsActions();
   const rightDrawer = useRightDrawer();
 
-  const activeView = props.activeView ?? dashboard.activeView;
-  const setIsBulkImportOpen = props.setIsBulkImportOpen ?? modalsActions.setIsBulkImportOpen;
-  const onOpenCreateSlice = props.onOpenCreateSlice ?? (() => modalsActions.openSliceEditor(null));
-  const onOpenSliceManager = props.onOpenSliceManager ?? (() => modalsActions.setIsSliceManagerOpen(true));
-  const onOpenViewConfig = props.onOpenViewConfig ?? (() => rightDrawer.setIsRightDrawerOpen(true));
-  const slices = props.slices ?? dashboard.visibleTableSlices ?? dashboard.currentTableSlices ?? [];
-  const activeSliceId = props.activeSliceId ?? dashboard.activeSliceId ?? null;
-  const onSelectSlice = props.onSelectSlice ?? dashboard.handleSelectSlice ?? (() => {});
-  const sliceCounts = props.sliceCounts ?? dashboard.sliceCounts ?? {};
-  const totalItemsCount = props.totalItemsCount ?? dashboard.items?.length ?? 0;
+  const activeView = dashboard.activeView;
+  const setIsBulkImportOpen = modalsActions.setIsBulkImportOpen;
+  const onOpenCreateSlice = () => modalsActions.openSliceEditor(null);
+  const onOpenSliceManager = () => modalsActions.setIsSliceManagerOpen(true);
+  const onOpenViewConfig = () => rightDrawer.setIsRightDrawerOpen(true);
+  const slices = dashboard.visibleTableSlices ?? dashboard.currentTableSlices ?? [];
+  const activeSliceId = dashboard.activeSliceId ?? null;
+  const onSelectSlice = dashboard.handleSelectSlice ?? (() => {});
+  const sliceCounts = dashboard.sliceCounts ?? {};
+  const totalItemsCount = dashboard.items?.length ?? 0;
   const hasSlices = slices.length > 0 && activeView !== 'schema' && activeView !== 'analytics';
 
   return (

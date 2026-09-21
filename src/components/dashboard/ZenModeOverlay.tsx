@@ -4,32 +4,24 @@ import { useDashboard } from '../../context/DashboardContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
 import { useDebouncedSearch } from '../../hooks/useDebouncedSearch';
 
-export interface ZenModeOverlayProps {
-  isZenMode?: boolean;
-  searchTerm?: string;
-  setSearchTerm?: (term: string) => void;
-  onOpenSettings?: () => void;
-  onExitZenMode?: () => void;
-}
-
-export const ZenModeOverlay: React.FC<ZenModeOverlayProps> = (props) => {
+export const ZenModeOverlay: React.FC = () => {
   const dashboard = useDashboard();
   const rightDrawer = useRightDrawer();
 
-  const isZenMode = props.isZenMode ?? dashboard.isZenMode ?? false;
-  const searchTerm = props.searchTerm ?? dashboard.searchTerm ?? '';
-  const setSearchTerm = props.setSearchTerm ?? dashboard.setSearchTerm;
+  const isZenMode = dashboard.isZenMode ?? false;
+  const searchTerm = dashboard.searchTerm ?? '';
+  const setSearchTerm = dashboard.setSearchTerm;
   const {
     inputRef: searchInputRef,
     typed: typedSearch,
     onChange: commitSearch,
     clear: clearSearch
   } = useDebouncedSearch(searchTerm, setSearchTerm);
-  const onOpenSettings = props.onOpenSettings ?? (() => rightDrawer.setIsRightDrawerOpen(true));
-  const onExitZenMode = props.onExitZenMode ?? (() => {
+  const onOpenSettings = () => rightDrawer.setIsRightDrawerOpen(true);
+  const onExitZenMode = () => {
     dashboard.setIsZenMode?.(false);
     dashboard.showToast?.('Modo Zen desactivado', 'info', 'Enfoque');
-  });
+  };
 
   if (!isZenMode) return null;
 

@@ -1,30 +1,23 @@
 import React from 'react';
-import { InventoryTable, InventoryTableProps } from '../InventoryTable';
+import { InventoryTable } from '../InventoryTable';
 import { useDashboard } from '../../context/DashboardContext';
 
-export interface DashboardTableContainerProps extends InventoryTableProps {
-  totalItemsCount?: number;
-  groupedItems?: any[] | null;
-  groupByDirection?: 'asc' | 'desc';
-  toggleGroupByDirection?: () => void;
-}
-
-export const DashboardTableContainer: React.FC<DashboardTableContainerProps> = (props) => {
+export const DashboardTableContainer: React.FC = () => {
   const dashboard = useDashboard();
 
-  const totalItemsCount = props.totalItemsCount ?? dashboard.items?.length ?? 0;
-  const groupedItems = props.groupedItems ?? dashboard.groupedItems ?? null;
-  const groupByDirection = props.groupByDirection ?? dashboard.groupByDirection ?? 'asc';
-  const toggleGroupByDirection = props.toggleGroupByDirection ?? dashboard.toggleGroupByDirection;
+  const totalItemsCount = dashboard.items?.length ?? 0;
+  const groupedItems = dashboard.groupedItems ?? null;
+  const groupByDirection = dashboard.groupByDirection ?? 'asc';
+  const toggleGroupByDirection = dashboard.toggleGroupByDirection;
 
-  const filteredItems = props.filteredItems ?? dashboard.filteredItems ?? [];
-  const groupByColumn = props.groupByColumn ?? dashboard.groupByColumn;
-  const expandAllGroups = props.expandAllGroups ?? dashboard.expandAllGroups;
-  const collapseAllGroups = props.collapseAllGroups ?? dashboard.collapseAllGroups;
+  const filteredItems = dashboard.filteredItems ?? [];
+  const groupByColumn = dashboard.groupByColumn;
+  const expandAllGroups = dashboard.expandAllGroups;
+  const collapseAllGroups = dashboard.collapseAllGroups;
 
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 md:bg-white md:dark:bg-slate-900 md:border border-slate-200 dark:border-slate-800 md:rounded-3xl md:shadow-sm overflow-hidden min-h-0 relative">
-      <InventoryTable {...props} />
+      <InventoryTable />
 
       {/* Footer summary bar */}
       <div className="hidden md:flex p-3 bg-slate-100 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 flex-col sm:flex-row justify-between items-center gap-2">

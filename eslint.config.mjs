@@ -60,20 +60,13 @@ export default tseslint.config(
     }
   },
   {
-    // Deuda técnica congelada (Fase 2). Estos archivos todavía usan el patrón
-    // doble-camino; la lista solo puede ENCOGER. Al migrar uno, quitar su línea.
+    // Deuda técnica congelada (Fase 2). A estos archivos aún les quedan props
+    // por compatibilidad con quien los monta; la lista solo puede ENCOGER.
+    // `Sidebar` es la única excepción real: `DashboardMobileDrawer` le pasa
+    // props con comportamiento propio (cerrar el menú al navegar), por lo que
+    // necesita la ruta por props además del contexto.
     files: [
-      'src/components/InventoryTable.tsx',
-      'src/components/navigation/DashboardTopNav.tsx',
-      'src/components/drawers/ViewConfigControlDrawer.tsx',
-      'src/components/views/DashboardFilterPanels.tsx',
-      'src/components/dashboard/FloatingBulkActionBar.tsx',
-      'src/components/dashboard/DashboardTableContainer.tsx',
-      'src/components/navigation/DashboardPageHeader.tsx',
       'src/components/navigation/Sidebar.tsx',
-      'src/components/dashboard/DashboardMobileDrawer.tsx',
-      'src/components/dashboard/ZenModeOverlay.tsx',
-      'src/components/dashboard/DashboardMobileFABs.tsx',
     ],
     rules: {
       'no-restricted-syntax': 'off'

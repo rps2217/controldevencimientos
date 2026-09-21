@@ -10,7 +10,6 @@ import {
   Maximize2,
   Minimize2,
   Table,
-  Database,
   FileSpreadsheet,
   Settings2,
   CheckCircle2,
@@ -27,7 +26,7 @@ import {
   Barcode,
   Download
 } from 'lucide-react';
-import { SheetConfig, TableSlice } from '../../types';
+import { TableSlice } from '../../types';
 import { BUILT_IN_SLICES } from '../../utils/sliceRegistry';
 import { VIRTUAL_COLUMNS } from '../../utils/virtualColumns';
 import { parseAnyDate } from '../../utils/dateCalculations';
@@ -38,66 +37,6 @@ import { useModalsActions } from '../../context/ModalsContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
 
 import { STORAGE_KEYS } from '../../utils/appStorage';
-export interface ViewConfigControlDrawerProps {
-  isOpen?: boolean;
-  onClose?: () => void;
-  // Column visibility
-  allHeaders?: string[];
-  hiddenColumns?: string[];
-  onToggleColumnVisibility?: (header: string) => void;
-  onResetColumns?: () => void;
-  onShowAllColumns?: () => void;
-  // Slices
-  activeTableKey?: string;
-  activeSliceId?: string | null;
-  onSelectSlice?: (sliceId: string | null) => void;
-  customSlices?: TableSlice[];
-  onOpenSliceEditor?: (sliceToEdit?: TableSlice) => void;
-  // Table presentation & Zen mode
-  isZenMode?: boolean;
-  onToggleZenMode?: () => void;
-  tableDensity?: 'comfortable' | 'compact' | 'ultra';
-  onChangeTableDensity?: (density: 'comfortable' | 'compact' | 'ultra') => void;
-  // External configs
-  sheetConfig?: SheetConfig;
-  onOpenGlobalConfig?: () => void;
-  onOpenBulkActionsConfig?: () => void;
-  onOpenSchemaEditor?: () => void;
-  onOpenBackendMirror?: () => void;
-  // Stats
-  totalItemsCount?: number;
-  filteredItemsCount?: number;
-  // Grouping (shifted from page header)
-  groupByColumn?: string;
-  setGroupByColumn?: (col: string) => void;
-  groupByDirection?: 'asc' | 'desc';
-  onToggleGroupByDirection?: () => void;
-  // Summary view (shifted from page header)
-  isSummaryView?: boolean;
-  onToggleSummaryView?: () => void;
-  // KPIs (shifted from page header)
-  areFiltersVisible?: boolean;
-  onToggleFiltersVisible?: () => void;
-  // Sticky Columns (shifted from page header)
-  isStickyEnabled?: boolean;
-  onToggleStickyColumns?: () => void;
-  // Column Widths (shifted from page header)
-  hasCustomColWidths?: boolean;
-  handleResetColWidths?: () => void;
-  // Ticket configuration (shifted from page header dropdown)
-  onOpenTicketConfig?: () => void;
-  // Actions & Export Props
-  activeSheetTitle?: string;
-  filteredItems?: any[];
-  products?: any[];
-  policies?: any[];
-  drainageReportItems?: any[];
-  visibleHeaders?: string[];
-  handlePrintTicket?: (items: any[], mode?: 'standard' | 'barcode') => void;
-  setIsGmailModalOpen?: (open: boolean) => void;
-  setIsWhatsAppModalOpen?: (open: boolean) => void;
-  setIsPmReportOpen?: (open: boolean) => void;
-}
 
 const DENSITY_OPTIONS = [
   { id: 'comfortable', label: 'Cómoda', desc: 'Espaciosa' },
@@ -105,77 +44,74 @@ const DENSITY_OPTIONS = [
   { id: 'ultra', label: 'Ultra', desc: 'Máx. Datos' },
 ] as const;
 
-export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (props) => {
+export const ViewConfigControlDrawer: React.FC = () => {
   const dashboard = useDashboard();
   const modalsActions = useModalsActions();
   const rightDrawer = useRightDrawer();
 
-  const isOpen = props.isOpen ?? rightDrawer.isRightDrawerOpen ?? false;
-  const onClose = props.onClose ?? (() => rightDrawer.setIsRightDrawerOpen(false));
+  const isOpen = rightDrawer.isRightDrawerOpen ?? false;
+  const onClose = () => rightDrawer.setIsRightDrawerOpen(false);
   const allHeaders = useMemo(
-    () => props.allHeaders ?? dashboard.headers ?? [],
-    [props.allHeaders, dashboard.headers]
+    () => dashboard.headers ?? [],
+    [dashboard.headers]
   );
-  const hiddenColumns = props.hiddenColumns ?? (dashboard.hiddenColumns?.[dashboard.activeView] || []);
-  const onToggleColumnVisibility = props.onToggleColumnVisibility ?? ((h: string) => dashboard.toggleVisibility?.(h));
-  const onResetColumns = props.onResetColumns ?? (() => dashboard.resetColumnOrder?.());
-  const onShowAllColumns = props.onShowAllColumns ?? (() => dashboard.showAllColumns?.());
-  const activeTableKey = props.activeTableKey ?? dashboard.activeView;
-  const activeSliceId = props.activeSliceId ?? dashboard.activeSliceId;
-  const onSelectSlice = props.onSelectSlice ?? ((sliceId: string | null) => {
+  const hiddenColumns = dashboard.hiddenColumns?.[dashboard.activeView] || [];
+  const onToggleColumnVisibility = (h: string) => dashboard.toggleVisibility?.(h);
+  const onResetColumns = () => dashboard.resetColumnOrder?.();
+  const onShowAllColumns = () => dashboard.showAllColumns?.();
+  const activeTableKey = dashboard.activeView;
+  const activeSliceId = dashboard.activeSliceId;
+  const onSelectSlice = (sliceId: string | null) => {
     if (!sliceId) {
       dashboard.handleSelectSlice?.(null);
     } else {
       const found = dashboard.currentTableSlices?.find(s => s.id === sliceId);
       dashboard.handleSelectSlice?.(found || null);
     }
-  });
-  const customSlices = props.customSlices ?? dashboard.customSlices ?? [];
-  const onOpenSliceEditor = props.onOpenSliceEditor ?? ((slice?: TableSlice) => {
+  };
+  const customSlices = dashboard.customSlices ?? [];
+  const onOpenSliceEditor = (slice?: TableSlice) => {
     modalsActions.openSliceEditor(slice || null);
-  });
-  const isZenMode = props.isZenMode ?? dashboard.isZenMode ?? false;
-  const onToggleZenMode = props.onToggleZenMode ?? (() => {
+  };
+  const isZenMode = dashboard.isZenMode ?? false;
+  const onToggleZenMode = () => {
     const next = !dashboard.isZenMode;
     dashboard.setIsZenMode?.(next);
     dashboard.showToast?.(next ? 'Modo Zen activado (Presiona Esc para salir)' : 'Modo Zen desactivado', 'info', 'Enfoque');
-  });
-  const tableDensity = props.tableDensity ?? dashboard.tableDensity ?? 'comfortable';
-  const onChangeTableDensity = props.onChangeTableDensity ?? ((d) => dashboard.setTableDensity?.(d));
-  const sheetConfig = props.sheetConfig ?? dashboard.sheetConfig;
-  const onOpenGlobalConfig = props.onOpenGlobalConfig ?? (() => modalsActions.setIsConfigOpen?.(true));
-  const onOpenBulkActionsConfig = props.onOpenBulkActionsConfig ?? (() => modalsActions.setIsBulkActionsConfigOpen?.(true));
-  const onOpenSchemaEditor = props.onOpenSchemaEditor ?? (() => dashboard.setActiveView?.('schema'));
-  const onOpenBackendMirror = props.onOpenBackendMirror;
-  const totalItemsCount = props.totalItemsCount ?? dashboard.items?.length ?? 0;
-  const filteredItemsCount = props.filteredItemsCount ?? dashboard.filteredItems?.length ?? 0;
-  const groupByColumn = props.groupByColumn ?? dashboard.groupByColumn ?? 'none';
-  const setGroupByColumn = props.setGroupByColumn ?? dashboard.handleSetGroupByColumn;
-  const groupByDirection = props.groupByDirection ?? dashboard.groupByDirection ?? 'asc';
-  const onToggleGroupByDirection = props.onToggleGroupByDirection ?? (
-    dashboard.handleSetGroupByDirection
-      ? () => dashboard.handleSetGroupByDirection?.(dashboard.groupByDirection === 'desc' ? 'asc' : 'desc')
-      : undefined
-  );
-  const isSummaryView = props.isSummaryView ?? dashboard.isSummaryView ?? false;
-  const onToggleSummaryView = props.onToggleSummaryView ?? (() => dashboard.handleToggleSummaryView?.());
-  const areFiltersVisible = props.areFiltersVisible ?? dashboard.areFiltersVisible ?? true;
-  const onToggleFiltersVisible = props.onToggleFiltersVisible ?? (() => dashboard.setAreFiltersVisible?.(prev => !prev));
-  const isStickyEnabled = props.isStickyEnabled ?? (dashboard.sheetConfig?.enableStickyColumns === true);
-  const onToggleStickyColumns = props.onToggleStickyColumns ?? (() => dashboard.handleToggleStickyColumns?.());
-  const hasCustomColWidths = props.hasCustomColWidths ?? dashboard.hasCustomColWidths ?? false;
-  const handleResetColWidths = props.handleResetColWidths ?? (() => dashboard.handleResetColWidths?.());
-  const onOpenTicketConfig = props.onOpenTicketConfig ?? (() => modalsActions.setIsTicketConfigOpen?.(true));
-  const activeSheetTitle = props.activeSheetTitle ?? dashboard.activeSheet?.title;
-  const filteredItems = props.filteredItems ?? dashboard.filteredItems ?? [];
-  const products = props.products ?? dashboard.products ?? [];
-  const policies = props.policies ?? dashboard.policies ?? [];
-  const drainageReportItems = props.drainageReportItems ?? dashboard.drainageReportItems ?? [];
-  const visibleHeaders = props.visibleHeaders ?? dashboard.visibleHeaders ?? [];
-  const handlePrintTicket = props.handlePrintTicket ?? dashboard.handlePrintTicket;
-  const setIsGmailModalOpen = props.setIsGmailModalOpen ?? modalsActions.setIsGmailModalOpen;
-  const setIsWhatsAppModalOpen = props.setIsWhatsAppModalOpen ?? modalsActions.setIsWhatsAppModalOpen;
-  const setIsPmReportOpen = props.setIsPmReportOpen ?? modalsActions.setIsPmReportOpen;
+  };
+  const tableDensity = dashboard.tableDensity ?? 'comfortable';
+  const onChangeTableDensity = (d: 'comfortable' | 'compact' | 'ultra') => dashboard.setTableDensity?.(d);
+  const sheetConfig = dashboard.sheetConfig;
+  const onOpenGlobalConfig = () => modalsActions.setIsConfigOpen?.(true);
+  const onOpenBulkActionsConfig = () => modalsActions.setIsBulkActionsConfigOpen?.(true);
+  const onOpenSchemaEditor = () => dashboard.setActiveView?.('schema');
+  const totalItemsCount = dashboard.items?.length ?? 0;
+  const filteredItemsCount = dashboard.filteredItems?.length ?? 0;
+  const groupByColumn = dashboard.groupByColumn ?? 'none';
+  const setGroupByColumn = dashboard.handleSetGroupByColumn;
+  const groupByDirection = dashboard.groupByDirection ?? 'asc';
+  const onToggleGroupByDirection = dashboard.handleSetGroupByDirection
+    ? () => dashboard.handleSetGroupByDirection?.(dashboard.groupByDirection === 'desc' ? 'asc' : 'desc')
+    : undefined;
+  const isSummaryView = dashboard.isSummaryView ?? false;
+  const onToggleSummaryView = () => dashboard.handleToggleSummaryView?.();
+  const areFiltersVisible = dashboard.areFiltersVisible ?? true;
+  const onToggleFiltersVisible = () => dashboard.setAreFiltersVisible?.(prev => !prev);
+  const isStickyEnabled = dashboard.sheetConfig?.enableStickyColumns === true;
+  const onToggleStickyColumns = () => dashboard.handleToggleStickyColumns?.();
+  const hasCustomColWidths = dashboard.hasCustomColWidths ?? false;
+  const handleResetColWidths = () => dashboard.handleResetColWidths?.();
+  const onOpenTicketConfig = () => modalsActions.setIsTicketConfigOpen?.(true);
+  const activeSheetTitle = dashboard.activeSheet?.title;
+  const filteredItems = dashboard.filteredItems ?? [];
+  const products = dashboard.products ?? [];
+  const policies = dashboard.policies ?? [];
+  const drainageReportItems = dashboard.drainageReportItems ?? [];
+  const visibleHeaders = dashboard.visibleHeaders ?? [];
+  const handlePrintTicket = dashboard.handlePrintTicket;
+  const setIsGmailModalOpen = modalsActions.setIsGmailModalOpen;
+  const setIsWhatsAppModalOpen = modalsActions.setIsWhatsAppModalOpen;
+  const setIsPmReportOpen = modalsActions.setIsPmReportOpen;
   const [activeTab, setActiveTab] = useState<'view' | 'columns' | 'slices' | 'actions' | 'system'>('view');
   const [columnSearch, setColumnSearch] = useState('');
 
@@ -955,23 +891,6 @@ export const ViewConfigControlDrawer: React.FC<ViewConfigControlDrawerProps> = (
                     </span>
                     <span className="text-[10px] text-slate-400">Abrir →</span>
                   </button>
-
-                  {onOpenBackendMirror && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        onOpenBackendMirror();
-                      }}
-                      className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-between transition-all text-left"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Database className="w-4 h-4 text-amber-600" />
-                        Espejo Backend REST / Dual-Write
-                      </span>
-                      <span className="text-[10px] text-slate-400">Espejo →</span>
-                    </button>
-                  )}
 
                   {onOpenTicketConfig && (
                     <button

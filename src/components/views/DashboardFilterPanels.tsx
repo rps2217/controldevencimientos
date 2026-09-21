@@ -1,65 +1,38 @@
 import React from 'react';
 import { Upload, Plus, FileWarning } from 'lucide-react';
-import { InventoryItem, SheetProperties } from '../../types';
 import { EventResolutionCards } from './EventResolutionCards';
 import { EventFilterChips } from './EventFilterChips';
 import { PmRadarCards } from './PmRadarCards';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
 
-export interface DashboardFilterPanelsProps {
-  areFiltersVisible?: boolean;
-  quickChips?: string[];
-  activeQuickChip?: string | null;
-  setActiveQuickChip?: (chip: string | null) => void;
-  activeView?: string;
-  activeSheet?: SheetProperties | null;
-  items?: InventoryItem[];
-  eventResolutionFilter?: string[];
-  setEventResolutionFilter?: React.Dispatch<React.SetStateAction<string[]>>;
-  handleFilterToggle?: <T>(prev: T[], val: T, isMulti: boolean) => T[];
-  eventResolutionMetrics?: any;
-  eventFilter?: any[];
-  setEventFilter?: React.Dispatch<React.SetStateAction<any[]>>;
-  eventMetrics?: any;
-  frcBodValues?: string[];
-  frcBodCounts?: Record<string, number>;
-  frcBodFilter?: string[];
-  setFrcBodFilter?: React.Dispatch<React.SetStateAction<string[]>>;
-  pmRadarFilter?: string[];
-  setPmRadarFilter?: React.Dispatch<React.SetStateAction<string[]>>;
-  pmMetrics?: any;
-  onOpenBulkImport?: () => void;
-  onOpenNewItemModal?: () => void;
-}
-
-export const DashboardFilterPanels: React.FC<DashboardFilterPanelsProps> = (props) => {
+export const DashboardFilterPanels: React.FC = () => {
   const dashboard = useDashboard();
   const modalsActions = useModalsActions();
 
-  const areFiltersVisible = props.areFiltersVisible ?? dashboard.areFiltersVisible ?? false;
-  const quickChips = props.quickChips ?? dashboard.quickChips ?? [];
-  const activeQuickChip = props.activeQuickChip ?? dashboard.activeQuickChip ?? null;
-  const setActiveQuickChip = props.setActiveQuickChip ?? dashboard.setActiveQuickChip ?? (() => {});
-  const activeView = props.activeView ?? dashboard.activeView;
-  const activeSheet = props.activeSheet ?? dashboard.activeSheet;
-  const items = props.items ?? dashboard.items ?? [];
-  const eventResolutionFilter = props.eventResolutionFilter ?? dashboard.eventResolutionFilter ?? [];
-  const setEventResolutionFilter = props.setEventResolutionFilter ?? dashboard.setEventResolutionFilter ?? (() => {});
-  const handleFilterToggle = props.handleFilterToggle ?? dashboard.handleFilterToggle ?? ((prev, _val) => prev);
-  const eventResolutionMetrics = props.eventResolutionMetrics ?? dashboard.eventResolutionMetrics;
-  const eventFilter = props.eventFilter ?? dashboard.eventFilter ?? [];
-  const setEventFilter = props.setEventFilter ?? dashboard.setEventFilter ?? (() => {});
-  const eventMetrics = props.eventMetrics ?? dashboard.eventMetrics;
-  const frcBodValues = props.frcBodValues ?? dashboard.frcBodValues ?? [];
-  const frcBodCounts = props.frcBodCounts ?? dashboard.frcBodCounts ?? {};
-  const frcBodFilter = props.frcBodFilter ?? dashboard.frcBodFilter ?? [];
-  const setFrcBodFilter = props.setFrcBodFilter ?? dashboard.setFrcBodFilter ?? (() => {});
-  const pmRadarFilter = props.pmRadarFilter ?? dashboard.pmRadarFilter ?? [];
-  const setPmRadarFilter = props.setPmRadarFilter ?? dashboard.setPmRadarFilter ?? (() => {});
-  const pmMetrics = props.pmMetrics ?? dashboard.pmMetrics;
-  const onOpenBulkImport = props.onOpenBulkImport ?? (() => modalsActions.setIsBulkImportOpen(true));
-  const onOpenNewItemModal = props.onOpenNewItemModal ?? (() => dashboard.handleOpenModal());
+  const areFiltersVisible = dashboard.areFiltersVisible ?? false;
+  const quickChips = dashboard.quickChips ?? [];
+  const activeQuickChip = dashboard.activeQuickChip ?? null;
+  const setActiveQuickChip = dashboard.setActiveQuickChip ?? (() => {});
+  const activeView = dashboard.activeView;
+  const activeSheet = dashboard.activeSheet;
+  const items = dashboard.items ?? [];
+  const eventResolutionFilter = dashboard.eventResolutionFilter ?? [];
+  const setEventResolutionFilter = dashboard.setEventResolutionFilter ?? (() => {});
+  const handleFilterToggle = dashboard.handleFilterToggle ?? ((prev, _val) => prev);
+  const eventResolutionMetrics = dashboard.eventResolutionMetrics;
+  const eventFilter = dashboard.eventFilter ?? [];
+  const setEventFilter = dashboard.setEventFilter ?? (() => {});
+  const eventMetrics = dashboard.eventMetrics;
+  const frcBodValues = dashboard.frcBodValues ?? [];
+  const frcBodCounts = dashboard.frcBodCounts ?? {};
+  const frcBodFilter = dashboard.frcBodFilter ?? [];
+  const setFrcBodFilter = dashboard.setFrcBodFilter ?? (() => {});
+  const pmRadarFilter = dashboard.pmRadarFilter ?? [];
+  const setPmRadarFilter = dashboard.setPmRadarFilter ?? (() => {});
+  const pmMetrics = dashboard.pmMetrics;
+  const onOpenBulkImport = () => modalsActions.setIsBulkImportOpen(true);
+  const onOpenNewItemModal = () => dashboard.handleOpenModal();
 
   if (!areFiltersVisible) return null;
 

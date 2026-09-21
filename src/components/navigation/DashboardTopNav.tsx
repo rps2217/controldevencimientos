@@ -1,103 +1,53 @@
 import React, { useEffect } from 'react';
 import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle } from 'lucide-react';
-import { InventoryItem, SheetConfig, SheetProperties } from '../../types';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
 import { useDebouncedSearch } from '../../hooks/useDebouncedSearch';
 
-export interface DashboardTopNavProps {
-  isMobileMenuOpen?: boolean;
-  setIsMobileMenuOpen?: (open: boolean) => void;
-  activeView?: string;
-  activeSheetTitle?: string;
-  searchableHeaders?: string[];
-  searchTerm?: string;
-  setSearchTerm?: (term: string) => void;
-  hasActiveFilters?: boolean;
-  clearAllFilters?: () => void;
-  setIsScannerOpen?: (open: boolean) => void;
-  setIsMobilePistoleoOpen?: (open: boolean) => void;
-  isActionsMenuOpen?: boolean;
-  setIsActionsMenuOpen?: (open: boolean) => void;
-  setIsGmailModalOpen?: (open: boolean) => void;
-  setIsWhatsAppModalOpen?: (open: boolean) => void;
-  setIsPmReportOpen?: (open: boolean) => void;
-  onOpenBulkActionsConfig?: () => void;
-  onOpenTicketConfig?: () => void;
-  drainageReportItems?: InventoryItem[];
-  headers?: string[];
-  visibleHeaders?: string[];
-  filteredItems?: InventoryItem[];
-  sheetConfig?: SheetConfig;
-  products?: any[];
-  policies?: any[];
-  handlePrintTicket?: (items: InventoryItem[], mode?: 'standard' | 'barcode') => void;
-  isOffline?: boolean;
-  lastCachedAt?: number | string | null;
-  isSyncing?: boolean;
-  offlineQueue?: any[];
-  handleSyncOfflineQueue?: () => void;
-  fetchData?: (config: SheetConfig, view: string, force?: boolean) => void;
-  loading?: boolean;
-  latencyMs?: number | null;
-  connectionStatus?: string;
-  onOpenSyncAudit?: () => void;
-  onOpenStockCount?: () => void;
-  failedCount?: number;
-  // Executive Context & Actions props
-  isRelationalActive?: boolean;
-  activeSheet?: SheetProperties | null;
-  isModalOpen?: boolean;
-  handleOpenModal?: () => void;
-  setIsBulkImportOpen?: (open: boolean) => void;
-  setIsScriptModalOpen?: (open: boolean) => void;
-  onOpenViewConfig?: () => void;
-}
-
-export const DashboardTopNav: React.FC<DashboardTopNavProps> = (props) => {
+export const DashboardTopNav: React.FC = () => {
   const dashboard = useDashboard();
   const modalsActions = useModalsActions();
   const rightDrawer = useRightDrawer();
 
-  const setIsMobileMenuOpen = props.setIsMobileMenuOpen ?? modalsActions.setIsMobileMenuOpen;
-  const activeView = props.activeView ?? dashboard.activeView;
-  const activeSheetTitle = props.activeSheetTitle ?? dashboard.activeSheet?.title;
-  const searchableHeaders = props.searchableHeaders ?? dashboard.searchableHeaders ?? [];
-  const searchTerm = props.searchTerm ?? dashboard.searchTerm ?? '';
-  const setSearchTerm = props.setSearchTerm ?? dashboard.setSearchTerm;
-  const searchValue = props.searchTerm ?? dashboard.searchTerm ?? '';
+  const setIsMobileMenuOpen = modalsActions.setIsMobileMenuOpen;
+  const activeView = dashboard.activeView;
+  const activeSheetTitle = dashboard.activeSheet?.title;
+  const searchableHeaders = dashboard.searchableHeaders ?? [];
+  const searchTerm = dashboard.searchTerm ?? '';
+  const setSearchTerm = dashboard.setSearchTerm;
+  const searchValue = dashboard.searchTerm ?? '';
   const {
     inputRef: searchInputRef,
     typed: typedSearch,
     onChange: commitSearch,
     clear: clearSearch
   } = useDebouncedSearch(searchValue, setSearchTerm);
-  const hasActiveFilters = props.hasActiveFilters ?? dashboard.hasActiveFilters ?? false;
-  const clearAllFilters = props.clearAllFilters ?? dashboard.clearAllFilters ?? (() => {});
-  const setIsScannerOpen = props.setIsScannerOpen ?? modalsActions.setIsScannerOpen;
-  const setIsMobilePistoleoOpen = props.setIsMobilePistoleoOpen ?? modalsActions.setIsMobilePistoleoOpen;
-  const filteredItems = props.filteredItems ?? dashboard.filteredItems ?? [];
-  const sheetConfig = props.sheetConfig ?? dashboard.sheetConfig;
-  const isOffline = props.isOffline ?? dashboard.isOffline ?? false;
-  const lastCachedAt = props.lastCachedAt ?? dashboard.lastCachedAt;
-  const isSyncing = props.isSyncing ?? dashboard.isSyncing;
-  const offlineQueue = props.offlineQueue ?? dashboard.offlineQueue ?? [];
-  const handleSyncOfflineQueue = props.handleSyncOfflineQueue ?? dashboard.handleSyncOfflineQueue ?? (() => {});
-  const fetchData = props.fetchData ?? dashboard.fetchData;
-  const loading = props.loading ?? dashboard.loading ?? false;
-  const latencyMs = props.latencyMs ?? dashboard.latencyMs;
-  const onOpenSyncAudit = props.onOpenSyncAudit ?? (() => modalsActions.setIsSyncAuditOpen?.(true));
-  const failedCount = props.failedCount ?? dashboard.failedCount ?? 0;
-  const isRelationalActive = props.isRelationalActive ?? dashboard.isRelationalActive ?? false;
-  const activeSheet = props.activeSheet ?? dashboard.activeSheet;
-  const isModalOpen = props.isModalOpen ?? dashboard.isModalOpen ?? false;
-  const handleOpenModal = props.handleOpenModal ?? dashboard.handleOpenModal;
-  const setIsBulkImportOpen = props.setIsBulkImportOpen ?? modalsActions.setIsBulkImportOpen;
-  const setIsScriptModalOpen = props.setIsScriptModalOpen ?? modalsActions.setIsScriptModalOpen;
-  const onOpenViewConfig = props.onOpenViewConfig ?? (() => rightDrawer.setIsRightDrawerOpen(true));
-  const onOpenStockCount = props.onOpenStockCount ?? (() => modalsActions.setIsStockCountOpen?.(true));
+  const hasActiveFilters = dashboard.hasActiveFilters ?? false;
+  const clearAllFilters = dashboard.clearAllFilters ?? (() => {});
+  const setIsScannerOpen = modalsActions.setIsScannerOpen;
+  const setIsMobilePistoleoOpen = modalsActions.setIsMobilePistoleoOpen;
+  const filteredItems = dashboard.filteredItems ?? [];
+  const sheetConfig = dashboard.sheetConfig;
+  const isOffline = dashboard.isOffline ?? false;
+  const lastCachedAt = dashboard.lastCachedAt;
+  const isSyncing = dashboard.isSyncing;
+  const offlineQueue = dashboard.offlineQueue ?? [];
+  const handleSyncOfflineQueue = dashboard.handleSyncOfflineQueue ?? (() => {});
+  const fetchData = dashboard.fetchData;
+  const loading = dashboard.loading ?? false;
+  const latencyMs = dashboard.latencyMs;
+  const onOpenSyncAudit = () => modalsActions.setIsSyncAuditOpen?.(true);
+  const failedCount = dashboard.failedCount ?? 0;
+  const isRelationalActive = dashboard.isRelationalActive ?? false;
+  const activeSheet = dashboard.activeSheet;
+  const isModalOpen = dashboard.isModalOpen ?? false;
+  const handleOpenModal = dashboard.handleOpenModal;
+  const setIsBulkImportOpen = modalsActions.setIsBulkImportOpen;
+  const setIsScriptModalOpen = modalsActions.setIsScriptModalOpen;
+  const onOpenViewConfig = () => rightDrawer.setIsRightDrawerOpen(true);
+  const onOpenStockCount = () => modalsActions.setIsStockCountOpen?.(true);
   // Global Keyboard shortcut for search (Cmd+K / Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
