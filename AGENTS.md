@@ -278,9 +278,25 @@ Ponytail (§5) sigue siendo obligatoria.
 | Comando | Qué hace |
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Es el gate real. |
-| `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx`. |
+| `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
+
+### Hoja de cálculo: procedencia de `xlsx` y fixtures
+
+- `xlsx` está **aliaseado** en `package.json` a `npm:@e965/xlsx@0.20.3` (mismo artefacto
+  que el CDN oficial de SheetJS, verificado byte a byte). La copia en npm (`0.18.5`) sigue
+  vulnerable a Prototype Pollution y ReDoS: **no** cambiar el alias por `xlsx@latest`.
+- `tests/fixtures/*.xlsx` se generan con **openpyxl** (`tests/fixtures/generate.py`), no
+  con la propia librería, para que las pruebas no sean un eco del lector. Están
+  versionados; CI no ejecuta el generador.
+- Al leer `.xlsx` usa `raw: true` y normaliza celdas con un helper de fecha: `raw: false`
+  devuelve el texto *formateado* y corrompe identificadores numéricos grandes
+  (`"1.23457E+12"` en vez del EAN real).
+- `parseSpreadsheetFile(file)` es el punto de entrada único para archivos subidos
+  (binario o texto). No reimplementes parseo en las vistas.
+- `importPharmacySnapshotToCampaign` acepta registros **y** matrices 2D; normaliza en su
+  único punto de entrada. Si añades llamadores, no asumas la forma.
 
 ### Arneses de medición (`tests/perf/`, requieren Chromium y un dev server)
 

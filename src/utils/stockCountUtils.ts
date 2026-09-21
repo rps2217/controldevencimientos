@@ -9,7 +9,7 @@ import {
   CampaignAuditRow
 } from '../types';
 import { findColumnBySemantic } from './columnAliases';
-import { parseLocaleNumber, getEndOfMonthDateForYm, formatDisplayDate } from './pureCalculations';
+import { parseLocaleNumber, rowToObject, getEndOfMonthDateForYm, formatDisplayDate } from './pureCalculations';
 import { findMasterProduct, getMasterProductSummary } from './referenceResolver';
 import { exportToExcel } from './exportUtils';
 
@@ -567,7 +567,7 @@ export function createNewCampaign(nombre: string, local?: string): InventoryCamp
  */
 export function importPharmacySnapshotToCampaign(
   campaign: InventoryCampaign,
-  rows: Record<string, any>[],
+  rows: ReadonlyArray<Record<string, unknown> | ReadonlyArray<unknown>>,
   headers: string[],
   filename: string = 'Snapshot_ERP'
 ): { updatedCampaign: InventoryCampaign; totalImported: number; newSkus: number; updatedSkus: number } {
@@ -603,7 +603,12 @@ export function importPharmacySnapshotToCampaign(
   const currentSnapshot = { ...campaign.snapshotTeoricoActual };
   let detectedLocal = campaign.local || '';
 
-  for (const row of rows) {
+  for (const rawRow of rows) {
+    // Los llamadores no son consistentes: el modal y la campana de consolidación
+    // entregan matrices (string[][]) mientras que otros entregan registros. Se
+    // normaliza aquí, en el único punto de entrada, para no perder ninguna fila.
+    const row: Record<string, any> = Array.isArray(rawRow) ? rowToObject(headers, rawRow) : rawRow;
+
     // 1. Resolve SKU code (handling multiple formats and aliases)
     let rawSku = skuCol ? row[skuCol] : null;
     if (rawSku === undefined || rawSku === null || String(rawSku).trim() === '') {

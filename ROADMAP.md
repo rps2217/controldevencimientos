@@ -1,6 +1,7 @@
 # Plan de Reforma Arquitectónica
 
-Estado: **Fases 0 y 2 completadas**; Fases 1 (1.3 en curso), 3–6 pendientes.
+Estado: **Fases 0 y 2 completadas**; Fases 1 (1.3 en curso), 3–6 pendientes. Riesgo
+`xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
 Protocolo Ponytail: cada fase busca el código mínimo efectivo, sin dependencias nuevas salvo justificación explícita.
 
@@ -602,8 +603,11 @@ justifique; evaluar `manualChunks`. **No añadir `manualChunks` sin medir antes.
 
 ## Deuda conocida (no introducida por este plan)
 
-- `xlsx` tiene una vulnerabilidad de severidad alta sin fix disponible
-  (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9). Revisar alternativa en Fase 6.
+- ~~`xlsx` con vulnerabilidad alta sin fix~~ **RESUELTO**. El fix de SheetJS (0.20.2+)
+  existe pero nunca se publicó en npm, por eso `npm audit` reportaba "no fix
+  available". Se pasó a la versión parcheada con un alias de npm
+  (`"xlsx": "npm:@e965/xlsx@0.20.3"`), sin dependencias nuevas ni cambios de código.
+  Ver "Riesgo de seguridad" más abajo.
 - 20 warnings de `react-hooks/exhaustive-deps` preexistentes, varios ligados a la
   inestabilidad del contexto (Fase 1 los cierra).
 
@@ -614,6 +618,34 @@ justifique; evaluar `manualChunks`. **No añadir `manualChunks` sin medir antes.
 Barrido del repo contra la Escalera de Decisiones. Resultado global: **el árbol está
 sano**; la deuda grande ya está inventariada en las fases de arriba y no aparecieron
 patologías nuevas. Lo verificado y lo descartado:
+
+**Cierre del riesgo `xlsx` (segunda pasada)**
+
+La premisa registrada ("reemplazar por un lector propio") resultó ser la escalera
+resuelta en el escalón equivocado: el fix oficial ya existe, solo que fuera de npm.
+- Mitigación aplicada: alias `"xlsx": "npm:@e965/xlsx@0.20.3"`. Ver "Riesgo de
+  seguridad" para la verificación de integridad byte a byte.
+- El lector propio y `exceljs`/`read-excel-file` se descartaron: dependencia nueva o
+  cientos de líneas para un fix que ya está empaquetado. YAGNI.
+- Se eliminó el **import estático** de `xlsx` en `MobileErpSnapshotView` (era el único
+  que lo metía en el bundle inicial) y se unificó su parseo en `parseSpreadsheetFile`.
+
+**Bugs reales de pérdida de datos encontrados al cubrir el camino de importación**
+1. `importPharmacySnapshotToCampaign` recibía matrices 2D (`string[][]`) de la vista
+   móvil y de la campaña de consolidation, pero solo leía registros (`row[col]`) →
+   **importaba 0 SKUs en silencio**. Ahora normaliza ambas formas en su único punto de
+   entrada con `rowToObject`.
+2. `parseExcelBuffer` usaba `raw: false`, que entrega el texto *formateado* de la celda:
+   un EAN/SKU exportado como número grande se leía como `"1.23457E+12"`, corrompiendo el
+   identificador primario. Corregido a `raw: true` + normalización explícita de celdas
+   `Date` a ISO local (evita `String(Date)` y desfases por zona horaria).
+3. Al fusionar (1) y (2) se corrigió el residual de fechas: las celdas de fecha nativas
+   ya no llegan como `"Mon Jun 30 2025 …"`.
+
+Cobertura añadida: `tests/xlsx.test.ts` (18 casos) con fixtures `.xlsx` **generados por
+openpyxl**, un productor independiente de la librería bajo prueba, incluidos seriales de
+Excel, fechas nativas, SKUs numéricos grandes y round-trip de escritura. Integrado en
+`npm test`/`npm run verify`.
 
 **Lo que se corrigió en esta pasada**
 - Rama remota stale `ponytail-audit-strict-types`: ancestro de `main` (19 commits
@@ -644,13 +676,20 @@ patologías nuevas. Lo verificado y lo descartado:
 - Las 12 dependencias declaradas tienen uso real en `src`. No hay paquetes zombis.
 - `dist/` está correctamente ignorado en git (0 archivos versionados).
 
-**Riesgo de seguridad confirmado (no nuevo)**
+**Riesgo de seguridad `xlsx` — mitigado (actualizado)**
 - `xlsx@0.18.5`: 2 avisos de severidad alta (**Prototype Pollution** GHSA-4r6h-8v6p-xvw6 y
-  **ReDoS** GHSA-5pgg-2g8v-p4x9), **sin fix disponible**. Se usa en 9 archivos de
-  importación/exportación. La mitigación correcta es dejar de procesar libros xlsx
-  arbitrarios de terceros; migrar a un parser mantenido es trabajo de Fase 6. Vía
-  correcta si se retoma: reemplazar `xlsx` por lectura propia de CSV que ya existe.
-- `npm audit --omit=dev`: 1 vulnerabilidad alta, la anterior. Sin hallazgos adicionales.
+  **ReDoS** GHSA-5pgg-2g8v-p4x9). Se usaba en **2** archivos de producción (no 9):
+  `universalImporter.ts` (lectura) y `exportUtils.ts` (escritura).
+- El "sin fix disponible" **era un artefacto del registro npm**, no del código: SheetJS
+  publica las versiones parcheadas (0.19.3 / 0.20.2+) en su CDN, no en npm. Se optó por
+  el espejo npm del mismo artefacto (`@e965/xlsx@0.20.3`) mediante alias de npm:
+  cero dependencias nuevas, cero cambios de código, `import xlsx` intacto.
+- **Verificación de integridad**: el código de `@e965/xlsx@0.20.3` es **byte-idéntico**
+  al tarball oficial `cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` (hash de `xlsx.mjs` y
+  `dist/xlsx.full.min.js` coincidentes; único diff en `README.md` y el campo `name`).
+  Licencia Apache-2.0 preservada. Es un cambio de **procedencia**, no de contenido.
+- `npm audit --omit=dev`: **0 vulnerabilidades**. Sin hallazgos adicionales.
+- Cargado solo con `import()` dinámico, así que no entra al bundle inicial.
 
 **Tipado estricto — deuda de `any` cuantificada**
 - 201 usos de `any`/`as any`/`<any>` en `src`. Concentrados en `referenceResolver.ts`

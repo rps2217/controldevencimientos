@@ -30,7 +30,6 @@ import {
   Check,
   SlidersHorizontal
 } from 'lucide-react';
-import { read, utils } from 'xlsx';
 import { getErrorMessage } from '../../utils/pureCalculations';
 
 interface MobileErpSnapshotViewProps {
@@ -141,45 +140,20 @@ export const MobileErpSnapshotView: React.FC<MobileErpSnapshotViewProps> = ({
 
     try {
       setIsUploading(true);
-      const buffer = await file.arrayBuffer();
-      const uint8 = new Uint8Array(buffer);
-      
-      let parsedHeaders: string[] = [];
-      let parsedRows: any[][] = [];
+      // Un solo camino de parseo: `parseSpreadsheetFile` ya resuelve binario
+      // (con valores crudos, sin notación científica) o texto delimitado.
+      const { parseSpreadsheetFile } = await import('../../utils/universalImporter');
+      const parsed = await parseSpreadsheetFile(file);
 
-      try {
-        const wb = read(uint8, { type: 'array', cellDates: true, dense: true });
-        const firstSheetName = wb.SheetNames[0];
-        const sheet = wb.Sheets[firstSheetName];
-        const jsonData: any[][] = utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
-
-        if (jsonData.length >= 2) {
-          parsedHeaders = jsonData[0].map(h => String(h || '').trim());
-          parsedRows = jsonData.slice(1);
-        }
-      } catch (xlsxErr) {
-        // Fallback para texto plano CSV / TSV si no es binario xlsx
-        const decoder = new TextDecoder('utf-8');
-        const text = decoder.decode(uint8);
-        const { parseDelimitedText } = await import('../../utils/universalImporter');
-        const delimited = parseDelimitedText(text);
-        if (delimited.headers.length > 0 && delimited.rows.length > 0) {
-          parsedHeaders = delimited.headers;
-          parsedRows = delimited.rows;
-        } else {
-          throw xlsxErr;
-        }
-      }
-
-      if (parsedRows.length === 0 || parsedHeaders.length === 0) {
+      if (parsed.rows.length === 0 || parsed.headers.length === 0) {
         showToast('El archivo no contiene filas de datos válidas', 'error');
         return;
       }
 
       const { updatedCampaign, totalImported, newSkus } = importPharmacySnapshotToCampaign(
         activeCampaign,
-        parsedRows,
-        parsedHeaders,
+        parsed.rows,
+        parsed.headers,
         file.name
       );
 
