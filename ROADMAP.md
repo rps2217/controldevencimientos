@@ -451,6 +451,23 @@ Queda pendiente el resto de la extracción (`useInventoryData`, `useDashboardVie
 `useInventoryActions`, `useDashboardModals`), a abordar con el mismo criterio: cortes
 cohesionados, cada uno verificado contra `verify` + los E2E aplicables.
 
+#### Hecho: `useDashboardChromeState` (3, corte por presentación pura)
+
+Siguiente corte por cohesión: los flags de **chrome** sin relación con los datos
+(`isSidebarCollapsed`, `areFiltersVisible`, `isSchemaLoading`, `isSummaryView`, `isZenMode`,
+`tableDensity`) más sus dos efectos (persistencia y atajo `Escape`) y el
+`handleToggleSummaryView`. Se agrupan porque su perfil es idéntico y ninguno participa del
+ciclo de carga de datos.
+
+Ganancia colateral de la Fase 4: la densidad de tabla persistía con `localStorage` crudo
+(`safeParse` a mano y un `setItem` en `try/catch`); ahora pasa por la puerta
+`readStorage`/`writeStorage` como el resto. Se unifica el camino sin cambiar el formato
+almacenado, así que la configuración existente se sigue leyendo.
+
+`InventoryDashboard.tsx`: **2.120 → 2.081 líneas** (39 menos; el hook nuevo tiene 96).
+`tsc` limpio, ESLint sin errores (20 warnings preexistentes), 148 + 7 pruebas en verde y
+los E2E `groupcheck`, `modals` y `searchcheck` en OK sobre el build de producción.
+
 ### Fase 4 — Puerta única de persistencia (**iniciada**)
 
 Corrección de la premisa del plan: **no son "20 archivos saltándose `STORAGE_KEYS`"**.
