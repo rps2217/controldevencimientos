@@ -605,9 +605,9 @@ justifique; evaluar `manualChunks`. **No añadir `manualChunks` sin medir antes.
 
 - ~~`xlsx` con vulnerabilidad alta sin fix~~ **RESUELTO**. El fix de SheetJS (0.20.2+)
   existe pero nunca se publicó en npm, por eso `npm audit` reportaba "no fix
-  available". Se pasó a la versión parcheada con un alias de npm
-  (`"xlsx": "npm:@e965/xlsx@0.20.3"`), sin dependencias nuevas ni cambios de código.
-  Ver "Riesgo de seguridad" más abajo.
+  available". Se instala el **artifact oficial** de SheetJS
+  (`vendor/xlsx-0.20.3.tgz`) como dependencia `file:`, sin dependencias nuevas ni
+  cambios de código. Ver "Riesgo de seguridad" más abajo.
 - 20 warnings de `react-hooks/exhaustive-deps` preexistentes, varios ligados a la
   inestabilidad del contexto (Fase 1 los cierra).
 
@@ -623,8 +623,8 @@ patologías nuevas. Lo verificado y lo descartado:
 
 La premisa registrada ("reemplazar por un lector propio") resultó ser la escalera
 resuelta en el escalón equivocado: el fix oficial ya existe, solo que fuera de npm.
-- Mitigación aplicada: alias `"xlsx": "npm:@e965/xlsx@0.20.3"`. Ver "Riesgo de
-  seguridad" para la verificación de integridad byte a byte.
+- Mitigación aplicada: `file:vendor/xlsx-0.20.3.tgz`, el artifact oficial de SheetJS.
+  Ver "Riesgo de seguridad" para la procedencia y el hash.
 - El lector propio y `exceljs`/`read-excel-file` se descartaron: dependencia nueva o
   cientos de líneas para un fix que ya está empaquetado. YAGNI.
 - Se eliminó el **import estático** de `xlsx` en `MobileErpSnapshotView` (era el único
@@ -681,13 +681,17 @@ Excel, fechas nativas, SKUs numéricos grandes y round-trip de escritura. Integr
   **ReDoS** GHSA-5pgg-2g8v-p4x9). Se usaba en **2** archivos de producción (no 9):
   `universalImporter.ts` (lectura) y `exportUtils.ts` (escritura).
 - El "sin fix disponible" **era un artefacto del registro npm**, no del código: SheetJS
-  publica las versiones parcheadas (0.19.3 / 0.20.2+) en su CDN, no en npm. Se optó por
-  el espejo npm del mismo artefacto (`@e965/xlsx@0.20.3`) mediante alias de npm:
-  cero dependencias nuevas, cero cambios de código, `import xlsx` intacto.
-- **Verificación de integridad**: el código de `@e965/xlsx@0.20.3` es **byte-idéntico**
-  al tarball oficial `cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` (hash de `xlsx.mjs` y
-  `dist/xlsx.full.min.js` coincidentes; único diff en `README.md` y el campo `name`).
-  Licencia Apache-2.0 preservada. Es un cambio de **procedencia**, no de contenido.
+  publica las versiones parcheadas (0.19.3 / 0.20.2+) en su CDN, no en npm. Se vendoriza
+  el **artifact oficial** (`vendor/xlsx-0.20.3.tgz`, 2.4 MB, versionado en el repo) y se
+  declara como `"xlsx": "file:vendor/xlsx-0.20.3.tgz"`: cero dependencias nuevas, cero
+  cambios de código y sin intermediarios.
+- **Procedencia verificada**: es el tarball de `cdn.sheetjs.com`, con `name: "xlsx"` y
+  `version: "0.20.3"` (no un espejo de terceros). `sha256`
+  `8dc73fc3b00203e72d176e85b50938627c7b086e607c682e8d3c22c02bb99fe8`.
+  Licencia Apache-2.0 preservada.
+- Se evaluó antes un alias npm a un espejo público (`@e965/xlsx`), verificado byte a byte
+  contra el oficial; se descartó por depender de la continuidad de un republicador
+  ajeno. El `file:` no tiene ese riesgo.
 - `npm audit --omit=dev`: **0 vulnerabilidades**. Sin hallazgos adicionales.
 - Cargado solo con `import()` dinámico, así que no entra al bundle inicial.
 

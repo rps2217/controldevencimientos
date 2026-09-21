@@ -26,7 +26,7 @@
     "react-router-dom": "^7.18.3",
     "recharts": "^3.10.1",
     "vite": "^6.2.3",
-    "xlsx": "npm:@e965/xlsx@0.20.3",
+    "xlsx": "file:vendor/xlsx-0.20.3.tgz",
     "zod": "^4.4.3"
   },
   "devDependencies": {

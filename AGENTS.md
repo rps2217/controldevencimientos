@@ -284,9 +284,13 @@ Ponytail (§5) sigue siendo obligatoria.
 
 ### Hoja de cálculo: procedencia de `xlsx` y fixtures
 
-- `xlsx` está **aliaseado** en `package.json` a `npm:@e965/xlsx@0.20.3` (mismo artefacto
-  que el CDN oficial de SheetJS, verificado byte a byte). La copia en npm (`0.18.5`) sigue
-  vulnerable a Prototype Pollution y ReDoS: **no** cambiar el alias por `xlsx@latest`.
+- `xlsx` se instala desde el **artifact oficial** de SheetJS vendorizado en el repo:
+  `"xlsx": "file:vendor/xlsx-0.20.3.tgz"`. npm solo tiene 0.18.5, vulnerable a Prototype
+  Pollution y ReDoS, y **no** recibirá el fix. No lo cambies por `xlsx@latest` ni por un
+  alias npm: el tarball del CDN es la única fuente parcheada.
+- Para actualizar la librería: descarga el `.tgz` del CDN oficial, **verifica el hash**,
+  reemplaza `vendor/xlsx-*.tgz`, actualiza el `file:` en `package.json` y corre
+  `npm install && npm run verify`. No edites el tarball.
 - `tests/fixtures/*.xlsx` se generan con **openpyxl** (`tests/fixtures/generate.py`), no
   con la propia librería, para que las pruebas no sean un eco del lector. Están
   versionados; CI no ejecuta el generador.
