@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
-import { z } from 'zod';
 import { getSpreadsheetMetadata, getAllSheetsData, appendRow, updateRow, deleteRow, deleteRows, saveCloudConfig, loadCloudConfig, getScriptPropertiesConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
 import type { SheetRow } from '../lib/sheets';
 import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, EventCategory, ViewKey } from '../types';
@@ -25,6 +24,7 @@ import { useColumnManager } from '../hooks/useColumnManager';
 import { useInventoryFiltering, handleFilterToggle } from '../hooks/useInventoryFiltering';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { useCloudConfigSync } from '../hooks/useCloudConfigSync';
+import { useDashboardChromeState } from '../hooks/useDashboardChromeState';
 import { useTicketPrinting } from '../hooks/useTicketPrinting';
 import { useModuleViewState } from '../hooks/useModuleViewState';
 import { indexedDbService } from '../db/indexedDbService';
@@ -36,7 +36,7 @@ import {
   SAMPLE_PRODUCTS, 
   SAMPLE_POLICIES 
 } from '../data/sampleInventory';
-import { STORAGE_KEYS, readStorage, sheetConfigShapeSchema, tableDensitySchema } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, sheetConfigShapeSchema } from '../utils/appStorage';
 
 // Helpers para almacenamiento persistente y configuración modular
 import { getStoredDemoItems, saveStoredDemoItems, mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
@@ -266,10 +266,6 @@ export const InventoryDashboard: React.FC = () => {
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
-  const [areFiltersVisible, setAreFiltersVisible] = useState<boolean>(false);
-  const [isSchemaLoading, setIsSchemaLoading] = useState(false);
-
   const {
     isModalOpen,
     setIsModalOpen,
@@ -299,18 +295,6 @@ export const InventoryDashboard: React.FC = () => {
   });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [tableDensity, setTableDensity] = useState<'comfortable' | 'compact' | 'ultra'>(() => {
-    const parsed = tableDensitySchema.safeParse(localStorage.getItem(STORAGE_KEYS.TABLE_DENSITY));
-    return parsed.success ? parsed.data : 'compact';
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.TABLE_DENSITY, tableDensity);
-    } catch {
-      // ignore
-    }
-  }, [tableDensity]);
 
   // Contextual intelligence for bulk actions on the current table
   const bulkActionCtx = useMemo(() => {
@@ -411,48 +395,25 @@ export const InventoryDashboard: React.FC = () => {
     return map;
   }, [activeSheet?.title, sheetConfig.schema, sheetConfig.userVirtualColumns]);
 
-  const [isSummaryView, setIsSummaryView] = useState<boolean>(false);
-  const [isZenMode, setIsZenMode] = useState<boolean>(() =>
-    readStorage<boolean>(STORAGE_KEYS.ZEN_MODE, z.boolean(), false)
-  );
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.ZEN_MODE, JSON.stringify(isZenMode));
-    } catch {
-      // ignore quota / security error
-    }
-  }, [isZenMode]);
-
-  // Zen Mode Keyboard Shortcut (Escape to exit)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isZenMode) {
-        setIsZenMode(false);
-        showToast('Modo Zen desactivado', 'info', 'Enfoque');
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isZenMode, showToast]);
-
-  const handleToggleSummaryView = useCallback(() => {
-    if (!isSummaryView) {
-      const keyCols = headers.filter(h => {
-        const clean = h.toLowerCase();
-        return /sku|código|codigo|descrip|producto|cant|unidades|stock|vencimiento|fecha_vc|pol[ií]tica|estado/i.test(clean);
-      });
-      if (keyCols.length > 0) {
-        setVisibleColumns(keyCols);
-      }
-      setIsSummaryView(true);
-      showToast('Vista Resumida activada: mostrando columnas indispensables', 'info', 'Densidad de Vista');
-    } else {
-      showAllColumns();
-      setIsSummaryView(false);
-      showToast('Vista Completa activada: mostrando todas las columnas', 'info', 'Densidad de Vista');
-    }
-  }, [isSummaryView, headers, setVisibleColumns, showAllColumns, showToast]);
+  const {
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    areFiltersVisible,
+    setAreFiltersVisible,
+    isSchemaLoading,
+    setIsSchemaLoading,
+    isSummaryView,
+    tableDensity,
+    setTableDensity,
+    isZenMode,
+    setIsZenMode,
+    handleToggleSummaryView
+  } = useDashboardChromeState({
+    headers,
+    setVisibleColumns,
+    showAllColumns,
+    showToast
+  });
 
   const searchableHeaders = useMemo(() => {
     if (!activeSheet) return headers;
