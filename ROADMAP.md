@@ -473,6 +473,36 @@ reinterpretar el contenido. 4 aserciones nuevas en `test-modules.ts` lo fijan.
 `tsc` limpio, ESLint sin errores (20 warnings preexistentes), 152 + 7 pruebas en verde y
 los E2E `groupcheck`, `modals` y `searchcheck` en OK sobre el build de producción.
 
+#### Hecho: `useInventoryData` (3, corte por cohesión del ciclo de carga)
+
+El corte pendiente de mayor valor era `fetchData` (283 líneas), pero no se había abordado
+porque ocupaba el centro de un **ciclo real entre hooks**: `useOfflineSync` necesita
+`fetchData` para recargar tras vaciar la cola, y `fetchData` necesita `setIsOffline` y
+`setLastCachedAt` de `useOfflineSync`. El hook nuevo agrupa los 11 estados de datos
+(`metadata`, `activeSheet`, `headers`, `items`, `allMainItems`, `products`, `policies`,
+`isRelationalActive`, `loading`, `error`, `isBackgroundSyncing`) y el ciclo de carga
+*stale-while-revalidate*.
+
+**Cómo se rompió el ciclo**: `useOfflineSync` ya guardaba su callback en un `useRef`
+interno, así que basta con darle un puente equivalente. El componente declara
+`fetchDataRef` y lo asigna *después* de `useInventoryData` (`fetchDataRef.current = fetchData`);
+el callback de sincronización lee `fetchDataRef.current?.(...)` al vaciar la cola, es decir
+en tiempo de evento, no de render. No hay closure obsoleta (el ref siempre apunta a la
+última versión) y no se creó ninguna dependencia circular entre hooks. La opción de
+duplicar los setters de estado offline dentro del hook se descartó: rompería la única
+fuente de verdad.
+
+Los estados de datos se movieron a **antes** de sus consumidores tempranos (`frcBodCol` los
+usa en el render, `useItemFormModal` los recibe por parámetro), lo que obligó a reordenar
+`sheetConfig` + `useCloudConfigSync` un poco más arriba. `setMetadata`, `setLoading`,
+`setError` y `setIsRelationalActive` sólo se usan dentro del hook: no se re-exponen.
+
+`InventoryDashboard.tsx`: **2.081 → 1.818 líneas** (263 menos; el hook nuevo tiene 381).
+`tsc` limpio, ESLint sin errores (20 warnings preexistentes), **177 pruebas en verde**
+(152 + 7 + 18), `npm run build` OK y los E2E `searchcheck`, `groupcheck`, `modals`,
+`startupcorruption` y `latency` en OK sobre el build de producción (mediana de tecleo
+22 ms, sin regresión).
+
 ### Fase 4 — Puerta única de persistencia (**iniciada**)
 
 Corrección de la premisa del plan: **no son "20 archivos saltándose `STORAGE_KEYS`"**.

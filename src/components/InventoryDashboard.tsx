@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
-import { getSpreadsheetMetadata, getAllSheetsData, appendRow, updateRow, deleteRow, deleteRows, saveCloudConfig, loadCloudConfig, getScriptPropertiesConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
-import type { SheetRow } from '../lib/sheets';
-import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, EventCategory, ViewKey } from '../types';
+import { appendRow, updateRow, deleteRow, deleteRows, saveCloudConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
+import { InventoryItem, SheetConfig, EventCategory, ViewKey } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
 import { useModalsActions } from '../context/ModalsContext';
 import { DashboardProvider, DashboardContextType } from '../context/DashboardContext';
@@ -25,21 +24,15 @@ import { useInventoryFiltering, handleFilterToggle } from '../hooks/useInventory
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { useCloudConfigSync } from '../hooks/useCloudConfigSync';
 import { useDashboardChromeState } from '../hooks/useDashboardChromeState';
+import { useInventoryData } from '../hooks/useInventoryData';
+import type { FetchDataFn } from '../hooks/useInventoryData';
 import { useTicketPrinting } from '../hooks/useTicketPrinting';
 import { useModuleViewState } from '../hooks/useModuleViewState';
 import { indexedDbService } from '../db/indexedDbService';
-import { 
-  SAMPLE_HEADERS, 
-  SAMPLE_ITEMS, 
-  SAMPLE_EVENTS_HEADERS,
-  SAMPLE_EVENTS_ITEMS,
-  SAMPLE_PRODUCTS, 
-  SAMPLE_POLICIES 
-} from '../data/sampleInventory';
 import { STORAGE_KEYS, readStorage, sheetConfigShapeSchema } from '../utils/appStorage';
 
 // Helpers para almacenamiento persistente y configuración modular
-import { getStoredDemoItems, saveStoredDemoItems, mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
+import { saveStoredDemoItems, mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
 import { getErrorMessage } from '../utils/pureCalculations';
 export { mergeCloudConfigs, type ModuleViewState };
 
@@ -77,17 +70,7 @@ export const InventoryDashboard: React.FC = () => {
   } = useModalsActions();
   const { showToast, updateToast, removeToast } = useToast();
   const confirm = useConfirm();
-  const [metadata, setMetadata] = useState<SpreadsheetMetadata | null>(null);
-  const [activeSheet, setActiveSheet] = useState<SheetProperties | null>(null);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [allMainItems, setAllMainItems] = useState<InventoryItem[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [policies, setPolicies] = useState<any[]>([]);
-  const [isRelationalActive, setIsRelationalActive] = useState<boolean>(false);
   const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   
   // Storage & Cloud Sync Status
 
@@ -98,6 +81,11 @@ export const InventoryDashboard: React.FC = () => {
   // Local-First IndexedDB Offline Sync Hook with Transition Refs
   const prevIsOfflineRef = useRef<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const activeSyncToastIdRef = useRef<string | null>(null);
+
+  // Puente hacia `useInventoryData.fetchData`: se asigna tras declararlo. El
+  // callback de sincronización lo lee al vaciar la cola, no durante el render,
+  // así que un ref rompe el ciclo sin provocar cierres obsoletos.
+  const fetchDataRef = useRef<FetchDataFn | null>(null);
 
   const {
     offlineQueue,
@@ -126,7 +114,7 @@ export const InventoryDashboard: React.FC = () => {
     clearQueue,
     clearAuditLog
   } = useOfflineSync(async (syncedCount?: number) => {
-    await fetchData(sheetConfig, activeView, true);
+    await fetchDataRef.current?.(sheetConfig, activeView, true);
 
     // Auto-sync visual feedback toast resolution upon recovering connection
     if (activeSyncToastIdRef.current) {
@@ -182,9 +170,6 @@ export const InventoryDashboard: React.FC = () => {
     }
   }, [isOffline, offlineQueue.length, showToast, updateToast]);
 
-  // Background Stale-While-Revalidate Sync Indicator
-  const [isBackgroundSyncing, setIsBackgroundSyncing] = useState<boolean>(false);
-
   const handleSyncOfflineQueue = async () => {
     if (offlineQueue.length === 0) return;
     const toastId = showToast(`Sincronizando ${offlineQueue.length} cambios pendientes con Google Sheets...`, 'loading', 'Sincronización', 0);
@@ -236,17 +221,6 @@ export const InventoryDashboard: React.FC = () => {
 
   const [selectedRowIds, setSelectedRowIds] = useState<number[]>([]);
 
-  const frcBodCol = useMemo<string | null>(() => {
-    return findColumnBySemantic(headers, 'frc_bod') || 
-           headers.find(h => {
-             const clean = h.trim().toLowerCase();
-             return /frc.*bod|bodega|destino|warehouse|^bod$/i.test(clean) || clean.includes('bod');
-           }) || null;
-  }, [headers]);
-
-  const [draggedCol, setDraggedCol] = useState<string | null>(null);
-  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
-
   // Sheet configuration state
   const [sheetConfig, setSheetConfig] = useState<SheetConfig>(() =>
     readStorage<SheetConfig>(STORAGE_KEYS.SHEET_CONFIG, sheetConfigShapeSchema, {})
@@ -263,6 +237,53 @@ export const InventoryDashboard: React.FC = () => {
     handlePushPropertiesConfig,
     handlePushCloudConfig
   } = useCloudConfigSync(sheetConfig, setIsSyncingCloud);
+
+  const {
+    metadata,
+    activeSheet,
+    setActiveSheet,
+    headers,
+    setHeaders,
+    items,
+    setItems,
+    allMainItems,
+    setAllMainItems,
+    products,
+    setProducts,
+    policies,
+    setPolicies,
+    isRelationalActive,
+    loading,
+    error,
+    isBackgroundSyncing,
+    fetchData
+  } = useInventoryData({
+    sheetConfig,
+    setSheetConfig,
+    activeView,
+    showToast,
+    setIsOffline,
+    setLastCachedAt,
+    setHasCloudConfigSheet,
+    setCloudConfigSheetName,
+    setConfigStorageMode
+  });
+
+  // `useOfflineSync` necesita recargar los datos al vaciar su cola, y este hook
+  // necesita sus setters de estado offline: el ciclo se rompe con un ref, que
+  // el callback diferido lee en el momento de la sincronización (no en render).
+  fetchDataRef.current = fetchData;
+
+  const frcBodCol = useMemo<string | null>(() => {
+    return findColumnBySemantic(headers, 'frc_bod') || 
+           headers.find(h => {
+             const clean = h.trim().toLowerCase();
+             return /frc.*bod|bodega|destino|warehouse|^bod$/i.test(clean) || clean.includes('bod');
+           }) || null;
+  }, [headers]);
+
+  const [draggedCol, setDraggedCol] = useState<string | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -684,290 +705,6 @@ export const InventoryDashboard: React.FC = () => {
     }
     return [];
   }, [items, headers, activeView]);
-
-  const fetchData = useCallback(async (currentConfig = sheetConfig, currentView = activeView, forceRefresh = false) => {
-    let hasRenderedCache = false;
-    try {
-      const scriptUrl = localStorage.getItem(STORAGE_KEYS.SCRIPT_URL);
-      if (!scriptUrl || !scriptUrl.trim()) {
-        throw new Error('No script URL configured, loading demo mode');
-      }
-
-      setError(null);
-
-      // =========================================================================
-      // FASE 1: STALE-WHILE-REVALIDATE (Renderizado Instantáneo desde IndexedDB - 0ms)
-      // =========================================================================
-      const expectedTargetSheet = 
-        (currentView === 'main' || currentView === 'analytics') ? (currentConfig.main || 'Vencimientos_Inventario') :
-        currentView === 'events' ? (currentConfig.events || 'FRC') :
-        currentView === 'products' ? (currentConfig.products || 'Catalogo_Productos') :
-        currentView === 'policies' ? (currentConfig.policies || 'Politicas_Canje') :
-        currentView;
-
-      if (!forceRefresh) {
-        try {
-          const cachedTarget = await indexedDbService.getCachedSheet(expectedTargetSheet);
-          if (cachedTarget && cachedTarget.rows && cachedTarget.rows.length > 0) {
-            const h = cachedTarget.rows[0];
-            setHeaders(h);
-            const schemaKeys = Object.entries(currentConfig.schema?.[expectedTargetSheet] || {})
-              .filter(([_, conf]) => Boolean(conf.isKey))
-              .map(([colName]) => colName);
-
-            const parsed = cachedTarget.rows.slice(1).map((row: string[], idx: number) => {
-              const it: InventoryItem = { ...rowToObject(h, row), _rowIndex: idx + 2 };
-              const identity = resolveItemIdentity(it, h, expectedTargetSheet, schemaKeys);
-              it._entityKey = identity.keyValue;
-              it._entityKeyCol = identity.keyColumn || undefined;
-              it._isSyntheticKey = identity.isSynthetic;
-              return it;
-            });
-
-            setItems(parsed);
-            if (currentView === 'main') setAllMainItems(parsed);
-            setLastCachedAt(cachedTarget.timestamp);
-            hasRenderedCache = true;
-            setLoading(false); // Cero espera visual para el usuario
-          }
-
-          // Cargar productos y políticas relacionales cacheados en 0ms
-          const prodTitle = currentConfig.products || 'Catalogo_Productos';
-          const cachedProds = await indexedDbService.getCachedSheet(prodTitle);
-          if (cachedProds && cachedProds.rows && cachedProds.rows.length > 1) {
-            const ph = cachedProds.rows[0];
-            setProducts(cachedProds.rows.slice(1).map((r: string[]) => rowToObject(ph, r)));
-            setIsRelationalActive(true);
-          }
-
-          const polTitle = currentConfig.policies || 'Politicas_Canje';
-          const cachedPols = await indexedDbService.getCachedSheet(polTitle);
-          if (cachedPols && cachedPols.rows && cachedPols.rows.length > 1) {
-            const polH = cachedPols.rows[0];
-            setPolicies(cachedPols.rows.slice(1).map((r: string[]) => rowToObject(polH, r)));
-            setIsRelationalActive(true);
-          }
-        } catch (cacheErr) {
-          console.warn('[Cache] Error al leer caché inicial IndexedDB:', cacheErr);
-        }
-      }
-
-      if (!hasRenderedCache) {
-        setLoading(true);
-      }
-      setIsBackgroundSyncing(true);
-
-      // =========================================================================
-      // FASE 2: REVALIDACIÓN CON GOOGLE SHEETS (Batch Fetching en 1 Solo Viaje)
-      // =========================================================================
-      const meta = await getSpreadsheetMetadata(forceRefresh);
-      setMetadata(meta);
-      const allSheets = meta.sheets.map((s: any) => s.properties.title);
-      
-      // 1. Opción 2: Script Properties (PropertiesService)
-      let foundRemoteConfig = false;
-      let remoteConfigToMerge: SheetConfig | null = null;
-      try {
-        const propConfig = await getScriptPropertiesConfig(forceRefresh);
-        if (propConfig && (propConfig.schema || propConfig.main || propConfig.slices)) {
-          remoteConfigToMerge = propConfig;
-          setConfigStorageMode('properties');
-          foundRemoteConfig = true;
-        }
-      } catch (e) {
-        console.warn('PropertiesService config check:', e);
-      }
-
-      // 2. Si no está en Script Properties, verificar pestaña técnica _CONFIG_APP
-      const configSheet = allSheets.find((t: string) => /^_CONFIG(_APP)?$|^_APP_CONFIG$/i.test(t.trim()));
-      if (configSheet) {
-        setHasCloudConfigSheet(true);
-        setCloudConfigSheetName(configSheet);
-        if (!foundRemoteConfig) {
-          try {
-            const cloudConf = await loadCloudConfig(configSheet);
-            if (cloudConf && (cloudConf.schema || cloudConf.main || cloudConf.slices)) {
-              remoteConfigToMerge = cloudConf;
-              setConfigStorageMode('sheet');
-              foundRemoteConfig = true;
-            }
-          } catch (e) {
-            console.warn('Error loading cloud config from sheet:', e);
-          }
-        }
-      } else {
-        setHasCloudConfigSheet(false);
-        if (!foundRemoteConfig) {
-          setConfigStorageMode('local');
-        }
-      }
-
-      if (remoteConfigToMerge) {
-        currentConfig = mergeCloudConfigs(currentConfig, remoteConfigToMerge);
-        try {
-          localStorage.setItem(STORAGE_KEYS.SHEET_CONFIG, JSON.stringify(currentConfig));
-        } catch {}
-      }
-
-      const mainSheetTitle = currentConfig.main || allSheets.find((t: string) => /vencimiento|caducidad/i.test(t)) || allSheets[0];
-      const eventsSheetTitle = currentConfig.events || allSheets.find((t: string) => /^frc$|evento|incidencia|averia|merma|diferencia|transporte/i.test(t));
-      const prodSheetTitle = currentConfig.products || allSheets.find((t: string) => /producto/i.test(t));
-      const polSheetTitle = currentConfig.policies || allSheets.find((t: string) => /política|politica|canje/i.test(t));
-      
-      if (!currentConfig.main && mainSheetTitle) currentConfig.main = mainSheetTitle;
-      if (!currentConfig.events && eventsSheetTitle) currentConfig.events = eventsSheetTitle;
-      if (!currentConfig.products && prodSheetTitle) currentConfig.products = prodSheetTitle;
-      if (!currentConfig.policies && polSheetTitle) currentConfig.policies = polSheetTitle;
-      if (currentConfig !== sheetConfig) {
-        setSheetConfig(currentConfig);
-        localStorage.setItem(STORAGE_KEYS.SHEET_CONFIG, JSON.stringify(currentConfig));
-      }
-      
-      // Determinar hoja objetivo para la vista activa
-      let targetSheetTitle = '';
-      if (currentView === 'main' || currentView === 'analytics') targetSheetTitle = currentConfig.main || allSheets[0];
-      else if (currentView === 'events') targetSheetTitle = currentConfig.events || eventsSheetTitle || '';
-      else if (currentView === 'products') targetSheetTitle = currentConfig.products || '';
-      else if (currentView === 'policies') targetSheetTitle = currentConfig.policies || '';
-      else targetSheetTitle = currentView;
-
-      const targetSheetProp = meta.sheets.find((s: any) => s.properties.title === targetSheetTitle)?.properties;
-      if (targetSheetProp) {
-        setActiveSheet(targetSheetProp);
-      } else {
-        setActiveSheet(null);
-      }
-
-      // Preparar lista unificada de hojas para descargar en UN SOLO VIAJE (Batch Fetching)
-      const sheetsToFetch = Array.from(new Set([
-        targetSheetProp?.title,
-        prodSheetTitle,
-        polSheetTitle,
-        (mainSheetTitle && currentView !== 'main') ? mainSheetTitle : null
-      ].filter(Boolean) as string[]));
-
-      // 🚀 Batch Fetching: Reduce llamadas HTTP secuenciales a 1 sola petición paralela o agregada
-      const batchData = await getAllSheetsData(sheetsToFetch, forceRefresh);
-
-      let hasRelational = false;
-
-      // Procesar Catálogo de Productos
-      if (prodSheetTitle && batchData[prodSheetTitle] && batchData[prodSheetTitle].length > 0) {
-        const prodRows = batchData[prodSheetTitle];
-        const h = prodRows[0];
-        setProducts(prodRows.slice(1).map((row: SheetRow) => rowToObject(h, row)));
-        await indexedDbService.saveCachedSheet(prodSheetTitle, prodRows);
-        hasRelational = true;
-      } else if (products.length > 0) {
-        hasRelational = true;
-      }
-
-      // Procesar Políticas de Canje
-      if (polSheetTitle && batchData[polSheetTitle] && batchData[polSheetTitle].length > 0) {
-        const polRows = batchData[polSheetTitle];
-        const h = polRows[0];
-        setPolicies(polRows.slice(1).map((row: SheetRow) => rowToObject(h, row)));
-        await indexedDbService.saveCachedSheet(polSheetTitle, polRows);
-        hasRelational = true;
-      } else if (policies.length > 0) {
-        hasRelational = true;
-      }
-
-      // Procesar Datos de Vencimientos (si la vista actual es otra)
-      if (mainSheetTitle && currentView !== 'main' && batchData[mainSheetTitle] && batchData[mainSheetTitle].length > 0) {
-        const mainRows = batchData[mainSheetTitle];
-        const h = mainRows[0];
-        setAllMainItems(mainRows.slice(1).map((row: SheetRow, index: number) => ({ ...rowToObject(h, row), _rowIndex: index + 2 })));
-        await indexedDbService.saveCachedSheet(mainSheetTitle, mainRows);
-      }
-
-      // Procesar la Hoja Activa
-      if (targetSheetProp && batchData[targetSheetProp.title]) {
-        const rows = batchData[targetSheetProp.title];
-        await indexedDbService.saveCachedSheet(targetSheetProp.title, rows);
-        setLastCachedAt(new Date().toISOString());
-        setIsOffline(false);
-
-        if (rows.length > 0) {
-          const headerRow = rows[0];
-          const stringHeaders = headerRow.map(String);
-          setHeaders(stringHeaders);
-          const schemaKeys = Object.entries(sheetConfig.schema?.[targetSheetProp.title] || {})
-            .filter(([_, conf]) => Boolean(conf.isKey))
-            .map(([colName]) => colName);
-
-          const parsedItems: InventoryItem[] = rows.slice(1).map((row: SheetRow, index: number) => {
-            const item: InventoryItem = { ...rowToObject(stringHeaders, row), _rowIndex: index + 2 };
-
-            // Resolver clave primaria robusta
-            const identity = resolveItemIdentity(item, stringHeaders, targetSheetProp.title, schemaKeys);
-            item._entityKey = identity.keyValue;
-            item._entityKeyCol = identity.keyColumn || undefined;
-            item._isSyntheticKey = identity.isSynthetic;
-
-            return item;
-          });
-          setItems(parsedItems);
-          if (currentView === 'main') setAllMainItems(parsedItems);
-        } else {
-          setHeaders([]);
-          setItems([]);
-        }
-      }
-
-      setIsRelationalActive(hasRelational);
-    } catch (err: unknown) {
-      console.warn('Network or Apps Script error:', err);
-
-      // Si ya tenemos items renderizados desde caché IndexedDB o estado local, conservarlos y marcar estado offline
-      if (hasRenderedCache || items.length > 0) {
-        setIsOffline(true);
-        setIsRelationalActive(true);
-        return;
-      }
-
-      // Fallback a modo demo solo si no hay datos ni caché
-      setMetadata({
-        sheets: [
-          { properties: { sheetId: 1, title: 'Vencimientos_Inventario', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } } },
-          { properties: { sheetId: 2, title: 'FRC', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } } },
-          { properties: { sheetId: 3, title: 'Catalogo_Productos', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } } },
-          { properties: { sheetId: 4, title: 'Politicas_Canje', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } } }
-        ]
-      });
-
-      if (currentView === 'events') {
-        setActiveSheet({ sheetId: 2, title: 'FRC', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } });
-        setHeaders(SAMPLE_EVENTS_HEADERS);
-        setItems(getStoredDemoItems('events', SAMPLE_EVENTS_ITEMS));
-      } else if (currentView === 'products') {
-        setActiveSheet({ sheetId: 3, title: 'Catalogo_Productos', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } });
-        setHeaders(Object.keys(SAMPLE_PRODUCTS[0] || {}));
-        const defaultProds = SAMPLE_PRODUCTS.map((p, i) => ({ _rowIndex: i + 2, ...p }));
-        setItems(getStoredDemoItems('products', defaultProds));
-      } else if (currentView === 'policies') {
-        setActiveSheet({ sheetId: 4, title: 'Politicas_Canje', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } });
-        setHeaders(Object.keys(SAMPLE_POLICIES[0] || {}));
-        const defaultPols = SAMPLE_POLICIES.map((p, i) => ({ _rowIndex: i + 2, ...p }));
-        setItems(getStoredDemoItems('policies', defaultPols));
-      } else {
-        setActiveSheet({ sheetId: 1, title: 'Vencimientos_Inventario', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } });
-        setHeaders(SAMPLE_HEADERS);
-        setItems(getStoredDemoItems('main', SAMPLE_ITEMS));
-      }
-
-      setAllMainItems(getStoredDemoItems('main', SAMPLE_ITEMS));
-      const defaultProds = SAMPLE_PRODUCTS.map((p, i) => ({ _rowIndex: i + 2, ...p }));
-      setProducts(getStoredDemoItems('products', defaultProds));
-      const defaultPols = SAMPLE_POLICIES.map((p, i) => ({ _rowIndex: i + 2, ...p }));
-      setPolicies(getStoredDemoItems('policies', defaultPols));
-      setIsRelationalActive(true);
-      setError('Modo Demostración / Sin conexión: Mostrando datos de ejemplo de logística y vencimientos. Puede configurar su URL de Google Apps Script en Ajustes.');
-    } finally {
-      setLoading(false);
-      setIsBackgroundSyncing(false);
-    }
-  }, [sheetConfig, activeView, showToast, items.length, policies.length, products.length]);
 
   const handleSaveQuickTraspaso = async (targetItem: InventoryItem, traspasoNumber: string) => {
     const traspasoCol = findColumnBySemantic(headers, 'n_traspaso') || 'N_TRASPASO';
