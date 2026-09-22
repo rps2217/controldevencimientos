@@ -532,6 +532,23 @@ Resultado verificado: 3/3 en OK. La extracción de `useInventoryActions` queda a
 red; su interfaz sería de ~23 parámetros (medido), así que se abordará por sub-bloques
 cohesionados y no en una sola pieza.
 
+#### Corte `useTableGrouping`
+
+Segundo corte de Fase 3, sobre un sub-bloque **cohesionado** en vez del bloque entero de
+acciones. Se extrajeron a `src/hooks/useTableGrouping.ts` (81 líneas) los dos handlers de
+agrupación, el efecto de carga por tabla y el cálculo de `effectiveVisibleHeaders`.
+El motivo fue doble:
+
+- **Cohesión de dominio**: los dos handlers repetían la misma escritura de configuración
+  (fusionar el ajuste en `tableGroupings[tabla]` y persistir). Ahora comparten un
+  `persistGrouping` privado; la duplicación desaparece.
+- **Interfaz pequeña**: 9 parámetros, frente a los ~23 del bloque de acciones completo.
+  Por la escalera de Ponytail, extraer lo barato primero evita la abstracción especulativa.
+
+`InventoryDashboard.tsx`: **1.818 → 1.773 líneas**. Verificado: `tsc` limpio, ESLint 0
+errores (20 warnings preexistentes, sin cambios), 177/177 pruebas, build OK y los E2E
+`groupcheck`, `searchcheck` y `mutcheck` en OK.
+
 ### Fase 4 — Puerta única de persistencia (**iniciada**)
 
 Corrección de la premisa del plan: **no son "20 archivos saltándose `STORAGE_KEYS`"**.

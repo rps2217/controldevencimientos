@@ -57,6 +57,7 @@ import { SkeletonLoader } from './common/SkeletonLoader';
 import { useToast } from './common/ToastContainer';
 import { useConfirm } from './common/ConfirmDialog';
 import { useTableSlices } from '../hooks/useTableSlices';
+import { useTableGrouping } from '../hooks/useTableGrouping';
 
 const AnalyticsDashboard = lazy(() => import('./views/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 
@@ -502,66 +503,20 @@ export const InventoryDashboard: React.FC = () => {
   });
 
   // Contextual persistent grouping handlers per table
-  const handleSetGroupByColumn = useCallback((col: string) => {
-    setGroupByColumn(col);
-    const prevSetting = sheetConfig.tableGroupings?.[activeSheetKey] || {};
-    const updatedGroupings = {
-      ...(sheetConfig.tableGroupings || {}),
-      [activeSheetKey]: {
-        ...prevSetting,
-        groupByColumn: col,
-      }
-    };
-    saveConfig({
-      ...sheetConfig,
-      tableGroupings: updatedGroupings
-    });
-  }, [activeSheetKey, sheetConfig, saveConfig, setGroupByColumn]);
-
-  const handleSetGroupByDirection = useCallback((dir: 'asc' | 'desc') => {
-    setGroupByDirection(dir);
-    const prevSetting = sheetConfig.tableGroupings?.[activeSheetKey] || {};
-    const updatedGroupings = {
-      ...(sheetConfig.tableGroupings || {}),
-      [activeSheetKey]: {
-        ...prevSetting,
-        groupByDirection: dir,
-      }
-    };
-    saveConfig({
-      ...sheetConfig,
-      tableGroupings: updatedGroupings
-    });
-  }, [activeSheetKey, sheetConfig, saveConfig, setGroupByDirection]);
-
-  // Load contextual table grouping whenever activeSheetKey changes or on mount
-  useEffect(() => {
-    const saved = sheetConfig.tableGroupings?.[activeSheetKey];
-    if (saved && saved.groupByColumn) {
-      const col = saved.groupByColumn;
-      const dir = saved.groupByDirection || 'asc';
-      const isVirtual = VIRTUAL_COLUMNS.some(v => v.label === col || v.id === col);
-      const isHeader = headers.includes(col);
-      if (col === 'none' || isHeader || isVirtual) {
-        setGroupByColumn(col);
-        setGroupByDirection(dir);
-      } else {
-        setGroupByColumn('none');
-        setGroupByDirection('asc');
-      }
-    } else {
-      setGroupByColumn('none');
-      setGroupByDirection('asc');
-    }
-  }, [activeSheetKey, headers, setGroupByColumn, setGroupByDirection]);
-
-  // Effective visible headers: when grouping by a column, hide that column from table body to reduce cognitive clutter
-  const effectiveVisibleHeaders = useMemo(() => {
-    if (groupByColumn && groupByColumn !== 'none') {
-      return visibleHeaders.filter(h => h !== groupByColumn);
-    }
-    return visibleHeaders;
-  }, [visibleHeaders, groupByColumn]);
+  const {
+    handleSetGroupByColumn,
+    handleSetGroupByDirection,
+    effectiveVisibleHeaders
+  } = useTableGrouping({
+    activeSheetKey,
+    headers,
+    visibleHeaders,
+    sheetConfig,
+    saveConfig,
+    groupByColumn,
+    setGroupByColumn,
+    setGroupByDirection
+  });
 
   // Precomputed metadata for visible columns to prevent per-cell regex in 60fps virtualization
   const { visibleColumnMeta } = usePrecomputedColumns(headers, effectiveVisibleHeaders, frcBodCol);

@@ -160,6 +160,13 @@ function httpReq(method, urlPath) {
 
   console.log(JSON.stringify(out, null, 2));
   if (diag.length) console.log('ERRORES CONSOLA:', JSON.stringify(diag.slice(0,5)));
+  // Con SCRIPT_URL sembrado pero inalcanzable, las operaciones pasan por la ruta
+  // de encolado; que los tres casos hayan dado OK ya prueba ese camino. El conteo
+  // se reporta solo como informacion: la autosincronizacion drena la cola de forma
+  // asincrona, asi que exigir un tamano concreto seria flaky.
+  const queue = await ev(`(() => { try { return JSON.parse(localStorage.getItem('appsheet_clone_offline_queue') || '[]').length; } catch(e){ return -1; } })()`);
+  const queueTypes = await ev(`(() => { try { return JSON.parse(localStorage.getItem('appsheet_clone_offline_queue') || '[]').map(m => m.type).join(','); } catch(e){ return ''; } })()`);
+  console.log('COLA OFFLINE (informativo):', queue, 'tipos:', queueTypes);
   const okAll = out.every(o => o.ok);
   console.log(okAll ? 'RESULTADO: OK' : 'RESULTADO: FALLO');
   try{ws.close();}catch(e){}
