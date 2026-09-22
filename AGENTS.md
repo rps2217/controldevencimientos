@@ -38,6 +38,7 @@ El proyecto sigue una estructura modular limpia construida en **React 18+**, **T
     ├── workers/
     │   └── inventoryWorker.ts    # Web Worker de cómputo en segundo plano (filtrado, métricas, indexación)
     ├── hooks/
+    │   ├── useBarcodeScanner.ts  # Ciclo de vida compartido de la cámara de lectura (Html5Qrcode)
     │   ├── useInventoryWorker.ts # Hook de comunicación no bloqueante con el Web Worker
     │   ├── useInventoryFiltering.ts # Orquestación de filtros, paginación y agrupación
     │   ├── useModuleViewState.ts # Persistencia y transiciones de estado por módulo/pestaña
@@ -281,7 +282,7 @@ Ponytail (§5) sigue siendo obligatoria.
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
 | `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
-| `npm run test:e2e` | Arranca el build de producción y corre los 8 arneses de integridad (`tests/perf/run.cjs`). |
+| `npm run test:e2e` | Arranca el build de producción y corre los 10 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -309,7 +310,7 @@ Ponytail (§5) sigue siendo obligatoria.
 ### Arneses de medición (`tests/perf/`, requieren Chromium y un build servido)
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 9 arneses que cubren integridad de
+`npm run test:e2e` arranca el preview y corre los 10 arneses que cubren integridad de
 datos y navegación; devuelve código distinto de cero si alguno falla. El binario de Chrome
 se toma de `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`,
 etc.).
@@ -327,6 +328,7 @@ Para correr uno solo: `node tests/perf/<script>.cjs http://127.0.0.1:4173/`.
 | `searchcheck.cjs` | sí | El buscador filtra y se sincroniza con el contexto. |
 | `bulkcheck.cjs` | sí | Edición y eliminación masivas (rutas de pérdida de datos). |
 | `sidebarcheck.cjs` | sí | El sidebar resuelve datos del contexto y props solo de comportamiento (colapso y drawer móvil). |
+| `scannercheck.cjs` | sí | Ciclo de vida del lector de cámara con dispositivo falso: arranque real, cierre sin fugas y reapertura. |
 | `modals.cjs` | no | Abrir modales: commits, long tasks y encabezado visible. |
 | `profile.cjs` | no | Renders reales de tabla/fila (tecleo). |
 | `printcheck.cjs` | no | La vista de impresión. |

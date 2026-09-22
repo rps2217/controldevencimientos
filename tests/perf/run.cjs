@@ -28,6 +28,7 @@ const HARNESSES = [
   'searchcheck.cjs',
   'bulkcheck.cjs',
   'sidebarcheck.cjs',
+  'scannercheck.cjs',
 ];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -86,10 +87,22 @@ function get(url) {
   }
 
   const failed = [];
+  // Un arnés puede fallar por contención de recursos (Chrome de corridas previas todavía
+  // soltando procesos), no por una regresión: se vio `filas: 0` justo tras encadenar
+  // arneses, y pasaba aislado. Un único reintento evita el falso rojo sin tapar un fallo
+  // real, que vuelve a fallar. E2E_RETRIES=0 desactiva el reintento.
+  const maxRetries = process.env.E2E_RETRIES === undefined ? 1 : Number(process.env.E2E_RETRIES);
+  const runHarness = h => spawnSync(process.execPath, [path.join(__dirname, h), BASE],
+    { cwd: ROOT, stdio: 'inherit', timeout: 180000, env: process.env });
+
   for (const h of HARNESSES) {
     const t0 = Date.now();
-    const out = spawnSync(process.execPath, [path.join(__dirname, h), BASE],
-      { cwd: ROOT, stdio: 'inherit', timeout: 180000, env: process.env });
+    let out = runHarness(h);
+    if (out.status !== 0 && maxRetries > 0) {
+      console.log(`     ${h} falló; reintentando tras liberar recursos...`);
+      await sleep(3000);
+      out = runHarness(h);
+    }
     const secs = ((Date.now() - t0) / 1000).toFixed(1);
     const ok = out.status === 0;
     console.log(`${ok ? 'OK   ' : 'FALLO'} ${h} (${secs}s)`);

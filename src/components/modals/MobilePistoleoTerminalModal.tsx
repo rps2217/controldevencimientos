@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, X, Scan, Zap, Volume2, VolumeX, Plus, Minus, Search, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, Layers, Barcode, Sparkles, Trash2, Edit3, ShieldCheck, Keyboard } from 'lucide-react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { BARCODE_SUPPORTED_FORMATS, pickRearCamera } from '../../utils/barcodeScannerConfig';
 import { InventoryItem , SheetRecord } from '../../types';
 import { findColumnBySemantic } from '../../utils/columnAliases';
 import { findMasterProduct, getMasterProductSummary } from '../../utils/referenceResolver';
 import { parseLocaleNumber } from '../../utils/dateCalculations';
 import { playBeep, calculateLastDayOfMonthDateString, generateCuVc } from '../../utils/stockCountUtils';
 import { getErrorMessage } from '../../utils/pureCalculations';
+import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 
 interface ScannedSessionItem {
   id: string;
@@ -52,13 +51,7 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
   // Mode toggles
   const [scanMode, setScanMode] = useState<'LASER' | 'CAMERA'>('LASER');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [torchOn, setTorchOn] = useState<boolean>(false);
-  const [hasTorch, setHasTorch] = useState<boolean>(false);
   
-  // Camera state
-  const [cameraStatus, setCameraStatus] = useState<'IDLE' | 'STARTING' | 'RUNNING' | 'ERROR'>('IDLE');
-  const [cameraError, setCameraError] = useState<string>('');
-
   // Scanning & Form State
   const [inputCode, setInputCode] = useState<string>('');
   const [activeScannedCode, setActiveScannedCode] = useState<string>('');
@@ -82,10 +75,7 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
   
   // DOM Refs
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
   const readerElementId = 'pistoleo-terminal-camera-stream';
-  const lastScanTimestamp = useRef<number>(0);
-  const isMounted = useRef<boolean>(true);
 
   // Column helpers
   const skuCol = findColumnBySemantic(headers, 'sku') || 'SKU';
@@ -101,14 +91,6 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
   const totalScannedItemsCount = sessionScans.length;
   const totalScannedUnits = sessionScans.reduce((sum, s) => sum + s.cantidad, 0);
 
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-      stopCameraScanner();
-    };
-  }, []);
-
   // Auto-focus input for physical PDA Laser guns
   useEffect(() => {
     if (isOpen && scanMode === 'LASER') {
@@ -118,20 +100,6 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
       return () => clearTimeout(timer);
     }
   }, [isOpen, scanMode, activeScannedCode]);
-
-  // Handle Camera initialization when switching to CAMERA mode
-  useEffect(() => {
-    if (!isOpen) {
-      stopCameraScanner();
-      return;
-    }
-
-    if (scanMode === 'CAMERA') {
-      startCameraScanner();
-    } else {
-      stopCameraScanner();
-    }
-  }, [isOpen, scanMode]);
 
   const triggerFeedback = (type: 'success' | 'error' | 'skip') => {
     if (soundEnabled) {
@@ -144,107 +112,6 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
     }
   };
 
-  // Camera start / stop functions
-  const startCameraScanner = async () => {
-    try {
-      setCameraStatus('STARTING');
-      setCameraError('');
-
-      if (!navigator?.mediaDevices?.getUserMedia) {
-        setCameraStatus('ERROR');
-        setCameraError('El contexto del navegador no soporta acceso directo a la cámara. Usa el modo Láser PDA.');
-        return;
-      }
-
-      const devices = await Html5Qrcode.getCameras().catch(err => {
-        const msg = getErrorMessage(err);
-        if (msg.includes('NotAllowedError') || msg.includes('Permission') || msg.includes('not allowed')) {
-          throw new Error('Permiso de cámara denegado o restringido por el navegador.');
-        }
-        throw err;
-      });
-      if (!isMounted.current) return;
-
-      if (devices && devices.length > 0) {
-        const camId = pickRearCamera(devices)?.id ?? devices[devices.length - 1].id;
-
-        if (scannerRef.current) {
-          await stopCameraScanner();
-        }
-
-        const html5QrCode = new Html5Qrcode(readerElementId, {
-          formatsToSupport: BARCODE_SUPPORTED_FORMATS,
-          verbose: false
-        });
-        scannerRef.current = html5QrCode;
-
-        await html5QrCode.start(
-          camId,
-          {
-            fps: 15,
-            qrbox: { width: 260, height: 140 },
-            aspectRatio: 1.777778
-          },
-          (decodedText) => {
-            const now = Date.now();
-            const cleanText = decodedText.trim();
-            if (now - lastScanTimestamp.current < 1000) return;
-            
-            lastScanTimestamp.current = now;
-            processBarcodeScan(cleanText);
-          },
-          () => {}
-        );
-
-        setCameraStatus('RUNNING');
-
-        try {
-          const capabilities = html5QrCode.getRunningTrackCapabilities();
-          if ((capabilities as { torch?: boolean })?.torch) {
-            setHasTorch(true);
-          }
-        } catch {}
-      } else {
-        setCameraStatus('ERROR');
-        setCameraError('No se detectaron cámaras en el dispositivo. Usa el modo Láser PDA.');
-      }
-    } catch (err: unknown) {
-      setCameraStatus('ERROR');
-      const errMsg = getErrorMessage(err);
-      if (errMsg.includes('NotAllowedError') || errMsg.includes('Permission') || errMsg.includes('not allowed') || errMsg.includes('denegado')) {
-        setCameraError('Permiso de cámara denegado o no disponible en este marco. Usa la entrada de texto Láser PDA.');
-      } else {
-        setCameraError(errMsg || 'No se pudo iniciar la cámara.');
-      }
-    }
-  };
-
-  const stopCameraScanner = async () => {
-    if (scannerRef.current) {
-      try {
-        if (scannerRef.current.isScanning) {
-          await scannerRef.current.stop();
-        }
-        await scannerRef.current.clear();
-      } catch {}
-      scannerRef.current = null;
-    }
-    setCameraStatus('IDLE');
-    setTorchOn(false);
-  };
-
-  const handleToggleTorch = async () => {
-    if (!scannerRef.current || !hasTorch) return;
-    try {
-      const nextTorch = !torchOn;
-      await scannerRef.current.applyVideoConstraints({
-        advanced: [{ torch: nextTorch } as MediaTrackConstraints]
-      });
-      setTorchOn(nextTorch);
-    } catch {}
-  };
-
-  // Main Barcode Processing Core
   const processBarcodeScan = (code: string) => {
     const cleanCode = code.trim();
     if (!cleanCode) return;
@@ -294,6 +161,23 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
       triggerFeedback('success');
     }
   };
+
+  // El ciclo de vida de la cámara (arranque, formatos, linterna, parada) vive en el
+  // hook compartido con el resto de lectores: una sola copia de las reglas de conteo.
+  const {
+    status: cameraStatus,
+    error: cameraError,
+    torchOn,
+    hasTorch,
+    toggleTorch: handleToggleTorch,
+  } = useBarcodeScanner({
+    elementId: readerElementId,
+    active: isOpen && scanMode === 'CAMERA',
+    throttleMs: 1000,
+    qrbox: { width: 260, height: 140 },
+    aspectRatio: 1.777778,
+    onScan: processBarcodeScan,
+  });
 
   const handleInputSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();

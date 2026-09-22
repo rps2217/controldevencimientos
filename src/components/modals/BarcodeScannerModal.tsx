@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Camera, X, Scan, AlertCircle } from 'lucide-react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { getErrorMessage } from '../../utils/pureCalculations';
+import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -14,11 +13,20 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   onClose,
   onScanSuccess,
 }) => {
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
   const [manualCode, setManualCode] = useState('');
-  const scannerRef = useRef<Html5Qrcode | null>(null);
   const elementId = 'reader-container';
+
+  // Un solo disparo: al leer, el hook detiene la cámara y aquí se cierra el modal.
+  const { status, error } = useBarcodeScanner({
+    elementId,
+    active: isOpen,
+    stopOnScan: true,
+    qrbox: { width: 280, height: 180 },
+    onScan: (code) => {
+      onScanSuccess(code);
+      onClose();
+    },
+  });
 
   const handleManualSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -28,131 +36,6 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       onClose();
     }
   };
-
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!isOpen) {
-      setManualCode('');
-      setErrorMsg(null);
-      if (scannerRef.current) {
-        try {
-          if (scannerRef.current.isScanning) {
-            scannerRef.current.stop().catch(() => {}).finally(() => {
-              scannerRef.current = null;
-              if (isMounted) setIsScanning(false);
-            });
-          } else {
-            scannerRef.current = null;
-            if (isMounted) setIsScanning(false);
-          }
-        } catch {
-          scannerRef.current = null;
-          if (isMounted) setIsScanning(false);
-        }
-      }
-      return;
-    }
-
-    const startScanner = async () => {
-      try {
-        setErrorMsg(null);
-        
-        // Check if mediaDevices API is supported in current context
-        if (!navigator?.mediaDevices?.getUserMedia) {
-          if (isMounted) {
-            setErrorMsg('El navegador o contexto actual no soporta acceso directo a cámara. Usa la búsqueda manual.');
-          }
-          return;
-        }
-
-        // Pre-authorization check safely guarded
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          stream.getTracks().forEach(track => track.stop());
-        } catch (mediaErr: unknown) {
-          const mediaMsg = getErrorMessage(mediaErr);
-          if (mediaMsg.includes('NotAllowedError') || mediaMsg.includes('Permission') || mediaMsg.includes('not allowed')) {
-            console.warn("Camera access denied or restricted in preview context:", mediaErr);
-            if (isMounted) {
-              setErrorMsg('Acceso a la cámara restringido o denegado por el navegador. Puedes ingresar o escanear el SKU manualmente.');
-            }
-            return;
-          }
-        }
-
-        // Wait for DOM element and animations to settle
-        await new Promise(resolve => setTimeout(resolve, 400));
-        if (!isMounted || !isOpen) return;
-
-        const html5QrCode = new Html5Qrcode(elementId);
-        scannerRef.current = html5QrCode;
-
-        await html5QrCode.start(
-          { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: 280, height: 180 },
-          },
-          (decodedText) => {
-            if (isMounted) {
-              onScanSuccess(decodedText);
-              try {
-                if (html5QrCode.isScanning) {
-                  html5QrCode.stop().catch(() => {}).finally(() => {
-                    scannerRef.current = null;
-                    if (isMounted) setIsScanning(false);
-                    onClose();
-                  });
-                } else {
-                  scannerRef.current = null;
-                  if (isMounted) setIsScanning(false);
-                  onClose();
-                }
-              } catch {
-                scannerRef.current = null;
-                if (isMounted) setIsScanning(false);
-                onClose();
-              }
-            }
-          },
-          () => {}
-        );
-        if (isMounted) setIsScanning(true);
-      } catch (err: unknown) {
-        const errMsg = getErrorMessage(err);
-        console.warn('Scanner camera status:', errMsg);
-        if (isMounted) {
-          if (errMsg.includes('NotAllowedError') || errMsg.includes('Permission') || errMsg.includes('not allowed')) {
-            setErrorMsg('Permiso de cámara denegado o no disponible en este marco. Usa la búsqueda manual de SKU a continuación.');
-          } else {
-            setErrorMsg(
-              'No se pudo iniciar la cámara. Verifique los permisos del navegador o use la búsqueda manual.'
-            );
-          }
-        }
-      }
-    };
-
-    startScanner();
-
-    return () => {
-      isMounted = false;
-      if (scannerRef.current) {
-        try {
-          if (scannerRef.current.isScanning) {
-            scannerRef.current.stop().catch(() => {}).finally(() => {
-              scannerRef.current = null;
-            });
-          } else {
-            scannerRef.current = null;
-          }
-        } catch {
-          scannerRef.current = null;
-        }
-      }
-    };
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -180,7 +63,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         <div className="p-6 flex flex-col items-center">
           <div className="w-full aspect-[4/3] bg-slate-900 rounded-2xl overflow-hidden relative shadow-inner flex items-center justify-center">
             <div id={elementId} className="w-full h-full" />
-            {!isScanning && !errorMsg && (
+            {status !== 'RUNNING' && !error && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2 bg-slate-900">
                 <Camera className="w-8 h-8 animate-pulse text-blue-400" />
                 <span className="text-xs font-medium">Iniciando cámara...</span>
@@ -192,10 +75,10 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             </div>
           </div>
 
-          {errorMsg && (
+          {error && (
             <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2 text-xs text-amber-800 w-full">
               <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-              <span>{errorMsg}</span>
+              <span>{error}</span>
             </div>
           )}
 

@@ -1013,21 +1013,47 @@ exportados repetidos; esta buscó **cuerpos** de función normalizados.
   colapso/expansión en escritorio y el ciclo del drawer móvil. La sonda **no es vacía**:
   falla si el botón de colapso reaparece en el drawer o si `onNavigate` no cierra el menú.
 
-**Hallazgo de duplicación (real, no detectado antes)**
-- El **ciclo de vida del escáner de cámara** (`Html5Qrcode`) está duplicado en
-  `MobileCameraBarcodeScanner.tsx` y `MobilePistoleoTerminalModal.tsx`: `stopScanner`/
-  `stopCameraScanner` son idénticos carácter a carácter y `handleToggleTorch` también;
-  el arranque (selección de cámara trasera, `formatsToSupport`, `fps`, `qrbox`,
-  `aspectRatio`, lectura de capacidades de *torch*) comparte la misma secuencia con
-  mensajes de error distintos. Ambos están **en uso** (el primero en
-  `CampaignQuickScanModal` y `StockCountTerminal`; el segundo en `DashboardModalsManager`).
-  Es el candidato natural a un hook `useBarcodeCamera` en un corte futuro: ~100 líneas
-  duplicadas, con la diferencia real reducida a los textos y al manejo de errores.
+**Hallazgo de duplicación (real, ya corregido)**
+- El **ciclo de vida del escáner de cámara** (`Html5Qrcode`) estaba duplicado en
+  `MobileCameraBarcodeScanner.tsx` y `MobilePistoleoTerminalModal.tsx` (y una tercera
+  variante en `BarcodeScannerModal.tsx`): `stopScanner`/`stopCameraScanner` eran idénticos
+  carácter a carácter y `handleToggleTorch` también; el arranque (selección de cámara
+  trasera, `formatsToSupport`, `fps`, `qrbox`, `aspectRatio`, lectura de capacidades de
+  *torch*) repetía la misma secuencia con mensajes de error distintos. **Resuelto**:
+  extraído a `src/hooks/useBarcodeScanner.ts`, con los tres lectores migrados. Ver
+  "Corte: unificación del lector de cámara" más abajo.
 - `useOfflineSync.ts` (2 cuerpos) y `SliceEditorModal.tsx` (3 *toggles* de la misma forma)
   son duplicación **estructural**, no literal: cada copia opera sobre un campo distinto
   (`pmRadarFilter`, `eventFilter`, `eventResolutionFilter`) y unificarlas con un helper
   genérico añadiría indirección sin reducir el número de líneas de forma clara.
   Descartado por la Escalera (escalón 7: no hay ganancia medible).
+
+**Corte: unificación del lector de cámara (`useBarcodeScanner`)**
+- **Qué se unificó**: la secuencia completa del lector —elegir cámara trasera, arrancar
+  con los formatos de bodega, leer capacidades de linterna, debounce de lecturas, parar y
+  liberar— más el estado de `status`/`error`/`cameras`/`torch` que cada lector mantenía por
+  su cuenta. Las diferencias legítimas (ventana anti-ráfaga, `qrbox`, relación de aspecto,
+  detección optimista de linterna, parar tras un disparo) son opciones del hook.
+- **Riesgos que el hook elimina**, no sólo líneas: los tres lectores podían dejar la
+  cámara encendida al cambiar de modo o desmontar; ahora `stop` se ejecuta también en el
+  `cleanup` del efecto. Una **época** (`epoch`) descarta arranques asíncronos que terminen
+  después de una parada, así que una cámara ya detenida no revive. Las opciones que cambian
+  por render (`qrbox` suele ser una función en línea) viven en un ref: si entraran en las
+  dependencias de `start`, el efecto reiniciaría la cámara en bucle.
+- **Medición**: −377 líneas en los tres componentes (`BarcodeScannerModal` 236 → 119,
+  `MobileCameraBarcodeScanner` 368 → 223, `MobilePistoleoTerminalModal` 967 → 860) contra
+  un hook nuevo de ~230 líneas y su lector compartido. Neto: **una** implementación en vez
+  de tres. Muere de paso la API especulativa `meta.first` que sólo un consumidor hipotético
+  habría usado (YAGNI).
+- **Red de seguridad nueva, no vacía**: `scannercheck.cjs` (registrado en `run.cjs`) lanza
+  Chrome con `--use-fake-device-for-media-stream`, así que la cámara **arranca de verdad**.
+  Verifica que el botón abre el modal, que aparece un `<video>` con estado RUNNING sin
+  overlay de carga, que cerrar y reabrir reinicia el lector sin fugas y que no hay errores
+  de consola. Antes de este corte la ruta de cámara no tenía ninguna guardia: los E2E no
+  podían abrir un dispositivo.
+- **Efecto lateral en lint**: los 3 warnings `exhaustive-deps` de los lectores desaparecen
+  (20 → 17 en total), porque el ciclo de vida dejó de estar en `useEffect` de componentes.
+
 
 **Escalones con "sin hallazgos"**
 - Dependencias (5): las 13 declaradas tienen uso real (`motion/react`, `xlsx` diferido en
@@ -1062,3 +1088,61 @@ exportados repetidos; esta buscó **cuerpos** de función normalizados.
   `mutcheck` con `filasRenderizadas: 0`; con el árbol limpio dieron 8/8 y con los cambios
   9/9. Fue contención de recursos por lanzar Chrome en paralelo, no una regresión; se
   documenta porque un falso rojo en CI cuesta más de diagnosticar que un fallo real.
+
+---
+
+## Auditoría Ponytail (2026-09-19) — corte del lector de cámara
+
+Retomado el hallazgo de duplicación que quedó documentado sin corregir. El corte se hizo
+bajo la Escalera: primero reutilizar lo que ya existía (`barcodeScannerConfig`, que ya
+centralizaba formatos y selección de cámara trasera), después escribir sólo la secuencia
+que de verdad estaba repetida.
+
+**Lo que se corrigió**
+- `src/hooks/useBarcodeScanner.ts` (nuevo): una sola implementación del ciclo de vida del
+  lector (`getCameras` → cámara trasera → `start` con los formatos de bodega → capacidades
+  de linterna → `stop`/`clear`), más el estado asociado. Las diferencias reales entre
+  lectores son opciones (`repeatWindowMs`, `throttleMs`, `stopOnScan`, `torchOptimistic`,
+  `qrbox`, `aspectRatio`, `fps`).
+- Migrados los **tres** consumidores: `BarcodeScannerModal` (236 → 119),
+  `MobileCameraBarcodeScanner` (368 → 223) y `MobilePistoleoTerminalModal` (967 → 860).
+  Neto: **−377 líneas** contra ~230 del hook. Una implementación en vez de tres.
+- API especulativa retirada antes de publicarla: `onScan` recibía un `meta.first` que
+  ningún consumidor usaba. Es exactamente el escalón 1 (¿esto necesita existir?).
+
+**Riesgos reales que desaparecen, no sólo líneas**
+- La cámara ya no puede quedar encendida al desmontar: el `cleanup` del efecto llama
+  `stop`. Antes, `MobileCameraBarcodeScanner` detenía en el cleanup pero
+  `MobilePistoleoTerminalModal` dependía de una bandera `isMounted` manual.
+- Condición de carrera eliminada con una **época**: un `start` asíncrono que resuelva
+  después de un `stop` no reactiva el lector.
+- Bucle de reinicio evitado: las opciones que cambian por render (`qrbox` es una función
+  en línea) viven en un `ref`; si fueran dependencias de `start`, cada render relanzaría
+  la cámara.
+- Mensajes de error unificados con la misma clasificación de permiso
+  (`NotAllowedError`/`Permission`/`denegado`) en los tres lectores.
+
+**Red de seguridad nueva (no vacía)**
+- `tests/perf/scannercheck.cjs`, registrado en `run.cjs`. Arranca Chromium con
+  `--use-fake-device-for-media-stream` y comprueba, sobre el DOM real: el botón abre el
+  modal, aparece un `<video>` con estado RUNNING sin overlay de carga, cerrar y reabrir
+  reinicia el lector, y no hay errores de consola. La ruta de cámara no tenía ninguna
+  guardia previa porque los E2E no podían abrir un dispositivo. El arnés se verificó
+  primero contra el árbol ya migrado (no se escribió "para que pasara en vacío").
+
+**Verificación (medida)**
+- `tsc --noEmit`: 0 errores. `eslint src tests`: 0 errores y **17 warnings** (bajó de 20:
+  los 3 `exhaustive-deps` de los lectores desaparecen).
+- `npm test`: 152 + 7 + 18 pruebas en verde.
+- `npm run build` en verde y `npm run test:e2e` con **10 arneses** en verde, incluido el
+  nuevo. (Una corrida intermedia falló `importcheck` porque un servidor de preview manual
+  ocupaba el puerto 4173; con el puerto libre pasó. Se anota porque un falso rojo cuesta
+  más de diagnosticar que un fallo real.)
+
+**Siguiente palanca**
+- Sin cambios de criterio: quedan Fase 1.2/1.3 (hooks restantes), Fase 3 (extracción de
+  `useInventoryData`/`useDashboardViewState`/`useInventoryActions`/`useDashboardModals`),
+  Fase 4 (escrituras directas a `localStorage`) y Fase 5 (monolitos:
+  `StockCountTerminal` 2.751, `stockCountUtils` 1.481, `CampaignConsolidationDashboard`
+  1.399, `SliceEditorModal` 1.186, `InventoryDashboard` 1.377).
+

@@ -1,9 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { BARCODE_SUPPORTED_FORMATS, pickRearCamera } from '../../utils/barcodeScannerConfig';
+import React, { useState } from 'react';
 import { Camera, X, RefreshCw, Zap, Volume2, VolumeX, ShieldAlert } from 'lucide-react';
 import { playBeep } from '../../utils/stockCountUtils';
-import { getErrorMessage } from '../../utils/pureCalculations';
+import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 
 interface MobileCameraBarcodeScannerProps {
   isOpen: boolean;
@@ -20,190 +18,47 @@ export const MobileCameraBarcodeScanner: React.FC<MobileCameraBarcodeScannerProp
   activeLocation,
   sessionName
 }) => {
-  const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
-  const [scannerStatus, setScannerStatus] = useState<'IDLE' | 'STARTING' | 'RUNNING' | 'ERROR'>('IDLE');
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [torchOn, setTorchOn] = useState<boolean>(false);
-  const [hasTorch, setHasTorch] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [lastScannedCode, setLastScannedCode] = useState<string>('');
   const [scanFeedbackCount, setScanFeedbackCount] = useState<number>(0);
 
-  const scannerRef = useRef<Html5Qrcode | null>(null);
   const readerElementId = 'mobile-pda-barcode-scanner-stream';
-  const lastScanTimestamp = useRef<number>(0);
 
-  // Initialize and get cameras
-  useEffect(() => {
-    if (!isOpen) {
-      stopScanner();
-      return;
-    }
-
-    let isMounted = true;
-
-    async function initCamera() {
-      try {
-        setScannerStatus('STARTING');
-        setErrorMessage('');
-
-        if (!navigator?.mediaDevices?.getUserMedia) {
-          if (!isMounted) return;
-          setScannerStatus('ERROR');
-          setErrorMessage('El contexto del navegador no permite acceso a la cámara. Usa la lectura por láser PDA o texto manual.');
-          return;
-        }
-
-        const devices = await Html5Qrcode.getCameras().catch(err => {
-          const msg = getErrorMessage(err);
-          if (msg.includes('NotAllowedError') || msg.includes('Permission') || msg.includes('not allowed')) {
-            throw new Error('Permiso de cámara denegado o restringido en este contexto.');
-          }
-          throw err;
-        });
-        if (!isMounted) return;
-
-        if (devices && devices.length > 0) {
-          setCameras(devices);
-          // Prefer back camera ("environment")
-          const defaultCam = pickRearCamera(devices);
-          const defaultCamId = defaultCam ? defaultCam.id : devices[devices.length - 1].id;
-          setSelectedCameraId(defaultCamId);
-          startScannerWithCamera(defaultCamId);
-        } else {
-          setScannerStatus('ERROR');
-          setErrorMessage('No se detectaron cámaras en el dispositivo. Si usas un PDA con láser integrado, simplemente usa el botón físico de disparo con el cursor en el campo de texto.');
-        }
-      } catch (err: unknown) {
-        if (!isMounted) return;
-        setScannerStatus('ERROR');
-        const errMsg = getErrorMessage(err);
-        setErrorMessage(
-          (errMsg.includes('Permission') || errMsg.includes('NotAllowedError') || errMsg.includes('not allowed') || errMsg.includes('denegado'))
-            ? 'Permiso de cámara restringido o denegado en el navegador. Puedes ingresar o pistolear el código manualmente.' 
-            : 'Error al inicializar cámara: ' + (errMsg || 'Desconocido')
-        );
+  const {
+    status: scannerStatus,
+    error: errorMessage,
+    cameras,
+    selectedCameraId,
+    torchOn,
+    hasTorch,
+    start: startScannerWithCamera,
+    stop: stopScanner,
+    switchCamera: handleSwitchCamera,
+    toggleTorch: handleToggleTorch,
+  } = useBarcodeScanner({
+    elementId: readerElementId,
+    active: isOpen,
+    repeatWindowMs: 1200,
+    throttleMs: 400,
+    qrbox: (viewfinderWidth, viewfinderHeight) => {
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+      return {
+        width: Math.floor(minEdge * 0.85),
+        height: Math.floor(minEdge * 0.55)
+      };
+    },
+    aspectRatio: 1.333333,
+    onScan: (cleanText) => {
+      setLastScannedCode(cleanText);
+      setScanFeedbackCount(c => c + 1);
+      if (soundEnabled) {
+        playBeep('success');
+      } else if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate(35); } catch {}
       }
-    }
-
-    initCamera();
-
-    return () => {
-      isMounted = false;
-      stopScanner();
-    };
-  }, [isOpen]);
-
-  // Audio & Haptic Feedback
-  const triggerSuccessFeedback = () => {
-    if (soundEnabled) {
-      playBeep('success');
-    } else if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      try {
-        navigator.vibrate(35);
-      } catch {}
-    }
-  };
-
-  const startScannerWithCamera = async (cameraId: string) => {
-    try {
-      if (scannerRef.current) {
-        await stopScanner();
-      }
-
-      setScannerStatus('STARTING');
-      const html5QrCode = new Html5Qrcode(readerElementId, {
-        formatsToSupport: BARCODE_SUPPORTED_FORMATS,
-        verbose: false
-      });
-      scannerRef.current = html5QrCode;
-
-      await html5QrCode.start(
-        cameraId,
-        {
-          fps: 15,
-          qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            return {
-              width: Math.floor(minEdge * 0.85),
-              height: Math.floor(minEdge * 0.55)
-            };
-          },
-          aspectRatio: 1.333333
-        },
-        (decodedText) => {
-          const now = Date.now();
-          const cleanText = decodedText.trim();
-          
-          // Debounce same code scan within 1.2s to prevent runaway scans, but allow different codes instantly
-          if (cleanText === lastScannedCode && now - lastScanTimestamp.current < 1200) {
-            return;
-          }
-          if (now - lastScanTimestamp.current < 400) {
-            return;
-          }
-
-          lastScanTimestamp.current = now;
-          setLastScannedCode(cleanText);
-          setScanFeedbackCount(c => c + 1);
-          triggerSuccessFeedback();
-          onScan(cleanText);
-        },
-        () => {
-          // Scanner frame error (silent frame skipping)
-        }
-      );
-
-      setScannerStatus('RUNNING');
-
-      // Check for torch capability
-      try {
-        const capabilities = html5QrCode.getRunningTrackCapabilities();
-        if ((capabilities as { torch?: boolean })?.torch) {
-          setHasTorch(true);
-        }
-      } catch {}
-
-    } catch (err: unknown) {
-      setScannerStatus('ERROR');
-      setErrorMessage(err instanceof Error ? err.message : 'No se pudo iniciar el lector de cámara.');
-    }
-  };
-
-  const stopScanner = async () => {
-    if (scannerRef.current) {
-      try {
-        if (scannerRef.current.isScanning) {
-          await scannerRef.current.stop();
-        }
-        await scannerRef.current.clear();
-      } catch {}
-      scannerRef.current = null;
-    }
-    setScannerStatus('IDLE');
-    setTorchOn(false);
-  };
-
-  const handleToggleTorch = async () => {
-    if (!scannerRef.current || !hasTorch) return;
-    try {
-      const nextTorch = !torchOn;
-      await scannerRef.current.applyVideoConstraints({
-        advanced: [{ torch: nextTorch } as MediaTrackConstraints]
-      });
-      setTorchOn(nextTorch);
-    } catch {}
-  };
-
-  const handleSwitchCamera = async () => {
-    if (cameras.length <= 1) return;
-    const currentIndex = cameras.findIndex(c => c.id === selectedCameraId);
-    const nextIndex = (currentIndex + 1) % cameras.length;
-    const nextCamId = cameras[nextIndex].id;
-    setSelectedCameraId(nextCamId);
-    await startScannerWithCamera(nextCamId);
-  };
+      onScan(cleanText);
+    },
+  });
 
   if (!isOpen) return null;
 
