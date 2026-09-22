@@ -139,6 +139,14 @@ export interface InventoryItem {
   [key: string]: any; // Dynamic columns based on the sheet's headers
 }
 
+/**
+ * Fila de hoja ya convertida a objeto por encabezado (ver `rowToObject`).
+ * Los valores que vienen de la hoja son siempre cadenas; los metadatos `_` que
+ * se inyectan en runtime (p. ej. `_rowIndex`) son numéricos.
+ * Es el tipo de las filas de catálogo (`products`) y de políticas (`policies`).
+ */
+export type SheetRecord = Record<string, string | number | undefined>;
+
 
 export interface TicketColumnConfig {
   show: boolean;
@@ -186,11 +194,11 @@ export interface SliceFilterConfig {
   quickChip?: string | null;
   eventFilter?: string[];
   pmRadarFilter?: string[];
-  eventResolutionFilter?: ('pending' | 'completed')[];
+  eventResolutionFilter?: string[];
   frcBodFilter?: string[];
   columnFilters?: Record<string, string[]>;
   dynamicMonthFilter?: number[];
-  dynamicMonthRange?: DynamicMonthRange;
+  dynamicMonthRange?: DynamicMonthRange | null;
 }
 
 export interface TableSlice {

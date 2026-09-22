@@ -578,10 +578,10 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       ubicacion: countLocation.trim() || undefined,
       timestamp: new Date().toISOString(),
       rutProveedor: summary?.provider,
-      politica: (master?.POLITICA || master?.politica || '30'),
+      politica: String(master?.POLITICA || master?.politica || '30'),
       diasRetiro: (master?.['DIAS RETIRO_VC'] || master?.dias_retiro || '30'),
-      mundo: summary?.category || master?.MUNDO,
-      pm: master?.PM || master?.pm
+      mundo: summary?.category || (master?.MUNDO !== undefined ? String(master.MUNDO) : undefined),
+      pm: master?.PM !== undefined ? String(master.PM) : (master?.pm !== undefined ? String(master.pm) : undefined)
     };
 
     setSessions(prev => prev.map(s => {

@@ -16,18 +16,23 @@ interface EventFilterChipsProps {
   totalItems: number;
   eventFilter: string[];
   onFilterClick: (filter: string, isMulti: boolean) => void;
-  metrics: EventMetrics;
+  metrics?: EventMetrics;
   frcBodValues?: string[];
   frcBodCounts?: Record<string, number>;
   frcBodFilter?: string[];
   onFrcBodFilterClick?: (filter: string, isMulti: boolean) => void;
 }
 
+const EMPTY_METRICS: EventMetrics = {
+  vencimientoCercano: 0, transporte: 0, calInterna: 0, calExterna: 0,
+  canjes: 0, diferencia: 0, averia: 0, devolucion: 0
+};
+
 export const EventFilterChips: React.FC<EventFilterChipsProps> = ({
   totalItems,
   eventFilter,
   onFilterClick,
-  metrics,
+  metrics = EMPTY_METRICS,
   frcBodValues = [],
   frcBodCounts = {},
   frcBodFilter = [],

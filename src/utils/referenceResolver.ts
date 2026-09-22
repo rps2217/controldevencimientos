@@ -1,23 +1,23 @@
 import { findColumnBySemantic, KnownFieldSemantic } from './columnAliases';
 import { parseAnyDate, calculateWithdrawalDate, formatDisplayDate, formatInputDate } from './dateCalculations';
 import { extractCuVcFromRow } from './cuVcConsolidator';
-import { SheetConfig } from '../types';
+import { SheetConfig, SheetRecord } from '../types';
 
 export interface MasterProductSummary {
   sku: string;
   name: string;
   provider: string;
   category: string;
-  raw: any;
+  raw: SheetRecord | null;
 }
 
 export interface MasterCatalogIndex {
-  exactMap: Map<string, any>;
-  alphaMap: Map<string, any>;
+  exactMap: Map<string, SheetRecord>;
+  alphaMap: Map<string, SheetRecord>;
   summaryMap: Map<string, MasterProductSummary>;
   summaries: MasterProductSummary[];
   getBySku: (sku: string) => MasterProductSummary | null;
-  getRawBySku: (sku: string) => any | null;
+  getRawBySku: (sku: string) => SheetRecord | null;
   search: (query: string, limit?: number) => MasterProductSummary[];
 }
 
@@ -25,7 +25,7 @@ export interface MasterCatalogIndex {
  * Normalizes a RUT string by removing dots, hyphens, and whitespace, in uppercase.
  * e.g. "76.123.456-7" -> "761234567"
  */
-export function normalizeRut(rut: any): string {
+export function normalizeRut(rut: unknown): string {
   if (!rut) return '';
   return String(rut).replace(/[^0-9kK]/g, '').toUpperCase();
 }
@@ -33,7 +33,7 @@ export function normalizeRut(rut: any): string {
 /**
  * Normalizes text removing accents, punctuation, and multiple spaces for robust comparison.
  */
-export function normalizeCleanText(text: any): string {
+export function normalizeCleanText(text: unknown): string {
   if (!text) return '';
   return String(text)
     .normalize('NFD')
@@ -52,8 +52,8 @@ export interface ResolvedItemPolicyInfo {
   fechaRetiroIso: string;
   source: 'policy_module' | 'product_catalog' | 'item_form' | 'default';
   sourceDescription: string;
-  matchedPolicyEntry?: any;
-  matchedProductEntry?: any;
+  matchedPolicyEntry?: SheetRecord | null;
+  matchedProductEntry?: SheetRecord | null;
   providerName?: string;
   providerRut?: string;
   expiryDateStr?: string;
@@ -67,8 +67,8 @@ export interface ResolvedItemPolicyInfo {
 export function resolveItemPolicyAndRetiro(
   itemOrFormData: Record<string, any>,
   headers: string[] = [],
-  products: any[] = [],
-  policies: any[] = [],
+  products: SheetRecord[] = [],
+  policies: SheetRecord[] = [],
   customAliases?: Record<string, string[]>
 ): ResolvedItemPolicyInfo {
   if (!itemOrFormData) {
@@ -119,14 +119,14 @@ export function resolveItemPolicyAndRetiro(
   const rawItemRut = rutCol ? itemOrFormData[rutCol] : (itemOrFormData.RUT || itemOrFormData['RUT PROVEEDOR']);
 
   // 2. Find Master Product
-  let matchedProduct: any = null;
+  let matchedProduct: SheetRecord | null = null;
   if (cleanSku && products && products.length > 0) {
-    matchedProduct = findMasterProduct(cleanSku, products, customAliases);
+    matchedProduct = findMasterProduct(cleanSku, products, customAliases) ?? null;
     if (!matchedProduct) {
-      matchedProduct = products.find((p: any) => {
+      matchedProduct = products.find((p) => {
         const pSku = p['COD PRODUCTO'] || p['C'] || p['Código'] || p['Código Producto'] || p['SKU'] || p['sku'];
         return pSku && String(pSku).trim() === cleanSku;
-      });
+      }) ?? null;
     }
   }
 
@@ -156,54 +156,54 @@ export function resolveItemPolicyAndRetiro(
     : null;
 
   // 3. Match row in policies table (Politicas_Canje)
-  let matchedPolicyEntry: any = null;
+  let matchedPolicyEntry: SheetRecord | null = null;
 
   if (policies && policies.length > 0) {
     const cleanProdRut = normalizeRut(prodRut);
 
     // Priority 3a: Match by Provider RUT
     if (cleanProdRut) {
-      matchedPolicyEntry = policies.find((p: any) => {
+      matchedPolicyEntry = policies.find((p) => {
         const pRut = p['RUT'] || p['RUT PROVEEDOR'] || p['RUT_PROVEEDOR'] || p['A'];
         return pRut && normalizeRut(pRut) === cleanProdRut;
-      });
+      }) ?? null;
     }
 
     // Priority 3b: Match by Provider Name (Fuzzy / Substring / Corporate Suffix stripped)
     if (!matchedPolicyEntry && prodProv) {
       const normProv = normalizeCleanText(prodProv);
       if (normProv) {
-        matchedPolicyEntry = policies.find((p: any) => {
+        matchedPolicyEntry = policies.find((p) => {
           const pName = p['PROVEEDOR'] || p['NOMBRE'] || p['RAZON SOCIAL'] || p['LABORATORIO'] || p['NOMBRE PROVEEDOR'] || p['B'];
           if (!pName) return false;
           const normPName = normalizeCleanText(pName);
           if (!normPName) return false;
           return normProv === normPName || normProv.includes(normPName) || normPName.includes(normProv);
-        });
+        }) ?? null;
       }
     }
 
     // Priority 3c: Match by Family / Category (or provider/description containing family)
     if (!matchedPolicyEntry) {
       const candidates = [prodCategory, prodProv, prodDesc, rawItemPolicy].filter(Boolean).map(s => normalizeCleanText(s));
-      matchedPolicyEntry = policies.find((p: any) => {
+      matchedPolicyEntry = policies.find((p) => {
         const pFam = p['FAMILIA'] || p['CATEGORIA'] || p['RUBRO'] || p['MUNDO'];
         if (!pFam) return false;
         const normFam = normalizeCleanText(pFam);
         if (!normFam) return false;
         return candidates.some(cand => cand.includes(normFam) || normFam.includes(cand));
-      });
+      }) ?? null;
     }
 
     // Priority 3d: Match by explicit item policy text
     if (!matchedPolicyEntry && rawItemPolicy) {
       const normItemPol = normalizeCleanText(rawItemPolicy);
-      matchedPolicyEntry = policies.find((p: any) => {
+      matchedPolicyEntry = policies.find((p) => {
         const pPol = p['POLITICA'] || p['ACCION'] || p['CANJE'] || p['NOMBRE'];
         if (!pPol) return false;
         const normPPol = normalizeCleanText(pPol);
         return normItemPol === normPPol || normItemPol.includes(normPPol) || normPPol.includes(normItemPol);
-      });
+      }) ?? null;
     }
   }
 
@@ -357,11 +357,11 @@ export function resolveItemPolicyAndRetiro(
  * Pre-computes summaries and hash indexes so scans don't perform O(N) array traversals or regexes.
  */
 export function buildMasterCatalogIndex(
-  products: any[],
+  products: SheetRecord[],
   customAliases?: Record<string, string[]>
 ): MasterCatalogIndex {
-  const exactMap = new Map<string, any>();
-  const alphaMap = new Map<string, any>();
+  const exactMap = new Map<string, SheetRecord>();
+  const alphaMap = new Map<string, SheetRecord>();
   const summaryMap = new Map<string, MasterProductSummary>();
   const summaries: MasterProductSummary[] = [];
 
@@ -420,7 +420,7 @@ export function buildMasterCatalogIndex(
     }
   }
 
-  const getRawBySku = (sku: string): any | null => {
+  const getRawBySku = (sku: string): SheetRecord | null => {
     if (!sku) return null;
     const clean = String(sku).trim().toLowerCase();
     if (!clean) return null;
@@ -491,12 +491,12 @@ export function buildMasterCatalogIndex(
   };
 }
 
-let cachedIndexProducts: any[] | null = null;
+let cachedIndexProducts: SheetRecord[] | null = null;
 let cachedIndexAliases: Record<string, string[]> | undefined = undefined;
 let cachedIndexResult: MasterCatalogIndex | null = null;
 
 export function getMasterCatalogIndex(
-  products: any[],
+  products: SheetRecord[],
   customAliases?: Record<string, string[]>
 ): MasterCatalogIndex {
   if (!products || products.length === 0) {
@@ -521,7 +521,7 @@ export function getMasterCatalogIndex(
  * Extracts a normalized, semantic summary of a master product row
  */
 export function getMasterProductSummary(
-  product: any, 
+  product: SheetRecord, 
   customAliases?: Record<string, string[]>
 ): MasterProductSummary {
   if (!product) {
@@ -535,10 +535,10 @@ export function getMasterProductSummary(
   const catCol = findColumnBySemantic(keys, 'categoria', customAliases) || keys.find(k => /categor|familia|rubro/i.test(k));
 
   return {
-    sku: skuCol && product[skuCol] !== undefined ? String(product[skuCol]).trim() : (product.SKU || ''),
-    name: descCol && product[descCol] !== undefined ? String(product[descCol]).trim() : (product.DESCRIPCION || ''),
-    provider: provCol && product[provCol] !== undefined ? String(product[provCol]).trim() : (product.PROVEEDOR || ''),
-    category: catCol && product[catCol] !== undefined ? String(product[catCol]).trim() : (product.CATEGORIA || product.FAMILIA || ''),
+    sku: skuCol && product[skuCol] !== undefined ? String(product[skuCol]).trim() : String(product.SKU ?? ''),
+    name: descCol && product[descCol] !== undefined ? String(product[descCol]).trim() : String(product.DESCRIPCION ?? ''),
+    provider: provCol && product[provCol] !== undefined ? String(product[provCol]).trim() : String(product.PROVEEDOR ?? ''),
+    category: catCol && product[catCol] !== undefined ? String(product[catCol]).trim() : String(product.CATEGORIA ?? product.FAMILIA ?? ''),
     raw: product
   };
 }
@@ -548,9 +548,9 @@ export function getMasterProductSummary(
  */
 export function findMasterProduct(
   sku: string, 
-  products: any[], 
+  products: SheetRecord[], 
   customAliases?: Record<string, string[]>
-): any | null {
+): SheetRecord | null {
   if (!sku || !products || products.length === 0) return null;
   const index = getMasterCatalogIndex(products, customAliases);
   return index.getRawBySku(sku);
@@ -561,7 +561,7 @@ export function findMasterProduct(
  */
 export function searchMasterProducts(
   query: string, 
-  products: any[], 
+  products: SheetRecord[], 
   limit: number = 8,
   customAliases?: Record<string, string[]>
 ): MasterProductSummary[] {
@@ -579,11 +579,11 @@ export function searchMasterProducts(
  * - Master Policy -> Target Policy column
  */
 export function dereferenceMasterProduct(
-  masterProduct: any, 
+  masterProduct: SheetRecord, 
   targetHeaders: string[], 
   customAliases?: Record<string, string[]>
-): Record<string, any> {
-  const result: Record<string, any> = {};
+): Record<string, string> {
+  const result: Record<string, string> = {};
   if (!masterProduct || !targetHeaders || targetHeaders.length === 0) return result;
 
   const masterKeys = Object.keys(masterProduct);
@@ -619,7 +619,7 @@ export function dereferenceMasterProduct(
 
   for (const targetHeader of targetHeaders) {
     const cleanHeader = String(targetHeader || '').trim();
-    let val: any = undefined;
+    let val: string | number | undefined = undefined;
 
     if (/sku|código|codigo/i.test(cleanHeader)) {
       val = getMasterVal('sku', /sku|código|codigo/i);
@@ -679,8 +679,8 @@ export function dereferenceMasterProduct(
 export function autoCalculateItemFormData(
   currentForm: Record<string, string>,
   headers: string[],
-  products: any[] = [],
-  policies: any[] = [],
+  products: SheetRecord[] = [],
+  policies: SheetRecord[] = [],
   sheetConfig?: SheetConfig
 ): Record<string, string> {
   const newForm = { ...currentForm };
@@ -712,7 +712,7 @@ export function autoCalculateItemFormData(
 
   // 1. Lookup SKU in master catalog (products) if SKU is typed
   const skuVal = skuCol && newForm[skuCol] ? String(newForm[skuCol]).trim() : '';
-  let masterProduct: any = null;
+  let masterProduct: SheetRecord | null = null;
   if (skuVal && products && products.length > 0) {
     masterProduct = findMasterProduct(skuVal, products, customAliases);
     if (masterProduct) {

@@ -14,7 +14,7 @@ interface PmMetrics {
 interface PmRadarCardsProps {
   pmRadarFilter: string[];
   onFilterClick: (filter: string, isMulti: boolean) => void;
-  metrics: PmMetrics;
+  metrics?: PmMetrics;
 }
 
 export const PmRadarCards: React.FC<PmRadarCardsProps> = ({
@@ -22,6 +22,7 @@ export const PmRadarCards: React.FC<PmRadarCardsProps> = ({
   onFilterClick,
   metrics,
 }) => {
+  if (!metrics) return null;
   return (
     <div className="bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-3 sm:px-6 lg:px-8 py-3.5 shrink-0 transition-all">
       <div className="flex flex-col lg:flex-row gap-3 items-stretch">

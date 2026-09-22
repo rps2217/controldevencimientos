@@ -1,8 +1,14 @@
 import React, { createContext, useContext } from 'react';
-import { InventoryItem, SheetConfig, SheetProperties, SpreadsheetMetadata, EventCategory, GlobalTicketConfig, ViewTicketConfig, TableSlice } from '../types';
+import { InventoryItem, SheetConfig, SheetProperties, SpreadsheetMetadata, EventCategory, GlobalTicketConfig, ViewTicketConfig, TableSlice, SheetRecord, SliceFilterConfig, SortConfig } from '../types';
 import { OfflineMutation, AuditLogEntry } from '../db/indexedDbService';
 import { ConnectionHealthStatus } from '../hooks/useOfflineSync';
 import { BulkActionContext } from '../utils/bulkActionsRegistry';
+import { ManageableColumn } from '../hooks/useColumnManager';
+import type { ColumnMetadata } from '../hooks/usePrecomputedColumns';
+import type { DisplayRow } from '../hooks/useInventoryFiltering';
+import type { VirtualItem } from '@tanstack/react-virtual';
+import type { WorkerMetricsResult } from '../workers/inventoryWorker';
+import type { ImportConsolidationMode } from '../utils/cuVcConsolidator';
 
 export interface DashboardContextType {
   // Core Sheet & Metadata
@@ -15,8 +21,8 @@ export interface DashboardContextType {
   setActiveView: (view: string) => void;
   headers: string[];
   visibleHeaders: string[];
-  products: any[];
-  policies: any[];
+  products: SheetRecord[];
+  policies: SheetRecord[];
   allMainItems: InventoryItem[];
   items: InventoryItem[];
   filteredItems: InventoryItem[];
@@ -71,7 +77,7 @@ export interface DashboardContextType {
   // WhatsApp Modal
 
   // Column Manager Modal
-  allManageableColumns: any[];
+  allManageableColumns: ManageableColumn[];
   toggleVisibility: (col: string) => void;
   moveColumn: (colId: string, direction: 'up' | 'down') => void;
   showAllColumns: () => void;
@@ -86,7 +92,7 @@ export interface DashboardContextType {
   handleSaveTicketConfig: (view: string, viewConfig: ViewTicketConfig) => void;
 
   // Bulk Import Modal
-  handleUniversalImportConfirmed: (importedRows: Record<string, any>[], mode?: any) => Promise<void>;
+  handleUniversalImportConfirmed: (importedRows: SheetRecord[], mode?: ImportConsolidationMode) => Promise<void>;
 
   // Bulk Actions Config Modal
 
@@ -99,8 +105,8 @@ export interface DashboardContextType {
   handleDeleteSlice: (sliceId: string) => void;
   handleToggleSliceVisibility: (sliceId: string) => void;
   handleSetBulkVisibility: (sliceIds: string[], visible: boolean) => void;
-  currentFilters: any;
-  sortConfig: any;
+  currentFilters: SliceFilterConfig;
+  sortConfig: SortConfig;
   groupByColumn: string | null;
   groupByDirection: 'asc' | 'desc';
   handleSetGroupByColumn?: (col: string) => void;
@@ -108,7 +114,7 @@ export interface DashboardContextType {
   handleSaveSlice: (slice: TableSlice) => void;
 
   // Stock Count Terminal
-  handleSyncRowsToVencimientos: (rows: Record<string, any>[]) => Promise<void>;
+  handleSyncRowsToVencimientos: (rows: SheetRecord[]) => Promise<void>;
 
   // Sync Audit & Offline State
   offlineQueue: OfflineMutation[];
@@ -119,14 +125,14 @@ export interface DashboardContextType {
   connectionStatus: ConnectionHealthStatus;
   lastHealthCheck: Date | null;
   healthErrorMessage: string | null;
-  testConnectionHealth: () => Promise<any>;
-  syncQueue: (targetMutationId?: string) => Promise<any>;
+  testConnectionHealth: () => Promise<{ success: boolean; latencyMs: number; status: ConnectionHealthStatus; error?: string }>;
+  syncQueue: (targetMutationId?: string) => Promise<{ success: boolean; count: number; errors: string[] }>;
   removeMutation: (id: string) => Promise<void>;
-  discardMutation: (id: string, reason?: string) => Promise<any>;
+  discardMutation: (id: string, reason?: string) => Promise<OfflineMutation | null>;
   discardAllFailedMutations: () => Promise<number>;
-  retryMutation: (id: string) => Promise<any>;
-  retryAllFailedMutations: () => Promise<any>;
-  forkMutationAsAppend: (id: string) => Promise<any>;
+  retryMutation: (id: string) => Promise<{ success: boolean; count: number; errors: string[] }>;
+  retryAllFailedMutations: () => Promise<{ success: boolean; count: number; errors: string[] }>;
+  forkMutationAsAppend: (id: string) => Promise<OfflineMutation | null>;
   failedMutations: OfflineMutation[];
   failedCount: number;
   clearQueue: () => Promise<void>;
@@ -179,21 +185,21 @@ export interface DashboardContextType {
   eventResolutionFilter?: string[];
   setEventResolutionFilter?: React.Dispatch<React.SetStateAction<string[]>>;
   handleFilterToggle?: <T>(prev: T[], val: T, isMulti: boolean) => T[];
-  eventResolutionMetrics?: any;
-  eventFilter?: any[];
-  setEventFilter?: React.Dispatch<React.SetStateAction<any[]>>;
-  eventMetrics?: any;
+  eventResolutionMetrics?: WorkerMetricsResult['eventResolutionMetrics'];
+  eventFilter?: string[];
+  setEventFilter?: React.Dispatch<React.SetStateAction<string[]>>;
+  eventMetrics?: WorkerMetricsResult['eventMetrics'];
   frcBodValues?: string[];
   frcBodCounts?: Record<string, number>;
   frcBodFilter?: string[];
   setFrcBodFilter?: React.Dispatch<React.SetStateAction<string[]>>;
   pmRadarFilter?: string[];
   setPmRadarFilter?: React.Dispatch<React.SetStateAction<string[]>>;
-  pmMetrics?: any;
+  pmMetrics?: WorkerMetricsResult['pmMetrics'];
 
   // Table Container & Virtualization
   effectiveVisibleHeaders?: string[];
-  visibleColumnMeta?: any[];
+  visibleColumnMeta?: ColumnMetadata[];
   tableContainerRef?: React.RefObject<HTMLDivElement | null>;
   getColWidth?: (headerId: string, label: string, type?: string) => number;
   handleStartResize?: (colId: string, startWidth: number, e: React.MouseEvent) => void;
@@ -204,7 +210,7 @@ export interface DashboardContextType {
   onDeleteRow?: (item: InventoryItem) => void;
   onPmRadarFilterClick?: (targetFilter: string, isMulti: boolean) => void;
   onEventResolutionFilterClick?: (status: 'pending' | 'completed', isMulti: boolean) => void;
-  onEventFilterClick?: (eventCat: any, isMulti: boolean) => void;
+  onEventFilterClick?: (eventCat: EventCategory, isMulti: boolean) => void;
   onFrcBodFilterClick?: (bodVal: string, isMulti: boolean) => void;
   onOpenQuickTraspaso?: (item: InventoryItem) => void;
   onOpenWhatsApp?: (item: InventoryItem) => void;
@@ -217,10 +223,10 @@ export interface DashboardContextType {
   setDragOverCol?: (col: string | null) => void;
   columnFilters?: Record<string, string[]>;
   setColumnFilters?: React.Dispatch<React.SetStateAction<Record<string, string[]>>>;
-  columnOptionsMap?: Record<string, any[]>;
+  columnOptionsMap?: WorkerMetricsResult['columnOptionsMap'];
   frcBodCol?: string | null;
-  virtualRows?: any[];
-  paginatedDisplayRows?: any[];
+  virtualRows?: VirtualItem[];
+  paginatedDisplayRows?: DisplayRow[];
   paddingTop?: number;
   paddingBottom?: number;
   onSelectGroupRows?: (rowIndexes: number[], selected: boolean) => void;
@@ -230,7 +236,7 @@ export interface DashboardContextType {
   expandAllGroups?: () => void;
   collapseAllGroups?: () => void;
   collapsedGroups?: Record<string, boolean>;
-  groupedItems?: any[] | null;
+  groupedItems?: Array<[string, InventoryItem[]]> | null;
   toggleGroupByDirection?: () => void;
 }
 

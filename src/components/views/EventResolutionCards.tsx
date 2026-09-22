@@ -10,7 +10,7 @@ interface EventResolutionMetrics {
 interface EventResolutionCardsProps {
   eventResolutionFilter: string[];
   onFilterClick: (filter: string, isMulti: boolean) => void;
-  metrics: EventResolutionMetrics;
+  metrics?: EventResolutionMetrics;
 }
 
 export const EventResolutionCards: React.FC<EventResolutionCardsProps> = ({
@@ -18,6 +18,7 @@ export const EventResolutionCards: React.FC<EventResolutionCardsProps> = ({
   onFilterClick,
   metrics,
 }) => {
+  const m = metrics ?? { total: 0, pending: 0, completed: 0 };
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2.5">
@@ -49,7 +50,7 @@ export const EventResolutionCards: React.FC<EventResolutionCardsProps> = ({
             </div>
           </div>
           <span className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono">
-            {metrics.total}
+            {m.total}
           </span>
         </button>
 
@@ -78,7 +79,7 @@ export const EventResolutionCards: React.FC<EventResolutionCardsProps> = ({
             </div>
           </div>
           <span className="text-2xl font-black text-amber-700 dark:text-amber-300 font-mono">
-            {metrics.pending}
+            {m.pending}
           </span>
         </button>
 
@@ -107,7 +108,7 @@ export const EventResolutionCards: React.FC<EventResolutionCardsProps> = ({
             </div>
           </div>
           <span className="text-2xl font-black text-emerald-700 dark:text-emerald-300 font-mono">
-            {metrics.completed}
+            {m.completed}
           </span>
         </button>
       </div>

@@ -252,7 +252,7 @@ console.log('\n--- 5. Pruebas de referenceResolver.ts ---');
   const foundAlpha = findMasterProduct('1001', SAMPLE_PRODUCTS);
   assert(foundAlpha !== null && foundAlpha.SKU === 'SKU-1001', 'findMasterProduct busca por código numérico flexible');
 
-  const deref = dereferenceMasterProduct(foundExact, SAMPLE_HEADERS);
+  const deref = dereferenceMasterProduct(foundExact!, SAMPLE_HEADERS);
   assert(Object.keys(deref).length > 0, 'dereferenceMasterProduct propaga campos maestros');
   assert(deref['DESCRIPCION'] === 'Leche Entera UHT 1L', 'dereferenceMasterProduct asigna descripción correcta');
 }

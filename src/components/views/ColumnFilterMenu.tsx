@@ -6,6 +6,7 @@ export interface FilterOption {
   value: string;
   icon?: React.ReactNode;
   badgeClass?: string;
+  disabled?: boolean;
 }
 
 interface ColumnFilterMenuProps {

@@ -216,8 +216,10 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
     }
 
     // De-reference fields from master product to current sheet
-    const dereferenced = dereferenceMasterProduct(selectedProd.raw, headers, sheetConfig.customAliases);
-    Object.assign(updates, dereferenced);
+    if (selectedProd.raw) {
+      const dereferenced = dereferenceMasterProduct(selectedProd.raw, headers, sheetConfig.customAliases);
+      Object.assign(updates, dereferenced);
+    }
 
     if (onBatchUpdateFormData) {
       onBatchUpdateFormData(updates);

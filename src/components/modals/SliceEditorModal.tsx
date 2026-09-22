@@ -19,7 +19,7 @@ interface SliceEditorModalProps {
     pmRadarFilter?: string[];
     dynamicMonthFilter?: number[];
     dynamicMonthRange?: DynamicMonthRange | null;
-    eventResolutionFilter?: ('pending' | 'completed')[];
+    eventResolutionFilter?: string[];
     frcBodFilter?: string[];
     columnFilters?: Record<string, string[]>;
   };
