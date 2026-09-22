@@ -503,6 +503,35 @@ usa en el render, `useItemFormModal` los recibe por parámetro), lo que obligó 
 `startupcorruption` y `latency` en OK sobre el build de producción (mediana de tecleo
 22 ms, sin regresión).
 
+#### Red de seguridad antes de `useInventoryActions`: `mutcheck.cjs`
+
+Antes de mover los handlers de mutación (guardar, editar y eliminar) se midió su
+cobertura: **cero**. Ninguna prueba unitaria ni E2E tocaba `handleSave`, `handleDelete`,
+`handleBulkDelete`, `handleApplyBulkEdit` ni `handleUniversalImportConfirmed`, que son la
+ruta crítica de pérdida de datos y las que mueven la cola offline y el rollback. Mover ese
+código sin red habría incumplido un guardrail no negociable (`AGENTS.md` §5).
+
+Se añadió `tests/perf/mutcheck.cjs`, conductual y en modo demostración (sin red), con tres
+casos sobre el DOM real:
+
+| Caso | Señal exigida |
+| --- | --- |
+| Crear | Se guarda un SKU nuevo y una búsqueda posterior lo encuentra (1 fila). |
+| Editar | Al cambiar la descripción desde el drawer, el valor nuevo aparece en la tabla. |
+| Eliminar | Tras confirmar, el SKU ya no aparece (0 filas). |
+
+Dos decisiones de diseño del arnés, por señales que engañaban:
+- **No contar filas totales**: la paginación rellena la página, así que el total no cambia
+  de forma observable al crear/eliminar. Se aísla cada caso con el buscador, que es una
+  señal independiente de la paginación.
+- **Desambiguar el botón de confirmación**: el drawer tiene su propio botón "Eliminar" y el
+  diálogo monta otro con el mismo texto. Se selecciona por `autoFocus`, que el primario del
+  diálogo tiene y el del drawer no.
+
+Resultado verificado: 3/3 en OK. La extracción de `useInventoryActions` queda ahora con
+red; su interfaz sería de ~23 parámetros (medido), así que se abordará por sub-bloques
+cohesionados y no en una sola pieza.
+
 ### Fase 4 — Puerta única de persistencia (**iniciada**)
 
 Corrección de la premisa del plan: **no son "20 archivos saltándose `STORAGE_KEYS`"**.
