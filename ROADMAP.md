@@ -579,6 +579,34 @@ Dos correcciones de método en esa prueba, por aserciones que engañaban:
   demo, no por el refactor.
 - **No exigir el aviso final.** Se autodesvanece antes de una instantánea fiable.
 
+#### Corte `useInventoryBulkActions`
+
+Cuarto corte de Fase 3. Se extrajo a `src/hooks/useInventoryBulkActions.ts` (253 líneas) el
+bloque de **acciones masivas**: `handleApplyBulkEdit` y `handleBulkDelete`. Es el bloque de
+~23 dependencias que se había dejado pendiente por su tamaño; separarlo en su propia unidad
+de dominio —edición y borrado en lote sobre `selectedRowIds`— lo vuelve manejable.
+
+- **Interfaz de 13 parámetros** (no 23): `confirm` y los *toasts* no se pasan como props. El
+  hook los obtiene de sus propios contextos (`useConfirm`, `useToast`), evitando engordar la
+  interfaz con estado que ya vive en un provider.
+- **Tipos reales, no inventados**: `activeSheet: SheetProperties | null` y
+  `selectedRowIds: number[]`, tomados del dashboard en vez de uniones defensivas.
+- Se movió **verbatim**; los imports que quedaron huérfanos en el dashboard
+  (`deleteRows`, `EventCategory`, `EVENT_CATEGORIES`) se retiraron.
+
+`InventoryDashboard.tsx`: **1.549 → 1.377 líneas** (acumulado Fase 3: 2.081 → 1.377, −34%).
+
+**Red de seguridad nueva**: `tests/perf/bulkcheck.cjs`. Prueba la edición masiva en
+*Incidencias & FRC* (única vista que la habilita por defecto) y la eliminación en la vista
+principal. Señales elegidas para no engañar: el modal de edición se cierra **sólo** después
+de resolver `await onApply(...)`, y el borrado se verifica por el **almacén persistido**
+(`app_demo_items_main` 400 → 399), no por el conteo de nodos del DOM — la tabla está
+virtualizada y sólo renderiza ~23 filas de 400. Igual que en `importcheck`, los *toasts* no
+se asertan porque se autodesvanecen antes de una lectura fiable.
+
+Estado acumulado de hooks extraídos en Fase 3: `useInventoryData`, `useTableGrouping`,
+`useInventoryIngestion` y `useInventoryBulkActions`.
+
 ### Fase 4 — Puerta única de persistencia (**iniciada**)
 
 Corrección de la premisa del plan: **no son "20 archivos saltándose `STORAGE_KEYS`"**.
