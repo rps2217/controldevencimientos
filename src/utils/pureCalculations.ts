@@ -5,7 +5,7 @@ import { findColumnBySemantic } from './columnAliases';
  * Match a raw string from FRC_EVEN (e.g. 'VENC. CERC.', 'DET. PED', 'CAL. INTER', 'CANJES', 'DIF. PED')
  * into its corresponding EventCategory
  */
-export function getCategoryFromEventValue(rawVal: any): EventCategory | null {
+export function getCategoryFromEventValue(rawVal: unknown): EventCategory | null {
   if (rawVal === null || rawVal === undefined) return null;
   const raw = String(rawVal).trim().toUpperCase();
   if (!raw || raw === '-') return null;
@@ -49,7 +49,7 @@ export function getCategoryFromEventValue(rawVal: any): EventCategory | null {
  * - Month/Year: MM/YYYY, MM-YYYY, YYYY-MM (evaluates to last day of the month)
  * - Native Date objects or timestamps
  */
-export function parseAnyDate(dateVal: any): Date | null {
+export function parseAnyDate(dateVal: unknown): Date | null {
   if (dateVal === null || dateVal === undefined) return null;
   if (dateVal instanceof Date) {
     if (isNaN(dateVal.getTime())) return null;
@@ -149,7 +149,7 @@ export function parseAnyDate(dateVal: any): Date | null {
 /**
  * Format a Date for standard HTML `<input type="date">` (YYYY-MM-DD)
  */
-export function formatInputDate(dateVal: any): string {
+export function formatInputDate(dateVal: unknown): string {
   const d = parseAnyDate(dateVal);
   if (!d) return '';
   const yyyy = d.getFullYear();
@@ -162,7 +162,7 @@ export function formatInputDate(dateVal: any): string {
 /**
  * Format a Date or Timestamp for HTML `<input type="datetime-local">` (YYYY-MM-DDTHH:mm)
  */
-export function formatInputDateTime(dateVal: any): string {
+export function formatInputDateTime(dateVal: unknown): string {
   if (!dateVal) return '';
   let d: Date | null = null;
   if (dateVal instanceof Date) {
@@ -190,7 +190,7 @@ export function formatInputDateTime(dateVal: any): string {
 /**
  * Format a Date for elegant table display (DD/MM/YYYY)
  */
-export function formatDisplayDate(dateVal: any, fallback = '-'): string {
+export function formatDisplayDate(dateVal: unknown, fallback = '-'): string {
   const d = parseAnyDate(dateVal);
   if (!d) return String(dateVal || fallback);
   const yyyy = d.getFullYear();
@@ -203,7 +203,7 @@ export function formatDisplayDate(dateVal: any, fallback = '-'): string {
 /**
  * Robust number parsing supporting thousand separators, decimal commas/periods, and spaces
  */
-export function parseLocaleNumber(val: any, fallback = 0): number {
+export function parseLocaleNumber(val: unknown, fallback = 0): number {
   if (val === null || val === undefined) return fallback;
   if (typeof val === 'number') return isNaN(val) ? fallback : val;
 
@@ -244,7 +244,7 @@ export function parseLocaleNumber(val: any, fallback = 0): number {
 /**
  * Format number with thousand separators
  */
-export function formatLocaleNumber(numVal: any, decimals = 0): string {
+export function formatLocaleNumber(numVal: unknown, decimals = 0): string {
   const n = typeof numVal === 'number' ? numVal : parseLocaleNumber(numVal);
   return n.toLocaleString('es-ES', { 
     minimumFractionDigits: decimals, 
@@ -536,7 +536,7 @@ export function calculateWithdrawalDate(dVc: Date, diasRetiro: number): Date {
 /**
  * Clean and format phone numbers, ensuring they have the +56 prefix (Chile)
  */
-export function formatPhoneNumber(phone: any): string {
+export function formatPhoneNumber(phone: unknown): string {
   const rawPhone = String(phone || '').trim().replace(/[^\d+]/g, '');
   if (!rawPhone) return '';
   // If it already has an international prefix with '+'

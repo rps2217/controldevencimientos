@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { appendRow, updateRow, deleteRow, saveCloudConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
-import { InventoryItem, SheetConfig, ViewKey } from '../types';
+import { InventoryItem, SheetConfig, ViewKey, EventCategory } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
 import { useModalsActions } from '../context/ModalsContext';
 import { DashboardProvider, DashboardContextType } from '../context/DashboardContext';
@@ -1021,7 +1021,7 @@ export const InventoryDashboard: React.FC = () => {
     setEventResolutionFilter(prev => handleFilterToggle(prev, status, isMulti));
   }, []);
 
-  const handleEventFilterClick = useCallback((eventCat: any, isMulti: boolean) => {
+  const handleEventFilterClick = useCallback((eventCat: EventCategory, isMulti: boolean) => {
     setEventFilter(prev => handleFilterToggle(prev, eventCat, isMulti));
   }, []);
 
@@ -1035,7 +1035,7 @@ export const InventoryDashboard: React.FC = () => {
 
   const mappedSheets = [sheetConfig.main, sheetConfig.events, sheetConfig.products, sheetConfig.policies].filter(Boolean);
   const otherSheets = metadata?.sheets
-    .map((s: any) => s.properties.title)
+    .map(s => s.properties.title)
     .filter((t: string) => !mappedSheets.includes(t) && !/^_/i.test(t.trim())) || [];
 
   const dashboardContextValue: DashboardContextType = {

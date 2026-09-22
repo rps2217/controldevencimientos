@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { FileSpreadsheet, Upload, Clipboard, CheckCircle2, AlertCircle, ArrowRight, RefreshCw, Layers, Check, X, Sparkles, Filter } from 'lucide-react';
 import { parseExcelBuffer, parseDelimitedText, detectDelimiter, generateSmartColumnMappings, ParsedSpreadsheetResult } from '../../utils/universalImporter';
 import { rowToObject } from '../../utils/pureCalculations';
-import { InventoryItem } from '../../types';
+import { InventoryItem, SheetRecord } from '../../types';
 import { reconcileImportWithInventory, ImportConsolidationMode } from '../../utils/cuVcConsolidator';
 import { getErrorMessage } from '../../utils/pureCalculations';
 
@@ -13,7 +13,7 @@ interface UniversalImportModalProps {
   activeSheetTitle: string;
   existingItems?: InventoryItem[];
   customAliases?: Record<string, string[]>;
-  onImportConfirmed: (mappedRows: Record<string, any>[], mode?: ImportConsolidationMode) => Promise<void>;
+  onImportConfirmed: (mappedRows: SheetRecord[], mode?: ImportConsolidationMode) => Promise<void>;
 }
 
 export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
@@ -70,7 +70,7 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
   const mappedRowsPreview = useMemo(() => {
     if (!parsedData || parsedData.rows.length === 0) return [];
     return parsedData.rows.map(sourceRow => {
-      const mappedItem: Record<string, any> = {};
+      const mappedItem: SheetRecord = {};
       targetHeaders.forEach(targetCol => {
         const mappedSourceCol = customMappings[targetCol];
         if (mappedSourceCol && sourceRow[mappedSourceCol] !== undefined) {
@@ -168,7 +168,7 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
     try {
       // Map rows according to customMappings
       const mappedRowsList = parsedData.rows.map(sourceRow => {
-        const mappedItem: Record<string, any> = {};
+        const mappedItem: SheetRecord = {};
         targetHeaders.forEach(targetCol => {
           const mappedSourceCol = customMappings[targetCol];
           if (mappedSourceCol && sourceRow[mappedSourceCol] !== undefined) {

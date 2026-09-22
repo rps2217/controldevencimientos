@@ -1,4 +1,5 @@
-import { VirtualColumn, UserVirtualColumn } from '../types';
+import { VirtualColumn, UserVirtualColumn, SheetRecord, VirtualColumnDataContext } from '../types';
+export type { VirtualColumnDataContext };
 import { findColumnBySemantic } from './columnAliases';
 import { resolveItemPolicyAndRetiro } from './referenceResolver';
 import { parseAnyDate } from './dateCalculations';
@@ -52,7 +53,7 @@ export const VIRTUAL_COLUMNS: VirtualColumn[] = [
 
       if (!itemSku && !itemRut) return '-';
 
-      const productEntry = products.find((p: any) => {
+      const productEntry = products.find(p => {
         const keys = Object.keys(p);
         const pSkuCol = keys.find(k => /sku|código|codigo|cod_producto|cod.*producto/i.test(k));
         const pRutCol = keys.find(k => /rut/i.test(k));
@@ -72,9 +73,9 @@ export const VIRTUAL_COLUMNS: VirtualColumn[] = [
 
 export const calculateVirtualColumnValue = (
   col: VirtualColumn | UserVirtualColumn,
-  item: any,
+  item: SheetRecord,
   headers: string[],
-  allData: any
+  allData?: VirtualColumnDataContext
 ): string | number => {
   // Check if it's a System Virtual Column
   if ('calculate' in col && typeof col.calculate === 'function') {
@@ -86,7 +87,7 @@ export const calculateVirtualColumnValue = (
   const values = uvc.sourceColumns.map(sc => item[sc] || '');
   
   if (uvc.operation === 'concatenate') return values.join(' ');
-  if (uvc.operation === 'sum') return values.reduce((acc, v) => acc + (parseFloat(String(v)) || 0), 0);
+  if (uvc.operation === 'sum') return values.reduce<number>((acc, v) => acc + (parseFloat(String(v)) || 0), 0);
   if (uvc.operation === 'diff_days') {
      const d1 = parseAnyDate(values[0]);
      const d2 = parseAnyDate(values[1]);

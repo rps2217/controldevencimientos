@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { 
   CheckCircle2, Clock3, Edit2, Plus, Trash2, Building2, MessageSquare, Mail 
 } from 'lucide-react';
-import { InventoryItem } from '../../types';
+import { InventoryItem, EventCategory } from '../../types';
 import { 
   getItemStatus, 
   getEventCategory, 
@@ -30,7 +30,7 @@ export interface InventoryTableRowProps {
   onDeleteRow: (item: InventoryItem) => void;
   onPmRadarFilterClick: (targetFilter: string, isMulti: boolean) => void;
   onEventResolutionFilterClick: (status: 'pending' | 'completed', isMulti: boolean) => void;
-  onEventFilterClick: (eventCat: any, isMulti: boolean) => void;
+  onEventFilterClick: (eventCat: EventCategory, isMulti: boolean) => void;
   onFrcBodFilterClick: (bodVal: string, isMulti: boolean) => void;
   onOpenQuickTraspaso: (item: InventoryItem) => void;
   onOpenWhatsApp?: (item: InventoryItem) => void;

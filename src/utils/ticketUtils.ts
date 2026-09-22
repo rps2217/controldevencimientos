@@ -115,17 +115,17 @@ export function normalizeTicketConfig(
     return getDefaultViewTicketSettings(headers, activeView);
   }
 
-  let rawColumns: Record<string, any> = {};
+  let rawColumns: Record<string, TicketColumnConfig> = {};
   let generalSettings: TicketGeneralSettings = { ...defaultGeneral };
 
   if ('columns' in rawConfig && typeof rawConfig.columns === 'object' && rawConfig.columns !== null) {
-    rawColumns = rawConfig.columns;
+    rawColumns = rawConfig.columns as Record<string, TicketColumnConfig>;
     if (rawConfig.general) {
       generalSettings = { ...defaultGeneral, ...rawConfig.general };
     }
   } else {
     // Legacy format: rawConfig is directly Record<string, TicketColumnConfig>
-    rawColumns = rawConfig as Record<string, any>;
+    rawColumns = rawConfig as Record<string, TicketColumnConfig>;
   }
 
   // Check if at least one column is configured or visible

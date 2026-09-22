@@ -28,9 +28,9 @@ interface ModalsState {
   isMobilePistoleoOpen: boolean;
   isBulkEditOpen: boolean;
   isGmailModalOpen: boolean;
-  gmailModalItems: any[];
+  gmailModalItems: InventoryItem[];
   isWhatsAppModalOpen: boolean;
-  whatsAppModalItems: any[];
+  whatsAppModalItems: InventoryItem[];
   isColumnManagerOpen: boolean;
   isQuickTraspasoOpen: boolean;
   quickTraspasoItem: InventoryItem | null;
@@ -53,9 +53,9 @@ interface ModalsActions {
   setIsMobilePistoleoOpen: (open: boolean) => void;
   setIsBulkEditOpen: (open: boolean) => void;
   setIsGmailModalOpen: (open: boolean) => void;
-  setGmailModalItems: (items: any[]) => void;
+  setGmailModalItems: (items: InventoryItem[]) => void;
   setIsWhatsAppModalOpen: (open: boolean) => void;
-  setWhatsAppModalItems: (items: any[]) => void;
+  setWhatsAppModalItems: (items: InventoryItem[]) => void;
   setIsColumnManagerOpen: (open: boolean) => void;
   setIsQuickTraspasoOpen: (open: boolean) => void;
   setQuickTraspasoItem: (item: InventoryItem | null) => void;
@@ -100,9 +100,9 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isMobilePistoleoOpen, setIsMobilePistoleoOpen] = useState(false);
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [isGmailModalOpen, setIsGmailModalOpen] = useState(false);
-  const [gmailModalItems, setGmailModalItems] = useState<any[]>([]);
+  const [gmailModalItems, setGmailModalItems] = useState<InventoryItem[]>([]);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
-  const [whatsAppModalItems, setWhatsAppModalItems] = useState<any[]>([]);
+  const [whatsAppModalItems, setWhatsAppModalItems] = useState<InventoryItem[]>([]);
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false);
   const [isQuickTraspasoOpen, setIsQuickTraspasoOpen] = useState(false);
   const [quickTraspasoItem, setQuickTraspasoItem] = useState<InventoryItem | null>(null);

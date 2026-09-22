@@ -1,9 +1,10 @@
 import { findColumnBySemantic, KnownFieldSemantic } from './columnAliases';
 import { rowToObject } from './pureCalculations';
+import { SheetRecord } from '../types';
 
 export interface ParsedSpreadsheetResult {
   headers: string[];
-  rows: Record<string, any>[];
+  rows: SheetRecord[];
   totalRows: number;
   delimiterDetected?: string;
   sourceType: 'excel' | 'csv' | 'tsv' | 'clipboard';
@@ -189,7 +190,7 @@ export async function parseExcelBuffer(buffer: ArrayBuffer): Promise<ParsedSprea
 
   const worksheet = workbook.Sheets[sheetName];
   // Parse with header: 1 to get raw 2D array
-  const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { 
+  const rawData: unknown[][] = XLSX.utils.sheet_to_json(worksheet, { 
     header: 1, 
     raw: true,
   });
@@ -200,7 +201,7 @@ export async function parseExcelBuffer(buffer: ArrayBuffer): Promise<ParsedSprea
 
   // Find first non-empty row as header
   let headerRowIndex = 0;
-  while (headerRowIndex < rawData.length && (!rawData[headerRowIndex] || rawData[headerRowIndex].filter((c: any) => String(c || '').trim().length > 0).length === 0)) {
+  while (headerRowIndex < rawData.length && (!rawData[headerRowIndex] || rawData[headerRowIndex].filter((c: unknown) => String(c || '').trim().length > 0).length === 0)) {
     headerRowIndex++;
   }
 
@@ -208,17 +209,17 @@ export async function parseExcelBuffer(buffer: ArrayBuffer): Promise<ParsedSprea
     throw new Error('No se encontraron encabezados de columna en el archivo.');
   }
 
-  const rawHeaders: string[] = rawData[headerRowIndex].map((c: any) => String(c || '').trim());
+  const rawHeaders: string[] = rawData[headerRowIndex].map((c: unknown) => String(c || '').trim());
   const existingSet = new Set<string>();
   const headers = rawHeaders.map((h, idx) => sanitizeHeader(h, idx, existingSet));
 
   const dataRows = rawData.slice(headerRowIndex + 1);
-  const rows: Record<string, any>[] = [];
+  const rows: SheetRecord[] = [];
 
   for (let i = 0; i < dataRows.length; i++) {
     const rowCells = dataRows[i];
-    if (!rowCells || !rowCells.some((c: any) => String(c || '').trim() !== '')) continue;
-    const rowObj: Record<string, any> = {};
+    if (!rowCells || !rowCells.some((c: unknown) => String(c || '').trim() !== '')) continue;
+    const rowObj: SheetRecord = {};
     headers.forEach((h, idx) => {
       rowObj[h] = toCellString(rowCells[idx]);
     });

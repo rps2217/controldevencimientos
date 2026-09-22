@@ -1,5 +1,6 @@
 import React from 'react';
-import { 
+import type { InventoryItem } from '../../types';
+import {
   Database, FileSpreadsheet, Package, FileText, TableProperties, List, Settings, PanelLeftClose, PanelLeftOpen, PieChart, Barcode
 } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
@@ -47,7 +48,7 @@ export interface SidebarProps {
   setIsSidebarCollapsed?: (collapsed: boolean) => void;
   activeView?: string;
   setActiveView?: (view: string) => void;
-  setSelectedProduct?: (prod: any) => void;
+  setSelectedProduct?: (prod: InventoryItem | null) => void;
   otherSheets?: string[];
   onOpenConfig?: () => void;
   onOpenStockCount?: () => void;

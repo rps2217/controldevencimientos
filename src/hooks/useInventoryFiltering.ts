@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useDeferredValue } from 'react';
-import { InventoryItem, SheetConfig, SortConfig, DynamicMonthRange, ViewKey } from '../types';
+import { InventoryItem, SheetConfig, SortConfig, DynamicMonthRange, ViewKey , SheetRecord } from '../types';
 import { 
   getItemStatus, 
   getEventCategory, 
@@ -35,8 +35,8 @@ export interface UseInventoryFilteringProps {
   activeView: ViewKey;
   frcBodCol: string | null;
   sheetConfig: SheetConfig;
-  products: any[];
-  policies: any[];
+  products: SheetRecord[];
+  policies: SheetRecord[];
   searchTerm: string;
   activeQuickChip: string | null;
   searchableHeaders: string[];
@@ -170,7 +170,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
       return items;
     }
     return items.map(item => {
-      const virtualData: Record<string, any> = {};
+      const virtualData: Record<string, string | number> = {};
       targetVCs.forEach(col => {
         virtualData[col.id] = col.calculate(item, headers, { products, policies });
       });

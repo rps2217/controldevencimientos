@@ -14,7 +14,7 @@ import {
   Plus,
   Minus
 } from 'lucide-react';
-import { CampaignAuditRow, CampaignConsolidationMatrix, StockCountSession } from '../../types';
+import { CampaignAuditRow, CampaignConsolidationMatrix, StockCountSession, SheetRecord } from '../../types';
 import { playBeep } from '../../utils/stockCountUtils';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { MobileCameraBarcodeScanner } from '../views/MobileCameraBarcodeScanner';
@@ -24,7 +24,7 @@ interface CampaignQuickScanModalProps {
   onClose: () => void;
   matrix: CampaignConsolidationMatrix | null;
   sessions: StockCountSession[];
-  masterProducts?: any[];
+  masterProducts?: SheetRecord[];
   onMarkSkuClosed: (sku: string) => void;
   onReopenSku: (sku: string) => void;
   onAdjustSales?: (sku: string, salesQty: number) => void;
@@ -83,7 +83,7 @@ export const CampaignQuickScanModal: React.FC<CampaignQuickScanModalProps> = ({
 
     // 2. Barcode match in master catalog if not found directly
     if (!found && masterProducts.length > 0) {
-      const masterMatch = masterProducts.find((p: any) => {
+      const masterMatch = masterProducts.find(p => {
         const pBarcode = String(p.barcode || p.BARCODE || p.codigo_barra || p.EAN || '').trim();
         const pSku = String(p.sku || p.SKU || '').trim();
         return pBarcode === clean || pSku === clean;

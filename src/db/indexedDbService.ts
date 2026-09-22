@@ -5,10 +5,13 @@
  */
 import { STORAGE_KEYS, sheetCacheKey, readStorage, writeStorage, objectArraySchema, cachedSheetSchema, type CachedSheetFallback } from '../utils/appStorage';
 import { isFailedMutation } from '../utils/offlineQueueUtils';
+import type { SheetRow, CellValue } from '../lib/sheets';
+
+export type MutationValues = SheetRow | Record<string, CellValue>;
 
 export interface CachedSheetData {
   sheetTitle: string;
-  rows: any[][];
+  rows: SheetRow[];
   timestamp: string;
   recordCount: number;
 }
@@ -24,7 +27,7 @@ export interface OfflineMutation {
   keyValue?: string;
   keyColumn?: string;
   headers?: string[];
-  values?: any;
+  values?: MutationValues;
   createdAt: string;
   status: 'pending' | 'syncing' | 'failed' | 'completed';
   attempts: number;
@@ -40,7 +43,7 @@ export interface AuditLogEntry {
   timestamp: string;
   status: 'synced' | 'pending' | 'syncing' | 'failed';
   mutationId?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   errorMessage?: string;
 }
 
@@ -144,7 +147,7 @@ class IndexedDbService {
   /**
    * Obtiene una hoja desde IndexedDB (o fallback localStorage si no está disponible)
    */
-  async getCachedSheet(sheetTitle: string): Promise<{ rows: any[][]; timestamp: string } | null> {
+  async getCachedSheet(sheetTitle: string): Promise<{ rows: SheetRow[]; timestamp: string } | null> {
     if (!sheetTitle) return null;
 
     try {
@@ -183,7 +186,7 @@ class IndexedDbService {
   /**
    * Guarda de forma asíncrona una hoja completa en IndexedDB sin bloquear el hilo principal
    */
-  async saveCachedSheet(sheetTitle: string, rows: any[][]): Promise<void> {
+  async saveCachedSheet(sheetTitle: string, rows: SheetRow[]): Promise<void> {
     if (!sheetTitle || !Array.isArray(rows)) return;
 
     const payload: CachedSheetData = {
@@ -854,10 +857,10 @@ class IndexedDbService {
   }
 
   // Helpers internos
-  private getLocalStorageFallback(key: string): { rows: any[][]; timestamp: string } | null {
+  private getLocalStorageFallback(key: string): { rows: SheetRow[]; timestamp: string } | null {
     const cached = readStorage<CachedSheetFallback | null>(key, cachedSheetSchema.nullable(), null);
     if (!cached) return null;
-    return { rows: cached.rows, timestamp: cached.timestamp || new Date().toISOString() };
+    return { rows: cached.rows as SheetRow[], timestamp: cached.timestamp || new Date().toISOString() };
   }
 
   private getLocalStorageQueue(): OfflineMutation[] {

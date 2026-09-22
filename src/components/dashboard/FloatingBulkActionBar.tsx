@@ -8,6 +8,7 @@ import { parseAnyDate } from '../../utils/pureCalculations';
 import { exportToExcel } from '../../utils/exportUtils';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
+import type { SheetRecord } from '../../types';
 
 export const FloatingBulkActionBar: React.FC = () => {
   const dashboard = useDashboard();
@@ -46,8 +47,8 @@ export const FloatingBulkActionBar: React.FC = () => {
       ...(sheetConfig.userVirtualColumns || []).map(uvc => ({
         id: uvc.id,
         label: uvc.label,
-        calculate: (item: any) => {
-          const values = uvc.sourceColumns.map(sc => item[sc] || '');
+        calculate: (item: SheetRecord) => {
+          const values = uvc.sourceColumns.map(sc => String(item[sc] || ''));
           if (uvc.operation === 'concatenate') return values.join(' ');
           if (uvc.operation === 'sum') return values.reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
           if (uvc.operation === 'diff_days') {

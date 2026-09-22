@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'rea
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { X, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2, Undo2 } from 'lucide-react';
-import { StockCountSession, StockCountEntry, InventoryItem, InventoryCampaign } from '../../types';
+import { StockCountSession, StockCountEntry, InventoryItem, InventoryCampaign, SheetRecord } from '../../types';
 import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorage, saveStockCountSessionsToStorageDebounced, flushStockCountSessionsToStorage, loadCampaignsFromStorage, saveCampaignsToStorage, getActiveCampaignId, setActiveCampaignId, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
 import { saveAuditRowsToDedicatedSheet, syncCampaignsWithCloud } from '../../lib/sheets';
 import { LazyFallback } from '../common/LazyFallback';
@@ -14,7 +14,7 @@ import { CountNumpad } from './CountNumpad';
 import { MobileReadingsList } from './MobileReadingsList';
 import { LastScannedHeroCard } from './LastScannedHeroCard';
 import { MobileExpiryPrompt, MONTHS_LIST } from './MobileExpiryPrompt';
-import { buildMasterCatalogIndex } from '../../utils/referenceResolver';
+import { buildMasterCatalogIndex, MasterProductSummary } from '../../utils/referenceResolver';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { copyTextToClipboard } from '../../utils/exportUtils';
 import { executeThermalPrint } from '../../utils/ticketUtils';
@@ -28,9 +28,9 @@ const CampaignConsolidationDashboard = lazy(() => import('./CampaignConsolidatio
 interface StockCountTerminalProps {
   sheetItems: InventoryItem[];
   headers: string[];
-  masterProducts: any[];
+  masterProducts: SheetRecord[];
   activeSheetTitle: string;
-  onSyncRowsToVencimientos: (rows: Record<string, any>[]) => Promise<void>;
+  onSyncRowsToVencimientos: (rows: SheetRecord[]) => Promise<void>;
   showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info', title?: string) => void;
   onClose?: () => void;
 }
@@ -258,7 +258,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   const lastScanRef = useRef<{ sku: string; timestamp: number } | null>(null);
 
   // Autocomplete / Search dropdown
-  const [catalogSearchResults, setCatalogSearchResults] = useState<any[]>([]);
+  const [catalogSearchResults, setCatalogSearchResults] = useState<MasterProductSummary[]>([]);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const skuInputRef = useRef<HTMLInputElement>(null);
 
@@ -371,7 +371,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     showToast(`Empaque ×${factor} aplicado`, 'info');
   };
 
-  const searchDebounceRef = useRef<any>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Save sessions to storage with debouncing to keep the main thread responsive
   useEffect(() => {
@@ -452,7 +452,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     }, 200);
   };
 
-  const handleSelectProductFromCatalog = (product: any) => {
+  const handleSelectProductFromCatalog = (product: MasterProductSummary) => {
     setScannedSku(product.sku);
     setSelectedProductDesc(product.name);
     setIsSearchDropdownOpen(false);

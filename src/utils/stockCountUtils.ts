@@ -6,7 +6,8 @@ import {
   InventoryCampaign,
   CampaignSnapshotRecord,
   CampaignConsolidationMatrix,
-  CampaignAuditRow
+  CampaignAuditRow,
+  SheetRecord
 } from '../types';
 import { findColumnBySemantic } from './columnAliases';
 import { parseLocaleNumber, rowToObject, getEndOfMonthDateForYm, formatDisplayDate } from './pureCalculations';
@@ -68,7 +69,7 @@ export function generateShortVcId(): string {
 }
 
 
-let saveSessionsDebounceTimer: any = null;
+let saveSessionsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingSessionsToSave: StockCountSession[] | null = null;
 
 /**
@@ -131,7 +132,7 @@ export function reconcileStockCountSession(
   session: StockCountSession,
   sheetItems: InventoryItem[],
   headers: string[],
-  masterProducts: any[] = []
+  masterProducts: SheetRecord[] = []
 ): StockCountReconciliationItem[] {
   const qtyCol = findColumnBySemantic(headers, 'cantidad') || 'CANTIDAD';
   const skuCol = findColumnBySemantic(headers, 'sku') || 'SKU';
@@ -415,7 +416,7 @@ export function buildVencimientosRowFromCount(
   item: StockCountEntry | StockCountReconciliationItem,
   existingRowIndex?: number,
   existingIdVc?: string
-): Record<string, any> {
+): SheetRecord {
   const sku = String(item.sku || '').trim();
   const mm = item.mm ? String(item.mm).padStart(2, '0') : '';
   const yyyy = item.yyyy ? String(item.yyyy).trim() : '';
@@ -607,7 +608,7 @@ export function importPharmacySnapshotToCampaign(
     // Los llamadores no son consistentes: el modal y la campana de consolidación
     // entregan matrices (string[][]) mientras que otros entregan registros. Se
     // normaliza aquí, en el único punto de entrada, para no perder ninguna fila.
-    const row: Record<string, any> = Array.isArray(rawRow) ? rowToObject(headers, rawRow) : rawRow;
+    const row = Array.isArray(rawRow) ? rowToObject(headers, rawRow) : (rawRow as Record<string, unknown>);
 
     // 1. Resolve SKU code (handling multiple formats and aliases)
     let rawSku = skuCol ? row[skuCol] : null;
@@ -1104,7 +1105,7 @@ export async function exportDiscrepanciesForRecountSheet(
 export function buildAuditRowsFromCampaignMatrix(
   matrix: CampaignConsolidationMatrix,
   campaign: InventoryCampaign
-): Record<string, any>[] {
+): SheetRecord[] {
   const allRows: CampaignAuditRow[] = [
     ...matrix.cuadrados,
     ...matrix.discrepancias,
@@ -1153,7 +1154,7 @@ export function buildAuditRowsFromSession(
   session: StockCountSession,
   reconciliation: StockCountReconciliationItem[],
   campaign?: InventoryCampaign | null
-): Record<string, any>[] {
+): SheetRecord[] {
   const nowIso = new Date().toISOString();
   const dateStr = new Date().toLocaleDateString('es-CL');
 

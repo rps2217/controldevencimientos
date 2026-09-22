@@ -3,8 +3,8 @@ import {
   updateRow,
   clearSheetsCache
 } from '../lib/sheets';
-import { InventoryItem, SheetConfig } from '../types';
-import type { OfflineMutation } from '../db/indexedDbService';
+import { InventoryItem, SheetConfig, SheetRecord } from '../types';
+import type { OfflineMutation, MutationValues } from '../db/indexedDbService';
 import type { FetchDataFn } from './useInventoryData';
 import { resolveItemIdentity } from '../utils/entityIdentityResolver';
 import {
@@ -47,8 +47,8 @@ export const useInventoryIngestion = ({
   items: InventoryItem[];
   setItems: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
   setAllMainItems: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
-  setProducts: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
-  setPolicies: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
+  setProducts: React.Dispatch<React.SetStateAction<SheetRecord[]>>;
+  setPolicies: React.Dispatch<React.SetStateAction<SheetRecord[]>>;
   setIsSaving: React.Dispatch<React.SetStateAction<boolean>>;
   enqueueMutation: (mutation: {
     type: 'append' | 'update' | 'delete';
@@ -60,7 +60,7 @@ export const useInventoryIngestion = ({
     keyValue?: string;
     keyColumn?: string;
     headers?: string[];
-    values?: any;
+    values?: MutationValues;
   }) => Promise<OfflineMutation>;
   fetchData: FetchDataFn;
   showToast: (msg: string, type: 'info' | 'success' | 'error', title?: string, duration?: number) => void;
@@ -97,7 +97,7 @@ export const useInventoryIngestion = ({
   };
 
   const handleUniversalImportConfirmed = async (
-    mappedData: Record<string, any>[],
+    mappedData: SheetRecord[],
     mode: ImportConsolidationMode = 'consolidate_sum'
   ) => {
     if (!activeSheet || headers.length === 0) {
@@ -254,7 +254,7 @@ export const useInventoryIngestion = ({
     }
   };
 
-  const handleSyncRowsToVencimientos = async (rows: Record<string, any>[]) => {
+  const handleSyncRowsToVencimientos = async (rows: SheetRecord[]) => {
     if (!activeSheet) return;
     const targetTitle = activeSheet.title;
     try {
@@ -262,6 +262,7 @@ export const useInventoryIngestion = ({
       for (const row of rows) {
         const rowValues = headers.map(h => row[h] !== undefined ? String(row[h]) : '');
         const cuVc = row.CU_VC || row.cu_vc;
+        const cuVcKey = cuVc !== undefined && cuVc !== null && cuVc !== '' ? String(cuVc) : undefined;
         const existingItem = items.find(it => (cuVc && it.CU_VC === cuVc) || (it.SKU_VC === row.SKU_VC && it.MM === row.MM && it.YYYY === row.YYYY));
 
         if (existingItem && existingItem._rowIndex) {
@@ -272,7 +273,7 @@ export const useInventoryIngestion = ({
               type: 'update',
               sheetTitle: targetTitle,
               rowIndex: existingItem._rowIndex,
-              entityKey: existingItem._entityKey || cuVc,
+              entityKey: existingItem._entityKey || cuVcKey,
               entityKeyCol: existingItem._entityKeyCol || 'CU_VC',
               headers,
               values: rowValues
@@ -285,7 +286,7 @@ export const useInventoryIngestion = ({
             await enqueueMutation({
               type: 'append',
               sheetTitle: targetTitle,
-              entityKey: cuVc,
+              entityKey: cuVcKey,
               entityKeyCol: 'CU_VC',
               headers,
               values: rowValues

@@ -65,7 +65,7 @@ export interface ResolvedItemPolicyInfo {
  * and background calculations.
  */
 export function resolveItemPolicyAndRetiro(
-  itemOrFormData: Record<string, any>,
+  itemOrFormData: SheetRecord,
   headers: string[] = [],
   products: SheetRecord[] = [],
   policies: SheetRecord[] = [],

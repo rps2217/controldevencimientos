@@ -1,5 +1,6 @@
 import { formatDisplayDate } from './pureCalculations';
 import { calculateVirtualColumnValue } from './virtualColumns';
+import { SheetRecord, VirtualColumn, VirtualColumnDataContext } from '../types';
 
 /**
  * Universal, clean Excel exporter with automatic column width calculation
@@ -8,10 +9,10 @@ import { calculateVirtualColumnValue } from './virtualColumns';
 export async function exportToExcel(
   filename: string, 
   headers: string[], 
-  items: any[], 
+  items: SheetRecord[], 
   sheetName = 'Inventario',
-  virtualColumns?: any[],
-  allData?: any,
+  virtualColumns?: VirtualColumn[],
+  allData?: VirtualColumnDataContext,
   columnLabelsMap?: Record<string, string>
 ) {
   if (!items || !items.length) return;
@@ -55,13 +56,13 @@ export async function exportToExcel(
   const worksheetData = [
     displayHeaderNames,
     ...enhancedItems.map(item => exportHeaders.map(colId => {
-      let val = item[colId];
+      let val: unknown = item[colId];
       if ((val === undefined || val === null) && columnLabelsMap && columnLabelsMap[colId]) {
         val = item[columnLabelsMap[colId]];
       }
       if (val === null || val === undefined) return '';
       if (val instanceof Date) return formatDisplayDate(val);
-      return val;
+      return val as string | number;
     }))
   ];
 

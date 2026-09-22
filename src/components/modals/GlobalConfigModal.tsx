@@ -173,8 +173,8 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                 >
                   <option value="">-- Seleccionar Pestaña --</option>
                   {metadata?.sheets
-                    .filter((s: any) => !/^_/i.test(s.properties.title))
-                    .map((s: any) => (
+                    .filter(s => !/^_/i.test(s.properties.title || ''))
+                    .map(s => (
                       <option key={s.properties.sheetId} value={s.properties.title}>{s.properties.title}</option>
                     ))}
                 </select>
@@ -198,8 +198,8 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                 >
                   <option value="">-- (Opcional) Misma hoja principal o pestaña dedicada --</option>
                   {metadata?.sheets
-                    .filter((s: any) => !/^_/i.test(s.properties.title))
-                    .map((s: any) => (
+                    .filter(s => !/^_/i.test(s.properties.title || ''))
+                    .map(s => (
                       <option key={s.properties.sheetId} value={s.properties.title}>{s.properties.title}</option>
                     ))}
                 </select>
@@ -223,8 +223,8 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                 >
                   <option value="">-- Seleccionar Pestaña --</option>
                   {metadata?.sheets
-                    .filter((s: any) => !/^_/i.test(s.properties.title))
-                    .map((s: any) => (
+                    .filter(s => !/^_/i.test(s.properties.title || ''))
+                    .map(s => (
                       <option key={s.properties.sheetId} value={s.properties.title}>{s.properties.title}</option>
                     ))}
                 </select>
@@ -248,8 +248,8 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                 >
                   <option value="">-- Seleccionar Pestaña --</option>
                   {metadata?.sheets
-                    .filter((s: any) => !/^_/i.test(s.properties.title))
-                    .map((s: any) => (
+                    .filter(s => !/^_/i.test(s.properties.title || ''))
+                    .map(s => (
                       <option key={s.properties.sheetId} value={s.properties.title}>{s.properties.title}</option>
                     ))}
                 </select>

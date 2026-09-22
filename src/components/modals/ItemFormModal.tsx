@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, Loader2, Sparkles, AlertCircle, Link2, Info, Search, Check, RotateCcw, Eye, EyeOff, Sliders, Plus, CheckCircle2, ChevronDown, Calendar, AlertTriangle, ArrowRight, Layers, ShieldCheck } from 'lucide-react';
-import { SheetProperties, InventoryItem, EventCategory, SheetConfig, ColumnSchema } from '../../types';
+import { SheetProperties, InventoryItem, EventCategory, SheetConfig, ColumnSchema , SheetRecord } from '../../types';
 import { 
   EVENT_CATEGORIES, 
   renderEventIcon, 
@@ -40,9 +40,9 @@ interface ItemFormModalProps {
   onSave: (e: React.FormEvent) => Promise<void>;
   isSaving: boolean;
   sheetConfig: SheetConfig;
-  products: any[];
+  products: SheetRecord[];
   onBatchUpdateFormData?: (updates: Record<string, string>) => void;
-  policies?: any[];
+  policies?: SheetRecord[];
 }
 
 export const ItemFormModal: React.FC<ItemFormModalProps> = ({

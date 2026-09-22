@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { getSpreadsheetMetadata, getAllSheetsData, getScriptPropertiesConfig, loadCloudConfig } from '../lib/sheets';
 import type { SheetRow } from '../lib/sheets';
-import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig } from '../types';
+import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, SheetRecord } from '../types';
 import { rowToObject } from '../utils/pureCalculations';
 import { resolveItemIdentity } from '../utils/entityIdentityResolver';
 import { indexedDbService } from '../db/indexedDbService';
@@ -63,8 +63,8 @@ export function useInventoryData({
   const [headers, setHeaders] = useState<string[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [allMainItems, setAllMainItems] = useState<InventoryItem[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [policies, setPolicies] = useState<any[]>([]);
+  const [products, setProducts] = useState<SheetRecord[]>([]);
+  const [policies, setPolicies] = useState<SheetRecord[]>([]);
   const [isRelationalActive, setIsRelationalActive] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,13 +94,13 @@ export function useInventoryData({
         try {
           const cachedTarget = await indexedDbService.getCachedSheet(expectedTargetSheet);
           if (cachedTarget && cachedTarget.rows && cachedTarget.rows.length > 0) {
-            const h = cachedTarget.rows[0];
+            const h = cachedTarget.rows[0].map(String);
             setHeaders(h);
             const schemaKeys = Object.entries(currentConfig.schema?.[expectedTargetSheet] || {})
               .filter(([_, conf]) => Boolean(conf.isKey))
               .map(([colName]) => colName);
 
-            const parsed = cachedTarget.rows.slice(1).map((row: string[], idx: number) => {
+            const parsed = cachedTarget.rows.slice(1).map((row, idx) => {
               const it: InventoryItem = { ...rowToObject(h, row), _rowIndex: idx + 2 };
               const identity = resolveItemIdentity(it, h, expectedTargetSheet, schemaKeys);
               it._entityKey = identity.keyValue;
@@ -121,7 +121,7 @@ export function useInventoryData({
           const cachedProds = await indexedDbService.getCachedSheet(prodTitle);
           if (cachedProds && cachedProds.rows && cachedProds.rows.length > 1) {
             const ph = cachedProds.rows[0];
-            setProducts(cachedProds.rows.slice(1).map((r: string[]) => rowToObject(ph, r)));
+            setProducts(cachedProds.rows.slice(1).map(r => rowToObject(ph, r)));
             setIsRelationalActive(true);
           }
 
@@ -129,7 +129,7 @@ export function useInventoryData({
           const cachedPols = await indexedDbService.getCachedSheet(polTitle);
           if (cachedPols && cachedPols.rows && cachedPols.rows.length > 1) {
             const polH = cachedPols.rows[0];
-            setPolicies(cachedPols.rows.slice(1).map((r: string[]) => rowToObject(polH, r)));
+            setPolicies(cachedPols.rows.slice(1).map(r => rowToObject(polH, r)));
             setIsRelationalActive(true);
           }
         } catch (cacheErr) {
@@ -147,7 +147,7 @@ export function useInventoryData({
       // =========================================================================
       const meta = await getSpreadsheetMetadata(forceRefresh);
       setMetadata(meta);
-      const allSheets = meta.sheets.map((s: any) => s.properties.title);
+      const allSheets = meta.sheets.map(s => s.properties.title);
       
       // 1. Opción 2: Script Properties (PropertiesService)
       let foundRemoteConfig = false;
@@ -216,7 +216,7 @@ export function useInventoryData({
       else if (currentView === 'policies') targetSheetTitle = currentConfig.policies || '';
       else targetSheetTitle = currentView;
 
-      const targetSheetProp = meta.sheets.find((s: any) => s.properties.title === targetSheetTitle)?.properties;
+      const targetSheetProp = meta.sheets.find(s => s.properties.title === targetSheetTitle)?.properties;
       if (targetSheetProp) {
         setActiveSheet(targetSheetProp);
       } else {

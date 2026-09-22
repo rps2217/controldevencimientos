@@ -25,7 +25,7 @@ export interface MirrorLogEntry {
   action: 'test' | 'sync' | 'mutation' | 'conflict';
   status: 'ok' | 'error' | 'warning';
   message: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 class BackendMirrorService {
@@ -54,7 +54,7 @@ class BackendMirrorService {
     return [...this.logs].slice(-50);
   }
 
-  public addLog(action: MirrorLogEntry['action'], status: MirrorLogEntry['status'], message: string, details?: any) {
+  public addLog(action: MirrorLogEntry['action'], status: MirrorLogEntry['status'], message: string, details?: Record<string, unknown>) {
     const entry: MirrorLogEntry = {
       id: Math.random().toString(36).substring(2, 9),
       timestamp: new Date().toLocaleTimeString(),
@@ -209,7 +209,7 @@ class BackendMirrorService {
         headers,
         rowCount: items.length,
         items: items.map(it => {
-          const clean: Record<string, any> = {};
+          const clean: Record<string, unknown> = {};
           headers.forEach(h => {
             clean[h] = it[h] ?? '';
           });

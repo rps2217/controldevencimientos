@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { z } from 'zod';
-import { InventoryItem, SheetConfig, SheetProperties, EventCategory } from '../types';
+import { InventoryItem, SheetConfig, SheetProperties, EventCategory, SheetRecord } from '../types';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { getEventCategory, formatInputDate, formatInputDateTime, parseLocaleNumber, parseAnyDate, EVENT_CATEGORIES } from '../utils/dateCalculations';
 import { autoCalculateItemFormData } from '../utils/referenceResolver';
@@ -10,8 +10,8 @@ interface UseItemFormManagerParams {
   activeSheet: SheetProperties | null;
   activeView: string;
   sheetConfig: SheetConfig;
-  products: any[];
-  policies: any[];
+  products: SheetRecord[];
+  policies: SheetRecord[];
   eventFilter: string[];
   onBeforeOpen?: () => void;
 }
@@ -159,33 +159,33 @@ export function useItemFormManager({
 
       // Type specific validation
       if (effectiveType === 'number' || /^cant|unidades|stock|dias/i.test(header)) {
-        fieldSchema = fieldSchema.refine((val: any) => {
+        fieldSchema = fieldSchema.refine((val: unknown) => {
           if (!isRequired && (!val || String(val).trim() === '' || String(val).trim() === '-')) return true;
           const num = parseLocaleNumber(val);
           return !isNaN(num);
         }, 'Debe ser un número válido.');
       } else if (effectiveType === 'date' || (/fecha|vencimiento|vence|retiro/i.test(header) && !/dias|días|cant|stock|unidades|num/i.test(header))) {
-        fieldSchema = fieldSchema.refine((val: any) => {
+        fieldSchema = fieldSchema.refine((val: unknown) => {
           if (!isRequired && (!val || String(val).trim() === '' || String(val).trim() === '-' || String(val).trim() === 'N/A')) return true;
           return parseAnyDate(val) !== null;
         }, 'Formato de fecha inválido.');
       } else if (effectiveType === 'datetime' || /timestamp/i.test(header)) {
-        fieldSchema = fieldSchema.refine((val: any) => {
+        fieldSchema = fieldSchema.refine((val: unknown) => {
           if (!isRequired && (!val || String(val).trim() === '' || String(val).trim() === '-' || String(val).trim() === 'N/A')) return true;
-          return !isNaN(new Date(val).getTime()) || parseAnyDate(val) !== null;
+          return !isNaN(new Date(String(val)).getTime()) || parseAnyDate(val) !== null;
         }, 'Formato de fecha y hora inválido.');
       }
 
       // Custom validations for Vencimiento
       if (selectedEventCategory === 'VENCIMIENTO') {
         if (/^MM$/i.test(header.trim())) {
-          fieldSchema = fieldSchema.refine((val: any) => {
+          fieldSchema = fieldSchema.refine((val: unknown) => {
             if (!val && !isRequired) return true;
             const num = parseInt(String(val).trim(), 10);
             return !isNaN(num) && num >= 1 && num <= 12;
           }, 'El mes debe estar entre 1 y 12.');
         } else if (/^YYYY$/i.test(header.trim())) {
-          fieldSchema = fieldSchema.refine((val: any) => {
+          fieldSchema = fieldSchema.refine((val: unknown) => {
             if (!val && !isRequired) return true;
             const num = parseInt(String(val).trim(), 10);
             return !isNaN(num) && num >= 1990 && num <= 2100;
@@ -223,7 +223,7 @@ export function useItemFormManager({
     });
 
     // Normalize formData so undefined values become empty strings for z.string().trim()
-    const normalizedFormData: Record<string, any> = {};
+    const normalizedFormData: Record<string, string> = {};
     headers.forEach(h => {
       normalizedFormData[h] = formData[h] !== undefined ? formData[h] : '';
     });

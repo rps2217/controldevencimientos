@@ -1,4 +1,4 @@
-import { InventoryItem } from '../types';
+import { InventoryItem, SheetRecord } from '../types';
 import { findColumnBySemantic } from './columnAliases';
 import { parseLocaleNumber, parseAnyDate } from './pureCalculations';
 
@@ -15,7 +15,7 @@ export interface CuVcExtraction {
  * Returns both the computed CU_VC and its individual components.
  */
 export function extractCuVcFromRow(
-  row: Record<string, any>,
+  row: SheetRecord,
   headers?: string[],
   customAliases?: Record<string, string[]>
 ): CuVcExtraction {
@@ -31,7 +31,9 @@ export function extractCuVcFromRow(
 
   // 2. Extract SKU
   const skuCol = findColumnBySemantic(searchHeaders, 'sku', customAliases) || searchHeaders.find(h => /^sku/i.test(h.trim()));
-  let skuVal = skuCol && row[skuCol] !== undefined ? String(row[skuCol]).trim() : (row.SKU || row.sku || '');
+  let skuVal = skuCol && row[skuCol] !== undefined
+    ? String(row[skuCol]).trim()
+    : String(row.SKU || row.sku || '');
   skuVal = skuVal.replace(/\s+/g, '');
 
   // 3. Extract Year and Month
@@ -111,7 +113,7 @@ export interface ExistingCuVcMatch {
  * Checks if a candidate item or draft record already exists in the sheet items by matching CU_VC
  */
 export function findExistingItemByCuVc(
-  candidateRow: Record<string, any>,
+  candidateRow: SheetRecord,
   existingItems: InventoryItem[],
   headers: string[],
   customAliases?: Record<string, string[]>
@@ -173,11 +175,11 @@ export function findExistingItemByCuVc(
  * their quantities are aggregated and merged into a single clean row, eliminating internal duplicates.
  */
 export function consolidateBatchByCuVc(
-  rows: Record<string, any>[],
+  rows: SheetRecord[],
   headers: string[],
   customAliases?: Record<string, string[]>
 ): {
-  consolidatedRows: Record<string, any>[];
+  consolidatedRows: SheetRecord[];
   deduplicatedCount: number;
   totalOriginalCount: number;
 } {
@@ -188,8 +190,8 @@ export function consolidateBatchByCuVc(
   const cantHeader = findColumnBySemantic(headers, 'cantidad', customAliases) || 
                      headers.find(h => /^(cant|cantidad|stock|unidades)$/i.test(h.trim()));
 
-  const map = new Map<string, { row: Record<string, any>; qty: number; count: number }>();
-  const nonCompositeRows: Record<string, any>[] = [];
+  const map = new Map<string, { row: SheetRecord; qty: number; count: number }>();
+  const nonCompositeRows: SheetRecord[] = [];
 
   for (const r of rows) {
     const extract = extractCuVcFromRow(r, headers, customAliases);
@@ -218,7 +220,7 @@ export function consolidateBatchByCuVc(
     }
   }
 
-  const consolidatedComposite: Record<string, any>[] = [];
+  const consolidatedComposite: SheetRecord[] = [];
   let deduplicatedCount = 0;
 
   for (const { row, qty, count } of map.values()) {
@@ -247,14 +249,14 @@ export type ImportConsolidationMode =
 export interface ReconcileResult {
   rowsToUpdate: {
     rowIndex: number;
-    updatedItem: Record<string, any>;
+    updatedItem: InventoryItem;
     previousQty: number;
     addedQty: number;
     newTotalQty: number;
     cuVc: string;
     sku: string;
   }[];
-  rowsToAppend: Record<string, any>[];
+  rowsToAppend: SheetRecord[];
   skippedCount: number;
   matchedCount: number;
   internalDeduplicatedCount: number;
@@ -264,7 +266,7 @@ export interface ReconcileResult {
  * Reconciles imported rows against existing sheet inventory using CU_VC logic
  */
 export function reconcileImportWithInventory(
-  importedRows: Record<string, any>[],
+  importedRows: SheetRecord[],
   existingItems: InventoryItem[],
   headers: string[],
   customAliases?: Record<string, string[]>,
@@ -287,12 +289,12 @@ export function reconcileImportWithInventory(
                      headers.find(h => /^(cant|cantidad|stock|unidades)$/i.test(h.trim()));
 
   const rowsToUpdate: ReconcileResult['rowsToUpdate'] = [];
-  const rowsToAppend: Record<string, any>[] = [];
+  const rowsToAppend: SheetRecord[] = [];
   let skippedCount = 0;
   let matchedCount = 0;
 
   // Track which existing rows have already been updated in this batch to support multiple increments
-  const updatedExistingMap = new Map<number, { item: Record<string, any>; prevQty: number; addedQty: number; cuVc: string; sku: string }>();
+  const updatedExistingMap = new Map<number, { item: InventoryItem; prevQty: number; addedQty: number; cuVc: string; sku: string }>();
 
   for (const row of consolidatedRows) {
     const match = findExistingItemByCuVc(row, existingItems, headers, customAliases);

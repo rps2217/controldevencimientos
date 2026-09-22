@@ -230,7 +230,7 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
               onChange={async (e) => {
                 const sheetTitle = e.target.value;
                 if (sheetTitle) {
-                  const sheetProp = metadata?.sheets.find((s: any) => s.properties.title === sheetTitle)?.properties || null;
+                  const sheetProp = metadata?.sheets.find(s => s.properties.title === sheetTitle)?.properties || null;
                   setActiveSheet(sheetProp);
                   
                   if (sheetProp) {
@@ -258,8 +258,8 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
             >
               <option value="">-- Seleccionar Pestaña --</option>
               {metadata?.sheets
-                .filter((s: any) => !/^_/i.test(s.properties.title))
-                .map((s: any) => (
+                .filter(s => !/^_/i.test(s.properties.title || ''))
+                .map(s => (
                   <option key={s.properties.sheetId} value={s.properties.title}>{s.properties.title}</option>
                 ))}
             </select>
@@ -305,7 +305,7 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
                     refTable: sheetConfig.products || ''
                   };
                   
-                  const updateCol = (key: keyof ColumnSchema, value: any) => {
+                  const updateCol = <K extends keyof ColumnSchema>(key: K, value: ColumnSchema[K]) => {
                     const newSchema = { ...sheetConfig.schema };
                     if (!newSchema[activeSheet.title]) newSchema[activeSheet.title] = {};
                     newSchema[activeSheet.title][header] = { ...schema, [key]: value };
@@ -395,7 +395,7 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
                               className="w-full border border-blue-200 dark:border-blue-800 rounded-lg px-2.5 py-1.5 text-xs bg-blue-50/50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 focus:border-blue-500 outline-none font-medium"
                             >
                               <option value="">-- Tabla Destino (Ref) --</option>
-                              {metadata?.sheets.map((s: any) => (
+                              {metadata?.sheets.map(s => (
                                 <option key={s.properties.sheetId} value={s.properties.title}>
                                   {s.properties.title}
                                 </option>

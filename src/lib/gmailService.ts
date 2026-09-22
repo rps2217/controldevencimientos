@@ -1,6 +1,7 @@
 import { findColumnBySemantic, KnownFieldSemantic } from '../utils/columnAliases';
 import { formatDisplayDate, parseAnyDate, getItemStatus, getItemResolutionStatus } from '../utils/dateCalculations';
 import { fetchWithTimeout } from './http';
+import { InventoryItem, SheetRecord } from '../types';
 
 export function createMimeMessage({
   to,
@@ -76,7 +77,7 @@ export async function createGmailDraft(
  * regex candidate matching across all object keys, and direct key checks.
  */
 function extractFieldValue(
-  item: any,
+  item: Record<string, unknown>,
   candidateKeys: string[],
   semantic: KnownFieldSemantic,
   customAliases?: Record<string, string[]>,
@@ -192,9 +193,9 @@ function extractFieldValue(
 }
 
 export interface RelationalContext {
-  allMainItems?: any[];
-  products?: any[];
-  policies?: any[];
+  allMainItems?: SheetRecord[];
+  products?: SheetRecord[];
+  policies?: SheetRecord[];
 }
 
 /**
@@ -230,7 +231,7 @@ export function formatVirtualHeaderLabel(header: string): string {
 }
 
 export function generateItemsHtmlTable(
-  items: any[],
+  items: InventoryItem[],
   headers: string[] = [],
   customAliases?: Record<string, string[]>,
   relationalContext?: RelationalContext,
@@ -355,7 +356,7 @@ export function generateItemsHtmlTable(
           });
           if (pMatch) {
             const pKeys = Object.keys(pMatch);
-            cellVal = extractFieldValue(pMatch, pKeys, 'descripcion', customAliases) || pMatch['DESCRIPCION'] || pMatch['Producto'] || '';
+            cellVal = extractFieldValue(pMatch, pKeys, 'descripcion', customAliases) || String(pMatch['DESCRIPCION'] ?? '') || String(pMatch['Producto'] ?? '');
           }
           if (!cellVal) {
             const mMatch = allMainItems.find(m => {
@@ -365,7 +366,7 @@ export function generateItemsHtmlTable(
             });
             if (mMatch) {
               const mKeys = Object.keys(mMatch);
-              cellVal = extractFieldValue(mMatch, mKeys, 'descripcion', customAliases) || mMatch['DESCRIPCION'] || mMatch['Producto'] || '';
+              cellVal = extractFieldValue(mMatch, mKeys, 'descripcion', customAliases) || String(mMatch['DESCRIPCION'] ?? '') || String(mMatch['Producto'] ?? '');
             }
           }
         }
@@ -378,7 +379,7 @@ export function generateItemsHtmlTable(
           });
           if (matchByLote) {
             const mKeys = Object.keys(matchByLote);
-            cellVal = extractFieldValue(matchByLote, mKeys, 'descripcion', customAliases) || matchByLote['DESCRIPCION'] || matchByLote['Producto'] || '';
+            cellVal = extractFieldValue(matchByLote, mKeys, 'descripcion', customAliases) || String(matchByLote['DESCRIPCION'] ?? '') || String(matchByLote['Producto'] ?? '');
           }
         }
       }

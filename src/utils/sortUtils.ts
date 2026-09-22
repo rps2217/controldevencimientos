@@ -9,7 +9,7 @@ import { parseAnyDate, parseLocaleNumber } from './pureCalculations';
  * 3. Strings / Text (natural Spanish collation, numeric-aware like SKU-2 vs SKU-10)
  * 4. Empty / Null values cleanly placed at the bottom
  */
-export function compareItemValues(a: any, b: any, direction: 'asc' | 'desc' = 'asc'): number {
+export function compareItemValues(a: unknown, b: unknown, direction: 'asc' | 'desc' = 'asc'): number {
   const isAsc = direction === 'asc';
   const multiplier = isAsc ? 1 : -1;
 

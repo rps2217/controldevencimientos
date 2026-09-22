@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { CheckCircle2, AlertTriangle, HelpCircle, Package, Search, Download, RefreshCw, UploadCloud, FileSpreadsheet, Calendar, Layers, ShieldCheck, Plus, MapPin, Store, Check, RotateCcw, Zap, Cloud, Database, Loader2, Scan, MoreVertical } from 'lucide-react';
-import { InventoryCampaign, CampaignConsolidationMatrix, CampaignAuditRow, StockCountSession } from '../../types';
+import { InventoryCampaign, CampaignConsolidationMatrix, CampaignAuditRow, StockCountSession, SheetRecord } from '../../types';
 import { computeCampaignConsolidationMatrix, importPharmacySnapshotToCampaign, markSkuAsClosedInCampaign, reopenSkuInCampaign, setCampaignManualSalesAdjustment, exportCampaignReportToExcel, exportDiscrepanciesForRecountSheet, createNewCampaign, saveCampaignsToStorage, saveStockCountSessionsToStorage, buildAuditRowsFromCampaignMatrix, playBeep } from '../../utils/stockCountUtils';
 import { saveCampaignsToCloud, syncCampaignsWithCloud, saveAuditRowsToDedicatedSheet } from '../../lib/sheets';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
@@ -281,7 +281,7 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
     setIsProcessingSnapshot(true);
     try {
       let parsedHeaders: string[] = [];
-      let parsedRows: Record<string, any>[] = [];
+      let parsedRows: SheetRecord[] | string[][] = [];
 
       const fileNameLower = file.name.toLowerCase();
       const isExcel = fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls');

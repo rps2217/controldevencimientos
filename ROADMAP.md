@@ -1,8 +1,8 @@
 # Plan de Reforma Arquitectónica
 
 Estado: **Fases 0 y 2 completadas**; Fases 1 (1.3 en curso), 3–6 pendientes. Deuda `any`
-en `DashboardContext.tsx` y `referenceResolver.ts` saldada (2026-09-22). Riesgo
-`xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
+saldada en todo `src`: **1 solo `any`** declarado (la firma de índice de `SheetRecord`,
+justificada abajo). Riesgo `xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
 Protocolo Ponytail: cada fase busca el código mínimo efectivo, sin dependencias nuevas salvo justificación explícita.
 
@@ -887,14 +887,21 @@ Excel, fechas nativas, SKUs numéricos grandes y round-trip de escritura. Integr
 - `npm audit --omit=dev`: **0 vulnerabilidades**. Sin hallazgos adicionales.
 - Cargado solo con `import()` dinámico, así que no entra al bundle inicial.
 
-**Tipado estricto — deuda de `any` (actualizado 2026-09-22)**
-- 183 usos de `any` en `src` (eran 201 el 2026-09-19), 0 `as any`. `referenceResolver.ts`
-  y `DashboardContext.tsx` quedaron en **0**. El remanente se concentra en
-  `DashboardModalsManager.tsx` (19), `cuVcConsolidator.ts` (13), `pureCalculations.ts` (9).
-- El corte se hizo con tipos ya existentes en el repo (`ManageableColumn`,
-  `ColumnMetadata`, `DisplayRow`, `VirtualItem`, `WorkerMetricsResult`,
-  `SliceFilterConfig`, `SortConfig`, `ImportConsolidationMode`) más un tipo nuevo,
-  `SheetRecord`, para las filas dinámicas de hoja. Cero dependencias nuevas.
+**Tipado estricto — deuda `any` (actualizado 2026-09-23)**
+- **1 `any` en todo `src`** (eran 201 el 2026-09-19, 163 el 2026-09-22), 0 `as any`. El
+  único remanente es la firma de índice de `SheetRecord` en `types.ts`, deliberada: las
+  columnas de una hoja son heterogéneas por diseño (invariante AGENTS.md §6.5). Se
+  intentó cerrarla a `string | number | boolean | null` y el compilador produjo ~15
+  errores en cascada (solo `string | number | undefined` es asignable a `SheetRecord`
+  cuando ambos tienen firma de índice); el intento se revirtió con `tsc` en verde.
+- Barrido de esta pasada: `DashboardModalsManager.tsx` (19 → 0), `cuVcConsolidator.ts`
+  (12 → 0), `pureCalculations.ts` (8 → 0), `useItemFormManager.ts` (8 → 0),
+  `GlobalConfigModal.tsx` (8 → 0), `universalImporter.ts` y `SchemaEditorView.tsx`
+  (7/5 → 0), etc. Total: **39 archivos** tocados, 162 `any` eliminados por mapeo a tipos
+  ya existentes (`SheetRecord`, `InventoryItem`, `EventCategory`, `SheetRow`,
+  `CellValue`, `VirtualColumnDataContext` —este último nuevo, en `types.ts`—).
+- Cero dependencias nuevas. `tsc --noEmit` y `eslint src` (0 errores) en verde;
+  152 + 7 + 18 pruebas y 8 arneses E2E OK.
 
 **Monolitos (escalón 7) — ya en Fase 5**
 - Sin cambios: `StockCountTerminal.tsx` (2.751), `InventoryDashboard.tsx` (2.190),
@@ -948,6 +955,41 @@ independientes (conteos, herramientas, CI).
   exactamente lo que cierra la Fase 4 (puerta única de persistencia); no se toca suelto.
 
 **Siguiente palanca**
-- `DashboardModalsManager.tsx` (19 `any`), seguido de `cuVcConsolidator.ts` (13) y
-  `pureCalculations.ts` (9). Mismo criterio: mapear cada `any` a un tipo existente; si no
-  existe y la forma es real, definirlo en `types.ts`.
+- Agotada la deuda `any` de `src` (1 declarado, deliberado). Las palancas siguientes son
+  las fases abiertas: Fase 2 (patrón `props.X ?? dashboard.X`), Fase 3 (hooks restantes),
+  Fase 4 (escrituras directas a `localStorage`) y Fase 5 (monolitos), en ese orden.
+
+---
+
+## Auditoría Ponytail (2026-09-23)
+
+Barrido de cierre tras agotar la deuda `any`. Todos los conteos son **medidos**, no
+estimados, y están anclados a `git show HEAD:<archivo>` para que sean reproducibles.
+
+**Lo que se corrigió en esta pasada**
+- Deuda `any`: **163 → 1** (`grep -rhoE ": any|<any>|as any|any\[\]|any>" src`). 39
+  archivos tocados. El único remanente es la firma de índice de `SheetRecord`, cuya
+  unión falló con ~15 errores en cascada y se revirtió (intento registrado arriba).
+- Correcciones de compilación asociadas: `SheetRecord` importado donde faltaba
+  (`ViewConfigControlDrawer`, `FloatingBulkActionBar`, `Sidebar` ya de cortes previos);
+  `virtualData` tipado como `Record<string, string | number>`; `VirtualColumnDataContext`
+  creado en `types.ts` en vez de `any` en la firma de `calculate`.
+
+**Verificación (no asumida)**
+- `npm run verify`: tsc 0 errores, eslint 0 errores (20 warnings `exhaustive-deps`
+  preexistentes), 152 + 7 + 18 pruebas en verde.
+- `npm run build` y `npm run test:e2e` (**8 arneses**) en verde.
+
+**Escalones con "sin hallazgos" (segunda corroboración)**
+- Duplicación (2): 0 nombres exportados repetidos entre archivos.
+- Código muerto (1): 0 `TODO`/`FIXME`; 1 `console.log` (auto-sync de la cola offline,
+  traza operativa deliberada). Los ~13 exports "huérfanos" mantienen consumidor interno
+  (p. ej. `normalizeCleanText` con 6 usos propios, `getOffsetMonthName` con 15) o son
+  fachada de tests/plantillas embebidas (`APPS_SCRIPT_TEMPLATE`).
+- Dependencias (5): sin cambios; las 12 declaradas tienen uso real.
+
+**Desviación de documentación detectada**
+- `AGENTS.md` declaraba 7 arneses E2E; son **8** (`groupcheck.cjs` está en el `run.cjs`
+  desde el corte anterior). Corregido en la tabla de comandos.
+- `ROADMAP.md` declaraba 183 usos de `any`; el conteo real era 163 por el redondeo de
+  "usos" vs. firmas tipadas. Unificado al criterio de conteo reproducible de arriba.

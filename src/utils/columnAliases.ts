@@ -349,7 +349,7 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
 };
 
 // Normalize text removing diacritics and special spaces for fuzzy comparisons
-export function normalizeHeaderString(str: any): string {
+export function normalizeHeaderString(str: unknown): string {
   if (str === null || str === undefined) return '';
   return String(str)
     .trim()

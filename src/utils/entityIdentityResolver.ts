@@ -1,4 +1,6 @@
 import { findColumnBySemantic } from './columnAliases';
+import type { SheetMatrix } from '../lib/sheets';
+import type { InventoryItem } from '../types';
 
 /**
  * Robust Primary Key & Identity Resolver
@@ -23,7 +25,7 @@ export interface EntityKeyInfo {
  * 4. Fallback: Synthetic row index marker
  */
 export function resolveItemIdentity(
-  item: Record<string, any>,
+  item: InventoryItem,
   headers: string[],
   sheetTitle?: string,
   schemaKeys?: string[]
@@ -141,7 +143,7 @@ export function resolveItemIdentity(
  * Enables O(1) lookups when processing batches of mutations.
  */
 export function buildRowIdentityIndex(
-  refreshedRows: any[][],
+  refreshedRows: SheetMatrix,
   headers: string[],
   schemaKeys?: string[]
 ): Map<string, number> {
@@ -242,7 +244,7 @@ export function buildRowIdentityIndex(
  */
 export function matchRowIndexByIdentity(
   identity: EntityKeyInfo,
-  refreshedRows: any[][],
+  refreshedRows: SheetMatrix,
   headers: string[],
   prebuiltIndex?: Map<string, number>
 ): number | null {

@@ -279,7 +279,7 @@ Ponytail (§5) sigue siendo obligatoria.
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
 | `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
-| `npm run test:e2e` | Arranca el build de producción y corre los 7 arneses de integridad (`tests/perf/run.cjs`). |
+| `npm run test:e2e` | Arranca el build de producción y corre los 8 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -407,3 +407,7 @@ PR. Node 22. Sin secrets. El job `e2e` usa el Google Chrome preinstalado del run
    alcance a propósito.
 5. **Fases 5 y 6** — dividir monolitos y rendimiento/empaquetado. No añadir
    `manualChunks` sin medir antes.
+6. **Deuda `any` de `src`: CERRADA (2026-09-23)**. Queda **1** `any` declarado, la firma
+   de índice de `SheetRecord` (`types.ts`), deliberada por la heterogeneidad de columnas
+   (invariante §6.5); su cierre a unión produjo ~15 errores en cascada y se revirtió. No
+   reabrir sin un síntoma real. Detalle y barrido por archivo en `ROADMAP.md`.

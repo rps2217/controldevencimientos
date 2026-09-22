@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { indexedDbService, OfflineMutation, AuditLogEntry } from '../db/indexedDbService';
+import { indexedDbService, OfflineMutation, AuditLogEntry, MutationValues } from '../db/indexedDbService';
 import { appendRow, updateRow, deleteRow, getSheetData, pingGoogleSheets } from '../lib/sheets';
+import type { SheetMatrix } from '../lib/sheets';
 import { matchRowIndexByIdentity, buildRowIdentityIndex } from '../utils/entityIdentityResolver';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { backendMirrorService } from '../services/backendMirrorService';
@@ -17,7 +18,7 @@ function getMutationDescription(mutation: {
   rowIndex?: number;
   keyValue?: string;
   entityKey?: string;
-  values?: any;
+  values?: MutationValues;
 }): string {
   const target = mutation.keyValue || mutation.entityKey || (mutation.rowIndex ? `Fila #${mutation.rowIndex}` : '');
 
@@ -92,7 +93,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
       description: string;
       status?: AuditLogEntry['status'];
       entityKey?: string;
-      details?: Record<string, any>;
+      details?: Record<string, unknown>;
       errorMessage?: string;
     }) => {
       const created = await indexedDbService.addAuditLogEntry(entry);
@@ -180,7 +181,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
       keyValue?: string;
       keyColumn?: string;
       headers?: string[];
-      values?: any;
+      values?: MutationValues;
     }) => {
       const created = await indexedDbService.enqueueMutation(mutation);
       
@@ -247,7 +248,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
     setConnectionStatus('syncing');
     let successCount = 0;
     const errors: string[] = [];
-    const freshSheetsCache = new Map<string, any[][]>();
+    const freshSheetsCache = new Map<string, SheetMatrix>();
     const freshIndexesCache = new Map<string, Map<string, number>>();
 
     try {
@@ -262,7 +263,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
           await indexedDbService.updateAuditLogStatus(mutation.id, 'syncing');
 
           if (mutation.type === 'append') {
-            await appendRow(mutation.sheetTitle, mutation.values);
+            await appendRow(mutation.sheetTitle, Array.isArray(mutation.values) ? mutation.values : []);
           } else if (mutation.type === 'update') {
             let targetRowIndex: number | null = (typeof mutation.rowIndex === 'number' && !isNaN(mutation.rowIndex) && mutation.rowIndex > 1) 
               ? Math.floor(mutation.rowIndex) 
@@ -335,7 +336,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
             }
 
             if (targetRowIndex && targetRowIndex > 1) {
-              await updateRow(mutation.sheetTitle, targetRowIndex, mutation.values, {
+              await updateRow(mutation.sheetTitle, targetRowIndex, Array.isArray(mutation.values) ? mutation.values : [], {
                 entityKey: entityKey,
                 keyValue: entityKey
               });
@@ -345,7 +346,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
             } else {
               // Fallback: If row could not be found to update, append it so data is never lost
               console.warn(`[OfflineSync] Row index could not be located for update in "${mutation.sheetTitle}". Appending instead to preserve data.`);
-              await appendRow(mutation.sheetTitle, mutation.values);
+              await appendRow(mutation.sheetTitle, Array.isArray(mutation.values) ? mutation.values : []);
             }
           } else if (mutation.type === 'delete') {
             let targetRowIndex: number | null = (typeof mutation.rowIndex === 'number' && !isNaN(mutation.rowIndex) && mutation.rowIndex > 1) 

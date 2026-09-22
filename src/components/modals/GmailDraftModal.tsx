@@ -7,10 +7,27 @@ import {
   escapeHtml
 } from '../../lib/gmailService';
 import { getErrorMessage } from '../../utils/pureCalculations';
+import { InventoryItem, SheetRecord } from '../../types';
+
+interface GoogleTokenClient {
+  requestAccessToken: () => void;
+}
+
+interface GoogleIdentityServices {
+  accounts?: {
+    oauth2?: {
+      initTokenClient: (config: {
+        client_id: string;
+        scope: string;
+        callback: (response: { error?: string; access_token?: string }) => void;
+      }) => GoogleTokenClient;
+    };
+  };
+}
 
 declare global {
   interface Window {
-    google?: any;
+    google?: GoogleIdentityServices;
     __GOOGLE_CLIENT_ID__?: string;
   }
 }
@@ -18,13 +35,13 @@ declare global {
 interface GmailDraftModalProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedItems: any[];
+  selectedItems: InventoryItem[];
   headers: string[];
   customAliases?: Record<string, string[]>;
   activeViewTitle?: string;
-  allMainItems?: any[];
-  products?: any[];
-  policies?: any[];
+  allMainItems?: SheetRecord[];
+  products?: SheetRecord[];
+  policies?: SheetRecord[];
 }
 
 export const GmailDraftModal: React.FC<GmailDraftModalProps> = ({
@@ -148,7 +165,7 @@ export const GmailDraftModal: React.FC<GmailDraftModalProps> = ({
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: clientId,
           scope: 'https://www.googleapis.com/auth/gmail.compose',
-          callback: (response: any) => {
+          callback: (response: { error?: string; access_token?: string }) => {
             if (response.error) {
               setErrorMessage('Error al autorizar con Google: ' + response.error);
               return;

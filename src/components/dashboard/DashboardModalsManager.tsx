@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { InventoryItem, SheetConfig, EventCategory, GlobalTicketConfig, ViewTicketConfig, TableSlice } from '../../types';
+import { InventoryItem, SheetConfig, EventCategory, GlobalTicketConfig, ViewTicketConfig, TableSlice, SheetRecord, SheetProperties, SpreadsheetMetadata, SortConfig, SliceFilterConfig } from '../../types';
 import { ItemDetailDrawer } from '../drawers/ItemDetailDrawer';
 import { PmReportModal } from '../modals/PmReportModal';
 import { ScriptCodeModal } from '../modals/ScriptCodeModal';
@@ -24,6 +24,7 @@ import { OfflineMutation, AuditLogEntry } from '../../db/indexedDbService';
 import { ConnectionHealthStatus } from '../../hooks/useOfflineSync';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions, useModalsState } from '../../context/ModalsContext';
+import { ManageableColumn } from '../../hooks/useColumnManager';
 
 const StockCountTerminal = lazy(() => import('../views/StockCountTerminal').then(m => ({ default: m.StockCountTerminal })));
 
@@ -35,8 +36,8 @@ export interface DashboardModalsManagerProps {
   handleDelete: (item: InventoryItem) => Promise<void>;
   handlePrintTicket: (items: InventoryItem[], mode: 'standard' | 'barcode') => void;
   allMainItems: InventoryItem[];
-  policies: any[];
-  products: any[];
+  policies: SheetRecord[];
+  products: SheetRecord[];
   sheetConfig: SheetConfig;
   setSheetConfig: React.Dispatch<React.SetStateAction<SheetConfig>>;
   saveConfig: (c: SheetConfig) => void;
@@ -55,7 +56,7 @@ export interface DashboardModalsManagerProps {
   handleCloseModal: () => void;
   editingItem: InventoryItem | null;
   setEditingItem: (item: InventoryItem | null) => void;
-  activeSheet: any;
+  activeSheet: SheetProperties | null;
   activeView: string;
   headers: string[];
   formData: Record<string, string>;
@@ -70,7 +71,7 @@ export interface DashboardModalsManagerProps {
   // Global Config
   isConfigOpen: boolean;
   setIsConfigOpen: (open: boolean) => void;
-  metadata: any;
+  metadata: SpreadsheetMetadata | null;
   fetchData: (config?: SheetConfig, view?: string, force?: boolean) => Promise<void>;
 
   // Barcode Scanner
@@ -92,21 +93,21 @@ export interface DashboardModalsManagerProps {
   // Gmail
   isGmailModalOpen: boolean;
   setIsGmailModalOpen: (open: boolean) => void;
-  gmailModalItems: any[];
-  setGmailModalItems: (items: any[]) => void;
+  gmailModalItems: InventoryItem[];
+  setGmailModalItems: (items: InventoryItem[]) => void;
   filteredItems: InventoryItem[];
   visibleHeaders: string[];
 
   // WhatsApp
   isWhatsAppModalOpen: boolean;
   setIsWhatsAppModalOpen: (open: boolean) => void;
-  whatsAppModalItems: any[];
-  setWhatsAppModalItems: (items: any[]) => void;
+  whatsAppModalItems: InventoryItem[];
+  setWhatsAppModalItems: (items: InventoryItem[]) => void;
 
   // Column Manager
   isColumnManagerOpen: boolean;
   setIsColumnManagerOpen: (open: boolean) => void;
-  allManageableColumns: any[];
+  allManageableColumns: ManageableColumn[];
   toggleVisibility: (col: string) => void;
   moveColumn: (colId: string, direction: 'up' | 'down') => void;
   showAllColumns: () => void;
@@ -129,7 +130,7 @@ export interface DashboardModalsManagerProps {
   // Universal Import
   isBulkImportOpen: boolean;
   setIsBulkImportOpen: (open: boolean) => void;
-  handleUniversalImportConfirmed: (mappedData: Record<string, any>[], mode?: ImportConsolidationMode) => Promise<void>;
+  handleUniversalImportConfirmed: (mappedData: SheetRecord[], mode?: ImportConsolidationMode) => Promise<void>;
 
   // Bulk Actions Config
   isBulkActionsConfigOpen: boolean;
@@ -146,8 +147,8 @@ export interface DashboardModalsManagerProps {
   handleSetBulkVisibility: (sliceIds: string[], visible: boolean) => void;
 
   // Slice Editor
-  currentFilters: any;
-  sortConfig: any;
+  currentFilters: SliceFilterConfig;
+  sortConfig: SortConfig;
   groupByColumn: string;
   groupByDirection: 'asc' | 'desc';
   handleSaveSlice: (slice: TableSlice) => void;
@@ -156,7 +157,7 @@ export interface DashboardModalsManagerProps {
   isStockCountOpen: boolean;
   setIsStockCountOpen: (open: boolean) => void;
   items: InventoryItem[];
-  handleSyncRowsToVencimientos: (rows: Record<string, any>[]) => Promise<void>;
+  handleSyncRowsToVencimientos: (rows: SheetRecord[]) => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info', title?: string) => void;
 
   // Sync & Audit Modal
@@ -170,14 +171,14 @@ export interface DashboardModalsManagerProps {
   connectionStatus: ConnectionHealthStatus;
   lastHealthCheck: Date | null;
   healthErrorMessage: string | null;
-  testConnectionHealth: () => Promise<any>;
-  syncQueue: () => Promise<any>;
+  testConnectionHealth: () => Promise<{ success: boolean; latencyMs: number; status: ConnectionHealthStatus; error?: string }>;
+  syncQueue: (targetMutationId?: string) => Promise<{ success: boolean; count: number; errors: string[] }>;
   removeMutation: (id: string) => Promise<void>;
-  discardMutation?: (id: string, reason?: string) => Promise<any>;
+  discardMutation?: (id: string, reason?: string) => Promise<OfflineMutation | null>;
   discardAllFailedMutations?: () => Promise<number>;
-  retryMutation?: (id: string) => Promise<any>;
-  retryAllFailedMutations?: () => Promise<any>;
-  forkMutationAsAppend?: (id: string) => Promise<any>;
+  retryMutation?: (id: string) => Promise<{ success: boolean; count: number; errors: string[] }>;
+  retryAllFailedMutations?: () => Promise<{ success: boolean; count: number; errors: string[] }>;
+  forkMutationAsAppend?: (id: string) => Promise<OfflineMutation | null>;
   clearQueue: () => Promise<void>;
   clearAuditLog: () => Promise<void>;
 }

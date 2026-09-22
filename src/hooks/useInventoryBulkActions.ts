@@ -1,6 +1,6 @@
 import { updateRow, deleteRow, deleteRows } from '../lib/sheets';
 import { InventoryItem, SheetConfig, EventCategory, SheetProperties } from '../types';
-import type { OfflineMutation } from '../db/indexedDbService';
+import type { OfflineMutation, MutationValues } from '../db/indexedDbService';
 import type { FetchDataFn } from './useInventoryData';
 import { resolveItemIdentity } from '../utils/entityIdentityResolver';
 import { findColumnBySemantic } from '../utils/columnAliases';
@@ -53,7 +53,7 @@ export const useInventoryBulkActions = ({
     keyValue?: string;
     keyColumn?: string;
     headers?: string[];
-    values?: any;
+    values?: MutationValues;
   }) => Promise<OfflineMutation>;
   fetchData: FetchDataFn;
 }) => {

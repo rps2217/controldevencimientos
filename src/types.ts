@@ -71,11 +71,17 @@ export interface SheetConfig {
 
 export type ColumnType = 'text' | 'longtext' | 'number' | 'date' | 'datetime' | 'enum' | 'enumlist' | 'ref' | 'calculated' | 'virtual';
 
+export interface VirtualColumnDataContext {
+  products?: SheetRecord[];
+  policies?: SheetRecord[];
+  events?: SheetRecord[];
+}
+
 export interface VirtualColumn {
   id: string;
   label: string;
   supportedViews?: ViewKey[];
-  calculate: (item: any, headers: any, allData?: any) => any;
+  calculate: (item: SheetRecord, headers: string[], allData?: VirtualColumnDataContext) => string | number;
 }
 export type ColumnBehavior = 'none' | 'auto_id' | 'calc_fecha_vc' | 'calc_retiro' | 'sku_lookup';
 

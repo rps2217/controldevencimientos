@@ -4,13 +4,13 @@ import { SheetConfig, TableSlice, SortConfig, DynamicMonthRange } from '../types
  * Helpers para almacenamiento persistente en Modo Demostración / Offline
  */
 import { demoItemsKey, readStorage, writeStorage, objectArraySchema } from '../utils/appStorage';
-export const getStoredDemoItems = (view: string, defaultItems: any[]) => {
+export const getStoredDemoItems = <T>(view: string, defaultItems: T[]): T[] => {
   // Sin validar, un objeto suelto o un null persistido se devolvia como lista de
   // items y reventaba al hacer .map/.filter o al alimentar el estado de la tabla.
-  return readStorage<any[]>(demoItemsKey(view), objectArraySchema, defaultItems);
+  return readStorage<T[]>(demoItemsKey(view), objectArraySchema, defaultItems);
 };
 
-export const saveStoredDemoItems = (view: string, items: any[]) => {
+export const saveStoredDemoItems = (view: string, items: readonly unknown[]) => {
   writeStorage(demoItemsKey(view), items);
 };
 

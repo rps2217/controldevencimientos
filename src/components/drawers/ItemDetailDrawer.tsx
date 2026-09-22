@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Package, X, AlertCircle, CheckCircle2, Clock, Plus, Edit2, Eye, EyeOff, SlidersHorizontal, Link2, Trash2, Barcode as BarcodeIcon } from 'lucide-react';
-import { InventoryItem, EventCategory } from '../../types';
+import { InventoryItem, EventCategory , SheetRecord } from '../../types';
 import { 
   EVENT_CATEGORIES, 
   renderEventIcon, 
@@ -24,8 +24,8 @@ interface ItemDetailDrawerProps {
   onPrintBarcode?: (product: InventoryItem) => void;
   onNewEventForProduct: (sku: string, category?: EventCategory) => void;
   allMainItems: InventoryItem[];
-  policies: any[];
-  products?: any[];
+  policies: SheetRecord[];
+  products?: SheetRecord[];
   customAliases?: Record<string, string[]>;
 }
 

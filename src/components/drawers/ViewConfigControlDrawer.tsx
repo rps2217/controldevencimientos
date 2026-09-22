@@ -26,7 +26,7 @@ import {
   Barcode,
   Download
 } from 'lucide-react';
-import { TableSlice } from '../../types';
+import { TableSlice, SheetRecord } from '../../types';
 import { BUILT_IN_SLICES } from '../../utils/sliceRegistry';
 import { VIRTUAL_COLUMNS } from '../../utils/virtualColumns';
 import { parseAnyDate } from '../../utils/dateCalculations';
@@ -756,8 +756,8 @@ export const ViewConfigControlDrawer: React.FC = () => {
                           ...(sheetConfig.userVirtualColumns || []).map(uvc => ({
                             id: uvc.id,
                             label: uvc.label,
-                            calculate: (item: any) => {
-                              const values = uvc.sourceColumns.map(sc => item[sc] || '');
+                            calculate: (item: SheetRecord) => {
+                              const values = uvc.sourceColumns.map(sc => String(item[sc] || ''));
                               if (uvc.operation === 'concatenate') return values.join(' ');
                               if (uvc.operation === 'sum') return values.reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
                               if (uvc.operation === 'diff_days') { 

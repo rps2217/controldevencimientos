@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { MessageSquare, X, Send, ExternalLink } from 'lucide-react';
 import { findPhoneColumn } from '../../utils/columnAliases';
 import { formatPhoneNumber } from '../../utils/pureCalculations';
+import type { InventoryItem } from '../../types';
 
 interface WhatsAppModalProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedItems: any[];
+  selectedItems: InventoryItem[];
   headers: string[];
   activeViewTitle?: string;
   customAliases?: Record<string, string[]>;
@@ -48,7 +49,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
   const currentPhone = phoneColumn && currentContact ? formatPhoneNumber(currentContact[phoneColumn]) : '';
   const currentName = nameColumn && currentContact ? String(currentContact[nameColumn] || 'Contacto') : 'Contacto';
 
-  const handleSendWhatsApp = (contactItem?: any) => {
+  const handleSendWhatsApp = (contactItem?: InventoryItem) => {
     const targetItem = contactItem || currentContact;
     if (!targetItem) return;
 
