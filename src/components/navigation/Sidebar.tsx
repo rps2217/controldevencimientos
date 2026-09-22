@@ -1,5 +1,4 @@
 import React from 'react';
-import type { InventoryItem } from '../../types';
 import {
   Database, FileSpreadsheet, Package, FileText, TableProperties, List, Settings, PanelLeftClose, PanelLeftOpen, PieChart, Barcode
 } from 'lucide-react';
@@ -44,39 +43,43 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, active, onClick,
 }
 
 export interface SidebarProps {
-  isSidebarCollapsed?: boolean;
-  setIsSidebarCollapsed?: (collapsed: boolean) => void;
-  activeView?: string;
-  setActiveView?: (view: string) => void;
-  setSelectedProduct?: (prod: InventoryItem | null) => void;
-  otherSheets?: string[];
-  onOpenConfig?: () => void;
-  onOpenStockCount?: () => void;
+  /** El drawer móvil lo mantiene siempre expandido; no comparte el estado de colapso. */
+  forceExpanded?: boolean;
+  /** Gancho de navegación (el drawer móvil se cierra al elegir una vista). */
+  onNavigate?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = (props) => {
+export const Sidebar: React.FC<SidebarProps> = ({ forceExpanded = false, onNavigate }) => {
   const dashboard = useDashboard();
   const modalsActions = useModalsActions();
 
-  const isSidebarCollapsed = props.isSidebarCollapsed ?? dashboard.isSidebarCollapsed ?? false;
-  const setIsSidebarCollapsed = props.setIsSidebarCollapsed ?? dashboard.setIsSidebarCollapsed ?? (() => {});
-  const activeView = props.activeView ?? dashboard.activeView;
-  const setActiveView = props.setActiveView ?? dashboard.setActiveView;
-  const setSelectedProduct = props.setSelectedProduct ?? dashboard.setSelectedProduct;
-  const otherSheets = props.otherSheets ?? dashboard.otherSheets ?? [];
-  const onOpenConfig = props.onOpenConfig ?? (() => modalsActions.setIsConfigOpen(true));
-  const onOpenStockCount = props.onOpenStockCount ?? (() => modalsActions.setIsStockCountOpen?.(true));
+  // Los datos vienen siempre del contexto (fuente única). Las props describen
+  // sólo comportamiento, para no reintroducir el patrón doble-camino (Fase 2).
+  const isSidebarCollapsed = forceExpanded ? false : (dashboard.isSidebarCollapsed ?? false);
+  const setIsSidebarCollapsed = dashboard.setIsSidebarCollapsed ?? (() => {});
+  const { activeView, setActiveView, setSelectedProduct } = dashboard;
+  const otherSheets = dashboard.otherSheets ?? [];
+  const onOpenConfig = () => { modalsActions.setIsConfigOpen(true); onNavigate?.(); };
+  const onOpenStockCount = () => { modalsActions.setIsStockCountOpen?.(true); onNavigate?.(); };
+
+  const navigate = (view: string) => {
+    setActiveView(view);
+    setSelectedProduct(null);
+    onNavigate?.();
+  };
   return (
     <div className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 z-20 transition-all duration-300`}>
       <div className={`p-4 border-b border-slate-100 dark:border-slate-800 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
         {!isSidebarCollapsed && <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-2">Módulos</p>}
-        <button 
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-          className="p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" 
-          title={isSidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
-        >
-          {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-        </button>
+        {!forceExpanded && (
+          <button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            title={isSidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+          </button>
+        )}
       </div>
       
       <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-6">
@@ -85,32 +88,31 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
             icon={<Database className="w-5 h-5" />} 
             label="Vencimientos & Radar" 
             active={activeView === 'main'} 
-            onClick={() => { setActiveView('main'); setSelectedProduct(null); }}
+            onClick={() => navigate('main')}
             collapsed={isSidebarCollapsed}
           />
           <SidebarItem 
             icon={<FileSpreadsheet className="w-5 h-5" />} 
             label="Incidencias & FRC" 
             active={activeView === 'events'} 
-            onClick={() => { setActiveView('events'); setSelectedProduct(null); }}
+            onClick={() => navigate('events')}
             collapsed={isSidebarCollapsed}
           />
           <SidebarItem 
             icon={<Package className="w-5 h-5" />} 
             label="Catálogo Productos" 
             active={activeView === 'products'} 
-            onClick={() => { setActiveView('products'); setSelectedProduct(null); }}
+            onClick={() => navigate('products')}
             collapsed={isSidebarCollapsed}
           />
           <SidebarItem 
             icon={<FileText className="w-5 h-5" />} 
             label="Políticas de Canje" 
             active={activeView === 'policies'} 
-            onClick={() => { setActiveView('policies'); setSelectedProduct(null); }}
+            onClick={() => navigate('policies')}
             collapsed={isSidebarCollapsed}
           />
 
-          {onOpenStockCount && (
             <SidebarItem 
               icon={<Barcode className="w-5 h-5" />} 
               label="Conteo de Stock" 
@@ -119,7 +121,6 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
               collapsed={isSidebarCollapsed}
               badge="Físico"
             />
-          )}
           
           <div className="my-2 border-t border-slate-100 dark:border-slate-800"></div>
           
@@ -127,14 +128,14 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
             icon={<TableProperties className="w-5 h-5" />} 
             label="Estructura de Datos" 
             active={activeView === 'schema'} 
-            onClick={() => { setActiveView('schema'); setSelectedProduct(null); }}
+            onClick={() => navigate('schema')}
             collapsed={isSidebarCollapsed}
           />
           <SidebarItem 
             icon={<PieChart className="w-5 h-5" />} 
             label="Analítica & Dashboard" 
             active={activeView === 'analytics'} 
-            onClick={() => { setActiveView('analytics'); setSelectedProduct(null); }}
+            onClick={() => navigate('analytics')}
             collapsed={isSidebarCollapsed}
           />
         </div>
@@ -153,7 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                   icon={<List className="w-5 h-5" />} 
                   label={title} 
                   active={activeView === title} 
-                  onClick={() => { setActiveView(title); setSelectedProduct(null); }}
+                  onClick={() => navigate(title)}
                   collapsed={isSidebarCollapsed}
                 />
               ))}

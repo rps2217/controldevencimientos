@@ -28,9 +28,10 @@ export default tseslint.config(
       }],
       // Fase 2 del plan de arquitectura: el patrón `props.X ?? dashboard.X` da
       // dos rutas para el mismo dato y ya provocó un bug (fallback a no-op
-      // silencioso en ViewConfigControlDrawer). Congelado en los archivos que
-      // aún lo usan (ver `overrides` al final); prohibido en el resto. La lista
-      // se reduce a medida que cada archivo lee solo del contexto.
+      // silencioso en ViewConfigControlDrawer). Los 11 archivos que lo usaban
+      // ya leen solo del contexto; la regla aplica a todo `src` sin excepciones.
+      // Los props de comportamiento (p. ej. `Sidebar.onNavigate`) siguen siendo
+      // válidos: lo prohibido es duplicar la fuente del dato.
       'no-restricted-syntax': ['error', {
         selector: "LogicalExpression[operator='??'][left.object.name='props'][right.object.name='dashboard']",
         message:
@@ -57,19 +58,6 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-expressions': 'off',
       'no-unused-vars': 'off',
       'no-empty': ['error', { allowEmptyCatch: true }],
-    }
-  },
-  {
-    // Deuda técnica congelada (Fase 2). A estos archivos aún les quedan props
-    // por compatibilidad con quien los monta; la lista solo puede ENCOGER.
-    // `Sidebar` es la única excepción real: `DashboardMobileDrawer` le pasa
-    // props con comportamiento propio (cerrar el menú al navegar), por lo que
-    // necesita la ruta por props además del contexto.
-    files: [
-      'src/components/navigation/Sidebar.tsx',
-    ],
-    rules: {
-      'no-restricted-syntax': 'off'
     }
   },
 );

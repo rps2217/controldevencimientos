@@ -76,17 +76,19 @@ Resuelve el problema común de las hojas de cálculo con encabezados inconsisten
 - **`FIELD_PATTERNS`**: Diccionario de expresiones regulares por campo semántico que cubre variaciones ortográficas, acentos y abreviaciones.
 - **`findColumnBySemantic(headers, semantic)`**: Busca en un arreglo de encabezados de columnas el que coincida semánticamente, permitiendo mapeo automático robusto.
 
-### C. Cálculos y Utilidades de Fechas / Números (`src/utils/dateCalculations.tsx`)
-- **`parseAnyDate(dateVal)`**: Soporta:
+### C. Cálculos y Utilidades de Fechas / Números (`src/utils/pureCalculations.ts` + `src/utils/dateCalculations.tsx`)
+- **`parseAnyDate(dateVal)`** (en `pureCalculations.ts`): Soporta:
   1. Números de serie de Excel (ej. `45321`).
   2. Formatos ISO (`YYYY-MM-DD`, `YYYY/MM/DD`, `YYYY.MM.DD`).
   3. Formatos Latinos (`DD/MM/YYYY`, `DD-MM-YYYY`, `DD.MM.YYYY`).
   4. Formatos compactos (`YYYYMMDD`).
   5. Formatos Mes/Año (`MM/YYYY` - calcula último día del mes).
   6. Objetos `Date` nativos o cadenas de texto estándar.
-- **`parseLocaleNumber` / `formatLocaleNumber`**: Conversión y formateo robusto de valores numéricos de stock/cantidad que contengan comas y puntos decimales europeos/americanos.
-- **`getItemStatus(item, headers)`**: Calcula de manera inteligente el estado operativo de un ítem (ej. Vencido, Crítico por vencer, Próximo a retiro, En buen estado) comparando con la fecha actual.
-- **`getEventCategory(item, headers)`**: Clasifica automáticamente eventos e incidencias en categorías (`TRANSPORTE`, `DIFERENCIAS`, `MERMAS`, `CALIDAD`, etc.).
+- **`parseLocaleNumber` / `formatLocaleNumber`** (en `pureCalculations.ts`): Conversión y formateo robusto de valores numéricos de stock/cantidad que contengan comas y puntos decimales europeos/americanos.
+- **`getItemStatus(item, headers)`** (en `dateCalculations.tsx`): Calcula de manera inteligente el estado operativo de un ítem (ej. Vencido, Crítico por vencer, Próximo a retiro, En buen estado) comparando con la fecha actual.
+- **`getEventCategory(item, headers)`** (en `pureCalculations.ts`): Clasifica automáticamente eventos e incidencias en categorías (`TRANSPORTE`, `DIFERENCIAS`, `MERMAS`, `CALIDAD`, etc.).
+
+Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que consume el Web Worker); `dateCalculations.tsx` re-exporta sus funciones para no romper a los consumidores existentes y añade los envoltorios de UI.
 
 ### D. Registro y Configuración de Acciones Masivas (`src/utils/bulkActionsRegistry.ts`)
 - **Control Contextual y Prevención de Ruido Visual**: Permite activar, desactivar o dejar en modo automático (`auto`, `enabled`, `disabled`) cualquier acción masiva (WhatsApp, Gmail, Ticket, Excel, Acción PM, Edición FRC, Eliminar) por tabla o vista específica.
@@ -261,7 +263,7 @@ Para garantizar un código limpio, sin sobreingeniería (*anti-bloat*) y con el 
 4. **Tipado Estricto**: Asegúrate de que todo código nuevo mantenga compatibilidad estricta con TypeScript (`npm run lint` pasa sin errores de `tsc --noEmit`).
 5. **Robustez en Hojas de Cálculo**: Siempre que proceses datos tabulares externos, utiliza el motor de `columnAliases.ts` en lugar de buscar nombres de columnas fijos (`item['SKU']`), garantizando tolerancia a variaciones en los archivos del usuario.
 6. **Aplicar la Escalera de Ponytail**: Antes de escribir una sola línea de código, pregúntate si puedes reutilizar lo que ya existe o resolverlo con la menor cantidad de código posible.
-7. **Leer del contexto, no de dos sitios**: `ViewConfigControlDrawer` y `DashboardPageHeader` se montan **sin props**; su única ruta real de datos es `useDashboard()`. El patrón `props.X ?? dashboard.X` da dos caminos para el mismo valor y ya causó un bug real (el fallback `?? (() => {})` del selector de agrupación dejaba la acción en un no-op silencioso). ESLint lo prohíbe en código nuevo; hay una lista congelada en `eslint.config.mjs` que solo puede encoger.
+7. **Leer del contexto, no de dos sitios**: `ViewConfigControlDrawer` y `DashboardPageHeader` se montan **sin props**; su única ruta real de datos es `useDashboard()`. El patrón `props.X ?? dashboard.X` da dos caminos para el mismo valor y ya causó un bug real (el fallback `?? (() => {})` del selector de agrupación dejaba la acción en un no-op silencioso). ESLint lo prohíbe en todo `src`, sin excepciones. **Datos vs. comportamiento**: las props sólo pueden describir *comportamiento* (p. ej. `Sidebar.onNavigate` para cerrar el drawer móvil); nunca duplicar la fuente de un dato. Aplicar esa distinción fue lo que permitió cerrar la Fase 2 en `Sidebar` sin añadir contexto.
 8. **Antes de tocar el contexto o el dashboard**: ejecuta `npm run verify`. El contexto (`DashboardContextType`) declara ~180 miembros y `InventoryDashboard.tsx` tiene ~34 `useState`; el plan de reforma está en `ROADMAP.md` y debe seguirse por fases.
 
 ---
@@ -307,37 +309,43 @@ Ponytail (§5) sigue siendo obligatoria.
 ### Arneses de medición (`tests/perf/`, requieren Chromium y un build servido)
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 8 arneses que cubren integridad de
-datos; devuelve código distinto de cero si alguno falla. El binario de Chrome se toma de
-`CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`, etc.).
+`npm run test:e2e` arranca el preview y corre los 9 arneses que cubren integridad de
+datos y navegación; devuelve código distinto de cero si alguno falla. El binario de Chrome
+se toma de `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`,
+etc.).
 
 Para correr uno solo: `node tests/perf/<script>.cjs http://127.0.0.1:4173/`.
 
-| Script | Para qué sirve |
-|---|---|
-| `corruptcheck.cjs` | LocalStorage corrupto no rompe el arranque (10 casos). |
-| `startupcorruption.cjs` | Igual, sembrando varias claves a la vez. |
-| `offlinecheck.cjs` | Replay de la cola offline: un fallo de red no pierde la mutación y el reintento la drena. |
-| `mutcheck.cjs` | Crear, editar y eliminar registros (rutas de pérdida de datos). |
-| `importcheck.cjs` | Importación universal de punta a punta. |
-| `groupcheck.cjs` | Agrupación por columna de punta a punta (solicitud original b). |
-| `searchcheck.cjs` | El buscador filtra y se sincroniza con el contexto. |
-| `bulkcheck.cjs` | Edición y eliminación masivas (rutas de pérdida de datos). |
-| `modals.cjs` | Abrir modales: commits, long tasks y encabezado visible. |
-| `profile.cjs` | Renders reales de tabla/fila (tecleo). |
-| `printcheck.cjs` | La vista de impresión. |
+| Script | En la puerta | Para qué sirve |
+|---|---|---|
+| `corruptcheck.cjs` | sí | LocalStorage corrupto no rompe el arranque (10 casos). |
+| `startupcorruption.cjs` | sí | Igual, sembrando varias claves a la vez. |
+| `offlinecheck.cjs` | sí | Replay de la cola offline: un fallo de red no pierde la mutación y el reintento la drena. |
+| `mutcheck.cjs` | sí | Crear, editar y eliminar registros (rutas de pérdida de datos). |
+| `importcheck.cjs` | sí | Importación universal de punta a punta. |
+| `groupcheck.cjs` | sí | Agrupación por columna de punta a punta (solicitud original b). |
+| `searchcheck.cjs` | sí | El buscador filtra y se sincroniza con el contexto. |
+| `bulkcheck.cjs` | sí | Edición y eliminación masivas (rutas de pérdida de datos). |
+| `sidebarcheck.cjs` | sí | El sidebar resuelve datos del contexto y props solo de comportamiento (colapso y drawer móvil). |
+| `modals.cjs` | no | Abrir modales: commits, long tasks y encabezado visible. |
+| `profile.cjs` | no | Renders reales de tabla/fila (tecleo). |
+| `printcheck.cjs` | no | La vista de impresión. |
 
 `tests/perf/ctxdiff.cjs` **se retiró** (dependía de instrumentación ya eliminada).
 
 ### Robustez de arranque: la puerta de persistencia
 
-Toda lectura de `localStorage` debe pasar por `readStorage`/`readStorageValidated`
-(`src/utils/appStorage.ts`), y toda escritura por `writeStorage`. El motivo está
-medido: un valor con forma equivocada pasaba el `JSON.parse` y reventaba lejos de la
-causa, dejando la app sin montar. Los esquemas (`cachedSheetSchema`,
-`objectArraySchema`, `sheetConfigShapeSchema`, `moduleStatesSchema`, …) validan
-**contenedor y forma de cada elemento**, no cada campo: esos DTO evolucionan entre
-versiones y algunos los escribe la nube.
+Todo dato **estructurado** (objetos, listas, mapas) en `localStorage` debe pasar por
+`readStorage`/`readStorageValidated` (`src/utils/appStorage.ts`), y su escritura por
+`writeStorage`. El motivo está medido: un valor con forma equivocada pasaba el `JSON.parse`
+y reventaba lejos de la causa, dejando la app sin montar. Los esquemas
+(`cachedSheetSchema`, `objectArraySchema`, `sheetConfigShapeSchema`, `moduleStatesSchema`,
+…) validan **contenedor y forma de cada elemento**, no cada campo: esos DTO evolucionan
+entre versiones y algunos los escribe la nube.
+
+Las cadenas planas (credenciales como `SCRIPT_URL`/`SECURITY_TOKEN`, banderas como
+`DARK_MODE`) y los accesos de la **cola offline** —que la invariante pide no tocar— siguen
+usando `localStorage` directo; para esos no aplica el parseo con esquema.
 
 Al añadir una clave nueva: definir el esquema en `appStorage.ts`, no parsear a mano.
 
@@ -387,10 +395,11 @@ PR. Node 22. Sin secrets. El job `e2e` usa el Google Chrome preinstalado del run
      renderiza la cabecera con el valor real, el botón de orden existe, alternarlo
      reordena los grupos, y volver a `none` desactiva). La sonda **no es vacía**: con
      el no-op reintroducido en `ViewConfigControlDrawer.tsx:153` fallan 4 pasos.
-     El patrón doble-camino sigue ahí (ver punto 2), pero ya no oculta el objetivo.
-2. **Fase 2** — migrar los 11 archivos del patrón `props.X ?? dashboard.X` a leer solo
-   del contexto. La lista está en `eslint.config.mjs` (`overrides`) y **solo puede
-   encoger**.
+     El patrón doble-camino ya no existe (ver punto 2), así que el objetivo no queda oculto.
+2. **Fase 2** — CERRADA (11/11). Los 11 archivos del patrón `props.X ?? dashboard.X` leen
+   solo del contexto; el `overrides` de `eslint.config.mjs` se eliminó y la regla aplica a
+   todo `src`. En `Sidebar` la clave fue separar **datos** (contexto) de **comportamiento**
+   (`forceExpanded`, `onNavigate`). Sonda E2E nueva: `sidebarcheck.cjs`.
 3. **Fase 3** — extracción de hooks. **`useInventoryData`, `useTableGrouping`,
    `useInventoryIngestion` y `useInventoryBulkActions` HECHOS** (ver `ROADMAP.md`;
    `InventoryDashboard.tsx` 2.081 → 1.377 líneas, −34%). El bloque de acciones masivas se

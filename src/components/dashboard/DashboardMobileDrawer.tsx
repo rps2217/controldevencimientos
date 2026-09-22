@@ -11,12 +11,6 @@ export const DashboardMobileDrawer: React.FC = () => {
 
   const isOpen = modalsState.isMobileMenuOpen && !dashboard.isZenMode;
   const onClose = () => modalsActions.setIsMobileMenuOpen?.(false);
-  const activeView = dashboard.activeView;
-  const setActiveView = dashboard.setActiveView;
-  const setSelectedProduct = dashboard.setSelectedProduct;
-  const otherSheets = dashboard.otherSheets ?? [];
-  const onOpenConfig = () => modalsActions.setIsConfigOpen(true);
-  const onOpenStockCount = () => modalsActions.setIsStockCountOpen?.(true);
 
   if (!isOpen) return null;
 
@@ -35,26 +29,7 @@ export const DashboardMobileDrawer: React.FC = () => {
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <Sidebar
-            isSidebarCollapsed={false}
-            setIsSidebarCollapsed={() => {}}
-            activeView={activeView}
-            setActiveView={(v) => { 
-              setActiveView(v); 
-              setSelectedProduct(null); 
-              onClose(); 
-            }}
-            setSelectedProduct={setSelectedProduct}
-            otherSheets={otherSheets}
-            onOpenConfig={() => { 
-              onOpenConfig(); 
-              onClose(); 
-            }}
-            onOpenStockCount={() => { 
-              onOpenStockCount(); 
-              onClose(); 
-            }}
-          />
+          <Sidebar forceExpanded onNavigate={onClose} />
         </div>
       </div>
     </div>

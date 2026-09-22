@@ -1,6 +1,6 @@
 # Plan de Reforma Arquitectónica
 
-Estado: **Fases 0 y 2 completadas**; Fases 1 (1.3 en curso), 3–6 pendientes. Deuda `any`
+Estado: **Fases 0 y 2 completadas**; Fase 1 (1.3 en curso), 3–6 pendientes. Deuda `any`
 saldada en todo `src`: **1 solo `any`** declarado (la firma de índice de `SheetRecord`,
 justificada abajo). Riesgo `xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
@@ -44,7 +44,7 @@ refactorizar a la vez multiplica el riesgo.
 - [x] Pruebas de caracterización del cableado de agrupación (`tests/components.test.tsx`).
       Verificado que **fallan** si se reintroduce el no-op silencioso.
 - [x] Regla ESLint `no-restricted-syntax` que prohíbe `props.X ?? dashboard.X` en código
-      nuevo, con la lista de archivos pendientes congelada en `overrides` (hoy solo `Sidebar`).
+      nuevo. Sin `overrides`: tras cerrar la Fase 2 (11/11) la regla aplica a todo `src`.
 - [x] Script `npm run verify` = `tsc --noEmit && eslint src tests && npm test`.
 
 Nota: el DOM se instala con guarda de idempotencia y **solo** en las pruebas que lo
@@ -304,10 +304,10 @@ Nota sobre jsdom: `tests/baseline.probe.tsx` sirve para contar commits, pero sus
 milisegundos no son extrapolables (la tabla virtualizada mide 0 sin
 `ResizeObserver`). Para latencias, el instrumento CDP.
 
-### Fase 2 — Eliminar el doble camino · COMPLETADA (10 de 11)
+### Fase 2 — Eliminar el doble camino · COMPLETADA (11 de 11)
 
-Migrar los 11 archivos a leer **solo** del contexto. Resultado: **168 → 6** ocurrencias
-de `props.X ?? dashboard.X`; la lista de `overrides` pasa de 11 archivos a **1**.
+Migrar los 11 archivos a leer **solo** del contexto. Resultado: **168 → 0** ocurrencias
+de `props.X ?? dashboard.X`; el `overrides` de ESLint se eliminó por completo.
 
 **Hecho**: migrados `InventoryTable` (59), `DashboardTopNav` (23), `ViewConfigControlDrawer`
 (22), `DashboardFilterPanels` (21), `FloatingBulkActionBar` (13), `DashboardTableContainer`
@@ -319,12 +319,13 @@ Se eliminaron además las interfaces `*Props` que quedaron huérfanas y los impo
 que solo existían para declararlas. Las 3 advertencias `useMemo` que quedaban en
 `InventoryTable`/`ViewConfigControlDrawer` salen de sus listas de dependencias.
 
-**Desviación honesta del objetivo "= 0"**: `Sidebar` **no** migra. `DashboardMobileDrawer`
-le pasa props con comportamiento propio —su `setActiveView` además cierra el menú móvil—,
-así que necesita la ruta por props *y* el contexto. Es doble camino legítimo, no deuda.
-Eliminarlo exigiría o bien que el drawer duplique el menú, o bien un contexto nuevo para un
-solo consumidor: superficie añadida sin beneficio medido. Se documenta y se deja. La meta
-"lista vacía" se relaja a "solo la excepción justificada".
+**`Sidebar` (la excepción que se creía legítima)**: el aparente conflicto era clasificar
+mal las props. Los **datos** —colapso, vista activa, catálogo— son idénticos para ambos
+montajes y viven en el contexto; lo único propio del drawer móvil es **comportamiento**
+(cerrar el menú al navegar, no ofrecer colapso). `SidebarProps` se reduce a dos props de
+comportamiento (`forceExpanded`, `onNavigate`) y el componente resuelve una única fuente
+de datos. La ruta doble era una confusión de categorías, no un requisito: se eliminó sin
+contexto nuevo para un solo consumidor.
 
 **Hallazgo colateral (código muerto real)**: `ViewConfigControlDrawer` tenía el botón
 "Espejo Backend REST / Dual-Write" tras `props.onOpenBackendMirror &&`, prop que **nadie
@@ -332,10 +333,10 @@ pasaba y sin fallback de contexto**: nunca se renderizó. El acceso al espejo si
 pestaña correspondiente de `GlobalConfigModal`, así que el botón se eliminó (y el icono
 `Database` con él). Era el único prop de todo el repo con la forma `= props.X;` sin fallback.
 
-**Evidencia**: `npm run verify` verde (148 unitarias + 7 de componente, 0 fallos), 0 errores
-de ESLint, build PWA OK. E2E sobre el build de producción: `groupcheck`, `modals`,
-`printcheck` y `searchcheck` en OK. Diff neto **−332 líneas** (242 inserciones, 574 borrados)
-en 11 archivos.
+**Evidencia**: `npm run verify` verde (152 unitarias + 7 de componente + 18 de hoja de
+cálculo, 0 fallos), 0 errores de ESLint, build PWA OK. E2E sobre el build de producción:
+9 arneses OK, incluido el nuevo `sidebarcheck.cjs` que cubre colapso/expansión en
+escritorio y el drawer móvil (forzado expandido, sin colapso, cierra al navegar).
 
 ### Fase 3 — Delgazar `InventoryDashboard.tsx` (~2.190 líneas, ~34 `useState`)
 
@@ -993,3 +994,71 @@ estimados, y están anclados a `git show HEAD:<archivo>` para que sean reproduci
   desde el corte anterior). Corregido en la tabla de comandos.
 - `ROADMAP.md` declaraba 183 usos de `any`; el conteo real era 163 por el redondeo de
   "usos" vs. firmas tipadas. Unificado al criterio de conteo reproducible de arriba.
+
+## Auditoría Ponytail (2026-09-19) — cierre de Fase 2 y barrido de duplicación
+
+Barrido sobre el árbol con los 9 arneses E2E en verde. Contiene un hallazgo nuevo de
+duplicación que las pasadas anteriores no vieron, porque estas buscaban **nombres**
+exportados repetidos; esta buscó **cuerpos** de función normalizados.
+
+**Fase 2 cerrada (11/11)**
+- El patrón `props.X ?? dashboard.X` llega a **0** (`grep` medido). El `overrides` de
+  `eslint.config.mjs` se eliminó: la regla aplica a todo `src`.
+- La excepción que se creía legítima (`Sidebar`) era una **confusión de categorías**:
+  los datos (colapso, vista activa, catálogo) son idénticos en ambos montajes y viven en
+  el contexto; lo propio del drawer móvil es **comportamiento** (cerrar al navegar, no
+  ofrecer colapso). Se resolvió con dos props de comportamiento y una fuente única de
+  datos, sin contexto nuevo para un solo consumidor.
+- Sonda E2E nueva `sidebarcheck.cjs` (registrada en `run.cjs`): 6 pasos que cubren
+  colapso/expansión en escritorio y el ciclo del drawer móvil. La sonda **no es vacía**:
+  falla si el botón de colapso reaparece en el drawer o si `onNavigate` no cierra el menú.
+
+**Hallazgo de duplicación (real, no detectado antes)**
+- El **ciclo de vida del escáner de cámara** (`Html5Qrcode`) está duplicado en
+  `MobileCameraBarcodeScanner.tsx` y `MobilePistoleoTerminalModal.tsx`: `stopScanner`/
+  `stopCameraScanner` son idénticos carácter a carácter y `handleToggleTorch` también;
+  el arranque (selección de cámara trasera, `formatsToSupport`, `fps`, `qrbox`,
+  `aspectRatio`, lectura de capacidades de *torch*) comparte la misma secuencia con
+  mensajes de error distintos. Ambos están **en uso** (el primero en
+  `CampaignQuickScanModal` y `StockCountTerminal`; el segundo en `DashboardModalsManager`).
+  Es el candidato natural a un hook `useBarcodeCamera` en un corte futuro: ~100 líneas
+  duplicadas, con la diferencia real reducida a los textos y al manejo de errores.
+- `useOfflineSync.ts` (2 cuerpos) y `SliceEditorModal.tsx` (3 *toggles* de la misma forma)
+  son duplicación **estructural**, no literal: cada copia opera sobre un campo distinto
+  (`pmRadarFilter`, `eventFilter`, `eventResolutionFilter`) y unificarlas con un helper
+  genérico añadiría indirección sin reducir el número de líneas de forma clara.
+  Descartado por la Escalera (escalón 7: no hay ganancia medible).
+
+**Escalones con "sin hallazgos"**
+- Dependencias (5): las 13 declaradas tienen uso real (`motion/react`, `xlsx` diferido en
+  `exportUtils`/`universalImporter`, `react-router-dom` en `App` + `StockCountTerminal`).
+- Código muerto (1): 0 `TODO`/`FIXME`, 0 `ts-ignore`/`eslint-disable`, 0 exports huérfanos
+  (el barrido por nombres dio 0). El único `console.log` es la traza deliberada de la cola.
+- `any` (2): sigue en **1** (la firma de índice de `SheetRecord`).
+- Monetario (regla estricta del protocolo): **0** campos ni métricas de precio en la UI.
+  El ERP de farmacia se consume con `Stock`, `Inv. Inicial`, `Egreso`, `Ingreso`, `Venta`,
+  `Stock Min/Max/Crítico`; `AGENTS.md` (§2.M) lista justo esas columnas, sin precio. La
+  regla se cumple en código y en documentación.
+
+**Desviación de documentación detectada y corregida**
+- `AGENTS.md` (§2.C) situaba `parseAnyDate` y `getEventCategory` en
+  `dateCalculations.tsx`; viven en `pureCalculations.ts` (compatible con Web Worker) y
+  `dateCalculations.tsx` sólo los re-exporta. `getItemStatus` **sí** se define en el
+  `.tsx` (es envoltorio de UI). Corregido en ambos archivos, con la nota de por qué existe
+  el re-export (no romper consumidores).
+- `AGENTS.md` decía que **toda** lectura/escritura de `localStorage` pasaba por
+  `readStorage`/`writeStorage`. Hay **71** operaciones directas fuera de `appStorage.ts`
+  (18 archivos; 13 en `indexedDbService`, 13 en `App`). El dato que importa: **0
+  `JSON.parse` sin validar**, así que el riesgo que motivó la puerta (forma equivocada que
+  revienta lejos de la causa) está cerrado. Los accesos directos son cadenas planas
+  (`SCRIPT_URL`, `DARK_MODE`, …) y la cola offline —que la invariante pide no tocar—.
+  El guardarraíl se reescribió como "todo dato **estructurado** pasa por la puerta
+  validada", que es lo que el código cumple.
+
+**Verificación (no asumida)**
+- `npm run verify:all` en verde: tsc 0 errores, eslint 0 errores (20 warnings
+  `exhaustive-deps` preexistentes), 152 + 7 + 18 pruebas, build PWA y **9 arneses E2E**.
+- Nota de estabilidad del arnés: una corrida intermedia hizo fallar `startupcorruption` y
+  `mutcheck` con `filasRenderizadas: 0`; con el árbol limpio dieron 8/8 y con los cambios
+  9/9. Fue contención de recursos por lanzar Chrome en paralelo, no una regresión; se
+  documenta porque un falso rojo en CI cuesta más de diagnosticar que un fallo real.
