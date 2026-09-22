@@ -79,7 +79,7 @@ class CDP {
 }
 
 (async () => {
-  const chrome = spawn('/usr/bin/chromium', [
+  const chrome = spawn(process.env.CHROME_BIN || '/usr/bin/chromium', [
     '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
     '--no-first-run', '--disable-extensions', '--window-size=1600,1000',
     '--remote-debugging-port=' + PORT, '--user-data-dir=' + require('os').tmpdir() + '/perf-profile-' + PORT, 'about:blank',

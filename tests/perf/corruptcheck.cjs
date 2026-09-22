@@ -25,7 +25,7 @@ const KEY_COL_ORDERS = 'appsheet_clone_col_orders';
 const KEY_MODULE_STATES = 'app_module_states';
 
 (async () => {
-  const chrome = spawn('/usr/bin/chromium', ['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--no-first-run','--window-size=1600,1000','--remote-debugging-port='+PORT,'--user-data-dir='+require('os').tmpdir()+'/corrupt-'+PORT,'about:blank'], { stdio: ['ignore','ignore','ignore'] });
+  const chrome = spawn(process.env.CHROME_BIN || '/usr/bin/chromium', ['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--no-first-run','--window-size=1600,1000','--remote-debugging-port='+PORT,'--user-data-dir='+require('os').tmpdir()+'/corrupt-'+PORT,'about:blank'], { stdio: ['ignore','ignore','ignore'] });
   const die = c => { try { chrome.kill('SIGKILL'); } catch(e){} process.exit(c); };
   let ok=false; for(let i=0;i<60;i++){ try{ await req('GET','/json/version'); ok=true; break;}catch(e){await sleep(250);} }
   if(!ok) return die(1);
@@ -107,5 +107,9 @@ const KEY_MODULE_STATES = 'app_module_states';
   results.push({ caso: 'cache de hoja valido (control)', montada: r.mounted, errores: r.errors.length, detalle: r.errors[0] });
 
   console.log(JSON.stringify(results, null, 2));
-  try{ws.close();}catch(e){} die(0);
+  // Puerta real: cada escenario debe montar con cero errores. Sin este veredicto
+  // el arnes salia siempre con codigo 0 y no atrapaba ninguna regresion.
+  const passed = results.every(r => r.montada && r.errores === 0);
+  console.log(passed ? 'RESULTADO: OK' : 'RESULTADO: FALLO');
+  try{ws.close();}catch(e){} die(passed ? 0 : 1);
 })().catch(e => { console.error('Fallo:', e.message); process.exit(1); });

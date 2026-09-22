@@ -12,7 +12,9 @@
     "lint:eslint": "eslint src",
     "test": "tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts",
     "test:components": "tsx tests/components.test.tsx",
-    "verify": "tsc --noEmit && eslint src tests && npm test"
+    "test:e2e": "node tests/perf/run.cjs",
+    "verify": "tsc --noEmit && eslint src tests && npm test",
+    "verify:all": "npm run verify && npm run build && npm run test:e2e"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

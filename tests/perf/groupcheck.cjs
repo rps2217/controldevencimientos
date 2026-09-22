@@ -34,7 +34,7 @@ function req(method, p) {
 }
 
 (async () => {
-  const chrome = spawn('/usr/bin/chromium', [
+  const chrome = spawn(process.env.CHROME_BIN || '/usr/bin/chromium', [
     '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
     '--no-first-run', '--window-size=1600,1000',
     '--remote-debugging-port=' + port, '--user-data-dir=' + os.tmpdir() + '/group-' + port, 'about:blank',
@@ -180,6 +180,9 @@ function req(method, p) {
   push('volver a "Sin agrupar" desactiva la agrupacion', volvio === null, volvio);
 
   console.log(JSON.stringify({ montada: true, resultados: results, erroresConsola: [...consoleErrors] }, null, 2));
+  // Puerta real: sin veredicto el arnes salia siempre con codigo 0.
+  const passed = results.every(r => r.ok);
+  console.log(passed ? 'RESULTADO: OK' : 'RESULTADO: FALLO');
   try { ws.close(); } catch (e) {}
-  die(0);
+  die(passed ? 0 : 1);
 })().catch(e => { console.error('Fallo:', e.message); process.exit(1); });

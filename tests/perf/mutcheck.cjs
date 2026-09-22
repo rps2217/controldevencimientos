@@ -29,7 +29,7 @@ function httpReq(method, urlPath) {
 }
 
 (async () => {
-  const chrome = spawn('/usr/bin/chromium', ['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--no-first-run','--window-size=1600,1000','--remote-debugging-port='+port,'--user-data-dir='+os.tmpdir()+'/mc-'+port,'about:blank'], { stdio: ['ignore','ignore','ignore'] });
+  const chrome = spawn(process.env.CHROME_BIN || '/usr/bin/chromium', ['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--no-first-run','--window-size=1600,1000','--remote-debugging-port='+port,'--user-data-dir='+os.tmpdir()+'/mc-'+port,'about:blank'], { stdio: ['ignore','ignore','ignore'] });
   const die = c => { try { chrome.kill('SIGKILL'); } catch(e){} process.exit(c); };
   let ok=false; for(let i=0;i<60;i++){ try{ await httpReq('GET','/json/version'); ok=true; break;}catch(e){await sleep(250);} }
   if(!ok) return die(1);

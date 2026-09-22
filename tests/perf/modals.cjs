@@ -36,7 +36,7 @@ function req(method, p) {
 }
 
 (async () => {
-  const chrome = spawn('/usr/bin/chromium', [
+  const chrome = spawn(process.env.CHROME_BIN || '/usr/bin/chromium', [
     '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
     '--no-first-run', '--window-size=1600,1000',
     '--remote-debugging-port=' + port, '--user-data-dir=' + os.tmpdir() + '/modal-' + port, 'about:blank',

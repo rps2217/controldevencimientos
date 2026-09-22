@@ -46,7 +46,7 @@ class CDP {
 }
 
 (async () => {
-  const chrome = spawn('/usr/bin/chromium', ['--headless=new', '--no-sandbox', '--disable-gpu',
+  const chrome = spawn(process.env.CHROME_BIN || '/usr/bin/chromium', ['--headless=new', '--no-sandbox', '--disable-gpu',
     '--disable-dev-shm-usage', '--no-first-run', '--window-size=1600,1000',
     '--remote-debugging-port=' + PORT, '--user-data-dir=/tmp/cdp/inspect-profile-' + PORT, 'about:blank'],
     { stdio: ['ignore', 'ignore', 'ignore'] });

@@ -277,7 +277,9 @@ Ponytail (§5) sigue siendo obligatoria.
 
 | Comando | Qué hace |
 |---|---|
-| `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Es el gate real. |
+| `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
+| `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
+| `npm run test:e2e` | Arranca el build de producción y corre los 7 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -302,20 +304,26 @@ Ponytail (§5) sigue siendo obligatoria.
 - `importPharmacySnapshotToCampaign` acepta registros **y** matrices 2D; normaliza en su
   único punto de entrada. Si añades llamadores, no asumas la forma.
 
-### Arneses de medición (`tests/perf/`, requieren Chromium y un dev server)
+### Arneses de medición (`tests/perf/`, requieren Chromium y un build servido)
 
-Son pruebas de comportamiento, no solo de milisegundos. Se ejecutan así:
-`node tests/perf/<script>.cjs http://127.0.0.1:3001/`.
+Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
+`npm run test:e2e` arranca el preview y corre los 7 arneses que cubren integridad de
+datos; devuelve código distinto de cero si alguno falla. El binario de Chrome se toma de
+`CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`, etc.).
+
+Para correr uno solo: `node tests/perf/<script>.cjs http://127.0.0.1:4173/`.
 
 | Script | Para qué sirve |
 |---|---|
+| `corruptcheck.cjs` | LocalStorage corrupto no rompe el arranque (10 casos). |
+| `startupcorruption.cjs` | Igual, sembrando varias claves a la vez. |
+| `mutcheck.cjs` | Crear, editar y eliminar registros (rutas de pérdida de datos). |
+| `importcheck.cjs` | Importación universal de punta a punta. |
+| `groupcheck.cjs` | Agrupación por columna de punta a punta (solicitud original b). |
+| `searchcheck.cjs` | El buscador filtra y se sincroniza con el contexto. |
+| `bulkcheck.cjs` | Edición y eliminación masivas (rutas de pérdida de datos). |
 | `modals.cjs` | Abrir modales: commits, long tasks y encabezado visible. |
 | `profile.cjs` | Renders reales de tabla/fila (tecleo). |
-| `corruptcheck.cjs` | LocalStorage corrupto no rompe el arranque. |
-| `startupcorruption.cjs` | Igual, sembrando varias claves a la vez. |
-| `searchcheck.cjs` | El buscador filtra y se sincroniza con el contexto. |
-| `groupcheck.cjs` | Agrupación por columna de punta a punta (solicitud original b). |
-| `mutcheck.cjs` | Crear, editar y eliminar registros (rutas de pérdida de datos). |
 | `printcheck.cjs` | La vista de impresión. |
 
 `tests/perf/ctxdiff.cjs` **se retiró** (dependía de instrumentación ya eliminada).
@@ -341,8 +349,9 @@ necesidad. Hay un caso real resuelto: el botón "Restablecer Datos Locales" del
 
 ### CI
 
-`.github/workflows/verify.yml` corre `npm ci && npm run verify` en push a `main` y en
-PR. Node 22. Sin secrets.
+`.github/workflows/verify.yml` corre `npm ci && npm run verify && npm run build` (job
+`verify`) y `npm ci && npm run build && npm run test:e2e` (job `e2e`) en push a `main` y en
+PR. Node 22. Sin secrets. El job `e2e` usa el Google Chrome preinstalado del runner.
 
 ### Pendiente al momento de escribir esto
 

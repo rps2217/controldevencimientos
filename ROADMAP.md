@@ -713,6 +713,36 @@ Pendiente real que queda: los 8 `JSON.parse` de **`lib/sheets.ts`** son **respue
 red** (Web App de Apps Script), no almacenamiento local: validarlas con esquema es otro
 trabajo, y hoy se validan aguas abajo. No se tocaron para no ampliar el alcance.
 
+### Los arneses E2E, convertidos en puerta de CI (2026-09-19)
+
+Decisión tras auditar el árbol: la Fase 4 estaba **esencialmente cerrada** —sus tres
+pendientes (caché por pestaña, `JSON.parse` de `lib/sheets.ts` y los 2 accesos directos a
+`localStorage`) ya tienen guarda de forma aguas arriba o `try/catch` en el mismo sitio—,
+así que seguir ahí era bajo valor. El hueco real era otro, y de más peso:
+
+**Los arneses que protegen la invariante "no perder datos" eran utilidades manuales;
+ninguno corría en CI.** Es decir, todo el trabajo de Fase 4 (resiliencia a corrupción,
+importación, mutaciones) tenía evidencia que solo se ejecutaba si alguien se acordaba.
+
+Además se encontró un defecto de método: **`corruptcheck.cjs` y `groupcheck.cjs` salían
+siempre con código 0**, incluso al fallar, porque nunca calculaban un veredicto. No eran
+puertas de regresión, eran informes. Corregidos: ambos emiten `RESULTADO` y devuelven
+código distinto de cero si algún caso falla.
+
+**Puerta unificada — `tests/perf/run.cjs` + `npm run test:e2e`**:
+
+- Arranca el build de producción (`vite preview`) y espera a que acepte conexiones antes de
+  correr nada; si no levanta, falla en vez de dar falso verde.
+- Ejecuta los **7 arneses de integridad**: `corruptcheck`, `startupcorruption`, `mutcheck`,
+  `importcheck`, `groupcheck`, `searchcheck`, `bulkcheck`.
+- Devuelve código distinto de cero si alguno falla. Sin dependencias nuevas: mismo protocolo
+  CDP y el Chrome ya instalado (o `CHROME_BIN`).
+- CI (`verify.yml`) gana el job `e2e`, que usa el Google Chrome preinstalado del runner.
+  `npm run verify:all` = `verify` + `build` + `test:e2e`, el gate completo local.
+
+Verificado de punta a punta: `npm run verify:all` → `tsc` limpio, ESLint 0 errores, 177
+pruebas, build OK y **7 arneses E2E OK**.
+
 ### Fase 5 — Dividir monolitos
 
 `stockCountUtils.ts` (1.487) · `StockCountTerminal.tsx` (2.751) ·
