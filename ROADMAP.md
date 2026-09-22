@@ -1,6 +1,7 @@
 # Plan de Reforma Arquitectónica
 
-Estado: **Fases 0 y 2 completadas**; Fases 1 (1.3 en curso), 3–6 pendientes. Riesgo
+Estado: **Fases 0 y 2 completadas**; Fases 1 (1.3 en curso), 3–6 pendientes. Deuda `any`
+en `DashboardContext.tsx` y `referenceResolver.ts` saldada (2026-09-22). Riesgo
 `xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
 Protocolo Ponytail: cada fase busca el código mínimo efectivo, sin dependencias nuevas salvo justificación explícita.
@@ -886,11 +887,67 @@ Excel, fechas nativas, SKUs numéricos grandes y round-trip de escritura. Integr
 - `npm audit --omit=dev`: **0 vulnerabilidades**. Sin hallazgos adicionales.
 - Cargado solo con `import()` dinámico, así que no entra al bundle inicial.
 
-**Tipado estricto — deuda de `any` cuantificada**
-- 201 usos de `any`/`as any`/`<any>` en `src`. Concentrados en `referenceResolver.ts`
-  (27), `DashboardContext.tsx` (21), `DashboardModalsManager.tsx` (17). Reducirlos es
-  candidato natural para la Fase 2 (migración de contexto), no un trabajo suelto.
+**Tipado estricto — deuda de `any` (actualizado 2026-09-22)**
+- 183 usos de `any` en `src` (eran 201 el 2026-09-19), 0 `as any`. `referenceResolver.ts`
+  y `DashboardContext.tsx` quedaron en **0**. El remanente se concentra en
+  `DashboardModalsManager.tsx` (19), `cuVcConsolidator.ts` (13), `pureCalculations.ts` (9).
+- El corte se hizo con tipos ya existentes en el repo (`ManageableColumn`,
+  `ColumnMetadata`, `DisplayRow`, `VirtualItem`, `WorkerMetricsResult`,
+  `SliceFilterConfig`, `SortConfig`, `ImportConsolidationMode`) más un tipo nuevo,
+  `SheetRecord`, para las filas dinámicas de hoja. Cero dependencias nuevas.
 
 **Monolitos (escalón 7) — ya en Fase 5**
 - Sin cambios: `StockCountTerminal.tsx` (2.751), `InventoryDashboard.tsx` (2.190),
   `stockCountUtils.ts` (1.475). No se dividen sin motivo: la Fase 5 lo cubre.
+
+---
+
+## Auditoría Ponytail (2026-09-22)
+
+Barrido dirigido tras saldar la deuda `any` de contexto y resolutor. El árbol sigue
+sano: no aparecieron patologías nuevas y lo verificado se corrobora con señales
+independientes (conteos, herramientas, CI).
+
+**Lo que se corrigió en esta pasada**
+- `referenceResolver.ts`: 27 → **0** `any`. Firmas migradas a `SheetRecord[]`; el `?? null`
+  que cierra la unión `SheetRecord | undefined` del `Array.find`.
+- `DashboardContext.tsx`: 21 → **0** `any`. Cada campo pasó a un tipo que ya existía en el
+  repo, no a un `any` renombrado. Efecto lateral valioso: varios campos estaban **peor
+  tipados de lo que el runtime admite**, y el compilador destapó dos desalineaciones
+  reales (ver abajo).
+- `SliceFilterConfig.eventResolutionFilter` alineado a `string[]` (la UI ya lo trataba
+  así: `useState<string[]>` → `ColumnFilterMenu.selectedValues`); `dynamicMonthRange`
+  admite `null`, como lo emite el filtro.
+- `FilterOption` admite `disabled`: los menús ya insertaban separadores con esa clave,
+  que hasta ahora viajaba fuera del tipo.
+
+**Alineaciones que el tipado destapó (no son cosméticas)**
+1. `groupedItems` **no** es un `Map` sino `Array<[clave, items]>`; `DashboardTableContainer`
+   usa `.length`, correcto. Se tipó el arreglo, no se cambió el código.
+2. Los props de métricas (`EventResolutionCards`, `EventFilterChips`, `PmRadarCards`)
+   ahora toleran `undefined` explícitamente: el contexto puede no traerlas mientras el
+   worker procesa. Se resuelven con guarda interna (default / `return null`), sin
+   fabricar métricas falsas.
+
+**Verificación**
+- `npm run verify`: tsc 0 errores, eslint 0 errores (21 warnings preexistentes de
+  `exhaustive-deps`), 152 + 7 + 18 pruebas en verde.
+- `npm run build` y `npm run test:e2e` (8 arneses) en verde. CI `verify` reejecutada en
+  GitHub Actions sobre el commit del corte: jobs `verify` y `e2e` en **success**.
+
+**Escalones con "sin hallazgos"**
+- Código muerto (1): 0 `TODO`/`FIXME`; 1 `console.log` en `src`; los ~13 exports
+  "huérfanos" siguen teniendo consumidor interno o en tests.
+- Duplicación (2): 0 funciones con el mismo nombre en archivos distintos.
+- Dependencias (5): las 12 declaradas tienen uso real; `xlsx` solo por `import()` dinámico.
+- Monolitos (7): sin cambio de criterio; los divide la Fase 5.
+
+**Observación abierta (no accionable hoy)**
+- 28 escrituras directas a `localStorage` fuera de la puerta `appStorage`
+  (`App.tsx` 8, `stockCountUtils.ts` 4, `CampaignConsolidationDashboard.tsx` 4). Es
+  exactamente lo que cierra la Fase 4 (puerta única de persistencia); no se toca suelto.
+
+**Siguiente palanca**
+- `DashboardModalsManager.tsx` (19 `any`), seguido de `cuVcConsolidator.ts` (13) y
+  `pureCalculations.ts` (9). Mismo criterio: mapear cada `any` a un tipo existente; si no
+  existe y la forma es real, definirlo en `types.ts`.
