@@ -21,6 +21,7 @@ const BASE = `http://127.0.0.1:${PORT}/`;
 const HARNESSES = [
   'corruptcheck.cjs',
   'startupcorruption.cjs',
+  'offlinecheck.cjs',
   'mutcheck.cjs',
   'importcheck.cjs',
   'groupcheck.cjs',

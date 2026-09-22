@@ -733,7 +733,7 @@ código distinto de cero si algún caso falla.
 
 - Arranca el build de producción (`vite preview`) y espera a que acepte conexiones antes de
   correr nada; si no levanta, falla en vez de dar falso verde.
-- Ejecuta los **7 arneses de integridad**: `corruptcheck`, `startupcorruption`, `mutcheck`,
+- Ejecuta los **8 arneses de integridad**: `corruptcheck`, `startupcorruption`, `offlinecheck`, `mutcheck`,
   `importcheck`, `groupcheck`, `searchcheck`, `bulkcheck`.
 - Devuelve código distinto de cero si alguno falla. Sin dependencias nuevas: mismo protocolo
   CDP y el Chrome ya instalado (o `CHROME_BIN`).
@@ -741,7 +741,34 @@ código distinto de cero si algún caso falla.
   `npm run verify:all` = `verify` + `build` + `test:e2e`, el gate completo local.
 
 Verificado de punta a punta: `npm run verify:all` → `tsc` limpio, ESLint 0 errores, 177
-pruebas, build OK y **7 arneses E2E OK**.
+pruebas, build OK y **8 arneses E2E OK**.
+
+#### Arnés del replay offline (`offlinecheck.cjs`)
+
+La ruta más crítica —el vaciado de la cola en `useOfflineSync`— no tenía cobertura E2E.
+Las primitivas (`matchRowIndexByIdentity`, `sortQueueFifo`, `isFailedMutation`) sí estaban
+probadas, pero la orquestación (qué pasa cuando el backend rechaza una escritura) no.
+
+El arnés levanta un **backend Apps Script simulado en el mismo proceso**, que responde el
+protocolo real que habla `fetchFromScript` (`getMetadata`, `getSheetData`, `appendRow`,
+`updateRow`, `deleteRow`...), y apunta la app a él. Así puede forzar el fallo de escritura
+a voluntad, algo imposible con el backend real.
+
+Dos invariantes verificadas:
+
+1. **Un fallo de red no pierde la mutación**: con el backend rechazando `appendRow`, la
+   mutación queda en la cola marcada `failed` con `attempts: 1`; la cola sigue con 1
+   elemento.
+2. **El reintento drena la cola**: con el backend sano, `Reintentar Conflictos` aplica la
+   escritura y la cola queda a 0.
+
+Señales robustas: el estado de la cola se lee del respaldo persistido
+(`appsheet_clone_offline_queue`), no de un contador de UI, y el éxito del replay se confirma
+por los `appendRow` recibidos en el backend simulado. El único `console.error` esperado (el
+rechazo deliberado) se excluye explícitamente para no enmascarar regresiones reales. La
+cola de siembra se apoya en el respaldo en `localStorage`, que `getOfflineQueue` migra a
+IndexedDB: evita una carrera con el arranque de la app que sí tendría escribir en la BD
+directamente.
 
 ### Fase 5 — Dividir monolitos
 

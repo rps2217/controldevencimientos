@@ -307,7 +307,7 @@ Ponytail (§5) sigue siendo obligatoria.
 ### Arneses de medición (`tests/perf/`, requieren Chromium y un build servido)
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 7 arneses que cubren integridad de
+`npm run test:e2e` arranca el preview y corre los 8 arneses que cubren integridad de
 datos; devuelve código distinto de cero si alguno falla. El binario de Chrome se toma de
 `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`, etc.).
 
@@ -317,6 +317,7 @@ Para correr uno solo: `node tests/perf/<script>.cjs http://127.0.0.1:4173/`.
 |---|---|
 | `corruptcheck.cjs` | LocalStorage corrupto no rompe el arranque (10 casos). |
 | `startupcorruption.cjs` | Igual, sembrando varias claves a la vez. |
+| `offlinecheck.cjs` | Replay de la cola offline: un fallo de red no pierde la mutación y el reintento la drena. |
 | `mutcheck.cjs` | Crear, editar y eliminar registros (rutas de pérdida de datos). |
 | `importcheck.cjs` | Importación universal de punta a punta. |
 | `groupcheck.cjs` | Agrupación por columna de punta a punta (solicitud original b). |
