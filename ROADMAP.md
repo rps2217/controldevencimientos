@@ -549,6 +549,36 @@ El motivo fue doble:
 errores (20 warnings preexistentes, sin cambios), 177/177 pruebas, build OK y los E2E
 `groupcheck`, `searchcheck` y `mutcheck` en OK.
 
+#### Corte `useInventoryIngestion`
+
+Tercer corte de Fase 3, también por sub-bloque cohesionado. Se extrajo a
+`src/hooks/useInventoryIngestion.ts` (304 líneas) todo el **ingesta de filas externas**:
+`handleSaveQuickTraspaso`, `handleUniversalImportConfirmed` y `handleSyncRowsToVencimientos`.
+Los tres comparten la misma mecánica —normalizar filas, escribir en la nube y, al fallar,
+encolar la mutación— y por eso forman una unidad de dominio real.
+
+- **Interfaz de 15 parámetros** para 238 líneas trasladadas, la mejor proporción de los
+  cuatro bloques medidos (import+sync 15, `handleSave` 22, bulk-edit/delete 23).
+- Se movió **verbatim**; el único ajuste fue tipar `enqueueMutation` como
+  `Promise<OfflineMutation>` y `fetchData` como `FetchDataFn`, ambos tipos reales ya
+  existentes, en vez de inventar firmas.
+
+`InventoryDashboard.tsx`: **1.773 → 1.549 líneas** (acumulado Fase 3: 2.081 → 1.549, −26%).
+
+**Red de seguridad nueva**: `tests/perf/importcheck.cjs` recorre la ruta completa por la
+UI —cambiar a *Incidencias & FRC*, abrir el modal, pegar un TSV, analizar y confirmar— y
+exige dos señales sólidas: que aparezca el aviso de consolidación (el handler procesó las
+filas) y que el modal se cierre (su `onClose` sólo corre tras resolver el `await
+onImportConfirmed`, luego no lanzó).
+
+Dos correcciones de método en esa prueba, por aserciones que engañaban:
+
+- **No buscar el SKU importado en la tabla.** En modo demostración, al cambiar de vista los
+  `items` de `main` siguen en estado y la carga de datos de `events` no ocurre, así que la
+  tabla no refleja la inserción. La aserción habría fallado por una limitación del modo
+  demo, no por el refactor.
+- **No exigir el aviso final.** Se autodesvanece antes de una instantánea fiable.
+
 ### Fase 4 — Puerta única de persistencia (**iniciada**)
 
 Corrección de la premisa del plan: **no son "20 archivos saltándose `STORAGE_KEYS`"**.

@@ -381,13 +381,14 @@ PR. Node 22. Sin secrets.
 2. **Fase 2** — migrar los 11 archivos del patrón `props.X ?? dashboard.X` a leer solo
    del contexto. La lista está en `eslint.config.mjs` (`overrides`) y **solo puede
    encoger**.
-3. **Fase 3** — extracción de hooks. **`useInventoryData` y `useTableGrouping` HECHOS**
-   (ver `ROADMAP.md`; `InventoryDashboard.tsx` 2.081 → 1.773 líneas). Quedan
-   `useDashboardViewState`, `useInventoryActions` y `useDashboardModals`. Al abordar
-   `useInventoryActions`, la interfaz del hook sería de ~23 parámetros (medido), señal de
-   que traslada el problema de archivo en vez de reducir acoplamiento; por la escalera de
-   Ponytail conviene seguir cortando por sub-bloques cohesionados y no en bloque. El arnés
-   `mutcheck.cjs` ya da red de seguridad a esas rutas.
+3. **Fase 3** — extracción de hooks. **`useInventoryData`, `useTableGrouping` y
+   `useInventoryIngestion` HECHOS** (ver `ROADMAP.md`; `InventoryDashboard.tsx`
+   2.081 → 1.549 líneas, −26%). Quedan `useDashboardViewState`, `useInventoryActions`
+   y `useDashboardModals`. Al abordar `useInventoryActions`, la interfaz del hook sería de
+   ~23 parámetros (medido), señal de que traslada el problema de archivo en vez de reducir
+   acoplamiento; por la escalera de Ponytail conviene seguir cortando por sub-bloques
+   cohesionados y no en bloque (los cortes ya hechos iban de 9 y 15 parámetros). Los arneses
+   `mutcheck.cjs` e `importcheck.cjs` dan red de seguridad a esas rutas.
 4. **Fase 4** — los 8 `JSON.parse` de `lib/sheets.ts` son **respuestas de red**, no
    almacenamiento local; validarlas con esquema es trabajo aparte y se dejó fuera de
    alcance a propósito.
