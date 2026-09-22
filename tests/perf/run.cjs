@@ -57,16 +57,32 @@ function get(url) {
     if (b.status !== 0) process.exit(b.status || 1);
   }
 
-  const preview = spawn('npm', ['run', 'preview', '--', '--port', String(PORT), '--strictPort'],
-    { cwd: ROOT, stdio: ['ignore', 'ignore', 'ignore'] });
-  const killAll = code => { try { preview.kill('SIGKILL'); } catch (e) {} process.exit(code); };
+  // Se fuerza host IPv4 explicito: el host por defecto de vite (`localhost`)
+  // puede resolver a ::1 y dejar inalcanzable la sonda a 127.0.0.1.
+  const preview = spawn('npm',
+    ['run', 'preview', '--', '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'],
+    { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+  let previewLog = '';
+  preview.stdout.on('data', d => { previewLog += d.toString(); });
+  preview.stderr.on('data', d => { previewLog += d.toString(); });
+
+  let exited = false;
+  preview.on('exit', () => { exited = true; });
+  const killAll = code => {
+    try { preview.kill('SIGKILL'); } catch (e) {}
+    process.exit(code);
+  };
 
   // Espera a que el preview acepte conexiones; si no, no tiene sentido seguir.
   let up = false;
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 90 && !exited; i++) {
     try { await get(BASE); up = true; break; } catch (e) { await sleep(500); }
   }
-  if (!up) { console.error(`El preview no respondio en ${BASE}`); killAll(1); }
+  if (!up) {
+    console.error(`El preview no respondio en ${BASE}${exited ? ' (el proceso termino)' : ''}`);
+    if (previewLog.trim()) console.error('--- salida del preview ---\n' + previewLog.trim());
+    killAll(1);
+  }
 
   const failed = [];
   for (const h of HARNESSES) {
