@@ -1,11 +1,14 @@
 # Plan de Reforma Arquitectónica
 
-Estado: **Fases 0 y 2 completadas**; Fase 1 (1.3 en curso), 5 (red del invariante de conteo
-puesta), 6 (primer corte hecho), 3–4 pendientes. Deuda `any`
+Estado: **Fases 0, 2 y 4 completadas**; Fase 5 en curso (2 cortes hechos), Fase 6 con el
+primer corte hecho, Fases 1.3 y 3 pendientes. Deuda `any`
 saldada en todo `src`: **1 solo `any`** declarado (la firma de índice de `SheetRecord`,
 justificada abajo). Riesgo `xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
 Protocolo Ponytail: cada fase busca el código mínimo efectivo, sin dependencias nuevas salvo justificación explícita.
+
+> **Para retomar mañana, leer directamente «Punto de arranque» al final del documento.**
+> Ahí está el estado exacto, lo verificado y cuál es el siguiente corte con su medición.
 
 ---
 
@@ -1456,3 +1459,100 @@ intencional.
 
 Verificación del corte: `tsc` sin errores · `eslint` 0 errores / 16 warnings preexistentes ·
 **170 + 10 + 18 pruebas** (198; +18 de la sección 18) · **12 arneses E2E** en verde.
+
+---
+
+## Punto de arranque (2026-09-19, cierre de jornada)
+
+Sección pensada para leer primero mañana. Resume qué está hecho, qué está verificado y por
+dónde sigue el trabajo, sin tener que reconstruirlo leyendo todo el documento.
+
+### Dónde está el repo
+
+| | |
+| --- | --- |
+| Rama | `main`, árbol limpio |
+| Último commit | `f5a04f4` — corte 2 de Fase 5 (`countAggregation.ts`) |
+| CI | `verify.yml` verde en `9e7abe7`, `f5a04f4` y anteriores |
+| Gate actual | `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **206 + 10 + 18 = 234 pruebas** · **12 arneses E2E** |
+
+Commits de la jornada, de más reciente a más antiguo:
+
+1. `f5a04f4` — `refactor(conteo)`: agregación del conteo a `countAggregation.ts` (Fase 5, corte 2).
+2. `9e7abe7` — `refactor(storage)`: helper `isDemoMode()` (hallazgo 3 de la auditoría Ponytail).
+3. `f17fcdc` — `docs(auditoria)`: barrido Ponytail.
+4. `5334eed` — `test(count)`: cuadratura, sync a VENCIMIENTOS y modo BLIND.
+5. `e4e0e64` — `refactor(count)`: motor de campañas a `campaignUtils.ts` (Fase 5, corte 1).
+
+### Lo hecho hoy, en una línea cada cosa
+
+- **Auditoría Ponytail cerrada**, con 6 hallazgos y evidencia. En `ROADMAP.md`.
+- **`isDemoMode()`**: la definición de "no hay backend" estaba escrita igual en 5 sitios; ahora
+  vive en `appStorage.ts` con 4 pruebas que fijan el contrato (ausente, vacío, solo espacios,
+  URL real). Verificada por mutación: quitar el `.trim()` rompe el caso de espacios.
+- **Fase 5, corte 2** — el trabajo principal de la jornada. Detalle en su sección.
+
+### El resultado que más importa para mañana: medir antes de cortar
+
+Al encarar `StockCountTerminal.tsx` el impulso natural era partir el JSX en componentes
+(móvil / escritorio). **Se midió y se descartó**: 43 y 65 identidades del padre
+respectivamente. Quedó como método, no como anécdota:
+
+> Antes de extraer un bloque de render, contar cuántas identidades del padre necesita.
+> Por encima de ~10-15 props, el componente resultante es **peor** que el JSX inline:
+> traslada el acoplamiento a una interfaz en vez de reducirlo. La costura suele estar en
+> la **lógica pura**, no en la presentación.
+
+El corte que sí se hizo sacó ~200 líneas de lógica de agregación con interfaz estrecha
+(entra sesión + filtros, sale filas) y **sin cobertura previa**.
+
+### Lo que sigue, medido y en orden de valor
+
+1. **Fase 5, corte 3 — `CampaignConsolidationDashboard.tsx` (1.399 líneas).** Mismo método:
+   medir superficies de props antes de tocar nada; buscar la lógica pura (la consolidación
+   por CU_VC ya está en `campaignUtils.ts`, así que probablemente queden los cálculos de
+   presentación y los filtros de la matriz). Útil: `countAggregation.ts` es la plantilla del
+   patrón que funcionó — funciones puras, un `export interface` por forma de salida, pruebas
+   en sección nueva de `test-modules.ts`.
+2. **Fase 6 — medir el bundle restante.** El arranque ya bajó de 457 a 355 KB gzip al sacar
+   `html5-qrcode`. Queda por ver si hay más peso diferible. **No añadir `manualChunks` sin
+   medir antes** (regla explícita de la fase).
+3. **Hallazgos Ponytail que quedaron fuera** (limpieza oportunista, no bloquean nada):
+   - Escrituras directas a `SHEET_CONFIG` fuera de `appStorage`: 3 sitios reales
+     (`useInventoryData.ts:193` y `:208`, `InventoryDashboard.tsx:351`). El de
+     `useOfflineSync.ts:208` es una **lectura**, no una escritura: no cuenta.
+   - `!isBlind` duplicado entre la vista móvil y la de escritorio del terminal.
+   - `printcheck.cjs`: arnés huérfano (no está en la puerta de CI) y **no asserta** (siempre
+     `exit 0`). Decidir si se convierte en aserción o se elimina.
+4. **Fases 1.3 y 3** — cerrar lo que quedó a medias sin abrir frente nuevo.
+   En Fase 3 quedan `useDashboardViewState`, `useInventoryActions` y `useDashboardModals`.
+   Ojo: al medir `useInventoryActions` la interfaz daba ~23 parámetros, señal de que traslada
+   el problema en vez de reducir acoplamiento. Cortar por sub-bloques cohesionados (los ya
+   hechos fueron de 9, 13 y 15), no en bloque.
+
+### Deuda y trampas conocidas (no reabrir sin síntoma real)
+
+- **1 solo `any`** en todo `src`: la firma de índice de `SheetRecord`. Es deliberada
+  (heterogeneidad de columnas); cerrarla a unión produjo ~15 errores en cascada y se revirtió.
+- **`xlsx`** viene de un artifact vendorizado (`vendor/xlsx-0.20.3.tgz`). No cambiar por
+  `xlsx@latest` ni alias npm: la de npm es 0.18.5, vulnerable y sin fix.
+- **Los 8 `JSON.parse` de `lib/sheets.ts`** son respuestas de red, no almacenamiento local.
+  Validarlas con esquema quedó fuera de alcance a propósito (Fase 4).
+- **`React.lazy` de los modales del escáner**: descartado a propósito. El terminal de
+  pistoleo conserva `sessionScans` al cerrarse; montarlo condicionalmente perdería la sesión
+  de conteo a medio turno.
+- **Regla de push**: `git push origin main` y nada más. No empujar el mismo commit a una
+  segunda rama; no dejar ramas de PR tras el merge.
+- **`git push` pide contraseña** si el token del remote quedó viejo. Se arregla con
+  `git remote set-url origin "https://${GITHUB_TOKEN}@github.com/rps2217/controldevencimientos.git"`.
+
+### Cómo verificar antes de commitear
+
+```bash
+npm run verify        # tsc + eslint + unitarias. Se corre en cada paso.
+npm run verify:all    # + build + 12 arneses E2E. Obligatorio antes de commitear.
+```
+
+Tarda varios minutos: conviene lanzarlo en segundo plano y escribir el `EXIT=` a un log
+(el patrón usado hoy), porque la salida final se pierde si la consola corta.
+

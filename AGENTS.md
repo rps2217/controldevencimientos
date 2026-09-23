@@ -45,11 +45,14 @@ El proyecto sigue una estructura modular limpia construida en **React 18+**, **T
     │   ├── useOfflineSync.ts     # Hook de sincronización y vaciado de cola offline
     │   └── useColumnResize.ts    # Manejo interactivo del ancho de columnas
     ├── utils/
-    │   ├── appStorage.ts        # Fuente única de claves de localStorage (STORAGE_KEYS) y migración
+    │   ├── appStorage.ts        # Fuente única de claves de localStorage (STORAGE_KEYS), migración e isDemoMode()
     │   ├── columnAliases.ts      # Motor de detección semántica de encabezados de columnas
     │   ├── pureCalculations.ts   # Cálculos puros y parsing de fechas y métricas (Zero-DOM/Web Worker compatible)
     │   ├── universalImporter.ts  # Parser universal de Excel/CSV/TSV y motor de auto-mapeo semántico
-    │   └── dateCalculations.tsx  # Badges de UI, iconos y renderizado de estados
+    │   ├── dateCalculations.tsx  # Badges de UI, iconos y renderizado de estados
+    │   ├── stockCountUtils.ts    # Motor de sesiones de conteo, cuadratura y exportación
+    │   ├── campaignUtils.ts      # Motor de campañas de inventario cíclico (separado del de sesiones)
+    │   └── countAggregation.ts   # Agregación pura del conteo: agrupación, KPIs, filtros (sin React)
     └── components/
         ├── InventoryDashboard.tsx# Vista principal de control y filtrado de inventario
         ├── views/
@@ -199,6 +202,17 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
   - **Exportación de Acta de Cierre Oficial (.xlsx)**: Genera el informe final consolidado con desglose por mueble y auditoría.
   - **Lanzador de 2da Vuelta Directa**: Crea automáticamente una sesión de conteo focalizada en los SKUs descuadrados.
 
+### N. Modularización del Conteo por Dominio (Fase 5)
+- **`src/utils/stockCountUtils.ts`**: solo el **ciclo de sesión** de conteo —`reconcileStockCountSession`, `buildVencimientosRowFromCount`, `generateCuVc`, la persistencia de sesiones y la exportación a Excel—.
+- **`src/utils/campaignUtils.ts`**: el **ciclo de campaña** completo (13 exports, ~680 líneas): `importPharmacySnapshotToCampaign`, `computeCampaignConsolidationMatrix`, la separación de aguas, reportes, actas y su persistencia. Se separó porque tenía **cero acoplamiento** con el resto y **cero consumidores internos**.
+- **`src/utils/countAggregation.ts`**: la **agregación pura del conteo**, sin React. Ocho funciones que antes eran `useMemo` dentro de `StockCountTerminal.tsx` (~200 líneas) y no tenían cobertura:
+  - `groupSkuEntries` / `filterGroupedEntries` / `filterChronoEntries` — agrupan y filtran las lecturas. **Agrupan por `SKU`, no por `CU_VC`**: dos meses del mismo SKU se ven como un solo grupo. El motor de cuadratura sí separa por `CU_VC`, así que son criterios distintos a propósito.
+  - `getLastScannedItem` — acumulado de la última lectura. Depende del orden de `conteos`: el terminal inserta al frente, así que `conteos[0]` es la más reciente.
+  - `computeReconciliationMetrics` — KPIs. El teórico incluye `ajusteMovimiento` (ventas del turno), que es lo que hace cuadrar la diferencia neta con la operación real y no con el snapshot congelado. La cobertura usa `|| 1` en el denominador para no dar `NaN` con sesión vacía.
+  - `getReconciliationProviders` / `filterReconciliation` / `getPendingItems` — proveedores distintos, filtros de estado y proveedor (`DIF` = todo lo que no está cuadrado, **no** solo faltantes), y checklist de pendientes (`teorico > 0 && contado === 0`).
+  - `StockCountReconciliationView` ya no declara `ReconciliationFilter` ni `ReconciliationMetrics`: los importa de este módulo.
+- **`isDemoMode()` en `appStorage.ts`**: fuente única de "no hay backend configurado" (`!localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim()`). Estaba escrita idéntica en 5 sitios. El `.trim()` no es adorno: `SCRIPT_URL` con solo espacios es modo demo.
+
 ---
 
 ## 4. Integración con Google Sheets y Google Apps Script
@@ -275,6 +289,23 @@ Esta sección es memoria para el próximo agente. El **plan vigente es `ROADMAP.
 (fases 0–6) y manda sobre `PLAN_CONTINUIDAD.md`, que describe una auditoría Ponytail
 anterior ya absorbida. Antes de escribir código, leer `ROADMAP.md`; la escalera de
 Ponytail (§5) sigue siendo obligatoria.
+
+> **Retomar el trabajo**: la sección **«Punto de arranque»** al final de `ROADMAP.md` tiene
+> el estado exacto (rama, último commit, gate), lo hecho y el siguiente corte medido.
+> Es lo primero que hay que leer. Esta sección §7 queda para comandos y trampas.
+
+### Método al dividir monolitos (aprendido en la Fase 5)
+
+Al extraer un bloque de render a un componente, **medir antes cuántas identidades del padre
+necesita**. En `StockCountTerminal.tsx` los bloques móvil y escritorio pedían 43 y 65; un
+componente con esa superficie de props es peor que el JSX inline, porque traslada el
+acoplamiento a una interfaz en vez de reducirlo. Se descartó por el escalón 7. La costura
+rentable suele estar en la **lógica pura** (entra estado, salen filas), no en la presentación.
+
+Plantilla del patrón que funcionó: `src/utils/countAggregation.ts` — funciones puras, un
+`export interface` por forma de salida, sus pruebas en una sección propia de
+`test-modules.ts`. Y **verificar cada prueba nueva por mutación**: en el corte 2, una prueba
+pasaba en vacío porque el fixture no distinguía los dos criterios de agrupación posibles.
 
 ### Comandos
 
@@ -415,12 +446,17 @@ PR. Node 22. Sin secrets. El job `e2e` usa el Google Chrome preinstalado del run
    conviene seguir cortando por sub-bloques cohesionados y no en bloque (los cortes ya hechos
    iban de 9, 13 y 15 parámetros). Los arneses `mutcheck.cjs`, `importcheck.cjs` y
    `bulkcheck.cjs` dan red de seguridad a esas rutas.
-4. **Fase 4** — los 8 `JSON.parse` de `lib/sheets.ts` son **respuestas de red**, no
-   almacenamiento local; validarlas con esquema es trabajo aparte y se dejó fuera de
-   alcance a propósito.
-5. **Fases 5 y 6** — dividir monolitos y rendimiento/empaquetado. No añadir
-   `manualChunks` sin medir antes.
-6. **Deuda `any` de `src`: CERRADA (2026-09-23)**. Queda **1** `any` declarado, la firma
+4. **Fase 4 — CERRADA (2026-09-19)**: sus tres pendientes (caché por pestaña, `JSON.parse`
+   de `lib/sheets.ts`, y los 2 accesos directos a `localStorage`) ya tenían guarda aguas
+   arriba o `try/catch` en el mismo sitio. Al auditarla se encontró y cerró un hueco de más
+   peso: los arneses E2E eran utilidades manuales y **ninguno corría en CI**, así que toda la
+   evidencia de "no perder datos" solo se ejecutaba si alguien se acordaba. Hoy corren como
+   job `e2e`.
+5. **Fases 5 y 6** — dividir monolitos y rendimiento/empaquetado. Fase 5 lleva 2 cortes
+   (`campaignUtils.ts`, `countAggregation.ts`); Fase 6 sacó `html5-qrcode` del chunk de
+   arranque (457 → 355 KB gzip). **No añadir `manualChunks` sin medir antes.**
+   Método y siguiente corte en «Punto de arranque» de `ROADMAP.md`.
+6. **Deuda `any` de `src`: CERRADA (2026-09-19)**. Queda **1** `any` declarado, la firma
    de índice de `SheetRecord` (`types.ts`), deliberada por la heterogeneidad de columnas
    (invariante §6.5); su cierre a unión produjo ~15 errores en cascada y se revirtió. No
    reabrir sin un síntoma real. Detalle y barrido por archivo en `ROADMAP.md`.
