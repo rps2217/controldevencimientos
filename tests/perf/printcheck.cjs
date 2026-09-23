@@ -3,6 +3,20 @@
  * que el ticket esta montado con contenido en el momento del disparo. Gatear el
  * montaje de TicketPrintView no debe romper la impresion (el DOM debe existir
  * antes de window.print()).
+ *
+ * Existe porque esta ruta no tenia arnes en la puerta: `printcheck` solo imprimia
+ * logs y siempre salia 0, asi que no podia fallar. Convertido en aserciones y
+ * promovido a la puerta; validado por mutacion (gatear el montaje con el estado
+ * pendiente hace caer las dos comprobaciones del ticket).
+ *
+ * Verifica:
+ *   1. La tabla lista filas y se puede seleccionar una.
+ *   2. La barra de acciones masivas ofrece el boton de imprimir.
+ *   3. window.print() se dispara exactamente una vez.
+ *   4. El ticket existe en el DOM en el instante del disparo.
+ *   5. El ticket tiene contenido renderizado (no monta vacio).
+ *
+ * Uso: node printcheck.cjs <url>
  */
 const { spawn } = require('child_process');
 const http = require('http');
@@ -56,8 +70,11 @@ function req(method, urlPath) {
   for(let i=0;i<120;i++){ if(await ev(`!!document.querySelector('[title="Abrir Panel Lateral de Control, Densidad y Vistas"]')`)) break; await sleep(250);}
   await sleep(3000);
 
+  const results = [];
+  const push = (paso, ok, detalle) => results.push({ paso, ok, detalle });
+
   const rows = await ev(`document.querySelectorAll('tbody tr').length`);
-  console.log('filas en tabla:', rows);
+  push('la tabla de inventario lista filas', rows > 0, rows);
 
   // Seleccionar la primera fila con su checkbox.
   const selected = await ev(`(() => {
@@ -67,7 +84,8 @@ function req(method, urlPath) {
     return true;
   })()`);
   await sleep(600);
-  console.log('checkbox de fila pulsado:', selected, '| seleccionadas:', await ev(`[...document.querySelectorAll('tbody tr input[type=checkbox]')].filter(c=>c.checked).length`));
+  const checked = await ev(`[...document.querySelectorAll('tbody tr input[type=checkbox]')].filter(c=>c.checked).length`);
+  push('se puede seleccionar una fila para imprimir', selected === true && checked > 0, checked);
 
   // Buscar boton de imprimir en la barra flotante de acciones masivas.
   const printBtn = await ev(`(() => {
@@ -77,15 +95,26 @@ function req(method, urlPath) {
     const r = b.getBoundingClientRect();
     return { x: r.left + r.width/2, y: r.top + r.height/2, label: (b.getAttribute('title')||b.textContent||'').trim().slice(0,40) };
   })()`);
-  console.log('boton imprimir:', printBtn ? printBtn.label : 'NO ENCONTRADO');
+  push('la barra de acciones masivas ofrece el boton de imprimir', !!printBtn, printBtn && printBtn.label);
 
   if (printBtn) {
     for (const type of ['mousePressed','mouseReleased']) {
       await send('Input.dispatchMouseEvent', { type, x: printBtn.x, y: printBtn.y, button: 'left', clickCount: 1 });
     }
     await sleep(400);
-    const probe = await ev('JSON.stringify({calls: window.__printCalls, probe: window.__printProbe})');
-    console.log('resultado al disparar print:', probe);
   }
-  try{ws.close();}catch(e){} die(0);
+  const probe = await ev('JSON.stringify({calls: window.__printCalls, probe: window.__printProbe})');
+  const { calls, probe: p } = JSON.parse(probe);
+  // El invariante caro: el ticket debe existir en el DOM CON contenido en el
+  // instante del disparo. Gatear su montaje lo rompe; esto lo detecta.
+  push('window.print() se dispara al pulsar imprimir', calls === 1, calls);
+  push('el ticket existe en el DOM en el momento del disparo', !!(p && p.exists), p && p.exists);
+  push('el ticket tiene contenido renderizado (no monta vacio)',
+    !!(p && p.visibleText && p.visibleText.length > 0 && p.rowCount > 0),
+    p && { texto: (p.visibleText||'').slice(0,60), filas: p.rowCount });
+
+  console.log(JSON.stringify({ resultados: results }, null, 2));
+  const passed = results.every(r => r.ok);
+  console.log(passed ? 'RESULTADO: OK' : 'RESULTADO: FALLO');
+  try{ws.close();}catch(e){} die(passed ? 0 : 1);
 })().catch(e => { console.error('Fallo:', e.message); process.exit(1); });

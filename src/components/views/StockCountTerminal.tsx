@@ -12,6 +12,7 @@ import { MobileErpSnapshotView } from './MobileErpSnapshotView';
 import { StockCountReconciliationView } from './StockCountReconciliationView';
 import { StockCountSessionsListView, NewSessionConfig } from './StockCountSessionsListView';
 import { CountNumpad } from './CountNumpad';
+import { CampaignSkuErpBadge } from '../campaign/CampaignSkuBadges';
 import { MobileReadingsList } from './MobileReadingsList';
 import { LastScannedHeroCard } from './LastScannedHeroCard';
 import { MobileExpiryPrompt, MONTHS_LIST } from './MobileExpiryPrompt';
@@ -1502,15 +1503,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                                 <span className="truncate">{selectedProductDesc}</span>
                               </div>
-                              {!isBlind && (campaignSkuStats?.inErp ? (
-                                <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 rounded-lg text-[10px] font-black shrink-0">
-                                  ERP: {campaignSkuStats.stockTeorico} un
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 rounded-lg text-[10px] font-black shrink-0">
-                                  Hallazgo Físico
-                                </span>
-                              ))}
+                              {!isBlind && <CampaignSkuErpBadge stats={campaignSkuStats} />}
                             </div>
 
                             {/* Campaign Status Pill Bar */}
@@ -1962,15 +1955,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                               <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 truncate">
                                 ✓ {selectedProductDesc}
                               </span>
-                              {!isBlind && (campaignSkuStats?.inErp ? (
-                                <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 rounded text-[10px] font-black shrink-0">
-                                  ERP: {campaignSkuStats.stockTeorico} un
-                                </span>
-                              ) : (
-                                <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 rounded text-[10px] font-black shrink-0">
-                                  Hallazgo
-                                </span>
-                              ))}
+                              {!isBlind && <CampaignSkuErpBadge stats={campaignSkuStats} compact />}
                               {!isBlind && campaignSkuStats && campaignSkuStats.diferencia !== null && (
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-black shrink-0 ${
                                   campaignSkuStats.diferencia === 0

@@ -60,7 +60,8 @@ El proyecto sigue una estructura modular limpia construida en **React 18+**, **T
         │   └── SchemaEditorView.tsx# Vista de configuración y mapeo de esquema de columnas
         ├── campaign/
         │   ├── CampaignMatrixTable.tsx # Pestaña MATRIX de la consolidación de campaña (tabla, filtros, ajuste de venta)
-        │   └── CampaignKpiSemaphore.tsx # Semáforo de 4 estados, cobertura y muebles consolidados de la campaña
+        │   ├── CampaignKpiSemaphore.tsx # Semáforo de 4 estados, cobertura y muebles consolidados de la campaña
+        │   └── CampaignSkuBadges.tsx # Badge ERP/Hallazgo compartido entre la vista móvil y de escritorio del terminal
         ├── modals/
         │   ├── GlobalConfigModal.tsx # Configuración global y credenciales
         │   ├── UniversalImportModal.tsx # Ingestión universal asistida (Excel, CSV, TSV, Portapapeles)
@@ -216,6 +217,7 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
   - `filterAuditRows` — aplica estado, proveedor y búsqueda (SKU, descripción o proveedor) sobre las filas ya consolidadas.
 - **`src/components/campaign/CampaignMatrixTable.tsx`**: la pestaña **MATRIX** de la consolidación (tabla, barra de filtros, buscador, ajuste de venta por fila). Se extrajo del dashboard en la Fase 5, corte 3: 15 props, todas de datos o callbacks existentes.
 - **`src/components/campaign/CampaignKpiSemaphore.tsx`**: el **semáforo de 4 estados**, la cobertura global y los muebles consolidados de la campaña. Se extrajo en el corte 4: 7 props. Incluye su propia guarda `if (!matrix) return null`, así que el padre no lo envuelve en condicional.
+- **`src/components/campaign/CampaignSkuBadges.tsx`**: el badge de **stock teórico del ERP / hallazgo físico** del terminal de conteo, antes duplicado entre la vista móvil y la de escritorio (`StockCountTerminal.tsx`). `CampaignSkuErpBadge` toma `stats` (`inErp`, `stockTeorico`) y `compact` para la variante de escritorio. El badge de *diferencia* que lo acompaña **no** se unificó: cada vista tenía su propio formato (emoji+verbo vs. signo) y un solo consumidor (YAGNI).
 - **`src/utils/countAggregation.ts`**: la **agregación pura del conteo**, sin React. Ocho funciones que antes eran `useMemo` dentro de `StockCountTerminal.tsx` (~200 líneas) y no tenían cobertura:
   - `groupSkuEntries` / `filterGroupedEntries` / `filterChronoEntries` — agrupan y filtran las lecturas. **Agrupan por `SKU`, no por `CU_VC`**: dos meses del mismo SKU se ven como un solo grupo. El motor de cuadratura sí separa por `CU_VC`, así que son criterios distintos a propósito.
   - `getLastScannedItem` — acumulado de la última lectura. Depende del orden de `conteos`: el terminal inserta al frente, así que `conteos[0]` es la más reciente.

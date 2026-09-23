@@ -1758,6 +1758,71 @@ puede caber con cabecera inline. Si en un corte futuro se desea, la medida ya es
 
 
 
+## Auditoría Ponytail (2026-09-19) — limpieza oportunista + medición de Fase 6
+
+Corte de cierre de los dos hallazgos baratos de la lista de pendientes ('hallazgos Ponytail
+que quedaron fuera') y de la medición que pedía la Fase 6. Sin frente nuevo.
+
+### 1. Badge de campaña des-duplicado (`CampaignSkuBadges.tsx`)
+
+- **Qué se unificó**: el badge de stock teórico del ERP / hallazgo físico. Estaba copiado casi
+  literal en la vista móvil y en la de escritorio de `StockCountTerminal.tsx`, dentro de
+  `{!isBlind && (campaignSkuStats?.inErp ? ... : ...)}`. Extraído a `CampaignSkuErpBadge` con
+  la prop `compact` para la variante de escritorio.
+- **Qué NO se unificó, a propósito**: el badge de *diferencia* que acompaña a cada uno. La vista
+  móvil usa emoji y verbo (`🟢 Cuadrado`, `🟡 Sobran +n`, `🔴 Faltan n`, colores `-200`, y solo
+  en el pill bar bajo la descripción); la de escritorio usa el signo (`+n`, colores `-100`,
+  inline). Cada uno vive en una sola vista, así que unificarlo habría sido una abstracción con
+  dos modos para un solo consumidor: se dejó duplicado (YAGNI).
+- **Trampa encontrada y evitada**: el bloque móvil de diferencia parecía parte del pill bar,
+  pero el arreglo correcto era sustituir solo el badge ERP. Un primer intento de reescribir
+  también el bloque de diferencia desalineó el cierre JSX; revertido.
+- **Validación por mutación**: forzar `inErp=false` en el componente compartido hace caer
+  `DOCUMENT SI muestra el stock teorico del ERP (control positivo)` en `blindcheck.cjs`
+  (móvil y escritorio comparten el mismo punto). Restaurado, verde otra vez.
+
+### 2. `printcheck.cjs` promovido a la puerta
+
+- **Qué era**: un arnés que corría a mano, imprimía diagnósticos por consola y **siempre** salía
+  `exit 0`; no podía fallar. Estaba fuera de la lista `HARNESSES` de `run.cjs`.
+- **Por qué no se eliminó**: recorría una ruta viva (`FloatingBulkActionBar` → `handlePrintTicket`
+  → `TicketPrintView`) y producía datos útiles (`window.__printCalls=1`, root montado, texto).
+  Solo le faltaba asertar.
+- **Qué se hizo**: 5 aserciones (tabla lista y seleccionable; barra ofrece imprimir; `print()`
+  se dispara 1 vez; el ticket existe en el DOM en el instante del disparo; el ticket tiene
+  contenido, no monta vacío) y entrada a `HARNESSES`. La puerta pasó de 13 a 14 arneses.
+- **Validación por mutación**: gatear el montaje de `TicketPrintView` con `itemsToPrintList.length > 0`
+  (el estado *pendiente*, justo el bug que el arnés debe detener) hace caer las dos aserciones
+  del ticket y da `RESULTADO: FALLO` / `exit 1`. Restaurado, verde.
+
+### 3. Fase 6 — medición del bundle (sin cambios de config)
+
+Medición con `manualChunks` temporal **solo para atribuir peso**, revertido tras medir (la regla
+de la fase prohíbe añadir `manualChunks` sin medir antes). Resultado del arranque (entrada
+`index-vxHktdJW.js`, 353,20 KB gzip) + su chunk estático compartido:
+
+| Origen | Tamaño gzip |
+|---|---|
+| React + ReactDOM + scheduler | 69,45 KB |
+| motion | 42,38 KB |
+| zod | 26,61 KB |
+| react-router | 13,92 KB |
+| lucide-react | 10,28 KB |
+| (resto: app, contextos, estilos) | ~190,12 KB |
+
+**Conclusión medida (no aplicada):** partirlos con `manualChunks` **no reduce el arranque**;
+solo reparte el mismo peso en más ficheros (190 + 69 + 42 + 27 + 14 + 10 ≈ 352 KB ≈ 353 KB).
+El orden de carga no cambia. Lo único que bajaría arranque de verdad es hacer *lazy* un
+consumidor, y los candidatos no lo permiten hoy: `motion` lo usan `ConfirmDialog` y
+`ToastContainer` (montados en el árbol raíz; su import debe subir al arranque) y `zod` valida
+la config persistida antes de renderizar. `xlsx` (163,12 KB) y `html5-qrcode`
+(`index-rt81CstL.js`, 110,58 KB) **ya son diferibles** por `await import`.
+**Recomendación:** no tocar `manualChunks`; el arranque ya está razonablemente diferido. Si
+algún día se quiere bajar más, el costo es real (lazy de un consumidor raíz) y hay que decidirlo
+con el usuario antes.
+
+---
+
 ## Punto de arranque (2026-09-19, cierre de jornada)
 
 Sección pensada para leer primero mañana. Resume qué está hecho, qué está verificado y por
@@ -1770,7 +1835,11 @@ dónde sigue el trabajo, sin tener que reconstruirlo leyendo todo el documento.
 | Rama | `main` |
 | Último commit | cortes 3 y 4 de Fase 5 (`CampaignMatrixTable.tsx`, `CampaignKpiSemaphore.tsx`) |
 | CI | `verify.yml` verde sobre los commits previos |
-| Gate actual | `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **234 + 10 + 18 = 262 pruebas** · **13 arneses E2E** |
+| Gate actual | `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **234 + 10 + 18 = 262 pruebas** · **14 arneses E2E** |
+
+Pendiente de commit en la jornada de cierre (sin frente nuevo): badge de campaña des-duplicado
+(`CampaignSkuBadges.tsx`), `printcheck.cjs` promovido a la puerta con aserciones, y la medición
+de Fase 6. Detalle en "limpieza oportunista + medición de Fase 6".
 
 Commits de la jornada, de más reciente a más antiguo:
 
@@ -1815,16 +1884,27 @@ El corte que sí se hizo sacó ~200 líneas de lógica de agregación con interf
    **Lo que queda en el padre**: la cabecera (195 líneas, 16 identidades — por encima del
    umbral) y `SNAPSHOT_UPLOAD` (125 líneas, 11 identidades), ambos extraíbles si se desea.
    La medida de cada uno ya está tomada.
-2. **Fase 6 — medir el bundle restante.** El arranque ya bajó de 457 a 355 KB gzip al sacar
-   `html5-qrcode`. Queda por ver si hay más peso diferible. **No añadir `manualChunks` sin
-   medir antes** (regla explícita de la fase).
+2. **Fase 6 — medir el bundle restante.** ✅ **Medido** (2026-09-19, ver "limpieza oportunista +
+   medición de Fase 6"). El arranque son **353 KB gzip** (entry + un chunk estático compartido).
+   **`manualChunks` no reduce**: solo reparte el mismo peso. `xlsx` y `html5-qrcode` ya son
+   diferibles; `motion` y `zod` no pueden serlo sin *lazy* de un consumidor raíz. Recomendación:
+   no tocar la config.
 3. **Hallazgos Ponytail que quedaron fuera** (limpieza oportunista, no bloquean nada):
    - Escrituras directas a `SHEET_CONFIG` fuera de `appStorage`: 3 sitios reales
      (`useInventoryData.ts:193` y `:208`, `InventoryDashboard.tsx:351`). El de
      `useOfflineSync.ts:208` es una **lectura**, no una escritura: no cuenta.
-   - `!isBlind` duplicado entre la vista móvil y la de escritorio del terminal.
-   - `printcheck.cjs`: arnés huérfano (no está en la puerta de CI) y **no asserta** (siempre
-     `exit 0`). Decidir si se convierte en aserción o se elimina.
+   - `!isBlind` duplicado entre la vista móvil y la de escritorio del terminal. ✅ **Resuelto
+     (2026-09-19)**, y la duplicación era mayor que el solo `!isBlind`: el markup completo del
+     badge ERP/Hallazgo estaba copiado en las dos vistas. Extraído a `CampaignSkuErpBadge`
+     (`src/components/campaign/CampaignSkuBadges.tsx`). El badge de *diferencia* que lo
+     acompañaba en cada vista usa colores, formato y texto distintos (emoji+verbo vs. signo) y
+     solo se usa en su propia vista: unificarlo habría sido abstracción de un solo uso, así que
+     se dejó duplicado a propósito (YAGNI). Validado por mutación: forzar `inErp=false` hace
+     caer `DOCUMENT SI muestra el stock teorico del ERP` en `blindcheck.cjs`.
+   - `printcheck.cjs`: arnés huérfano (no está en la puerta de CI) y **no assertaba** (siempre
+     `exit 0`). ✅ **Resuelto (2026-09-19)**: convertido en 5 aserciones reales y promovido a la
+     puerta. Validado por mutación (gatear el montaje de `TicketPrintView` con el estado
+     pendiente hace caer las dos comprobaciones del ticket). La puerta pasó de 13 a **14 arneses**.
 4. **Fases 1.3 y 3** — cerrar lo que quedó a medias sin abrir frente nuevo.
    En Fase 3 quedan `useDashboardViewState`, `useInventoryActions` y `useDashboardModals`.
    Ojo: al medir `useInventoryActions` la interfaz daba ~23 parámetros, señal de que traslada
