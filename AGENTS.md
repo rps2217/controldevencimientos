@@ -52,11 +52,14 @@ El proyecto sigue una estructura modular limpia construida en **React 18+**, **T
     │   ├── dateCalculations.tsx  # Badges de UI, iconos y renderizado de estados
     │   ├── stockCountUtils.ts    # Motor de sesiones de conteo, cuadratura y exportación
     │   ├── campaignUtils.ts      # Motor de campañas de inventario cíclico (separado del de sesiones)
+    │   ├── campaignAggregation.ts # Agregación de la vista de consolidación de campaña (pura, sin React)
     │   └── countAggregation.ts   # Agregación pura del conteo: agrupación, KPIs, filtros (sin React)
     └── components/
         ├── InventoryDashboard.tsx# Vista principal de control y filtrado de inventario
         ├── views/
         │   └── SchemaEditorView.tsx# Vista de configuración y mapeo de esquema de columnas
+        ├── campaign/
+        │   └── CampaignMatrixTable.tsx # Pestaña MATRIX de la consolidación de campaña (tabla, filtros, ajuste de venta)
         ├── modals/
         │   ├── GlobalConfigModal.tsx # Configuración global y credenciales
         │   ├── UniversalImportModal.tsx # Ingestión universal asistida (Excel, CSV, TSV, Portapapeles)
@@ -205,6 +208,12 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
 ### N. Modularización del Conteo por Dominio (Fase 5)
 - **`src/utils/stockCountUtils.ts`**: solo el **ciclo de sesión** de conteo —`reconcileStockCountSession`, `buildVencimientosRowFromCount`, `generateCuVc`, la persistencia de sesiones y la exportación a Excel—.
 - **`src/utils/campaignUtils.ts`**: el **ciclo de campaña** completo (13 exports, ~680 líneas): `importPharmacySnapshotToCampaign`, `computeCampaignConsolidationMatrix`, la separación de aguas, reportes, actas y su persistencia. Se separó porque tenía **cero acoplamiento** con el resto y **cero consumidores internos**.
+- **`src/utils/campaignAggregation.ts`**: la **agregación de la vista de consolidación de campaña**, sin React. Cuatro funciones que antes eran `useMemo` dentro de `CampaignConsolidationDashboard.tsx`:
+  - `resolveActiveCampaign` — elige la campaña activa por id y, si no la encuentra, cae a la primera. La vista no debe quedarse en blanco con un id huérfano.
+  - `collectAllAuditRows` — une los cuatro estados de la separación de aguas en el orden canónico: discrepancias, nunca pistoleados, cuadrados, hallazgos. El orden importa para la matriz.
+  - `getAuditProviders` — proveedores distintos de las filas auditadas, ordenados, para el filtro desplegable.
+  - `filterAuditRows` — aplica estado, proveedor y búsqueda (SKU, descripción o proveedor) sobre las filas ya consolidadas.
+- **`src/components/campaign/CampaignMatrixTable.tsx`**: la pestaña **MATRIX** de la consolidación (tabla, barra de filtros, buscador, ajuste de venta por fila). Se extrajo del dashboard en la Fase 5, corte 3: 15 props, todas de datos o callbacks existentes. El resto de pestañas (`SNAPSHOT_UPLOAD`, `CAMPAIGN_SETTINGS`) siguen en el dashboard.
 - **`src/utils/countAggregation.ts`**: la **agregación pura del conteo**, sin React. Ocho funciones que antes eran `useMemo` dentro de `StockCountTerminal.tsx` (~200 líneas) y no tenían cobertura:
   - `groupSkuEntries` / `filterGroupedEntries` / `filterChronoEntries` — agrupan y filtran las lecturas. **Agrupan por `SKU`, no por `CU_VC`**: dos meses del mismo SKU se ven como un solo grupo. El motor de cuadratura sí separa por `CU_VC`, así que son criterios distintos a propósito.
   - `getLastScannedItem` — acumulado de la última lectura. Depende del orden de `conteos`: el terminal inserta al frente, así que `conteos[0]` es la más reciente.
@@ -332,7 +341,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
 | `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
-| `npm run test:e2e` | Arranca el build de producción y corre los 12 arneses de integridad (`tests/perf/run.cjs`). |
+| `npm run test:e2e` | Arranca el build de producción y corre los 13 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -360,7 +369,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 ### Arneses de medición (`tests/perf/`, requieren Chromium y un build servido)
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 12 arneses que cubren integridad de
+`npm run test:e2e` arranca el preview y corre los 13 arneses que cubren integridad de
 datos y navegación; devuelve código distinto de cero si alguno falla. El binario de Chrome
 se toma de `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`,
 etc.).
@@ -381,6 +390,7 @@ Para correr uno solo: `node tests/perf/<script>.cjs http://127.0.0.1:4173/`.
 | `scannercheck.cjs` | sí | Ciclo de vida del lector de cámara con dispositivo falso: arranque real, cierre sin fugas y reapertura. |
 | `countcheck.cjs` | sí | El debounce de 300 ms no pierde la última lectura al descargar la página. |
 | `blindcheck.cjs` | sí | En BLIND no se filtra el stock del ERP a la pantalla (par discriminante con DOCUMENT). |
+| `campaigncheck.cjs` | sí | Matriz de consolidación de campaña: clasificación de los 4 estados, filtros, búsqueda acumulada y ajuste de venta persistido (12 verificaciones). |
 | `modals.cjs` | no | Abrir modales: commits, long tasks y encabezado visible. |
 | `profile.cjs` | no | Renders reales de tabla/fila (tecleo). |
 | `printcheck.cjs` | no | Diagnóstico manual de la vista de impresión. No asserta: imprime el resultado y sale 0. No usarlo como verificación automática. |

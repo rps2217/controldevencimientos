@@ -116,6 +116,12 @@ import {
   markSkuAsClosedInCampaign,
   buildAuditRowsFromCampaignMatrix
 } from './src/utils/campaignUtils';
+import {
+  resolveActiveCampaign,
+  collectAllAuditRows,
+  getAuditProviders,
+  filterAuditRows
+} from './src/utils/campaignAggregation';
 import { InventoryCampaign, StockCountSession, CampaignSnapshotItem, StockCountEntry, StockCountReconciliationItem, InventoryItem } from './src/types';
 import { createMimeMessage, escapeHtml } from './src/lib/gmailService';
 
@@ -1157,6 +1163,161 @@ console.log('\n--- 19. Pruebas de agregacion y filtrado del conteo (countAggrega
     'pendientes: filtra por SKU');
   assert(getPendingItems(null, pend, '').length === 0,
     'pendientes: sin sesion no hay checklist');
+}
+
+console.log('\n--- 20. Pruebas de derivacion y filtrado de campanas (campaignAggregation) ---');
+{
+  const makeCampaign = (overrides: Partial<InventoryCampaign> = {}): InventoryCampaign => ({
+    id: 'camp-1',
+    nombre: 'Auditoría Local 121',
+    local: 'LOCAL 121',
+    fechaInicio: '2026-09-01T00:00:00.000Z',
+    fechaActualizacion: '2026-09-01T00:00:00.000Z',
+    estado: 'ACTIVA',
+    snapshotTeoricoActual: {},
+    historialSnapshots: [],
+    sessionIds: [],
+    itemsValidadosCerrados: {},
+    ajustesVentaManual: {},
+    ...overrides
+  });
+
+  const makeSession = (sku: string, cantidad: number): StockCountSession => ({
+    id: `ses-${sku}`,
+    nombre: 'Conteo Pasillo 3',
+    ubicacion: 'Pasillo 3',
+    modo: 'DOCUMENT',
+    requiereVencimiento: false,
+    hojaOrigen: 'main',
+    estado: 'IN_PROGRESS',
+    fechaInicio: '2026-09-10T00:00:00.000Z',
+    conteos: [{
+      id: 'c1', sku, descripcion: `Producto ${sku}`, cantidad,
+      timestamp: '2026-09-10T10:00:00.000Z'
+    }]
+  });
+
+  const snapshotItem = (sku: string, stockTeorico: number, extra: Partial<CampaignSnapshotItem> = {}) => ({
+    sku, descripcion: `Producto ${sku}`, stockTeorico, fechaCarga: '2026-09-01T00:00:00.000Z', ...extra
+  });
+
+  // --- resolveActiveCampaign ---
+  assert(resolveActiveCampaign([], null) === null,
+    'campana activa: sin campanas devuelve null');
+
+  const c1 = makeCampaign({ id: 'camp-1' });
+  const c2 = makeCampaign({ id: 'camp-2' });
+  assert(resolveActiveCampaign([c1, c2], null)?.id === 'camp-1',
+    'campana activa: sin id seleccionado cae a la primera (evita el estado "sin campana" con datos)');
+  assert(resolveActiveCampaign([c1, c2], 'camp-2')?.id === 'camp-2',
+    'campana activa: con id seleccionado devuelve la que corresponde');
+  assert(resolveActiveCampaign([c1, c2], 'no-existe') === null,
+    'campana activa: id desconocido devuelve null');
+
+  // --- collectAllAuditRows ---
+  assert(collectAllAuditRows(null).length === 0,
+    'filas de auditoria: sin matriz no hay filas');
+
+  const camp = makeCampaign({
+    snapshotTeoricoActual: {
+      SKU_OK: snapshotItem('SKU_OK', 100),
+      SKU_DIF: snapshotItem('SKU_DIF', 100),
+      SKU_NUNCA: snapshotItem('SKU_NUNCA', 50)
+    }
+  });
+  const matriz = computeCampaignConsolidationMatrix(camp, [
+    makeSession('SKU_OK', 100),
+    makeSession('SKU_DIF', 80),
+    makeSession('SKU_NUEVO', 7)
+  ]);
+
+  const allRows = collectAllAuditRows(matriz);
+  assert(allRows.length === 4,
+    'filas de auditoria: agrega los 4 estados (cuadrados + discrepancias + nunca + hallazgos)');
+  const estados = new Set(allRows.map(r => r.estadoGlobal));
+  assert(estados.has('VALIDADO_OK') && estados.has('DISCREPANCIA') &&
+    estados.has('NUNCA_PISTOLEADO') && estados.has('HALLAZGO'),
+    'filas de auditoria: incluye los cuatro estados de la separacion de aguas');
+
+  // --- getAuditProviders ---
+  assert(getAuditProviders([]).length === 0,
+    'proveedores: sin filas devuelve lista vacia');
+
+  const conProv = [
+    { ...allRows[0], proveedor: 'Lab Norte' },
+    { ...allRows[0], proveedor: 'Lab Sur' },
+    { ...allRows[0], proveedor: 'Lab Norte' },
+    { ...allRows[0], proveedor: '' }
+  ];
+  const provs = getAuditProviders(conProv as typeof allRows);
+  assert(provs.length === 2 && provs[0] === 'Lab Norte' && provs[1] === 'Lab Sur',
+    'proveedores: deduplica, descarta vacios y ordena alfabeticamente');
+
+  // --- filterAuditRows ---
+  assert(filterAuditRows(null, 'ALL', 'ALL', '').length === 0,
+    'filtro de matriz: sin matriz devuelve vacio');
+
+  assert(filterAuditRows(matriz, 'DISCREPANCIA', 'ALL', '').length === 1,
+    'filtro de matriz: DISCREPANCIA muestra solo discrepancias');
+  assert(filterAuditRows(matriz, 'NUNCA_PISTOLEADO', 'ALL', '').length === 1,
+    'filtro de matriz: NUNCA_PISTOLEADO muestra solo los no pistoleados');
+  assert(filterAuditRows(matriz, 'HALLAZGO', 'ALL', '').length === 1,
+    'filtro de matriz: HALLAZGO muestra solo hallazgos fisicos');
+  assert(filterAuditRows(matriz, 'VALIDADO_OK', 'ALL', '').length === 1,
+    'filtro de matriz: VALIDADO_OK muestra solo cuadrados');
+  assert(filterAuditRows(matriz, 'ALL', 'ALL', '').length === 4,
+    'filtro de matriz: ALL agrega los cuatro estados');
+
+  // Orden con ALL: lo que exige accion primero.
+  const ordenAll = filterAuditRows(matriz, 'ALL', 'ALL', '');
+  assert(ordenAll[0].estadoGlobal === 'DISCREPANCIA',
+    'filtro de matriz: con ALL las discrepancias van primero (lo accionable arriba)');
+  assert(ordenAll[ordenAll.length - 1].estadoGlobal === 'HALLAZGO',
+    'filtro de matriz: con ALL los hallazgos van al final');
+
+  // Filtro por proveedor.
+  const conProveedor = makeCampaign({
+    snapshotTeoricoActual: {
+      SKU_P1: snapshotItem('SKU_P1', 100, { proveedor: 'Lab Norte' }),
+      SKU_P2: snapshotItem('SKU_P2', 100, { proveedor: 'Lab Sur' })
+    }
+  });
+  const matrizProv = computeCampaignConsolidationMatrix(conProveedor, [
+    makeSession('SKU_P1', 90),
+    makeSession('SKU_P2', 90)
+  ]);
+  assert(filterAuditRows(matrizProv, 'ALL', 'ALL', '').length === 2,
+    'filtro de matriz: sin proveedor seleccionado muestra las dos discrepancias');
+  assert(filterAuditRows(matrizProv, 'ALL', 'Lab Norte', '').length === 1,
+    'filtro de matriz: filtra por proveedor seleccionado');
+
+  // Busqueda: SKU, descripcion y proveedor.
+  assert(filterAuditRows(matrizProv, 'ALL', 'ALL', 'SKU_P1').length === 1,
+    'filtro de matriz: busca por SKU');
+  assert(filterAuditRows(matrizProv, 'ALL', 'ALL', 'producto sku_p2').length === 1,
+    'filtro de matriz: busca por descripcion sin distinguir mayusculas');
+  assert(filterAuditRows(matrizProv, 'ALL', 'ALL', 'lab sur').length === 1,
+    'filtro de matriz: busca por proveedor');
+  assert(filterAuditRows(matrizProv, 'ALL', 'ALL', 'zzz').length === 0,
+    'filtro de matriz: busqueda sin coincidencias devuelve vacio');
+  assert(filterAuditRows(matrizProv, 'ALL', 'ALL', '   ').length === 2,
+    'filtro de matriz: busqueda con solo espacios no filtra (equivale a vacio)');
+
+  // Acumulativo: estado + proveedor + busqueda.
+  assert(filterAuditRows(matrizProv, 'DISCREPANCIA', 'Lab Sur', 'sku_p2').length === 1,
+    'filtro de matriz: estado, proveedor y busqueda se acumulan');
+  assert(filterAuditRows(matrizProv, 'VALIDADO_OK', 'Lab Sur', '').length === 0,
+    'filtro de matriz: acumular un estado sin filas da vacio');
+
+  // Las filas devueltas siguen siendo las mismas entidades de la matriz.
+  const soloDiscrepancia = filterAuditRows(matriz, 'DISCREPANCIA', 'ALL', '');
+  assert(soloDiscrepancia[0] === matriz.discrepancias[0],
+    'filtro de matriz: devuelve las mismas referencias, sin clonar');
+
+  // Mutacion: quitando el trim interno de q, ' SKU_DIF ' deja de coincidir.
+  // (Cuidado: quitar el trim de la guarda NO cambia nada, porque q se recorta igual.)
+  assert(filterAuditRows(matriz, 'DISCREPANCIA', 'ALL', ' SKU_DIF ').length === 1,
+    'filtro de matriz: recorta espacios alrededor del termino de busqueda');
 }
 
 console.log(`\n========================================`);

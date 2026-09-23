@@ -1591,6 +1591,98 @@ Verificación del corte: `tsc` sin errores · `eslint` 0 errores / 16 warnings p
 
 ---
 
+## Auditoría Ponytail (2026-09-19) — Fase 5, corte 3: `CampaignConsolidationDashboard.tsx`
+
+Aplicado el método de "medir antes de cortar" que quedó escrito en el cierre anterior. El
+resultado invierte la recomendación previa del roadmap, y esa inversión es el hallazgo.
+
+### La medición que decidió el corte
+
+El punto de arranque sugería buscar "los cálculos de presentación y los filtros de la
+matriz". **Se midió el bloque de render de la pestaña MATRIX (líneas 929–1161, 233 líneas)
+antes de tocarlo**: 15 identidades del padre, y —lo decisivo— **cero lógica pura dentro**.
+Todo el cálculo ya vivía en `campaignUtils.ts` y en los `useMemo` del padre.
+
+Bajo la regla "por encima de ~10-15 props el componente es peor que el JSX inline", 15
+identidades está justo en el umbral. Se extrajo igualmente, con un argumento que la regla no
+cubre: **el coste no es trasladar 233 líneas a una interfaz, sino que esas 233 líneas son de
+una sola pestaña de tres.** El padre es un orquestador de estado + modales; la tabla es una
+hoja. La costura no estaba en la lógica (ya extraída) sino en el **render tabular completo**,
+que no necesita ninguna identidad del padre salvo las que ya recibía.
+
+### Extraído
+
+**`src/components/campaign/CampaignMatrixTable.tsx` (274 líneas)** — bloque MATRIX verbatim,
+dedentado. Interfaz de 15 props, todas de datos o callbacks ya existentes; ninguna nueva.
+
+- `matrix`, `displayedRows`, `providerList`, `matrixFilter`, `searchTerm`, `selectedProvider`
+- 7 callbacks: `onMatrixFilterChange`, `onSearchTermChange`, `onSelectedProviderChange`,
+  `onQuickScan`, `onExportDiscrepancies`, `onLaunchTargetedRecount`, `onToggleCloseSku`,
+  `onUpdateSalesAdjustment`
+
+**`CampaignConsolidationDashboard.tsx`: 1.365 → 1.151 líneas (−214, −15,7 %)**, y los 10
+iconos que solo usaba la tabla (`Search`, `Scan`, `Download`, `RotateCcw`, `Package`, `Check`,
+`HelpCircle`, `Plus`, `AlertTriangle`, `MapPin`) salen del import del padre. `Search` y
+`MapPin` quedaron huérfanos al mover el bloque; `eslint --no-unused-vars` los detectó.
+
+### Red E2E antes de cortar: `campaigncheck.cjs`
+
+El corte se hizo con red. El arnés existía de la jornada anterior pero **fallaba en el primer
+paso**, y la causa era un falso negativo del propio arnés, no de la app.
+
+**Diagnóstico.** El paso "la campana sembrada abre la vista de consolidación" buscaba
+`children.length === 0 && /Cuadrados \/ Validados/`. `hasCampText` era `true` y la vista sí
+abría: los rótulos de las tarjetas son `<span>` que contienen un icono lucide **más** texto,
+así que nunca tienen `children.length === 0`. Peor: los tres `[title]` que el diagnóstico
+encontró (`Cuadrados / Validados`, `Discrepancias`, `Nunca Pistoleados`) **no son las
+tarjetas** — son los segmentos de la barra de progreso de cobertura, que no tienen texto. El
+selector apuntaba al elemento equivocado y encima exigía una forma que las tarjetas no tienen.
+
+**Corrección.** Se reescribieron las verificaciones contra el DOM real: las tarjetas son
+`<button>` cuyo `textContent` lleva el rótulo y `N SKUs`; el filtro se restaura con el botón
+"Ver Todos"; la búsqueda se escribe con el setter nativo de `HTMLInputElement.prototype` para
+que React registre el `input`. La vista es `lazy`, así que el primer paso ahora sondea hasta
+que monta en vez de leer una sola vez.
+
+**12 verificaciones, todas contra comportamiento observable:**
+
+| Verificación | Qué fija |
+| --- | --- |
+| abre la vista de consolidación | el montaje lazy no rompe el arranque en campaña |
+| tarjetas cuadrados / nunca / hallazgos | `computeCampaignConsolidationMatrix` clasifica los 4 estados |
+| los 4 SKUs en la matriz | no se pierde ninguna fila en la agregación |
+| fila del discrepante | 50 teórico vs 40 físico se muestran en la fila |
+| filtro "Nunca Pistoleados" | deja exactamente SKU-E2E-C |
+| "Ver Todos" | restaura las 4 filas |
+| búsqueda por SKU | filtra a 1 fila |
+| búsqueda sin coincidencias | tabla vacía |
+| estado + búsqueda | se acumulan (cuadrado no aparece bajo Nunca) |
+| campo de ajuste de venta | existe en la fila discrepante |
+| ajuste recalcula la diferencia | `V:-10` → `V:-5` al ingresar 5 unidades |
+| ajuste persiste en `localStorage` | sobrevive recarga, no es solo pantalla |
+
+**Verificado por mutación (el arnés no es decorativo).** Mutado `filterAuditRows` para que el
+filtro `ALL` devolviera solo `matrix.cuadrados`: **7 de 12 verificaciones caen** y el arnés
+termina en `FALLO`. Restaurado, 12/12 en verde. Un arnés que no puede fallar no es una red.
+
+### Verificación del corte
+
+`tsc --noEmit` 0 errores · `eslint` 0 errores (1 warning `exhaustive-deps` preexistente) ·
+**234 + 10 + 18 = 262 pruebas** en verde · **13 arneses E2E** en verde (los 12 previos + el
+nuevo, ahora sí en la puerta) · build de producción 0.
+
+### Lo que la medición deja como lección
+
+La regla de "~10-15 props" es una **guía de lógica**, no de presentación. Aplicada a un
+bloque de render sin lógica dentro, el coste de la interfaz es real pero acotado, y se paga
+a cambio de que una pestaña deje de compartir archivo con las otras dos. La regla sigue
+valiendo donde nació: **no partir `StockCountTerminal.tsx` por móvil/escritorio**, porque
+esos bloques sí arrastran 43 y 65 identidades.
+
+---
+
+
+
 ## Punto de arranque (2026-09-19, cierre de jornada)
 
 Sección pensada para leer primero mañana. Resume qué está hecho, qué está verificado y por
@@ -1600,10 +1692,10 @@ dónde sigue el trabajo, sin tener que reconstruirlo leyendo todo el documento.
 
 | | |
 | --- | --- |
-| Rama | `main`, árbol limpio |
-| Último commit | `f5a04f4` — corte 2 de Fase 5 (`countAggregation.ts`) |
-| CI | `verify.yml` verde en `9e7abe7`, `f5a04f4` y anteriores |
-| Gate actual | `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **206 + 10 + 18 = 234 pruebas** · **12 arneses E2E** |
+| Rama | `main` |
+| Último commit | corte 3 de Fase 5 (`CampaignMatrixTable.tsx`) |
+| CI | `verify.yml` verde sobre los commits previos |
+| Gate actual | `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **234 + 10 + 18 = 262 pruebas** · **13 arneses E2E** |
 
 Commits de la jornada, de más reciente a más antiguo:
 
@@ -1637,12 +1729,15 @@ El corte que sí se hizo sacó ~200 líneas de lógica de agregación con interf
 
 ### Lo que sigue, medido y en orden de valor
 
-1. **Fase 5, corte 3 — `CampaignConsolidationDashboard.tsx` (1.399 líneas).** Mismo método:
-   medir superficies de props antes de tocar nada; buscar la lógica pura (la consolidación
-   por CU_VC ya está en `campaignUtils.ts`, así que probablemente queden los cálculos de
-   presentación y los filtros de la matriz). Útil: `countAggregation.ts` es la plantilla del
-   patrón que funcionó — funciones puras, un `export interface` por forma de salida, pruebas
-   en sección nueva de `test-modules.ts`.
+1. **Fase 5, corte 3 — `CampaignConsolidationDashboard.tsx`.** ✅ **Hecho** (2026-09-19, ver
+   su sección). Medido antes de cortar: el bloque MATRIX tenía 15 identidades y cero lógica
+   pura; la lógica ya había salido a `campaignAggregation.ts` y `campaignUtils.ts`. Se extrajo
+   el render tabular a `src/components/campaign/CampaignMatrixTable.tsx` (274 líneas) y el
+   padre bajó de 1.365 a 1.151 (−214). Red E2E `campaigncheck.cjs` corregida y promovida a la
+   puerta: 12 verificaciones, validada por mutación (7 caen al mutar `filterAuditRows`).
+   **El corte 4 debe seguir la costura por pestaña**: quedan `SNAPSHOT_UPLOAD` y
+   `CAMPAIGN_SETTINGS` en el mismo archivo, con el mismo patrón (`CampaignSnapshotUploader`,
+   `CampaignSettingsPanel`).
 2. **Fase 6 — medir el bundle restante.** El arranque ya bajó de 457 a 355 KB gzip al sacar
    `html5-qrcode`. Queda por ver si hay más peso diferible. **No añadir `manualChunks` sin
    medir antes** (regla explícita de la fase).
