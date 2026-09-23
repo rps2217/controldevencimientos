@@ -9,9 +9,9 @@ import {
   computeCampaignConsolidationMatrix, 
   markSkuAsClosedInCampaign, 
   reopenSkuInCampaign,
-  importPharmacySnapshotToCampaign,
-  playBeep
-} from '../../utils/stockCountUtils';
+  importPharmacySnapshotToCampaign
+} from '../../utils/campaignUtils';
+import { playBeep } from '../../utils/stockCountUtils';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { 
   Search, 

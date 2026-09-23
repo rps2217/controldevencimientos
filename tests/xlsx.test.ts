@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import * as XLSX from 'xlsx';
 
 import { parseExcelBuffer, parseDelimitedText, parseSpreadsheetFile } from '../src/utils/universalImporter';
-import { importPharmacySnapshotToCampaign } from '../src/utils/stockCountUtils';
+import { importPharmacySnapshotToCampaign } from '../src/utils/campaignUtils';
 import { parseAnyDate } from '../src/utils/pureCalculations';
 
 let passed = 0;

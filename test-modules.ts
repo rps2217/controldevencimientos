@@ -95,12 +95,14 @@ import {
 import {
   saveStockCountSessionsToStorageDebounced,
   flushStockCountSessionsToStorage,
-  computeCampaignConsolidationMatrix,
-  markSkuAsClosedInCampaign,
-  buildAuditRowsFromCampaignMatrix,
   generateCuVc,
   calculateLastDayOfMonthDateString
 } from './src/utils/stockCountUtils';
+import {
+  computeCampaignConsolidationMatrix,
+  markSkuAsClosedInCampaign,
+  buildAuditRowsFromCampaignMatrix
+} from './src/utils/campaignUtils';
 import { InventoryCampaign, StockCountSession, CampaignSnapshotItem } from './src/types';
 import { createMimeMessage, escapeHtml } from './src/lib/gmailService';
 

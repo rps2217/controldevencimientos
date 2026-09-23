@@ -809,8 +809,39 @@ el arnés falla **solo** en el paso del invariante (exit 1, con el autocontrol a
 
 ### Fase 5 — Dividir monolitos
 
-`stockCountUtils.ts` (1.487) · `StockCountTerminal.tsx` (2.751) ·
-`CampaignConsolidationDashboard.tsx` (1.399) · `SliceEditorModal.tsx` (1.186).
+#### Corte 1 — `campaignUtils.ts`: separar el motor de campañas del de sesiones
+
+`stockCountUtils.ts` mezclaba dos dominios que **no compartían una sola función**:
+sesiones de conteo (`reconcileStockCountSession`, `buildVencimientosRowFromCount`, la
+persistencia de sesiones) y el ciclo completo de campaña (`importPharmacySnapshotToCampaign`,
+`computeCampaignConsolidationMatrix`, la separación de aguas, reportes, actas y su
+persistencia). El grafo de dependencias lo dejó claro: el bloque de campañas tenía **cero
+acoplamiento** con el resto y **cero consumidores internos**.
+
+Se extrajo la sección completa `CAMPAÑA DE INVENTARIO CÍCLICO MULTISESIÓN` (13 exports,
+~650 líneas) a `src/utils/campaignUtils.ts`, delimitada por su propio separador de sección.
+Se actualizaron los 5 consumidores (`StockCountTerminal`, `CampaignConsolidationDashboard`,
+`MobileErpSnapshotView`, `test-modules.ts`, `tests/xlsx.test.ts`) separando los imports por
+dominio, en vez de dejar un re-export en `stockCountUtils` que habría ocultado la dependencia
+real.
+
+| | Antes | Después |
+| --- | --- | --- |
+| `stockCountUtils.ts` | 1.481 | 829 |
+| `campaignUtils.ts` | — | 678 |
+
+El corte dejó a la vista deuda preexistente que se corrigió en el mismo paso: cuatro imports
+huérfanos tras la extracción (`rowToObject` y tres tipos de campaña) y un `import` de
+`appStorage` que **partía en dos el docblock** de `generateCuVc`.
+
+**Verificación de que es un movimiento puro, no una reescritura**: se comparó el cuerpo de
+cada función movida (normalizando espacios y cortando en su llave de cierre) contra el
+original; todas idénticas. `tsc` limpio, 0 imports huérfanos en ambos archivos, 180 pruebas,
+11 arneses E2E incluido `countcheck`.
+
+Monolitos restantes de la fase: `StockCountTerminal.tsx` (2.751) ·
+`CampaignConsolidationDashboard.tsx` (1.399) · `InventoryDashboard.tsx` (1.377) ·
+`SliceEditorModal.tsx` (1.186).
 
 ### Fase 6 — Rendimiento y empaquetado
 
