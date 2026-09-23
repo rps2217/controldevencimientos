@@ -1,7 +1,7 @@
 # Plan de Reforma Arquitectónica
 
-Estado: **Fases 0 y 2 completadas**; Fase 1 (1.3 en curso), 6 (primer corte hecho),
-3–5 pendientes. Deuda `any`
+Estado: **Fases 0 y 2 completadas**; Fase 1 (1.3 en curso), 5 (red del invariante de conteo
+puesta), 6 (primer corte hecho), 3–4 pendientes. Deuda `any`
 saldada en todo `src`: **1 solo `any`** declarado (la firma de índice de `SheetRecord`,
 justificada abajo). Riesgo `xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
@@ -772,6 +772,40 @@ rechazo deliberado) se excluye explícitamente para no enmascarar regresiones re
 cola de siembra se apoya en el respaldo en `localStorage`, que `getOfflineQueue` migra a
 IndexedDB: evita una carrera con el arranque de la app que sí tendría escribir en la BD
 directamente.
+
+#### Arnés del invariante del conteo (`countcheck.cjs`) — primera red de la Fase 5
+
+La Fase 5 (dividir monolitos) apunta al archivo más grande y más frágil:
+`StockCountTerminal.tsx` (2.751 líneas, 36 `useState`). Antes de cortar nada había que
+poner la red, porque **ese archivo tenía cobertura cero** —0 referencias en pruebas
+unitarias, de componente y E2E— y su historial lo confirma: 4 fixes de conteo, dos de
+ellos de **pérdida de datos** (`de6cacc` "evitar pérdida de la última lectura" y
+`8375865` "modo BLIND real…", este último de 87 líneas en el terminal y **sin una sola
+prueba**).
+
+El invariante no obvio: las sesiones se guardan con escritura **debounced de 300 ms**
+para no congelar la UI durante el pistoleo, y el volcado inmediato en
+`pagehide`/`visibilitychange` es lo que evita perder la última lectura. En una PDA eso
+no es el borde, es el caso común: el operario pistolea y cambia de app enseguida. Un
+refactor que mueva el efecto, cambie su orden o suspenda el componente reintroduce el
+bug sin que ninguna prueba lo note.
+
+La sonda es **determinista, no una carrera contra el timer**: se espera a que React
+confirme el commit (señal observable: la UI ya anuncia "2 lecturas"), y entonces se lee
+→ se dispara `pagehide` → se vuelve a leer dentro de la **misma tarea síncrona**. Un
+timer no puede dispararse ahí, así que el resultado discrimina:
+
+- con el flush: `antes = 1`, `despues = 2` → la lectura se salvó
+- sin el flush: `antes = 1`, `despues = 1` → se perdió
+
+Se añadió un **autocontrol** (`antes === 1`): si el debounce hubiera escrito antes de
+sondear, el caso no probaría el flush y la prueba se invalidaría en vez de dar un falso
+verde. También se fija la vía normal (el debounce persiste sin ayuda), para no confundir
+"el flush salva la lectura" con "la persistencia no funciona en absoluto".
+
+**Verificado que discrimina, no solo que pasa**: neutralizando el listener de `pagehide`
+el arnés falla **solo** en el paso del invariante (exit 1, con el autocontrol aún en
+`antes=1`); restaurado, vuelve a OK. Corre en CI dentro de `npm run test:e2e` (11 arneses).
 
 ### Fase 5 — Dividir monolitos
 
