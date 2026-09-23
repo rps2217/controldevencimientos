@@ -1683,6 +1683,81 @@ esos bloques sí arrastran 43 y 65 identidades.
 
 
 
+## Auditoría Ponytail (2026-09-19) — Fase 5, corte 4: `CampaignKpiSemaphore.tsx`
+
+El corte 3 dejó anotado que el corte 4 debía seguir "la costura por pestaña" (`SNAPSHOT_UPLOAD`
+y `CAMPAIGN_SETTINGS`). **La medición desmintió esa recomendación**, y evitarla es el valor de
+medir antes de cortar.
+
+### La medición que invirtió el plan
+
+Se midieron los tres bloques candidatos por identidades del padre, no por tamaño:
+
+| Bloque | Líneas | Identidades | Dentro del umbral (~10-15) |
+| --- | --- | --- | --- |
+| HEADER | 195 | 16 | no, por encima |
+| KPI + progreso | 218 | **9** | **sí, el mejor ratio** |
+| SNAPSHOT_UPLOAD | 125 | 11 | sí, pero es una sola pestaña pequeña |
+
+`CAMPAIGN_SETTINGS` **no existe como bloque**: se declara en el tipo de `activeTab` (línea 41)
+pero no hay `{activeTab === 'CAMPAIGN_SETTINGS' && ...}` en el render. Es un estado muerto del
+tipo, no una pestaña. El corte 3 lo dio por pendiente sin comprobarlo; la medición lo descarta.
+
+El mejor corte no era el que el plan sugería (`SNAPSHOT_UPLOAD`, 125 líneas y una sola
+pestaña), sino el **KPI + progreso**: 218 líneas, 74 % más de código, con menos identidades
+(9, la mitad) y cubierto por la red E2E que ya existe. Máximo código por mínimo acoplamiento.
+
+### Extraído
+
+**`src/components/campaign/CampaignKpiSemaphore.tsx` (253 líneas)** — aviso de destino de
+guardado, cobertura global, muebles consolidados y semáforo de 4 estados. Interfaz de 7 props,
+ninguna nueva:
+
+- `matrix`, `sessions`, `matrixFilter`, `lastCloudSyncDate`
+- `onNavigateToSessionList`, `onSwitchToTerminal`
+- `onSelectFilter(f)` — el padre lo compone como `setActiveTab('MATRIX'); setMatrixFilter(f)`
+- `isMatrixTabActive` — sustituye al `activeTab === 'MATRIX'` que resaltaba la tarjeta activa.
+  Un booleano con nombre propio en vez de pasar la pestaña entera: la tarjeta no necesita saber
+  en qué pestaña está la vista, solo si es la suya.
+
+El componente **auto-guarda con `if (!matrix) return null`**, así que el padre ya no envuelve en
+`{matrix && ...}`. El early-return es la guarda correcta: la matriz es precondición del bloque,
+no una condición de conveniencia.
+
+**`CampaignConsolidationDashboard.tsx`: 1.151 → 947 líneas (−204, −17,7 %)**, y otros 5 iconos
+salen del import del padre (`CheckCircle2`, `AlertTriangle`, `HelpCircle`, `Package`,
+`ShieldCheck`), detectados por `eslint` tras mover el bloque. Acumulado de los cortes 3 y 4:
+**1.365 → 947 (−418, −30,6 %)**.
+
+### Verificación por mutación
+
+Mutado `onSelectFilter` en el padre para que solo hiciera `setActiveTab('MATRIX')` y perdiera
+`setMatrixFilter(f)`: **caen 2 verificaciones** (`el filtro de Nunca Pistoleados deja solo el
+SKU sin lecturas` y `estado y busqueda se acumulan`). Restaurado, 12/12 en verde. El callback
+que compone el padre es exactamente lo que el arnés fija.
+
+**Nota de método.** La primera corrida mutada falló en el paso 1 y no en el 2 y 9, lo que
+parecía indicar que la mutación no se cubría. El log decía `reintentando tras liberar recursos`:
+era **contención de recursos** al correr dos Chromium a la vez, no un falso negativo. Repetida
+con el build servido en aislamiento, la mutación falla donde debe. Lección: un fallo en un paso
+que el cambio no toca es señal de entorno, no de cobertura; conviene aislarlo antes de concluir.
+
+### Verificación del corte
+
+`tsc --noEmit` 0 errores · `eslint` 0 errores (16 warnings preexistentes) · **234 + 10 + 18 =
+262 pruebas** · **13 arneses E2E** · build 0 · `verify:all` exit 0.
+
+### Alternativa descartada
+
+Extraer también HEADER (16 identidades) no se justifica: está **por encima del umbral**, son
+dos filas de 16 identidades cada una, y su valor de corte es menor que el ya hecho. El padre
+puede caber con cabecera inline. Si en un corte futuro se desea, la medida ya está tomada.
+
+---
+
+
+
+
 ## Punto de arranque (2026-09-19, cierre de jornada)
 
 Sección pensada para leer primero mañana. Resume qué está hecho, qué está verificado y por
@@ -1693,7 +1768,7 @@ dónde sigue el trabajo, sin tener que reconstruirlo leyendo todo el documento.
 | | |
 | --- | --- |
 | Rama | `main` |
-| Último commit | corte 3 de Fase 5 (`CampaignMatrixTable.tsx`) |
+| Último commit | cortes 3 y 4 de Fase 5 (`CampaignMatrixTable.tsx`, `CampaignKpiSemaphore.tsx`) |
 | CI | `verify.yml` verde sobre los commits previos |
 | Gate actual | `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **234 + 10 + 18 = 262 pruebas** · **13 arneses E2E** |
 
@@ -1729,15 +1804,17 @@ El corte que sí se hizo sacó ~200 líneas de lógica de agregación con interf
 
 ### Lo que sigue, medido y en orden de valor
 
-1. **Fase 5, corte 3 — `CampaignConsolidationDashboard.tsx`.** ✅ **Hecho** (2026-09-19, ver
-   su sección). Medido antes de cortar: el bloque MATRIX tenía 15 identidades y cero lógica
-   pura; la lógica ya había salido a `campaignAggregation.ts` y `campaignUtils.ts`. Se extrajo
-   el render tabular a `src/components/campaign/CampaignMatrixTable.tsx` (274 líneas) y el
-   padre bajó de 1.365 a 1.151 (−214). Red E2E `campaigncheck.cjs` corregida y promovida a la
-   puerta: 12 verificaciones, validada por mutación (7 caen al mutar `filterAuditRows`).
-   **El corte 4 debe seguir la costura por pestaña**: quedan `SNAPSHOT_UPLOAD` y
-   `CAMPAIGN_SETTINGS` en el mismo archivo, con el mismo patrón (`CampaignSnapshotUploader`,
-   `CampaignSettingsPanel`).
+1. **Fase 5, cortes 3 y 4 — `CampaignConsolidationDashboard.tsx`.** ✅ **Hechos** (2026-09-19,
+   ver sus secciones). Corte 3: la pestaña MATRIX a `CampaignMatrixTable.tsx` (274 líneas).
+   Corte 4: el semáforo y la cobertura a `CampaignKpiSemaphore.tsx` (253 líneas). El padre
+   bajó de **1.365 a 947 líneas (−30,6 %)**. La medición desmintió el plan del corte 3:
+   `CAMPAIGN_SETTINGS` no existe como bloque (estado muerto del tipo), y el mejor corte no
+   era `SNAPSHOT_UPLOAD` (125 líneas, 11 identidades) sino KPI+progreso (218 líneas, 9
+   identidades). Red E2E `campaigncheck.cjs` en la puerta, 12 verificaciones, validada por
+   mutación en ambos cortes.
+   **Lo que queda en el padre**: la cabecera (195 líneas, 16 identidades — por encima del
+   umbral) y `SNAPSHOT_UPLOAD` (125 líneas, 11 identidades), ambos extraíbles si se desea.
+   La medida de cada uno ya está tomada.
 2. **Fase 6 — medir el bundle restante.** El arranque ya bajó de 457 a 355 KB gzip al sacar
    `html5-qrcode`. Queda por ver si hay más peso diferible. **No añadir `manualChunks` sin
    medir antes** (regla explícita de la fase).
