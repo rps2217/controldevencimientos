@@ -96,14 +96,16 @@ import {
   saveStockCountSessionsToStorageDebounced,
   flushStockCountSessionsToStorage,
   generateCuVc,
-  calculateLastDayOfMonthDateString
+  calculateLastDayOfMonthDateString,
+  reconcileStockCountSession,
+  buildVencimientosRowFromCount
 } from './src/utils/stockCountUtils';
 import {
   computeCampaignConsolidationMatrix,
   markSkuAsClosedInCampaign,
   buildAuditRowsFromCampaignMatrix
 } from './src/utils/campaignUtils';
-import { InventoryCampaign, StockCountSession, CampaignSnapshotItem } from './src/types';
+import { InventoryCampaign, StockCountSession, CampaignSnapshotItem, StockCountEntry, InventoryItem } from './src/types';
 import { createMimeMessage, escapeHtml } from './src/lib/gmailService';
 
 
@@ -877,6 +879,120 @@ console.log('\n--- 17. Pruebas de seguridad de gmailService (inyección MIME y e
     'escapeHtml neutraliza ampersand, comillas dobles y simples');
   assert(escapeHtml(null) === '' && escapeHtml(undefined) === '',
     'escapeHtml devuelve cadena vacia para null y undefined');
+}
+
+console.log('\n--- 18. Pruebas de cuadratura y sincronizacion con VENCIMIENTOS ---');
+{
+  // Cabeceras canonicas de la hoja VENCIMIENTOS (las mismas que consume el terminal).
+  const HEADERS = ['ID_VC', 'SKU_VC', 'PRODUCTO_VC', 'MM', 'YYYY', 'FECHA_VC',
+    'RUT_PROVEEDOR_VC', 'POLITICA', 'DIAS RETIRO_VC', 'MUNDO', 'PM', 'timestamp',
+    'CU_VC', 'TIPO_EVENTO', 'CANTIDAD'];
+
+  const entry = (sku: string, cantidad: number, extra: Partial<StockCountEntry> = {}): StockCountEntry =>
+    ({ id: `c-${sku}-${cantidad}`, sku, descripcion: `Producto ${sku}`, cantidad, timestamp: '2026-09-10T10:00:00.000Z', ...extra });
+
+  const session = (over: Partial<StockCountSession> = {}): StockCountSession =>
+    ({ id: 's1', nombre: 'Conteo Pasillo 3', modo: 'DOCUMENT', requiereVencimiento: false,
+       hojaOrigen: 'main', estado: 'IN_PROGRESS', fechaInicio: '2026-09-10T00:00:00.000Z',
+       conteos: [], ...over });
+
+  const sheetRow = (sku: string, cantidad: string, extra: Partial<InventoryItem> = {}): InventoryItem =>
+    ({ _rowIndex: 2, SKU_VC: sku, CANTIDAD: cantidad, ...extra });
+
+  // --- Cuadratura: teoria vs. fisico ---
+
+  // Par discriminante del modo: si el teorico se filtrara a la cuadratura BLIND,
+  // el conteo dejaria de ser limpio. El control positivo fija que el mapeo existe
+  // y que la unica diferencia es el modo (mismo dato, misma sesion, distinto modo).
+  const enBlind = reconcileStockCountSession(
+    session({ modo: 'BLIND', conteos: [entry('SKU_A', 5)] }),
+    [sheetRow('SKU_A', '100')], HEADERS);
+  const enDocument = reconcileStockCountSession(
+    session({ conteos: [entry('SKU_A', 5)] }),
+    [sheetRow('SKU_A', '100')], HEADERS);
+  assert(enDocument[0]?.teorico === 100,
+    'DOCUMENT mapea el stock teorico de la hoja (control positivo de la cuadratura)');
+  assert(enBlind[0]?.teorico === 0,
+    'BLIND no mapea el stock teorico: la cuadratura no revela el dato del ERP');
+  assert(enBlind[0]?.contado === 5,
+    'BLIND si conserva lo contado fisicamente');
+
+  // Clasificacion de estados de cuadratura.
+  const falto = reconcileStockCountSession(session({ conteos: [entry('SKU_A', 5)] }), [sheetRow('SKU_A', '100')], HEADERS);
+  assert(falto[0]?.estado === 'FALTANTE' && falto[0]?.diferencia === -95,
+    'fisico menor que el teorico se clasifica FALTANTE con la diferencia negativa');
+
+  const sobro = reconcileStockCountSession(session({ conteos: [entry('SKU_A', 120)] }), [sheetRow('SKU_A', '100')], HEADERS);
+  assert(sobro[0]?.estado === 'SOBRANTE' && sobro[0]?.diferencia === 20,
+    'fisico mayor que el teorico se clasifica SOBRANTE con la diferencia positiva');
+
+  const cuadrado = reconcileStockCountSession(session({ conteos: [entry('SKU_A', 100)] }), [sheetRow('SKU_A', '100')], HEADERS);
+  assert(cuadrado[0]?.estado === 'CUADRADO' && cuadrado[0]?.diferencia === 0,
+    'fisico igual al teorico se clasifica CUADRADO');
+
+  // Un SKU con teorico y cero lecturas es FALTANTE, no "inexistente".
+  const sinLecturas = reconcileStockCountSession(session({ conteos: [] }), [sheetRow('SKU_Z', '10')], HEADERS);
+  assert(sinLecturas[0]?.estado === 'FALTANTE' && sinLecturas[0]?.contado === 0,
+    'un SKU con teorico y cero lecturas queda como FALTANTE (nunca pistoleado)');
+
+  // Hallazgo fisico: pistoleado pero ausente de la hoja.
+  const hallazgo = reconcileStockCountSession(session({ conteos: [entry('SKU_NUEVO', 8)] }), [], HEADERS);
+  assert(hallazgo[0]?.estado === 'NO_CATALOGADO' && hallazgo[0]?.teorico === 0,
+    'un SKU pistoleado ausente de la hoja se clasifica NO_CATALOGADO (hallazgo fisico)');
+
+  // --- Consolidacion por CU_VC: la unidad de vencimiento es SKU + MM/YYYY ---
+
+  const dosLecturasMismoCuVc = reconcileStockCountSession(
+    session({
+      requiereVencimiento: true,
+      conteos: [
+        entry('SKU_A', 3, { cu_vc: 'SKU_A202712', mm: '12', yyyy: '2027' }),
+        entry('SKU_A', 4, { cu_vc: 'SKU_A202712', mm: '12', yyyy: '2027' })
+      ]
+    }), [], HEADERS);
+  assert(dosLecturasMismoCuVc.length === 1 && dosLecturasMismoCuVc[0]?.contado === 7,
+    'dos lecturas del mismo CU_VC se consolidan en una sola fila con la cantidad sumada');
+
+  // Mismo SKU con distinto mes son vencimientos distintos: no deben fusionarse.
+  const dosMeses = reconcileStockCountSession(
+    session({
+      requiereVencimiento: true,
+      conteos: [
+        entry('SKU_A', 3, { cu_vc: 'SKU_A202711', mm: '11', yyyy: '2027' }),
+        entry('SKU_A', 4, { cu_vc: 'SKU_A202712', mm: '12', yyyy: '2027' })
+      ]
+    }), [], HEADERS);
+  assert(dosMeses.length === 2,
+    'el mismo SKU en meses distintos produce dos vencimientos separados');
+
+  // --- Fila canonica de sincronizacion a VENCIMIENTOS ---
+
+  const item = dosLecturasMismoCuVc[0];
+  const row = buildVencimientosRowFromCount(item, 7);
+  assert(row.CU_VC === 'SKU_A202712',
+    'la fila sincronizada lleva el CU_VC compuesto');
+  assert(row._entityKey === 'SKU_A202712' && row._entityKeyCol === 'CU_VC',
+    'la fila sincronizada fija su clave de entidad, para que la cola offline re-localice la fila');
+  assert(row._rowIndex === 7,
+    'la fila sincronizada conserva el rowIndex original del item');
+  assert(row.FECHA_VC === '31/12/2027',
+    'la fila sincronizada fija la fecha de vencimiento al ultimo dia del mes');
+  assert(row.CANTIDAD === 7,
+    'la fila sincronizada lleva la cantidad fisica consolidada');
+  assert(row.SKU_VC === 'SKU_A' && row.MM === '12' && row.YYYY === '2027',
+    'la fila sincronizada descompone SKU, MM y YYYY en sus columnas canonicas');
+
+  // Sin fecha de vencimiento la fila degrada al SKU: el terminal descarta estas
+  // lecturas antes de sincronizar (filtro contado > 0 && mm && yyyy), asi que la
+  // fila nunca deberia construirse; si se construyera, no debe inventar un CU_VC.
+  const sinFecha = buildVencimientosRowFromCount(entry('SKU_A', 4), undefined);
+  assert(sinFecha.CU_VC === 'SKU_A' && sinFecha.FECHA_VC === '' && sinFecha.MM === '',
+    'sin MM/YYYY la fila degrada al SKU limpio y no inventa fecha de vencimiento');
+
+  // La fila debe cubrir exactamente las columnas canonicas mas los metadatos internos.
+  const esperadas = HEADERS.filter(h => h !== 'TIPO_EVENTO');
+  assert(esperadas.every(h => h in row),
+    'la fila sincronizada cubre las columnas canonicas de VENCIMIENTOS');
 }
 
 console.log(`\n========================================`);

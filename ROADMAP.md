@@ -843,6 +843,44 @@ Monolitos restantes de la fase: `StockCountTerminal.tsx` (2.751) ·
 `CampaignConsolidationDashboard.tsx` (1.399) · `InventoryDashboard.tsx` (1.377) ·
 `SliceEditorModal.tsx` (1.186).
 
+#### Red de la cuadratura y del modo BLIND: unitaria primero, E2E donde el DOM es el punto
+
+Al separar el motor de campañas quedó a la vista un hueco mayor que el del terminal: el
+**núcleo puro** de la cuadratura tenía cobertura cero. `reconcileStockCountSession` y
+`buildVencimientosRowFromCount` —de donde salen los estados FALTANTE/SOBRANTE/CUADRADO, la
+consolidación por `CU_VC` y las 14 columnas que se escriben en VENCIMIENTOS— no tenían una
+sola prueba unitaria. Eso no se cubre con un arnés de navegador: es lógica pura y se prueba
+en `test-modules.ts` (sección 18, 18 aserciones nuevas).
+
+Los invariantes que fija, en orden de riesgo:
+
+- **`CU_VC` como clave de entidad de la fila sincronizada.** Si `_entityKey` deja de fijarse,
+  la cola offline no puede re-localizar la fila y cada sincronización **duplica** vencimientos
+  (AGENTS.md §K: la unidad de vencimiento es SKU + MM/YYYY, sin lotes).
+- **Consolidación por `CU_VC`, no por SKU.** Dos lecturas del mismo mes suman en una fila; el
+  mismo SKU en meses distintos son dos vencimientos. Fusionarlos o no sumarlos rompe la
+  cuadratura en silencio.
+- **Cuadratura BLIND sin teórico.** Se probó como **par discriminante** (DOCUMENT mapea el
+  teórico / BLIND no), no como aserción suelta: un gate roto que ocultara el teórico en *todos*
+  los modos daría verde con una sola aserción.
+- **Clasificación de estados**, incluidos los dos casos que no son diferencias aritméticas:
+  SKU con teórico y cero lecturas es FALTANTE (nunca pistoleado), y SKU pistoleado ausente de
+  la hoja es NO_CATALOGADO (hallazgo físico).
+
+**Verificado que discrimina**: mutando el gate de BLIND (`session.modo !== 'BLIND'` → `true`) y
+vaciando `_entityKey` fallan **exactamente** esas dos aserciones (168/170); restaurado, vuelve
+a 170/170.
+
+El arnés E2E `blindcheck.cjs` cubre la mitad que la prueba pura no puede ver: que el invariante
+llegue a la **pantalla**. Mismo par discriminante sobre el DOM real —en DOCUMENT debe aparecer
+el badge `ERP: <n> un`, en BLIND no—, sembrando catálogo maestro y campaña con snapshot porque
+el badge solo se renderiza si el SKU se resuelve contra ambos. Un detalle que costó una
+iteración: el gate `!isBlind` está duplicado en la rama de escritorio y en la de móvil; el arnés
+corre a 1600 px, así que la mutación tiene que apuntar a la rama de escritorio o el arnés pasa
+por la razón equivocada.
+
+Corre en CI dentro de `npm run test:e2e` (12 arneses).
+
 ### Fase 6 — Rendimiento y empaquetado
 
 Bundle principal 1.650 KB (455 KB gzip) y CSS 208 KB. `React.memo` donde el profiler lo
