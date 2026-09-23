@@ -2,21 +2,10 @@ import React, { useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { CheckCircle2, CheckCheck, Copy, MessageSquare, FileWarning, Printer, Download, Database, ShieldCheck, Building2 } from 'lucide-react';
 import { StockCountReconciliationItem, StockCountSession } from '../../types';
+import type { ReconciliationFilter, ReconciliationMetrics } from '../../utils/countAggregation';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 
-export type ReconciliationFilter = 'ALL' | 'DIF' | 'CUADRADO' | 'FALTANTE' | 'SOBRANTE' | 'NO_CATALOGADO';
-
-export interface ReconciliationMetrics {
-  totalContado: number;
-  totalTeorico: number;
-  diferenciaNeta: number;
-  cuadrados: number;
-  faltantes: number;
-  sobrantes: number;
-  noCatalogados: number;
-  conDiferencia: number;
-  cobertura: number;
-}
+export type { ReconciliationFilter, ReconciliationMetrics };
 
 export interface StockCountReconciliationViewProps {
   currentSession: StockCountSession;

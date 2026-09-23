@@ -17,6 +17,7 @@ import { LastScannedHeroCard } from './LastScannedHeroCard';
 import { MobileExpiryPrompt, MONTHS_LIST } from './MobileExpiryPrompt';
 import { buildMasterCatalogIndex, MasterProductSummary } from '../../utils/referenceResolver';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
+import { groupSkuEntries, getLastScannedItem, filterGroupedEntries, filterChronoEntries, getReconciliationProviders, filterReconciliation, computeReconciliationMetrics, getPendingItems } from '../../utils/countAggregation';
 import { copyTextToClipboard } from '../../utils/exportUtils';
 import { executeThermalPrint } from '../../utils/ticketUtils';
 import { TicketPrintView } from './TicketPrintView';
@@ -742,88 +743,20 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   };
 
   // Group count entries by SKU for consolidated view on mobile/desktop
-  const groupedSkuEntries = useMemo(() => {
-    if (!currentSession) return [];
-    const map = new Map<string, {
-      sku: string;
-      descripcion: string;
-      totalCantidad: number;
-      readingsCount: number;
-      lastTimestamp: string;
-      ubicaciones: string[];
-      mm?: string;
-      yyyy?: string;
-      entries: StockCountEntry[];
-    }>();
-
-    for (const entry of currentSession.conteos) {
-      const existing = map.get(entry.sku);
-      if (!existing) {
-        map.set(entry.sku, {
-          sku: entry.sku,
-          descripcion: entry.descripcion,
-          totalCantidad: entry.cantidad,
-          readingsCount: 1,
-          lastTimestamp: entry.timestamp,
-          ubicaciones: entry.ubicacion ? [entry.ubicacion] : [],
-          mm: entry.mm,
-          yyyy: entry.yyyy,
-          entries: [entry]
-        });
-      } else {
-        existing.totalCantidad += entry.cantidad;
-        existing.readingsCount += 1;
-        if (entry.ubicacion && !existing.ubicaciones.includes(entry.ubicacion)) {
-          existing.ubicaciones.push(entry.ubicacion);
-        }
-        if (!existing.mm && entry.mm) {
-          existing.mm = entry.mm;
-          existing.yyyy = entry.yyyy;
-        }
-        existing.entries.push(entry);
-      }
-    }
-
-    return Array.from(map.values());
-  }, [currentSession]);
+  const groupedSkuEntries = useMemo(() => groupSkuEntries(currentSession), [currentSession]);
 
   // Last scanned item with cumulative quantity for instant visual feedback on mobile
-  const lastScannedItem = useMemo(() => {
-    if (!currentSession || currentSession.conteos.length === 0) return null;
-    const latest = currentSession.conteos[0];
-    const totalForSku = currentSession.conteos
-      .filter(c => c.sku === latest.sku)
-      .reduce((sum, c) => sum + c.cantidad, 0);
-    const readingsCountForSku = currentSession.conteos.filter(c => c.sku === latest.sku).length;
-    return {
-      ...latest,
-      totalAcumulado: totalForSku,
-      scanCount: readingsCountForSku
-    };
-  }, [currentSession]);
+  const lastScannedItem = useMemo(() => getLastScannedItem(currentSession), [currentSession]);
 
   // Filtered grouped entries for search
-  const filteredGroupedSkuEntries = useMemo(() => {
-    if (!readingsSearch.trim()) return groupedSkuEntries;
-    const q = readingsSearch.toLowerCase().trim();
-    return groupedSkuEntries.filter(g => 
-      g.sku.toLowerCase().includes(q) || 
-      g.descripcion.toLowerCase().includes(q) ||
-      g.ubicaciones.some(u => u.toLowerCase().includes(q))
-    );
-  }, [groupedSkuEntries, readingsSearch]);
+  const filteredGroupedSkuEntries = useMemo(
+    () => filterGroupedEntries(groupedSkuEntries, readingsSearch),
+    [groupedSkuEntries, readingsSearch]);
 
   // Filtered chronological entries for search
-  const filteredChronoEntries = useMemo(() => {
-    if (!currentSession) return [];
-    if (!readingsSearch.trim()) return currentSession.conteos;
-    const q = readingsSearch.toLowerCase().trim();
-    return currentSession.conteos.filter(c => 
-      c.sku.toLowerCase().includes(q) || 
-      c.descripcion.toLowerCase().includes(q) ||
-      (c.ubicacion && c.ubicacion.toLowerCase().includes(q))
-    );
-  }, [currentSession, readingsSearch]);
+  const filteredChronoEntries = useMemo(
+    () => filterChronoEntries(currentSession, readingsSearch),
+    [currentSession, readingsSearch]);
 
   // Increment quantity for a specific SKU (+1) directly from the grouped card
   const handleIncrementSkuQuantity = (sku: string) => {
@@ -921,26 +854,12 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   }, [currentSession, sheetItems, headers, masterProducts, viewState]);
 
   // Unique list of suppliers found in current reconciliation session
-  const reconciliationProviders = useMemo(() => {
-    const set = new Set<string>();
-    reconciliation.forEach(r => {
-      if (r.rutProveedor && r.rutProveedor.trim()) {
-        set.add(r.rutProveedor.trim());
-      }
-    });
-    return Array.from(set).sort();
-  }, [reconciliation]);
+  const reconciliationProviders = useMemo(() => getReconciliationProviders(reconciliation), [reconciliation]);
 
   // Filtered reconciliation list for display & thermal printing
-  const filteredReconciliation = useMemo(() => {
-    let list = reconciliation;
-    if (selectedProviderFilter !== 'ALL') {
-      list = list.filter(r => String(r.rutProveedor || '').trim().toLowerCase() === String(selectedProviderFilter || '').trim().toLowerCase());
-    }
-    if (reconciliationFilter === 'ALL') return list;
-    if (reconciliationFilter === 'DIF') return list.filter(r => r.estado !== 'CUADRADO');
-    return list.filter(r => r.estado === reconciliationFilter);
-  }, [reconciliation, reconciliationFilter, selectedProviderFilter]);
+  const filteredReconciliation = useMemo(
+    () => filterReconciliation(reconciliation, reconciliationFilter, selectedProviderFilter),
+    [reconciliation, reconciliationFilter, selectedProviderFilter]);
 
   // Thermal ticket printer for supplier / reconciliation audit
   const handlePrintSupplierTicket = () => {
@@ -974,51 +893,10 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   };
 
   // Reconciliation summary KPIs
-  const metrics = useMemo(() => {
-    let totalContado = 0;
-    let totalTeorico = 0;
-    let cuadrados = 0;
-    let faltantes = 0;
-    let sobrantes = 0;
-    let noCatalogados = 0;
-
-    for (const r of reconciliation) {
-      totalContado += r.contado;
-      totalTeorico += (r.teorico + r.ajusteMovimiento);
-      if (r.estado === 'CUADRADO') cuadrados++;
-      else if (r.estado === 'FALTANTE') faltantes++;
-      else if (r.estado === 'SOBRANTE') sobrantes++;
-      else if (r.estado === 'NO_CATALOGADO') noCatalogados++;
-    }
-
-    const itemsContadosCount = reconciliation.filter(r => r.contado > 0).length;
-    const totalItemsCount = reconciliation.length || 1;
-    const cobertura = Math.round((itemsContadosCount / totalItemsCount) * 100);
-
-    return {
-      totalContado,
-      totalTeorico,
-      diferenciaNeta: totalContado - totalTeorico,
-      cuadrados,
-      faltantes,
-      sobrantes,
-      noCatalogados,
-      conDiferencia: faltantes + sobrantes + noCatalogados,
-      cobertura
-    };
-  }, [reconciliation]);
+  const metrics = useMemo(() => computeReconciliationMetrics(reconciliation), [reconciliation]);
 
   // Pending items list for operational checklist
-  const pendingItems = useMemo(() => {
-    if (!currentSession) return [];
-    const items = reconciliation.filter(r => r.contado === 0 && r.teorico > 0);
-    if (!pendingSearch.trim()) return items;
-    const term = pendingSearch.toLowerCase().trim();
-    return items.filter(r => 
-      r.sku.toLowerCase().includes(term) || 
-      r.descripcion.toLowerCase().includes(term)
-    );
-  }, [currentSession, reconciliation, pendingSearch]);
+  const pendingItems = useMemo(() => getPendingItems(currentSession, reconciliation, pendingSearch), [currentSession, reconciliation, pendingSearch]);
 
   // Export reconciliation report to Excel
   const handleExportExcel = async (exportScope: 'FILTERED' | 'COUNTED_ONLY' | 'ALL' = 'FILTERED') => {

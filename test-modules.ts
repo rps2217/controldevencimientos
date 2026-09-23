@@ -102,11 +102,21 @@ import {
   buildVencimientosRowFromCount
 } from './src/utils/stockCountUtils';
 import {
+  groupSkuEntries,
+  getLastScannedItem,
+  filterGroupedEntries,
+  filterChronoEntries,
+  getReconciliationProviders,
+  filterReconciliation,
+  computeReconciliationMetrics,
+  getPendingItems
+} from './src/utils/countAggregation';
+import {
   computeCampaignConsolidationMatrix,
   markSkuAsClosedInCampaign,
   buildAuditRowsFromCampaignMatrix
 } from './src/utils/campaignUtils';
-import { InventoryCampaign, StockCountSession, CampaignSnapshotItem, StockCountEntry, InventoryItem } from './src/types';
+import { InventoryCampaign, StockCountSession, CampaignSnapshotItem, StockCountEntry, StockCountReconciliationItem, InventoryItem } from './src/types';
 import { createMimeMessage, escapeHtml } from './src/lib/gmailService';
 
 
@@ -1005,6 +1015,148 @@ console.log('\n--- 18. Pruebas de cuadratura y sincronizacion con VENCIMIENTOS -
   const esperadas = HEADERS.filter(h => h !== 'TIPO_EVENTO');
   assert(esperadas.every(h => h in row),
     'la fila sincronizada cubre las columnas canonicas de VENCIMIENTOS');
+}
+
+console.log('\n--- 19. Pruebas de agregacion y filtrado del conteo (countAggregation) ---');
+{
+  // Estas ocho funciones vivian como useMemo dentro del terminal y no tenian
+  // cobertura. Como logica pura, se prueban aqui sin montar el DOM.
+  const entry = (sku: string, cantidad: number, extra: Partial<StockCountEntry> = {}): StockCountEntry => ({
+    id: `${sku}-${Math.random()}`,
+    sku,
+    descripcion: `Producto ${sku}`,
+    cantidad,
+    timestamp: '2026-09-19T10:00:00Z',
+    ...extra
+  });
+  const session = (conteos: StockCountEntry[]): StockCountSession => ({
+    id: 's1',
+    nombre: 'Mueble 1',
+    modo: 'DOCUMENT',
+    requiereVencimiento: true,
+    hojaOrigen: 'main',
+    estado: 'IN_PROGRESS',
+    fechaInicio: '2026-09-19T09:00:00Z',
+    conteos,
+    rangoAnos: { desde: 2026, hasta: 2028 }
+  });
+  const recon = (over: Partial<StockCountReconciliationItem>): StockCountReconciliationItem => ({
+    itemKey: over.sku || 'SKU', sku: 'SKU', descripcion: 'P',
+    teorico: 0, contado: 0, diferencia: 0, estado: 'CUADRADO', ajusteMovimiento: 0,
+    ...over
+  });
+
+  // Agrupacion: suma por SKU, recolecta ubicaciones sin duplicar y conserva el
+  // primer MM/YYYY visto. Es el invariante del que depende la cuadratura por CU_VC.
+  const grouped = groupSkuEntries(session([
+    entry('A', 3, { ubicacion: 'Pasillo 1', mm: '12', yyyy: '2027' }),
+    entry('A', 2, { ubicacion: 'Pasillo 1' }),
+    entry('A', 1, { ubicacion: 'Pasillo 2' }),
+    entry('B', 5)
+  ]));
+  const grupoA = grouped.find(g => g.sku === 'A')!;
+  assert(grupoA.totalCantidad === 6, 'agregacion: suma las cantidades del mismo SKU (3+2+1)');
+  assert(grupoA.readingsCount === 3, 'agregacion: cuenta las lecturas del mismo SKU');
+  assert(grupoA.ubicaciones.length === 2, 'agregacion: deduplica ubicaciones repetidas');
+  assert(grupoA.mm === '12' && grupoA.yyyy === '2027',
+    'agregacion: conserva el primer MM/YYYY del SKU');
+  assert(grouped.length === 2, 'agregacion: un grupo por SKU distinto');
+  assert(groupSkuEntries(null).length === 0, 'agregacion: sin sesion no hay grupos');
+
+  // La lista de lecturas agrupa por SKU, no por CU_VC: dos meses del mismo SKU
+  // se ven como un solo grupo con el acumulado. Es distinto del motor de
+  // cuadratura, que si separa por CU_VC (SKU + MM/YYYY). Se fija aqui para que
+  // cambiar la clave de agrupacion sin querer no pase inadvertido.
+  const dosMeses = groupSkuEntries(session([
+    entry('A', 3, { cu_vc: 'A202712', mm: '12', yyyy: '2027' }),
+    entry('A', 2, { cu_vc: 'A202801', mm: '01', yyyy: '2028' })
+  ]));
+  assert(dosMeses.length === 1 && dosMeses[0].totalCantidad === 5,
+    'agregacion: agrupa por SKU aunque los CU_VC sean de meses distintos');
+
+  // Ultima lectura: el terminal inserta al frente, asi que conteos[0] es la mas
+  // reciente y el acumulado debe sumar todas las lecturas de ese SKU.
+  const last = getLastScannedItem(session([entry('A', 4), entry('A', 2), entry('B', 9)]))!;
+  assert(last.sku === 'A' && last.totalAcumulado === 6 && last.scanCount === 2,
+    'ultima lectura: acumula solo las lecturas de su SKU');
+  assert(getLastScannedItem(session([])) === null, 'ultima lectura: sesion vacia devuelve null');
+
+  // Filtros de lecturas: buscan en SKU, descripcion y ubicacion.
+  const entries = [entry('ABC', 1, { ubicacion: 'Rack Norte' }), entry('XYZ', 2, { descripcion: 'Jabon' })];
+  assert(filterGroupedEntries(grouped, '').length === grouped.length,
+    'filtro lecturas: busqueda vacia devuelve todo');
+  assert(filterChronoEntries(session(entries), '').length === 2,
+    'filtro lecturas: busqueda vacia devuelve todo lo cronologico');
+  assert(filterChronoEntries(session(entries), 'rack').length === 1,
+    'filtro lecturas: encuentra por ubicacion');
+  assert(filterChronoEntries(session(entries), 'jabon').length === 1,
+    'filtro lecturas: encuentra por descripcion');
+  assert(filterChronoEntries(session(entries), 'nada').length === 0,
+    'filtro lecturas: sin coincidencias devuelve vacio');
+  assert(filterChronoEntries(null, 'x').length === 0, 'filtro lecturas: sin sesion devuelve vacio');
+
+  // KPIs: la diferencia neta es contado - (teorico + ajusteMovimiento), y el
+  // ajuste por movimiento (ventas del turno) tiene que entrar en el calculo.
+  const metrics = computeReconciliationMetrics([
+    recon({ sku: 'A', teorico: 10, contado: 10, ajusteMovimiento: 0, estado: 'CUADRADO' }),
+    recon({ sku: 'B', teorico: 8, contado: 5, ajusteMovimiento: 0, estado: 'FALTANTE' }),
+    recon({ sku: 'C', teorico: 2, contado: 4, ajusteMovimiento: 0, estado: 'SOBRANTE' }),
+    recon({ sku: 'D', teorico: 0, contado: 3, ajusteMovimiento: 0, estado: 'NO_CATALOGADO' }),
+    recon({ sku: 'E', teorico: 5, contado: 4, ajusteMovimiento: 1, estado: 'CUADRADO' })
+  ]);
+  assert(metrics.totalContado === 26, 'kpis: suma el total contado');
+  assert(metrics.totalTeorico === 26, 'kpis: el teorico incluye el ajuste por movimiento');
+  assert(metrics.diferenciaNeta === 0, 'kpis: la diferencia neta cruza contado contra teorico ajustado');
+  assert(metrics.cuadrados === 2 && metrics.faltantes === 1 && metrics.sobrantes === 1 && metrics.noCatalogados === 1,
+    'kpis: clasifica cada estado en su propio contador');
+  assert(metrics.conDiferencia === 3,
+    'kpis: conDiferencia agrupa faltantes, sobrantes y no catalogados');
+  assert(metrics.cobertura === 100,
+    'kpis: la cobertura es el porcentaje de lineas con lectura (las 5 tienen lectura)');
+
+  // Division por cero: una cuadratura vacia debe dar 0%, no NaN.
+  const vacio = computeReconciliationMetrics([]);
+  assert(vacio.cobertura === 0 && !Number.isNaN(vacio.cobertura),
+    'kpis: cuadratura vacia da 0% de cobertura y no NaN');
+
+  // Filtros de cuadratura: 'DIF' es "todo lo que no esta cuadrado", no solo faltantes.
+  // D (FALTANTE de 111) existe para que el cruce estado+proveedor discrimine:
+  // filtrar por 111 debe devolver 2 filas, y por 111+DIF solo 1.
+  const lista = [
+    recon({ sku: 'A', estado: 'CUADRADO', rutProveedor: '111' }),
+    recon({ sku: 'B', estado: 'FALTANTE', rutProveedor: '222' }),
+    recon({ sku: 'C', estado: 'NO_CATALOGADO', rutProveedor: '222' }),
+    recon({ sku: 'D', estado: 'FALTANTE', rutProveedor: '111' })
+  ];
+  assert(filterReconciliation(lista, 'ALL', 'ALL').length === 4,
+    'filtro cuadratura: ALL devuelve todo');
+  assert(filterReconciliation(lista, 'DIF', 'ALL').length === 3,
+    'filtro cuadratura: DIF incluye faltantes y no catalogados');
+  assert(filterReconciliation(lista, 'CUADRADO', 'ALL').length === 1,
+    'filtro cuadratura: filtra por un estado concreto');
+  assert(filterReconciliation(lista, 'ALL', '111').length === 2,
+    'filtro cuadratura: filtra por proveedor');
+  assert(filterReconciliation(lista, 'DIF', '111').length === 1,
+    'filtro cuadratura: combina estado y proveedor (111 tiene un cuadrado y un faltante)');
+
+  assert(getReconciliationProviders(lista).join(',') === '111,222',
+    'proveedores: lista los distintos y los ordena');
+  assert(getReconciliationProviders([]).length === 0,
+    'proveedores: sin datos devuelve lista vacia');
+
+  // Checklist pendiente: SKUs con teorico y cero lecturas; un SKU no catalogado
+  // (teorico 0) no es pendiente porque no se esperaba nada de el.
+  const pend = getPendingItems(session([]), [
+    recon({ sku: 'A', teorico: 5, contado: 0 }),
+    recon({ sku: 'B', teorico: 5, contado: 5 }),
+    recon({ sku: 'C', teorico: 0, contado: 0 })
+  ], '');
+  assert(pend.length === 1 && pend[0].sku === 'A',
+    'pendientes: solo los SKUs con teorico y cero lecturas');
+  assert(getPendingItems(session([]), pend, 'a').length === 1,
+    'pendientes: filtra por SKU');
+  assert(getPendingItems(null, pend, '').length === 0,
+    'pendientes: sin sesion no hay checklist');
 }
 
 console.log(`\n========================================`);

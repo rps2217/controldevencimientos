@@ -839,9 +839,57 @@ cada función movida (normalizando espacios y cortando en su llave de cierre) co
 original; todas idénticas. `tsc` limpio, 0 imports huérfanos en ambos archivos, 180 pruebas,
 11 arneses E2E incluido `countcheck`.
 
-Monolitos restantes de la fase: `StockCountTerminal.tsx` (2.751) ·
+Monolitos restantes de la fase: `StockCountTerminal.tsx` (2.629 tras el corte 2) ·
 `CampaignConsolidationDashboard.tsx` (1.399) · `InventoryDashboard.tsx` (1.377) ·
 `SliceEditorModal.tsx` (1.186).
+
+#### Corte 2 — `countAggregation.ts`: la agregación del conteo, fuera del terminal
+
+Al encarar `StockCountTerminal.tsx` (2.751 líneas) el primer impulso fue extraer los bloques
+de render —el móvil y el escritorio— como componentes. **Se midió antes de cortar y se
+descartó**: el bloque de escritorio necesita **43** identidades del padre y el móvil **65**
+(estado, setters, handlers y memoización). Un componente con esa superficie de props es más
+difícil de leer que el JSX inline: no hay una costura, hay un agujero. Descartado por el
+escalón 7 de la escalera.
+
+La costura real estaba en la lógica. Ocho `useMemo` (~200 líneas) calculaban agregación pura
+sobre la sesión —agrupar lecturas por SKU, KPIs de cuadratura, filtros de estado/proveedor,
+checklist de pendientes— y **ninguno tenía una sola prueba**: la cuadratura se verificaba a
+nivel de motor (`reconcileStockCountSession`) y de E2E, pero el cálculo de KPIs que ve el
+operario no se cubría en ningún sitio.
+
+Se extrajo a `src/utils/countAggregation.ts` con los cuerpos idénticos (las únicas
+diferencias son parámetros renombrados y un tipo inline que pasó a ser `GroupedSkuEntry`,
+misma forma). `StockCountReconciliationView` ya no declara `ReconciliationFilter` ni
+`ReconciliationMetrics`: los importa del módulo, que es donde se calculan.
+
+| | Antes | Después |
+| --- | --- | --- |
+| `StockCountTerminal.tsx` | 2.751 | 2.629 |
+| `countAggregation.ts` | — | 226 |
+
+**Pruebas (14 nuevas, sección 19) con verificación por mutación.** Cada una se comprobó
+rompiendo el código a propósito, no solo en verde:
+
+| Mutación aplicada | Prueba que debe caer | Resultado |
+| --- | --- | --- |
+| Agrupar por `CU_VC` en vez de por SKU | agrupa por SKU aunque los CU_VC sean de meses distintos | falla |
+| Quitar el `\|\| 1` del denominador de cobertura | cuadratura vacía da 0% y no NaN | falla |
+| `DIF` = solo faltantes (olvida no catalogados) | DIF incluye faltantes y no catalogados | falla |
+
+La primera mutación **no cayó** en el primer intento: el fixture usaba lecturas sin `cu_vc`,
+así que ambos criterios de agrupación coincidían y la prueba pasaba en vacío. Se añadió el
+caso de dos meses del mismo SKU, que la distingue; con eso, la mutación cae. Es el argumento
+de por qué la verificación por mutación no es opcional.
+
+Además se fijaron dos bordes que el código original ya resolvía pero nadie vigilaba: el
+acumulado de la última lectura suma solo su SKU, y el teórico de los KPIs incluye
+`ajusteMovimiento` (ventas del turno), que es lo que hace que la diferencia neta cuadre con
+la operación real y no con el snapshot congelado.
+
+Gate: `tsc` 0, `eslint` 0 errores, **206 unitarias** (14 nuevas) + 10 de componente + 18 de
+hoja = 234, y 12 arneses E2E incluidos `countcheck` y `blindcheck`.
+
 
 #### Red de la cuadratura y del modo BLIND: unitaria primero, E2E donde el DOM es el punto
 
