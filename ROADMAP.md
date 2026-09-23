@@ -1318,3 +1318,93 @@ estables de React, donde añadir la dependencia no cambia nada. Sólo se tocó e
 - `tsc` 0 errores; `eslint` 0 errores y **16 warnings** (bajó de 17: el de `useTableGrouping`
   desaparece porque la causa era el bug). Componentes: **10 pasadas, 0 falladas**.
 
+
+## Auditoría Ponytail (2026-09-19) — barrido tras el corte de campañas
+
+Barrido del árbol con la Escalera de Decisiones, después de extraer `campaignUtils.ts`.
+Cada hallazgo va con la evidencia que lo sustenta; lo que no tiene evidencia no se afirma.
+
+**Lo que se midió y está sano**
+
+- **Deuda `any`: 1** (`src/types.ts:145`, el índice dinámico por encabezados de hoja). Es
+  irreducible sin perder la naturaleza de hoja flexible, y está comentado como tal.
+- **Cero dependencias nuevas**, y las 13 de producción tienen consumidor real: `motion`
+  (2 archivos, vía `motion/react`), `recharts` (1), `zod` (4), `react-router-dom` (2),
+  `html5-qrcode` (2, fuera del chunk de arranque), `@tanstack/react-virtual` (3). Ninguna
+  es peso muerto.
+- **Cero campos monetarios en la UI**: 0 menciones de precio/costo/monto en
+  `src/components`. Se respeta la regla estricta de AGENTS.md §5.
+- **La puerta de persistencia (Fase 4) se sostiene**: 0 lecturas con
+  `JSON.parse(localStorage.getItem(...))` fuera de `appStorage.ts`. Toda lectura
+  estructurada pasa por `readStorage`/`readRawStorage` con esquema Zod.
+- **Sin capas duplicadas de cálculo**: `getItemStatus` **delega** en `computeItemRawStatus`;
+  `dateCalculations.tsx` aporta los badges de UI y `pureCalculations.ts` la lógica pura.
+  La separación es correcta, no duplicación.
+
+**Hallazgo 1 — Dorsal: 10 exports sin consumidor externo (superficie, no código muerto)**
+
+`encodeCode128`, `codesToBinaryString`, `normalizeHeaderString`, `consolidateBatchByCuVc`,
+`normalizeRut`, `normalizeCleanText`, `itemMatchesSlice`, `getDefaultTicketGeneralSettings`,
+`sanitizeHeader`, `loadCampaignsFromCloud` no se importan fuera de su archivo, pero **sí se
+usan dentro** (2–7 referencias cada uno). No son código muerto: son funciones internas
+exportadas de más. Coste real bajo (no entran al bundle si nadie las importa; un bundler
+moderno las poda). **No se toca en este corte**: quitar el `export` es seguro pero ruidoso
+y sin impacto medible; queda como limpieza oportunista, no como tarea.
+
+**Hallazgo 2 — Dorsal: el mismo ternario de diferencia de color, 8 veces**
+
+`diferencia > 0` con su rama de color se repite en `StockCountReconciliationView.tsx` (2),
+`StockCountTerminal.tsx` (4) y las dos ramas de escritorio/móvil del badge de campaña.
+Escalón 2 (reutilizar) aplica: un helper `getDifferenceBadgeClass(diferencia)` en
+`pureCalculations.ts` es una función pura de una línea. **No se aplica en este corte**
+porque los tres sitios usan **escalas de color distintas** (una `bg-*-200`, otra
+`bg-*-100`, otra `bg-*-950`) mezcladas con textos distintos ("Sobran +" vs "+"). Unificar
+exige antes decidir cuál es la canónica: es una decisión de diseño, no una extracción
+mecánica. Se registra para no perderlo.
+
+**Hallazgo 3 — Dorsal: la expresión "modo demo" escrita 5 veces**
+
+`const isDemo = !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();` aparece idéntica en
+`useInventoryIngestion.ts`, `useInventoryBulkActions.ts` (1 c/u) e `InventoryDashboard.tsx`
+(3). No existe helper. Escalón 3: es una expresión de una línea y un helper
+`isDemoMode()` en `appStorage.ts` la centraliza sin abstracción especulativa. **Candidato
+claro para el próximo corte**, de bajo riesgo y verificable.
+
+**Hallazgo 4 — Dorsal/CI: `printcheck.cjs` da falsa confianza**
+
+El arnés **existe, corre sobre el build y no falla**, pero **no asserta nada**: imprime
+filas, checkbox, botón y el resultado de `window.__printProbe`, y termina siempre en
+`die(0)`. Un `printcheck` rojo es imposible: solo puede informar. Está correctamente fuera
+de la puerta (`run.cjs`), pero AGENTS.md lo listaba como si verificara "la vista de
+impresión". Corregida la tabla para decir lo que hace (diagnóstico manual, no verificación).
+Promoverlo a la puerta exige primero escribir sus asserts —no es trabajo de este corte.
+
+**Hallazgo 5 — Duplicación de UI: el badge de campaña, escrito dos veces**
+
+El bloque `!isBlind && (campaignSkuStats?.inErp ? ... ERP ... : ... Hallazgo ...)` está
+**duplicado** entre la rama móvil (1627) y la de escritorio (2087), y el bloque de estado
+de diferencia también (1639 / 2096). Un extraer a subcomponente estándar choca con que las
+dos ramas usan **estilos y textos distintos** ("Hallazgo Físico" vs "Hallazgo", `bg-*-100`
+vs `bg-*-950`). No es copia mecánica: son dos presentaciones. Extraer un componente con
+props de variante sería abstraer por encima de dos usos y **añadir** código, contra el
+escalón 7. Se documenta como duplicación intencional (layout responsivo), no como deuda.
+
+**Hallazgo 6 — Dorsal: 3 escrituras a `SHEET_CONFIG` fuera de `appStorage`**
+
+`useInventoryData.ts` (2) e `InventoryDashboard.tsx` (1) escriben `SHEET_CONFIG` con
+`JSON.stringify` directo, en vez de `writeStorage`. Impacto real medido: **ninguno en
+comportamiento** (las tres envuelven en `try/catch`, y `writeStorage` haría exactamente lo
+mismo). Es inconsistencia de estilo, no bug. No se toca: cambiarlo obliga a importar
+`writeStorage` en tres sitios para idéntico efecto.
+
+**Veredicto del corte**
+
+El árbol está en buen estado Ponytail: sin código muerto confirmado, sin dependencias
+hinchadas, sin sobreingeniería nueva. Los seis hallazgos son dorsales (limpieza de
+superficie) salvo el 4, que es un falso verde de documentación ya corregido. El único
+candidato de valor inmediato es el **3** (`isDemoMode()`), y el **1** y **6** quedan como
+limpieza oportunista. El **2** espera decisión de diseño y el **5** se cierra como
+intencional.
+
+Verificación del corte: `tsc` sin errores · `eslint` 0 errores / 16 warnings preexistentes ·
+**170 + 10 + 18 pruebas** (198; +18 de la sección 18) · **12 arneses E2E** en verde.

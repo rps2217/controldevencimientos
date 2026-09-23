@@ -329,9 +329,11 @@ Para correr uno solo: `node tests/perf/<script>.cjs http://127.0.0.1:4173/`.
 | `bulkcheck.cjs` | sí | Edición y eliminación masivas (rutas de pérdida de datos). |
 | `sidebarcheck.cjs` | sí | El sidebar resuelve datos del contexto y props solo de comportamiento (colapso y drawer móvil). |
 | `scannercheck.cjs` | sí | Ciclo de vida del lector de cámara con dispositivo falso: arranque real, cierre sin fugas y reapertura. |
+| `countcheck.cjs` | sí | El debounce de 300 ms no pierde la última lectura al descargar la página. |
+| `blindcheck.cjs` | sí | En BLIND no se filtra el stock del ERP a la pantalla (par discriminante con DOCUMENT). |
 | `modals.cjs` | no | Abrir modales: commits, long tasks y encabezado visible. |
 | `profile.cjs` | no | Renders reales de tabla/fila (tecleo). |
-| `printcheck.cjs` | no | La vista de impresión. |
+| `printcheck.cjs` | no | Diagnóstico manual de la vista de impresión. No asserta: imprime el resultado y sale 0. No usarlo como verificación automática. |
 
 `tests/perf/ctxdiff.cjs` **se retiró** (dependía de instrumentación ya eliminada).
 
