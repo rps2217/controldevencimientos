@@ -1146,3 +1146,39 @@ que de verdad estaba repetida.
   `StockCountTerminal` 2.751, `stockCountUtils` 1.481, `CampaignConsolidationDashboard`
   1.399, `SliceEditorModal` 1.186, `InventoryDashboard` 1.377).
 
+
+---
+
+## Auditoría Ponytail (2026-09-19) — bug latente de agrupación (warning `exhaustive-deps` con causa real)
+
+De los 17 warnings `exhaustive-deps` que quedaban, uno era un bug, no ruido:
+`useTableGrouping.ts:69` no listaba `sheetConfig.tableGroupings` como dependencia. Revisados
+los demás, el de `useModuleViewState` (14 faltantes) es **deliberado** —el efecto debe correr
+sólo al cambiar de vista; añadirlos pisaría las ediciones del usuario— y el resto son setters
+estables de React, donde añadir la dependencia no cambia nada. Sólo se tocó el que tenía causa.
+
+**El bug (confirmado, no supuesto)**
+- `sheetConfig` se hidrata de `localStorage` y `fetchData` lo reemplaza después, cuando
+  responde la nube (PropertiesService o pestaña `_CONFIG_APP`). Si la config local no traía
+  agrupación y la de la nube sí, el efecto no volvía a correr (su array no cambiaba) y la
+  agrupación guardada **se perdía** hasta el siguiente cambio de hoja.
+- **Por qué no lo cubría nada**: los E2E siembran `SCRIPT_URL` apuntando a un puerto que
+  rechaza la conexión al instante, así que la app cae a su modo demo y la config de la nube
+  **nunca** llega tarde. La ruta quedaba sin cobertura por diseño del arnés, no por descuido.
+
+**La corrección (mínima)**
+- Se leen los **primitivos** guardados (`savedGroupByColumn`, `savedGroupByDirection`) y se
+  listan como dependencias. No se usa `tableGroupings` entero a propósito: cambia de
+  identidad en cada guardado, así que como dependencia re-ejecutaría el efecto sin que el
+  valor haya cambiado. Con primitivos, el efecto corre justo cuando la agrupación cambia.
+
+**Prueba que discrimina (no pasa en vacío)**
+- `tests/components.test.tsx`, caso 4: monta el hook y aplica la config **después** del
+  montaje (el `update()` del arnés). Verificado contra el código viejo y el nuevo:
+  **sin el fix falla** (`col: "none"` en vez de `PROVEEDOR`), **con el fix pasa**. Sin esa
+  comprobación cruzada, una prueba así no demuestra nada.
+
+**Verificación**
+- `tsc` 0 errores; `eslint` 0 errores y **16 warnings** (bajó de 17: el de `useTableGrouping`
+  desaparece porque la causa era el bug). Componentes: **10 pasadas, 0 falladas**.
+

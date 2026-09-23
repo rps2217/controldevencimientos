@@ -48,11 +48,18 @@ export const useTableGrouping = ({
     persistGrouping({ groupByDirection: dir });
   }, [persistGrouping, setGroupByDirection]);
 
+  // Se leen los primitivos guardados, no el objeto: `tableGroupings` cambia de
+  // identidad en cada guardado, así que depender de él re-ejecutaría el efecto sin
+  // que el valor haya cambiado. Con los primitivos, el efecto se re-ejecuta cuando
+  // de verdad cambia la agrupación (incluida la config que llega de la nube después
+  // del montaje, que antes se perdía).
+  const savedGroupByColumn = sheetConfig.tableGroupings?.[activeSheetKey]?.groupByColumn;
+  const savedGroupByDirection = sheetConfig.tableGroupings?.[activeSheetKey]?.groupByDirection;
+
   useEffect(() => {
-    const saved = sheetConfig.tableGroupings?.[activeSheetKey];
-    if (saved && saved.groupByColumn) {
-      const col = saved.groupByColumn;
-      const dir = saved.groupByDirection || 'asc';
+    if (savedGroupByColumn) {
+      const col = savedGroupByColumn;
+      const dir = savedGroupByDirection || 'asc';
       const isVirtual = VIRTUAL_COLUMNS.some(v => v.label === col || v.id === col);
       const isHeader = headers.includes(col);
       if (col === 'none' || isHeader || isVirtual) {
@@ -66,7 +73,7 @@ export const useTableGrouping = ({
       setGroupByColumn('none');
       setGroupByDirection('asc');
     }
-  }, [activeSheetKey, headers, setGroupByColumn, setGroupByDirection]);
+  }, [activeSheetKey, headers, savedGroupByColumn, savedGroupByDirection, setGroupByColumn, setGroupByDirection]);
 
   // La columna de agrupación se oculta del cuerpo de la tabla: ya aparece en la
   // cabecera del grupo, repetirla añade ruido.

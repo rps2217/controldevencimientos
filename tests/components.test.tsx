@@ -13,6 +13,8 @@ import { mount, makeContext, teardownDom } from './harness';
 import { DashboardProvider } from '../src/context/DashboardContext';
 import { RightDrawerProvider } from '../src/context/RightDrawerContext';
 import { ViewConfigControlDrawer } from '../src/components/drawers/ViewConfigControlDrawer';
+import { useTableGrouping } from '../src/hooks/useTableGrouping';
+import type { SheetConfig } from '../src/types';
 
 let passed = 0;
 let failed = 0;
@@ -132,6 +134,52 @@ async function testDrawerClosedRendersNothing() {
   await view.unmount();
 }
 
+async function testGroupingRestoredWhenConfigArrivesLate() {
+  console.log('\n--- 4. La agrupación guardada se restaura aunque la config llegue tarde ---');
+
+  // Escenario real: la config local no trae agrupación y la de la nube se aplica
+  // después del montaje (fetchData resuelve tarde). Antes el efecto no volvía a
+  // correr porque `tableGroupings` no era dependencia, y la agrupación se perdía.
+  const base = { headers: HEADERS, activeSheetKey: 'main' } as unknown as SheetConfig;
+  const withGrouping = {
+    ...base,
+    tableGroupings: { main: { groupByColumn: 'PROVEEDOR', groupByDirection: 'desc' } },
+  } as unknown as SheetConfig;
+
+  const probe = { col: 'none', dir: 'asc' as 'asc' | 'desc' };
+  // El hook no expone la agrupación: la recibe y la escribe con los setters, que
+  // aquí apuntan al estado del Probe. Ese estado es el observable real.
+  function Probe({ config }: { config: SheetConfig }) {
+    const [col, setCol] = React.useState('none');
+    const [dir, setDir] = React.useState<'asc' | 'desc'>('asc');
+    useTableGrouping({
+      activeSheetKey: 'main',
+      headers: HEADERS,
+      visibleHeaders: HEADERS,
+      sheetConfig: config,
+      saveConfig: () => {},
+      groupByColumn: col,
+      setGroupByColumn: setCol,
+      setGroupByDirection: setDir,
+    });
+    probe.col = col;
+    probe.dir = dir;
+    return <div data-col={col} data-dir={dir} />;
+  }
+
+  const view = await mount(<Probe config={base} />);
+  assert(probe.col === 'none',
+    'sin agrupación guardada arranca en "none"', probe);
+
+  await view.update(<Probe config={withGrouping} />);
+  assert(probe.col === 'PROVEEDOR',
+    'al llegar la config con agrupación, se restaura la columna', probe);
+  assert(probe.dir === 'desc',
+    'y también la dirección guardada', probe);
+
+  await view.unmount();
+}
+
 async function main() {
   console.log('========================================');
   console.log(' PRUEBAS DE COMPONENTE (Fase 0)');
@@ -140,6 +188,7 @@ async function main() {
   await testGroupingWiring();
   await testGroupingDirectionToggle();
   await testDrawerClosedRendersNothing();
+  await testGroupingRestoredWhenConfigArrivesLate();
 
   teardownDom();
 
