@@ -89,7 +89,8 @@ import {
   writeRawStorage,
   objectArraySchema,
   booleanMapSchema,
-  cachedSheetSchema
+  cachedSheetSchema,
+  isDemoMode
 } from './src/utils/appStorage';
 
 import {
@@ -329,6 +330,17 @@ console.log('\n--- 11. Pruebas de appStorage.ts ---');
   assert(STORAGE_KEYS.TICKET_CONFIG === 'global_ticket_print_config', 'appStorage: TICKET_CONFIG conserva la clave histórica');
   assert(sheetCacheKey('Hoja 1') === 'appsheet_clone_cache_Hoja 1', 'appStorage: sheetCacheKey construye la clave por pestaña');
   assert(demoItemsKey('main') === 'app_demo_items_main', 'appStorage: demoItemsKey construye la clave por vista');
+
+  // Modo demo: sin SCRIPT_URL no hay backend. Los tres bordes que importan:
+  // clave ausente, cadena vacía (lo que deja un input limpiado) y espacios.
+  store.clear();
+  assert(isDemoMode() === true, 'appStorage: sin SCRIPT_URL la app está en modo demo');
+  store.set(STORAGE_KEYS.SCRIPT_URL, '');
+  assert(isDemoMode() === true, 'appStorage: SCRIPT_URL vacío sigue siendo modo demo');
+  store.set(STORAGE_KEYS.SCRIPT_URL, '   ');
+  assert(isDemoMode() === true, 'appStorage: SCRIPT_URL con solo espacios sigue siendo modo demo');
+  store.set(STORAGE_KEYS.SCRIPT_URL, 'https://script.google.com/macros/s/abc/exec');
+  assert(isDemoMode() === false, 'appStorage: con SCRIPT_URL real no hay modo demo');
 
   // Migración: la canónica ausente se promueve desde la heredada
   store.clear();

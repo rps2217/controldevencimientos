@@ -27,7 +27,7 @@ import type { FetchDataFn } from '../hooks/useInventoryData';
 import { useTicketPrinting } from '../hooks/useTicketPrinting';
 import { useModuleViewState } from '../hooks/useModuleViewState';
 import { indexedDbService } from '../db/indexedDbService';
-import { STORAGE_KEYS, readStorage, sheetConfigShapeSchema } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, sheetConfigShapeSchema, isDemoMode } from '../utils/appStorage';
 
 // Helpers para almacenamiento persistente y configuración modular
 import { saveStoredDemoItems, mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
@@ -714,7 +714,7 @@ export const InventoryDashboard: React.FC = () => {
 
     const originalItems = [...items];
     const originalMainItems = [...allMainItems];
-    const isDemo = !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
+    const isDemo = isDemoMode();
     
     try {
       setIsSaving(true);
@@ -849,7 +849,7 @@ export const InventoryDashboard: React.FC = () => {
     if (!activeSheet || headers.length === 0) return;
     setIsSaving(true);
     try {
-      const isDemo = !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
+      const isDemo = isDemoMode();
       const now = new Date();
       const currentFormattedDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' ');
 
@@ -940,7 +940,7 @@ export const InventoryDashboard: React.FC = () => {
 
     const originalItems = [...items];
     const originalMainItems = [...allMainItems];
-    const isDemo = !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
+    const isDemo = isDemoMode();
 
     try {
       setIsSaving(true);

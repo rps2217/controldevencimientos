@@ -55,6 +55,14 @@ export const sheetCacheKey = (sheetTitle: string): string =>
 export const demoItemsKey = (view: string): string => `app_demo_items_${view}`;
 
 /**
+ * Sin `SCRIPT_URL` no hay backend: la app opera contra los datos de demostración.
+ * Estaba escrito igual en cinco sitios; vive aquí junto al resto de accesos a
+ * almacenamiento para que la definición de "modo demo" sea una sola.
+ */
+export const isDemoMode = (): boolean =>
+  !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
+
+/**
  * Lectura validada de una clave de localStorage.
  *
  * Cierra el fallo real de los `JSON.parse` sueltos: parsear sin validar acepta

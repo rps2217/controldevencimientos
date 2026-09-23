@@ -6,7 +6,7 @@ import { resolveItemIdentity } from '../utils/entityIdentityResolver';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { EVENT_CATEGORIES } from '../utils/dateCalculations';
 import { getErrorMessage } from '../utils/pureCalculations';
-import { STORAGE_KEYS } from '../utils/appStorage';
+import { isDemoMode } from '../utils/appStorage';
 import { saveStoredDemoItems } from '../utils/dashboardConfigUtils';
 import { useToast } from '../components/common/ToastContainer';
 import { useConfirm } from '../components/common/ConfirmDialog';
@@ -177,7 +177,7 @@ export const useInventoryBulkActions = ({
 
     const originalItems = [...items];
     const originalMainItems = [...allMainItems];
-    const isDemo = !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
+    const isDemo = isDemoMode();
 
     try {
       setIsSaving(true);

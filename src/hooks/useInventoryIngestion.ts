@@ -16,7 +16,7 @@ import {
 } from '../utils/cuVcConsolidator';
 import { rowToObject, getErrorMessage } from '../utils/pureCalculations';
 import { indexedDbService } from '../db/indexedDbService';
-import { STORAGE_KEYS } from '../utils/appStorage';
+import { isDemoMode } from '../utils/appStorage';
 import { saveStoredDemoItems } from '../utils/dashboardConfigUtils';
 
 /**
@@ -106,7 +106,7 @@ export const useInventoryIngestion = ({
     }
     try {
       setIsSaving(true);
-      const isDemo = !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
+      const isDemo = isDemoMode();
 
       const isVencimientosTable = activeView === 'main' || /vencimiento|caducidad|stock/i.test(activeSheet.title);
 
