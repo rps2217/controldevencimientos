@@ -1,6 +1,7 @@
 # Plan de Reforma Arquitectónica
 
-Estado: **Fases 0 y 2 completadas**; Fase 1 (1.3 en curso), 3–6 pendientes. Deuda `any`
+Estado: **Fases 0 y 2 completadas**; Fase 1 (1.3 en curso), 6 (primer corte hecho),
+3–5 pendientes. Deuda `any`
 saldada en todo `src`: **1 solo `any`** declarado (la firma de índice de `SheetRecord`,
 justificada abajo). Riesgo `xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
