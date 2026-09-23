@@ -294,6 +294,25 @@ Ponytail (§5) sigue siendo obligatoria.
 > el estado exacto (rama, último commit, gate), lo hecho y el siguiente corte medido.
 > Es lo primero que hay que leer. Esta sección §7 queda para comandos y trampas.
 
+### Dirección de producto: cañería vs. producto (contexto para decidir)
+
+La app **no** busca emular AppSheet ni venderse como plataforma no-code. Su identidad es una
+**herramienta especializada de control de vencimientos y conteo cíclico de inventario** para
+retail y farmacia, alimentada desde Google Sheets.
+
+Al medir el árbol, la proporción real es ~5.900 líneas de capa genérica (esquema, slices,
+referencias, alias, identidad, bulk actions, importador) frente a ~9.300 de dominio propio
+(vencimientos, conteo, campañas, cuadratura, CU_VC, farmacia). Regla práctica al dudar si algo
+pertenece a la app:
+
+> ¿Esto ayuda a **tragar datos sucios** (planillas de ERP, encabezados inconsistentes), o me
+> acerca a **un AppSheet peor**? Lo primero es cañería necesaria; lo segundo es lastre.
+
+Un objetivo concreto que sí es propio: **poder apuntar la app a otras hojas con datos
+distintos sin construir otra app a medida** → **Fase 7** de `ROADMAP.md`. Se apoya en el
+patrón de *activación por capacidades* que ya usan las bulk actions (¿hay columnas de
+teléfono? → WhatsApp), no en un lenguaje de fórmulas ni relaciones N-a-N.
+
 ### Método al dividir monolitos (aprendido en la Fase 5)
 
 Al extraer un bloque de render a un componente, **medir antes cuántas identidades del padre

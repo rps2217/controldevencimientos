@@ -1,7 +1,8 @@
 # Plan de Reforma Arquitectónica
 
 Estado: **Fases 0, 2 y 4 completadas**; Fase 5 en curso (2 cortes hechos), Fase 6 con el
-primer corte hecho, Fases 1.3 y 3 pendientes. Deuda `any`
+primer corte hecho, Fases 1.3 y 3 pendientes. **Fase 7 (multi-hoja por capacidades) anotada**
+como fase futura, después de 5 y 6. Deuda `any`
 saldada en todo `src`: **1 solo `any`** declarado (la firma de índice de `SheetRecord`,
 justificada abajo). Riesgo `xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
@@ -991,7 +992,135 @@ Chromium, RUNNING, stop → start) y pasa; `tsc` 0, `eslint` 0 errores, 180 prue
 - 20 warnings de `react-hooks/exhaustive-deps` preexistentes, varios ligados a la
   inestabilidad del contexto (Fase 1 los cierra).
 
+### Fase 7 — Multi-hoja por capacidades (una app, varias hojas)
+
+**Origen y encuadre.** El usuario planteó acercarse a AppSheet. Al medir el árbol, la
+conclusión cambió: no se trata de emular una plataforma no-code ni de vender a terceros,
+sino de un objetivo concreto y propio — **poder apuntar la app a hojas de Google Sheets con
+datos completamente distintos sin construir otra aplicación a medida cada vez**. Es reusar
+*las características de esta app* en otras hojas, no que un tercero construya apps.
+
+Esto refuerza la misma idea que sostiene el resto del plan: la capa genérica es **cañería**,
+el dominio es el **producto**. Lo que cambia es que la cañería deja de estar cableada a las
+cuatro hojas actuales.
+
+#### El diagnóstico: el motor ya es genérico, la configuración no
+
+`InventoryItem` **no** es un esquema rígido; es un objeto con claves por encabezado:
+
+```ts
+export interface InventoryItem {
+  _rowIndex: number;
+  _entityKey?: string;
+  [key: string]: any;   // columnas dinámicas según los headers de la hoja
+}
+```
+
+Consecuencia importante: **la tabla, los filtros, la búsqueda, la agrupación, el ordenamiento,
+el redimensionado, los slices, las bulk actions, la importación y la edición de filas ya
+funcionarían hoy con una hoja de datos distintos.** El motor de datos no es el obstáculo.
+
+El obstáculo está en cuatro ataduras, medidas:
+
+| Atadura | Magnitud |
+| --- | --- |
+| Referencias a `main` / `events` / `products` / `policies` | **139**, en >20 archivos, **sin constante centralizada** |
+| `ViewKey` como tipo cerrado | `'main' \| 'events' \| 'products' \| 'policies'` |
+| `SheetConfig` con 4 claves fijas | No admite una quinta tabla |
+| `BUILT_IN_SLICES` con dominio dentro | "Retiro Inmediato", "Canje Proveedor", `pmRadarFilter` cableados a `tableKey: 'main'` |
+
+Lectura de eso: apuntada a una hoja de "Clientes", la tabla y los filtros funcionan; lo que
+no tiene sentido es que aparezcan slices de vencimientos, el radar PM o el terminal de conteo.
+**No falta motor: falta separar el dominio del andamiaje.**
+
+#### El mecanismo ya existe: activación por capacidades
+
+El patrón no hay que inventarlo. `bulkActionsRegistry` ya lo usa:
+
+> WhatsApp solo si hay columnas telefónicas o la hoja se llama Contactos/Clientes; Gmail solo
+> si hay columnas de email.
+
+Pregunta *qué columnas hay*, no *cómo se llama la tabla*. Y la primitiva está hecha:
+`FIELD_PATTERNS` (`columnAliases.ts`) reconoce **31 semánticas** — `telefono`, `email`,
+`fecha_vc`, `sku`, `cantidad`, `proveedor`, `venta`, `stock_critico`, `lote`, `pm`, `mundo`…
+
+**Ese es el sistema de módulos.** La Fase 7 es extender la activación por capacidades desde
+las acciones masivas hasta los módulos completos:
+
+```
+¿FECHA_VC / fecha de vencimiento?      →  Radar de Vencimientos, PM, retiro
+¿SKU + CANTIDAD?                       →  Terminal de Conteo y Cuadratura
+¿columnas del ERP (Venta/Ingreso…)?    →  Campañas y separación de aguas
+¿TELEFONO / EMAIL?                     →  WhatsApp / Gmail
+siempre                                →  tabla, filtros, agrupación, slices, edición, importar
+```
+
+Una hoja sin columnas de vencimiento no muestra nada de vencimientos. Sin configurar nada.
+
+#### Ruta por pasos, cada uno con valor propio
+
+1. **Centralizar las 4 claves.** Hoy están regadas en 139 sitios sin constante. Es mecánico,
+   no cambia comportamiento, y es prerrequisito de lo demás. Vale por sí solo: el día que
+   haga falta una quinta tabla, es un cambio de datos y no 139.
+2. **Separar los slices nativos.** `BUILT_IN_SLICES` mezcla slices de dominio con la capa
+   genérica; los de dominio pasan a depender de capacidad en vez de `tableKey: 'main'`. Con
+   esto, una hoja nueva deja de mostrar "Canje Proveedor".
+3. **Modo genérico.** Aceptar una tabla sin ninguna semántica de dominio y mostrar solo el
+   andamiaje. Aquí por fin se abre una hoja de Clientes y funciona.
+4. **Perfiles de tabla (opcional).** Declarar "esta hoja es de tipo X" para cuando la
+   detección se equivoque.
+
+Decisión de diseño pendiente de cerrar con el usuario antes del paso 3: **detección
+automática sola** (elegante, se equivoca con hojas ambiguas) **vs. perfiles declarados**
+(predecible, exige UI). Recomendación: detección automática **con corrección manual**, que es
+lo que ya se hace con las bulk actions. Empezar por ahí, no por los perfiles.
+
+#### Fuera de alcance a propósito
+
+- **Lenguaje de fórmulas** y **relaciones N-a-N**. Ese es el camino a AppSheet y lleva el
+  proyecto a meses; para el objetivo real (reusar las capacidades propias en otras hojas) no
+  hace falta. `formula` y `type: 'calculated'` siguen **sin consumidores** (ver hallazgo
+  abajo); cablearlos o eliminarlos es cirugía aparte, barata y de honestidad, no parte de
+  esta fase.
+- **Vender a terceros / plataforma no-code.** Descartado explícitamente por el usuario.
+
+#### Relación con las fases en curso
+
+El corte 3 de Fase 5 (`CampaignConsolidationDashboard.tsx`) es **trabajo preparatorio de
+esta fase**: separar ese monolito es empezar a desenredar dominio de presentación, que es
+justo lo que la Fase 7 necesita. La Fase 7 entra **después** de 5 y 6, y solo cuando el
+usuario confirme el paso 1.
+
+#### Deuda que esta fase deja a la vista
+
+- `refTable` / `refKeyCol` / `refLabelCol` están declarados en `ColumnSchema` y **solo un
+  consumidor los lee, y es cosmético** (`ItemFormModal.tsx:736` pinta una etiqueta). El motor
+  de resolución (`referenceResolver.ts`, 828 líneas) **no los lee ni una vez**: recibe
+  `products` y `policies` como parámetros con nombre propio y resuelve por inferencia
+  semántica + heurísticas de seguridad escritas a mano. Es decir, hay **dos sistemas en
+  paralelo**: un esquema declarado en buena parte inerte y un motor de inferencia que es el
+  que realmente corre.
+- `formula` y `type: 'calculated'`: **cero consumidores en todo `src`**. Prometen en la UI
+  algo que no hacen.
+
+Esto refuerza la dirección de la fase: el patrón correcto ya está probado en
+`entityIdentityResolver` — **esquema declarado validado primero, inferencia semántica como
+respaldo**. No hay que sustituir la tolerancia a planillas caóticas (es un invariante no
+negociable, §6.5), sino estratificarla:
+
+```
+1. Esquema declarado  (si existe Y es válido)
+2. Inferencia semántica  (respaldo: el comportamiento de hoy)
+3. Sintético  (último recurso)
+```
+
+Con un detalle que no es adorno: **el escalón 1 hay que validarlo antes de confiar en él.** Si
+un usuario declara mal una clave, hoy las heurísticas lo rescatan; con "esquema primero" a
+secas, la declaración errónea gana y rompe. Hay que comprobar unicidad y no-vacío antes de
+darle prioridad.
+
 ---
+
 
 ## Auditoría Ponytail (2026-09-19)
 
@@ -1529,6 +1658,15 @@ El corte que sí se hizo sacó ~200 líneas de lógica de agregación con interf
    Ojo: al medir `useInventoryActions` la interfaz daba ~23 parámetros, señal de que traslada
    el problema en vez de reducir acoplamiento. Cortar por sub-bloques cohesionados (los ya
    hechos fueron de 9, 13 y 15), no en bloque.
+5. **Fase 7 — multi-hoja por capacidades** (anotada 2026-09-19, ver su sección). Objetivo del
+   usuario: apuntar la app a **otras hojas de Google Sheets con datos distintos** sin
+   construir otra app a medida. Diagnóstico: el motor ya es genérico (las filas son objetos
+   por encabezado), lo que está atado son las **4 claves de tabla** (139 referencias sin
+   constante) y los slices de dominio. El mecanismo a extender ya existe: activación por
+   capacidades, como hacen las bulk actions con teléfono/email.
+   **Entra después de 5 y 6.** El corte 3 de Fase 5 es trabajo preparatorio.
+   Antes del paso 3 hay que cerrar con el usuario una decisión: detección automática sola
+   vs. perfiles de tabla declarados (recomendación: automática con corrección manual).
 
 ### Deuda y trampas conocidas (no reabrir sin síntoma real)
 
