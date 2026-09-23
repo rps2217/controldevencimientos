@@ -782,6 +782,38 @@ directamente.
 Bundle principal 1.650 KB (455 KB gzip) y CSS 208 KB. `React.memo` donde el profiler lo
 justifique; evaluar `manualChunks`. **No añadir `manualChunks` sin medir antes.**
 
+#### Hecho: `html5-qrcode` fuera del chunk de arranque (−102 KB gzip, −22%)
+
+Medido antes de tocar: la librería pesa **374 KB min / 110 KB gzip** (bundled con esbuild),
+y estaba en el chunk de entrada porque `useBarcodeScanner` y `barcodeScannerConfig` la
+importaban con `import` de valor. Es el **24%** del bundle inicial y solo se necesita al
+abrir el escáner, así que una PWA de bodega la descargaba en cada arranque sin usarla.
+
+| | antes | después |
+| --- | --- | --- |
+| Chunk inicial (gzip) | 457 KB | **355 KB** |
+| Chunk del escáner | — (dentro del inicial) | 110 KB, cargado al abrir |
+
+Corte aplicado, sin dependencias nuevas:
+- `useBarcodeScanner.ts`: `import type { Html5Qrcode }` y `await import('html5-qrcode')`
+  dentro de `start`, después de la guardia de época (si el arranque se canceló mientras
+  cargaba, no se sigue).
+- `barcodeScannerConfig.ts`: el enum `Html5QrcodeSupportedFormats` se replicaba con
+  `import` de valor, que por sí solo ya arrastraba la librería. Ahora es `import type` y los
+  valores viven en una tabla `satisfies Record<string, Html5QrcodeSupportedFormats>`, de modo
+  que un valor equivocado **no compila** y `BARCODE_SUPPORTED_FORMATS` conserva su tipo
+  ancho (el estrecho rompía `test-modules.ts`). Son el contrato público y estable del enum.
+
+No se aplicó el `React.lazy` de los modales del escáner, que era el camino más obvio: el
+terminal de pistoleo **conserva `sessionScans` al cerrarse**, así que montarlo condicionalmente
+(o suspenderlo con un fallback que lo desmonte) perdería la sesión de conteo a medio turno.
+Descartado por la escalera: la mejora no compensa el riesgo sobre datos de sesión.
+
+Verificación: el chunk del escáner queda **precacheado por el service worker**, así que el
+escáner sigue funcionando offline; `scannercheck` recorre el ciclo real (cámara falsa de
+Chromium, RUNNING, stop → start) y pasa; `tsc` 0, `eslint` 0 errores, 180 pruebas y 10/10 E2E.
+
+
 ---
 
 ## Guardarraíles (Ponytail)

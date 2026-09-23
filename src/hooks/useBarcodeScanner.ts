@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+// Tipo solamente: el valor se carga al abrir el escáner (ver `start`). Un import
+// de valor aquí devolvería la librería (~110 KB gzip) al chunk de arranque.
+import type { Html5Qrcode } from 'html5-qrcode';
 import { BARCODE_SUPPORTED_FORMATS, pickRearCamera } from '../utils/barcodeScannerConfig';
 import { getErrorMessage } from '../utils/pureCalculations';
 
@@ -117,6 +119,8 @@ export function useBarcodeScanner(options: UseBarcodeScannerOptions): UseBarcode
         return;
       }
 
+      const { Html5Qrcode } = await import('html5-qrcode');
+      if (myEpoch !== epoch.current) return;
       const devices = await Html5Qrcode.getCameras();
       if (myEpoch !== epoch.current) return;
 

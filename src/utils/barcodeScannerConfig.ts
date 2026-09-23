@@ -1,4 +1,21 @@
-import { Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import type { Html5QrcodeSupportedFormats } from 'html5-qrcode';
+
+/**
+ * Valores del enum `Html5QrcodeSupportedFormats` de la librería. Se replican aquí
+ * en vez de importarlos porque importar el enum arrastra toda la librería
+ * (~110 KB gzip, ~24% del bundle inicial) al chunk de arranque, y solo se necesita
+ * al abrir el escáner. Son el contrato público y estable del enum (`core.d.ts`).
+ */
+const FORMAT = {
+  QR_CODE: 0,
+  CODE_39: 3,
+  CODE_128: 5,
+  ITF: 8,
+  EAN_13: 9,
+  EAN_8: 10,
+  UPC_A: 14,
+  UPC_E: 15,
+} satisfies Record<string, Html5QrcodeSupportedFormats>;
 
 /**
  * Formatos que la app debe leer en bodega: retail (EAN/UPC), góndola (CODE_128/39),
@@ -7,14 +24,14 @@ import { Html5QrcodeSupportedFormats } from 'html5-qrcode';
  * rechaza se traduce en un conteo incompleto.
  */
 export const BARCODE_SUPPORTED_FORMATS: Html5QrcodeSupportedFormats[] = [
-  Html5QrcodeSupportedFormats.EAN_13,
-  Html5QrcodeSupportedFormats.EAN_8,
-  Html5QrcodeSupportedFormats.CODE_128,
-  Html5QrcodeSupportedFormats.CODE_39,
-  Html5QrcodeSupportedFormats.UPC_A,
-  Html5QrcodeSupportedFormats.UPC_E,
-  Html5QrcodeSupportedFormats.QR_CODE,
-  Html5QrcodeSupportedFormats.ITF,
+  FORMAT.EAN_13,
+  FORMAT.EAN_8,
+  FORMAT.CODE_128,
+  FORMAT.CODE_39,
+  FORMAT.UPC_A,
+  FORMAT.UPC_E,
+  FORMAT.QR_CODE,
+  FORMAT.ITF,
 ];
 
 /** Marca visible que identifica la cámara trasera frente a la frontal del dispositivo. */
