@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { appendRow, updateRow, deleteRow, saveCloudConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
-import { InventoryItem, SheetConfig, ViewKey, EventCategory } from '../types';
+import { InventoryItem, SheetConfig, ViewKey, EventCategory, VIEW_KEYS } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
 import { useModalsActions } from '../context/ModalsContext';
 import { DashboardProvider, DashboardContextType } from '../context/DashboardContext';
@@ -779,9 +779,6 @@ export const InventoryDashboard: React.FC = () => {
 
       // Update persistent demo storage
       saveStoredDemoItems(activeView, nextItems);
-      if (activeView === 'main') saveStoredDemoItems('main', nextItems);
-      if (activeView === 'products') saveStoredDemoItems('products', nextItems);
-      if (activeView === 'policies') saveStoredDemoItems('policies', nextItems);
 
       // Save to IndexedDB cached sheet
       try {
@@ -882,7 +879,6 @@ export const InventoryDashboard: React.FC = () => {
       setItems(nextItems);
       if (activeView === 'main') setAllMainItems(nextItems);
       saveStoredDemoItems(activeView, nextItems);
-      if (activeView === 'main') saveStoredDemoItems('main', nextItems);
 
       try {
         const cachedRows = [headers, ...nextItems.map(it => headers.map(h => it[h] !== undefined && it[h] !== null ? String(it[h]) : ''))];
@@ -1033,7 +1029,7 @@ export const InventoryDashboard: React.FC = () => {
     return <SkeletonLoader />;
   }
 
-  const mappedSheets = [sheetConfig.main, sheetConfig.events, sheetConfig.products, sheetConfig.policies].filter(Boolean);
+  const mappedSheets = VIEW_KEYS.map(k => sheetConfig[k]).filter(Boolean);
   const otherSheets = metadata?.sheets
     .map(s => s.properties.title)
     .filter((t: string) => !mappedSheets.includes(t) && !/^_/i.test(t.trim())) || [];

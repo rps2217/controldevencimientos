@@ -20,8 +20,16 @@ export interface SheetMetadata {
 
 export type SpreadsheetMetadata = SheetMetadata;
 
-/** Vistas/hojas canónicas gestionadas por la app (y títulos personalizados). */
-export type ViewKey = 'main' | 'events' | 'products' | 'policies';
+/**
+ * Vistas/hojas canónicas gestionadas por la app (y títulos personalizados).
+ * `VIEW_KEYS` es la lista runtime de las canónicas; `ViewKey` se deriva de ella
+ * para que no puedan desincronizarse. `activeView` sigue siendo `string` a
+ * propósito: admite títulos de hojas no mapeadas ("otras pestañas"), que no son
+ * claves canónicas.
+ */
+export const VIEW_KEYS = ['main', 'events', 'products', 'policies'] as const;
+
+export type ViewKey = (typeof VIEW_KEYS)[number];
 
 export interface UserVirtualColumn {
   id: string;

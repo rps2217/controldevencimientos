@@ -1084,6 +1084,62 @@ lo que ya se hace con las bulk actions. Empezar por ahí, no por los perfiles.
   esta fase.
 - **Vender a terceros / plataforma no-code.** Descartado explícitamente por el usuario.
 
+#### Paso 1 — centralización de claves: hecho y medido (2026-09-19)
+
+**Qué se hizo.** `VIEW_KEYS` (`src/types.ts`) es ahora la lista runtime de las 4 canónicas, y
+`ViewKey` se **deriva** de ella (`(typeof VIEW_KEYS)[number]`), así que no pueden
+desincronizarse. Tres sitios que *enumeraban* las claves pasaron a iterarlas:
+
+| Sitio | Antes | Ahora |
+| --- | --- | --- |
+| `InventoryDashboard.tsx:1036` (`mappedSheets`) | array literal de 4 accesos | `VIEW_KEYS.map(k => sheetConfig[k])` |
+| `TableBulkActionsPanel.tsx:46-49` | 4 `if` sueltos | `VIEW_KEYS.forEach(...)` |
+| `bulkActionsRegistry.ts:81` | `['main','products','events']` literal | (pendiente: es un subconjunto con criterio de dominio, ver abajo) |
+
+**Corrección a la cifra del diagnóstico.** El ROADMAP decía **139 referencias**. Medido ahora:
+**166**, pero ese número mezcla cuatro cosas muy distintas, y tratarlas igual era el error:
+
+| Categoría | Cuántas | ¿Duele al añadir una 5ª tabla? |
+| --- | --- | --- |
+| Despacho por **identidad** (`activeView === 'main'`) | **89** | **Sí**: cada uno es una decisión de comportamiento |
+| Acceso al **nombre de hoja** (`config.main`) | **36** | No: es un dato, no una identidad |
+| Valor de **dato** (`tableKey:`, `supportedViews`) | **12** | No: es contenido, no código |
+| Clave de **storage/demo** (`demoItemsKey`) | **17** | No: genérica por construcción |
+| Enumeración de las claves | **3** | **Sí** (los únicos que había que tocar ya) |
+
+Es decir: el paso 1 no era "139 sitios", eran **3 enumeraciones**. Las 89 del primer grupo son
+el trabajo de los pasos 2 y 3, no del paso 1.
+
+**Hallazgo que cambia el plan: el paso 3 (modo genérico) ya funciona a medias.** Verificado en
+el código: `useInventoryData.ts` resuelve la hoja con un `else targetSheetTitle = currentView`
+y `expectedTargetSheet = currentView` para cualquier vista que no sea una de las 4. Es decir,
+**una quinta hoja ya carga datos hoy** por la ruta de "otras pestañas" (`otherSheets`), que ya
+existe y ya navega. Lo que falta no es *cargar*: es que no arrastre dominio.
+
+**Lo que sí queda roto hoy en una hoja genérica** (medido, no supuesto):
+
+1. **`sliceRegistry.itemMatchesSlice`**: `if (tableKey === 'main')` fuerza que todo ítem sea
+   `VENCIMIENTO`/`VENCIMIENTO_CERCANO`, y `'events'` lo contrario. En una hoja de Clientes,
+   `getEventCategory` no reconoce nada, así que los slices de `main` devolverían **0 filas**
+   silenciosamente. Es el síntoma más probable en producción.
+2. **`handleSave` / borrado** (`InventoryDashboard.tsx:776-784`, `883`, `955`): el estado solo
+   se enruta a `main`/`products`/`policies`. Una hoja genérica **no persiste en el estado de la
+   vista** (solo en `saveStoredDemoItems(activeView)`, que sí es genérico).
+3. **Código redundante encontrado de paso, y limpiado**: `saveStoredDemoItems(activeView, nextItems)`
+   seguido de ramas que escriben **la misma clave con el mismo valor**. `demoItemsKey(view)` es
+   `app_demo_items_${view}`, así que con `activeView === 'main'` la segunda escritura es
+   `app_demo_items_main` con el mismo `nextItems`: un **no-op demostrable** (no depende de qué
+   contenga `items`, porque el valor es la misma expresión). Eran **4 líneas muertas** en
+   `handleSave` (`:781-784`) y **1** en el guardado del pistoleo (`:884`). Eliminadas.
+   *No* se tocó el tercer sitio (`:956`, borrado): ahí la segunda escritura usa `nextMain`
+   (recomputado desde `allMainItems`), que es un valor distinto aunque normalmente equivalente.
+   Sin evidencia de que sea redundante, se deja.
+
+**Conclusión para el paso 2.** El orden natural cambia: no hace falta "crear" el modo genérico
+(paso 3), hace falta **quitarle el dominio a lo que ya carga**. El paso 2 (slices por
+capacidad) es el que desbloquea el paso 3, y el punto exacto a intervenir es
+`itemMatchesSlice` + `BUILT_IN_SLICES` con `tableKey: 'main'` fijo.
+
 #### Relación con las fases en curso
 
 El corte 3 de Fase 5 (`CampaignConsolidationDashboard.tsx`) es **trabajo preparatorio de

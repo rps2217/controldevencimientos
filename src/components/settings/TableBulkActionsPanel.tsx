@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Check, Ban, Sparkles, RotateCcw, Phone, Mail, Calendar, TableProperties } from 'lucide-react';
-import { SheetConfig, SpreadsheetMetadata } from '../../types';
+import { SheetConfig, SpreadsheetMetadata, VIEW_KEYS } from '../../types';
 import { 
   ALL_BULK_ACTIONS, 
   buildBulkActionContext, 
@@ -43,10 +43,10 @@ export const TableBulkActionsPanel: React.FC<TableBulkActionsPanelProps> = ({
         }
       });
     }
-    if (sheetConfig.main && !list.includes(sheetConfig.main)) list.push(sheetConfig.main);
-    if (sheetConfig.events && !list.includes(sheetConfig.events)) list.push(sheetConfig.events);
-    if (sheetConfig.products && !list.includes(sheetConfig.products)) list.push(sheetConfig.products);
-    if (sheetConfig.policies && !list.includes(sheetConfig.policies)) list.push(sheetConfig.policies);
+    VIEW_KEYS.forEach(k => {
+      const title = sheetConfig[k];
+      if (title && !list.includes(title)) list.push(title);
+    });
     
     // Default standard names if empty
     if (list.length === 0) {
