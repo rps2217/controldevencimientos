@@ -1,6 +1,6 @@
 import { formatDisplayDate } from './pureCalculations';
 import { calculateVirtualColumnValue } from './virtualColumns';
-import { SheetRecord, VirtualColumn, VirtualColumnDataContext } from '../types';
+import { SheetRecord, VirtualColumn, UserVirtualColumn, VirtualColumnDataContext } from '../types';
 
 /**
  * Universal, clean Excel exporter with automatic column width calculation
@@ -11,7 +11,7 @@ export async function exportToExcel(
   headers: string[], 
   items: SheetRecord[], 
   sheetName = 'Inventario',
-  virtualColumns?: VirtualColumn[],
+  virtualColumns?: (VirtualColumn | UserVirtualColumn)[],
   allData?: VirtualColumnDataContext,
   columnLabelsMap?: Record<string, string>
 ) {

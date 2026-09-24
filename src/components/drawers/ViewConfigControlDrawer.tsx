@@ -26,10 +26,9 @@ import {
   Barcode,
   Download
 } from 'lucide-react';
-import { TableSlice, SheetRecord } from '../../types';
+import { TableSlice } from '../../types';
 import { getSlicesForTable } from '../../utils/sliceRegistry';
-import { VIRTUAL_COLUMNS } from '../../utils/virtualColumns';
-import { parseAnyDate } from '../../utils/dateCalculations';
+import { VIRTUAL_COLUMNS, resolveActiveVirtualColumns } from '../../utils/virtualColumns';
 import { exportToExcel } from '../../utils/exportUtils';
 import { buildBulkActionContext, isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
 import { useDashboard } from '../../context/DashboardContext';
@@ -753,25 +752,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const activeVirtual = [
-                          ...VIRTUAL_COLUMNS.filter(vc => sheetConfig.activeVirtualColumns?.includes(vc.id)),
-                          ...(sheetConfig.userVirtualColumns || []).map(uvc => ({
-                            id: uvc.id,
-                            label: uvc.label,
-                            calculate: (item: SheetRecord) => {
-                              const values = uvc.sourceColumns.map(sc => String(item[sc] || ''));
-                              if (uvc.operation === 'concatenate') return values.join(' ');
-                              if (uvc.operation === 'sum') return values.reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
-                              if (uvc.operation === 'diff_days') { 
-                                const d1 = parseAnyDate(values[0]); 
-                                const d2 = parseAnyDate(values[1]); 
-                                if (d1 && d2) return Math.round(Math.abs(d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24)); 
-                                return '-'; 
-                              }
-                              return '-';
-                            }
-                          }))
-                        ];
+                        const activeVirtual = resolveActiveVirtualColumns(sheetConfig);
                         const allData = { products: products || [], policies: policies || [], events: [] };
                         const exportHeaders = (visibleHeaders && visibleHeaders.length > 0) ? visibleHeaders : allHeaders;
                         

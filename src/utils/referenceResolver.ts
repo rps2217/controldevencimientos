@@ -1,5 +1,5 @@
 import { findColumnBySemantic, KnownFieldSemantic } from './columnAliases';
-import { parseAnyDate, calculateWithdrawalDate, formatDisplayDate, formatInputDate } from './dateCalculations';
+import { parseAnyDate, calculateWithdrawalDate, formatDisplayDate, formatInputDate, getEndOfMonthDateForYm } from './dateCalculations';
 import { extractCuVcFromRow } from './cuVcConsolidator';
 import { SheetConfig, SheetRecord } from '../types';
 
@@ -320,8 +320,9 @@ export function resolveItemPolicyAndRetiro(
   if (!effectiveVcDate && rawMm && rawYyyy) {
     const m = parseInt(String(rawMm), 10);
     const y = parseInt(String(rawYyyy), 10);
-    if (m >= 1 && m <= 12 && y >= 2000 && y <= 2100) {
-      effectiveVcDate = new Date(y, m, 0); // Last day of month
+    const lastDayOfMonth = m >= 1 && m <= 12 && y >= 2000 && y <= 2100 ? getEndOfMonthDateForYm(y, m) : null;
+    if (lastDayOfMonth) {
+      effectiveVcDate = lastDayOfMonth;
       effectiveVcStr = `${y}-${String(m).padStart(2, '0')}-${String(effectiveVcDate.getDate()).padStart(2, '0')}`;
     }
   }
@@ -737,8 +738,8 @@ export function autoCalculateItemFormData(
   if (mVal && yVal && !isNaN(Number(mVal)) && !isNaN(Number(yVal))) {
     const mNum = parseInt(mVal, 10);
     const yNum = parseInt(yVal, 10);
-    if (mNum >= 1 && mNum <= 12 && yNum >= 2000 && yNum <= 2100) {
-      const lastDay = new Date(yNum, mNum, 0);
+    const lastDay = mNum >= 1 && mNum <= 12 && yNum >= 2000 && yNum <= 2100 ? getEndOfMonthDateForYm(yNum, mNum) : null;
+    if (lastDay) {
       const calcY = lastDay.getFullYear();
       const calcM = String(lastDay.getMonth() + 1).padStart(2, '0');
       const calcD = String(lastDay.getDate()).padStart(2, '0');

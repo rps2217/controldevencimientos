@@ -523,7 +523,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
       // Auto-trigger reconciliation on internet restoration if queue has items
       indexedDbService.getOfflineQueue().then((q) => {
         if (q.length > 0 && !isSyncingRef.current) {
-          console.log('[OfflineSync] Conexión restablecida. Auto-sincronizando cola offline...');
+          console.warn('[OfflineSync] Conexión restablecida. Auto-sincronizando cola offline...');
           syncQueueRef.current();
         }
       });

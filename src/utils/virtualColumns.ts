@@ -1,4 +1,4 @@
-import { VirtualColumn, UserVirtualColumn, SheetRecord, VirtualColumnDataContext } from '../types';
+import { VirtualColumn, UserVirtualColumn, SheetRecord, SheetConfig, VirtualColumnDataContext } from '../types';
 export type { VirtualColumnDataContext };
 import { findColumnBySemantic } from './columnAliases';
 import { resolveItemPolicyAndRetiro } from './referenceResolver';
@@ -69,6 +69,18 @@ export const VIRTUAL_COLUMNS: VirtualColumn[] = [
       return provKey && productEntry[provKey] ? String(productEntry[provKey]) : '-';
     }
   }
+];
+
+/**
+ * Columnas virtuales activas: las de sistema habilitadas en `activeVirtualColumns`
+ * mas las definidas por el usuario. Centraliza la construccion que antes se repetia
+ * en cada punto de exportacion.
+ */
+export const resolveActiveVirtualColumns = (
+  config?: Pick<SheetConfig, 'activeVirtualColumns' | 'userVirtualColumns'>
+): (VirtualColumn | UserVirtualColumn)[] => [
+  ...VIRTUAL_COLUMNS.filter(vc => config?.activeVirtualColumns?.includes(vc.id)),
+  ...(config?.userVirtualColumns || []),
 ];
 
 export const calculateVirtualColumnValue = (

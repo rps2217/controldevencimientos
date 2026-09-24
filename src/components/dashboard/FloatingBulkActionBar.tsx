@@ -3,12 +3,10 @@ import {
   Printer, Settings, Barcode, Mail, MessageSquare, Download, Flame, Edit2, Trash2, Sliders, X 
 } from 'lucide-react';
 import { isActionEnabledForTable, buildBulkActionContext } from '../../utils/bulkActionsRegistry';
-import { VIRTUAL_COLUMNS } from '../../utils/virtualColumns';
-import { parseAnyDate } from '../../utils/pureCalculations';
+import { resolveActiveVirtualColumns } from '../../utils/virtualColumns';
 import { exportToExcel } from '../../utils/exportUtils';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
-import type { SheetRecord } from '../../types';
 
 export const FloatingBulkActionBar: React.FC = () => {
   const dashboard = useDashboard();
@@ -41,27 +39,7 @@ export const FloatingBulkActionBar: React.FC = () => {
   const selectedItems = filteredItems.filter(i => selectedRowIds.includes(i._rowIndex as number));
 
   const handleExportSelectedExcel = () => {
-    // Prepare all virtual columns (system + user)
-    const activeVirtual = [
-      ...VIRTUAL_COLUMNS.filter(vc => sheetConfig.activeVirtualColumns?.includes(vc.id)),
-      ...(sheetConfig.userVirtualColumns || []).map(uvc => ({
-        id: uvc.id,
-        label: uvc.label,
-        calculate: (item: SheetRecord) => {
-          const values = uvc.sourceColumns.map(sc => String(item[sc] || ''));
-          if (uvc.operation === 'concatenate') return values.join(' ');
-          if (uvc.operation === 'sum') return values.reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
-          if (uvc.operation === 'diff_days') {
-            const d1 = parseAnyDate(values[0]);
-            const d2 = parseAnyDate(values[1]);
-            if (d1 && d2) return Math.round(Math.abs(d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
-            return '-';
-          }
-          return '-';
-        }
-      }))
-    ];
-
+    const activeVirtual = resolveActiveVirtualColumns(sheetConfig);
     const allData = { products, policies, events: [] };
     const exportHeaders = (visibleHeaders && visibleHeaders.length > 0) ? visibleHeaders : headers;
     exportToExcel(`Seleccion_${new Date().toISOString().split('T')[0]}`, exportHeaders, selectedItems, 'Selección', activeVirtual, allData, columnLabelsMap);
