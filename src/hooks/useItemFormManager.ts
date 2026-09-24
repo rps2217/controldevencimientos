@@ -8,7 +8,8 @@ import { autoCalculateItemFormData } from '../utils/referenceResolver';
 interface UseItemFormManagerParams {
   headers: string[];
   activeSheet: SheetProperties | null;
-  activeView: string;
+  /** Capacidad de incidencia: relaja la obligatoriedad de SKU en hojas de eventos. */
+  canLogEvents: boolean;
   sheetConfig: SheetConfig;
   products: SheetRecord[];
   policies: SheetRecord[];
@@ -19,7 +20,7 @@ interface UseItemFormManagerParams {
 export function useItemFormManager({
   headers,
   activeSheet,
-  activeView,
+  canLogEvents,
   sheetConfig,
   products,
   policies,
@@ -119,7 +120,7 @@ export function useItemFormManager({
     if (!activeSheet) return errors;
 
     const currentSchema = sheetConfig.schema?.[activeSheet.title] || {};
-    const isEventsSheet = activeView === 'events' || /frc|evento|incidenc|averia|merma|diferencia|transporte/i.test(activeSheet.title);
+    const isEventsSheet = canLogEvents || /frc|evento|incidenc|averia|merma|diferencia|transporte/i.test(activeSheet.title);
     
     // Dynamic Zod Schema generation based on our internal types
     const zSchemaShape: Record<string, z.ZodTypeAny> = {};
@@ -240,7 +241,7 @@ export function useItemFormManager({
     }
 
     return errors;
-  }, [activeSheet, sheetConfig, activeView, headers, selectedEventCategory, formData]);
+  }, [activeSheet, sheetConfig, canLogEvents, headers, selectedEventCategory, formData]);
 
   const handleFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

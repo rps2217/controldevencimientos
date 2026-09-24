@@ -28,6 +28,7 @@ import { saveStoredDemoItems } from '../utils/dashboardConfigUtils';
 export const useInventoryIngestion = ({
   activeSheet,
   activeView,
+  canExpire,
   sheetConfig,
   headers,
   items,
@@ -42,6 +43,8 @@ export const useInventoryIngestion = ({
 }: {
   activeSheet: { title: string; sheetId?: number } | null;
   activeView: string;
+  /** Capacidad de vencimiento: habilita la consolidacion por CU_VC al importar. */
+  canExpire: boolean;
   sheetConfig: SheetConfig;
   headers: string[];
   items: InventoryItem[];
@@ -108,7 +111,10 @@ export const useInventoryIngestion = ({
       setIsSaving(true);
       const isDemo = isDemoMode();
 
-      const isVencimientosTable = activeView === 'main' || /vencimiento|caducidad|stock/i.test(activeSheet.title);
+      // Consolidacion por CU_VC solo donde la hoja tiene dominio de vencimiento. El
+      // respaldo por nombre se conserva para no perder hojas de stock que hoy si
+      // consolidan; lo que se elimina es la identidad `activeView === 'main'`.
+      const isVencimientosTable = canExpire || /vencimiento|caducidad|stock/i.test(activeSheet.title);
 
       if (isVencimientosTable && mode !== 'append') {
         const reconciliation = reconcileImportWithInventory(

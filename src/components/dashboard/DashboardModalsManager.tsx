@@ -331,7 +331,8 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
         onSetEditingItem={setEditingItem}
         existingItems={items}
         activeSheet={activeSheet}
-        activeView={activeView}
+        canExpire={context.tableCapabilities?.has('vencimiento') ?? false}
+        canLogEvents={context.tableCapabilities?.has('incidencia') ?? false}
         headers={headers}
         formData={formData}
         formErrors={formErrors}

@@ -1,4 +1,4 @@
-import { InventoryItem, EventCategory, ViewKey } from '../types';
+import { InventoryItem, EventCategory } from '../types';
 import { 
   getEventCategory, 
   computeItemRawStatus, 
@@ -43,7 +43,8 @@ export type WorkerInMessage =
   | {
       type: 'FILTER_DATA';
       payload: {
-        activeView: ViewKey;
+        canExpire: boolean;
+        canLogEvents: boolean;
         searchTerm: string;
         eventFilter: string[];
         frcBodFilter: string[];
@@ -176,7 +177,8 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
     } as WorkerOutMessage);
   } else if (type === 'FILTER_DATA') {
     const {
-      activeView,
+      canExpire,
+      canLogEvents,
       searchTerm,
       eventFilter,
       frcBodFilter,
@@ -188,16 +190,16 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
       dynamicMonthRange
     } = payload;
 
-    const hasEventFilter = activeView === 'events' && eventFilter.length > 0;
+    const hasEventFilter = canLogEvents && eventFilter.length > 0;
     const eventFilterSet = hasEventFilter ? new Set(eventFilter) : null;
 
     const hasFrcBodFilter = frcBodFilter.length > 0 && !!frcBodCol;
     const frcBodFilterSet = hasFrcBodFilter ? new Set(frcBodFilter) : null;
 
-    const hasEventResFilter = activeView === 'events' && eventResolutionFilter.length > 0;
+    const hasEventResFilter = canLogEvents && eventResolutionFilter.length > 0;
     const eventResFilterSet = hasEventResFilter ? new Set(eventResolutionFilter) : null;
 
-    const hasPmRadarFilter = activeView === 'main' && pmRadarFilter.length > 0;
+    const hasPmRadarFilter = canExpire && pmRadarFilter.length > 0;
     const pmRadarFilterSet = hasPmRadarFilter ? new Set(pmRadarFilter) : null;
 
     const activeColFilterEntries = (Object.entries(columnFilters) as [string, string[]][])
@@ -215,7 +217,7 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
       const item = cachedNormalizedItems[i];
 
       // View constraints
-      if (activeView === 'main') {
+      if (canExpire) {
         if (item.eventCategory !== 'VENCIMIENTO' && item.eventCategory !== 'VENCIMIENTO_CERCANO') {
           continue;
         }
@@ -249,7 +251,7 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
             continue;
           }
         }
-      } else if (activeView === 'events') {
+      } else if (canLogEvents) {
         if (eventFilterSet) {
           if (!eventFilterSet.has(item.eventCategory)) continue;
         }

@@ -2237,6 +2237,7 @@ lo justifica; quedan inventariados:
 | Fase 7 paso 1 (claves) | Hecho (`08585b5`) |
 | Fase 7 paso 2 (slices por capacidad) | Hecho (`d3a62e3`) |
 | Fase 7 paso 3 (modo genérico) | **Hecho** (`genericcheck.cjs`): una hoja sin dominio carga, no arrastra slices ni el terminal de conteo. La corrección de UI medida fue Conteo/Pistoleo. |
+| Fase 7 paso 3b (gateo de UI de dominio por capacidad) | **Hecho** (`bodegacheck.cjs` + 17/17 E2E): los gates de dominio pasaron de identidad a capacidad; `supportedViews` → `supportedCapabilities`. La puerta E2E cazó una regresión (headers obsoletos en modo demo) corregida con respaldo por identidad de vista. |
 
 ### Paso 3 — coste real medido
 
@@ -2263,3 +2264,84 @@ refactor de fe, y quedan como deuda explícita por cortes.
 E2E (incluido `genericcheck.cjs` sobre backend falso) · mutación dirigida sobre la capacidad de
 conteo (caen exactamente las 2 aserciones nuevas) · build sin regresión de peso · CI `verify` y
 `e2e` verdes.
+
+## Auditoría Ponytail (2026-09-19, noche) — Fase 7 paso 3b (gateo de UI de dominio por capacidad)
+
+Corte que convierte los gates de **identidad** (`activeView === 'main'` / `'events'`) en gates de
+**capacidad** para la UI de dominio: columna Estado, tarjetas del Radar PM, chips de filtro y
+formulario. Método: medir antes de afirmar; cada hallazgo con evidencia y, donde aplica, con la
+mutación que lo demuestra. `tsc` 0 · eslint 0 errores (**16 warnings preexistentes**) · **17
+arneses E2E** (entra `bodegacheck.cjs`) · build sin regresión.
+
+**Hallazgo 1 — La aserción del Radar PM que se creía "por validar" era un falso positivo del
+propio arnés.** El patrón `/Radar PM \(Drenaje\)/i` no medía las tarjetas: matcheaba el **chip de
+slice** homónimo (`SliceEditorModal.tsx:47`), que existe en cualquier hoja con capacidad de
+vencimiento. Además el panel entero arranca oculto (`areFiltersVisible=false`,
+`useDashboardChromeState.ts:22`), así que `PmRadarCards` **nunca se montaba** y ninguna aserción
+textual podía distinguirlo. *Corregido el arnés:* activa "Mostrar Tarjetas KPI" y cuenta los
+botones-filtro reales del radar (`button[title^="Clic: Filtrar"]`). Con el panel abierto,
+Bodega_Sur monta **6 tarjetas**.
+
+**Hallazgo 2 — `pmMetrics` NO estaba gateado por identidad.** La hipótesis de trabajo era falsa:
+`createMetricsAccumulator` (`pureCalculations.ts:550`) calcula `pmMetrics` incondicionalmente; el
+radar no aparecía por el hallazgo 1, no por filtración de métricas. **Sin cambio.**
+
+**Hallazgo 3 — La fuga real estaba en la lógica de filtrado, no en la presentación.** Visible no
+es lo mismo que cableado: `useInventoryFiltering.ts` y `inventoryWorker.ts` gateaban el filtro
+del radar por `activeView === 'main'` y los filtros de evento por `'events'`. Convertir solo los
+componentes dejaba **tarjetas muertas**: se veían y no filtraban en hojas no canónicas.
+**Corregido** hilo a hilo: `detectTableCapabilities` alimenta `canExpire` / `canLogEvents`, que
+viajan al Web Worker como payload. La precedencia vencimiento > incidencia ya vive en el
+detector, así que el `if / else if` canónico se preserva exacto.
+
+**Hallazgo 4 — `activeView` quedó muerto en el worker.** Tras el cambio, `ViewKey` no se usaba en
+`inventoryWorker.ts` ni en `useInventoryWorker.ts`. **Eliminado** del contrato (2 importaciones
+muertas menos), en vez de dejar un parámetro inerte.
+
+**Prueba que prueba:** se añadió al arnés una aserción **funcional** — pulsar "Canje Proveedor"
+(cuenta 0 en Bodega_Sur) debe vaciar la tabla. **Mutación triple:** reponer
+`activeView === 'main'` en `DashboardFilterPanels` cae en "tarjetas del radar"; reponerlo en
+`useInventoryFiltering` cae en la aserción funcional; anular `hasPmRadarFilter` en el worker cae
+en la misma. Las tres rutas quedan cubiertas.
+
+**Lo que NO se tocó en ese primer corte:** `supportedViews: ['main']` en `VIRTUAL_COLUMNS` (fecha
+de retiro calculada, política de canje relacionada) seguía siendo un gate por identidad: se dejó
+inventariado para un segundo corte, no silenciado.
+
+### Segundo corte de 3b — `supportedViews` → `supportedCapabilities`, y la regresión que introdujo
+
+**Conversión.** Las 4 columnas virtuales relacionales pasaron de `supportedViews: ['main']` a
+`supportedCapabilities: ['vencimiento']` (`types.ts`, `virtualColumns.ts`), y `useColumnManager` /
+`useInventoryFiltering` filtran por capacidad. Los gates de botones y bulk actions que aún leían
+`activeView` (`DashboardTopNav`, `DashboardPageHeader`, `DashboardFilterPanels`, `InventoryTable`,
+`DashboardModalsManager`) pasaron a capacidad. `activeView` se eliminó de `useInventoryFiltering`.
+
+**La puerta cazó la regresión, y por eso se mide antes de cerrar.** Con la conversión, la puerta
+E2E completa pasó de 17/17 a **15/17**: `importcheck.cjs` y `bulkcheck.cjs` cayeron. Verificado
+contra baseline (`git stash` + build): en `HEAD` **pasan**, luego la regresión es del corte.
+
+**Causa raíz (medida con sonda CDP, no inferida):** en modo demo/offline, al cambiar de vista con
+caché ya renderizada, `useInventoryData` retorna temprano desde el `catch` (`items.length > 0`) y
+deja **`headers` y `activeSheet` con el valor de la vista anterior**; el único estado fresco es
+`activeView`. La capacidad, derivada de `headers`, quedaba obsoleta → el gate estricto por
+capacidad ocultaba "Importar FRC" y "Edición FRC" en la hoja correcta. *La tabla tras navegar a
+Incidencias mostraba encabezados de `main`.*
+
+**Corrección (centralizada, no parcheada por consumidor):** `resolveTableCapabilities(headers,
+customAliases, sheetTitle, activeView)` en `sliceRegistry.ts` parte de la capacidad de columnas
+(señal primaria) y **añade** la capacidad por respaldo cuando el nombre de hoja o la identidad de
+vista (`'main'` / `'events'`) sí son de dominio. El dashboard la usa **una sola vez** y publica el
+`Set` ya efectivo en el contexto; `useInventoryFiltering` lo recibe por props (con respaldo
+propio si no llega) y `buildBulkActionContext` lo resuelve igual. Una hoja no canónica navega con
+`activeView = <título>` ("Clientes"), que no colisiona con esas identidades ni con las regex, por
+lo que **`genericcheck` y `bodegacheck` siguen verdes** (2/2 en el par discriminante).
+
+**Verificación final (medida):** `tsc` 0 · eslint 0 errores (16 warnings preexistentes) ·
+**286 pruebas** (258 + 10 componente + 18 xlsx) · **17/17 arneses E2E** · build 0.
+
+**Deuda por identidad, medida con `grep` idéntico en ambos árboles:**
+`grep -rEn "activeView\s*===\s*['\"]|tableKey\s*===\s*['\"]" src` → **83** en baseline, **49**
+tras este corte (**−34**). `supportedViews` quedó en **0** referencias. Los 49 restantes son
+despachos de comportamiento no cubiertos por la sonda (productos, políticas, analítica, etc.):
+siguen inventariados, no silenciados.
+

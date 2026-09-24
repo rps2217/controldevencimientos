@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { SheetConfig, ViewKey } from '../types';
+import { SheetConfig, TableCapability } from '../types';
 import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
 
 import { STORAGE_KEYS, readStorage, writeStorage, stringArrayMapSchema, type StringArrayMap } from '../utils/appStorage';
@@ -15,6 +15,8 @@ export interface UseColumnManagerOptions {
   headers: string[];
   activeSheetTitle?: string;
   activeView: string;
+  /** Capacidades de dominio de la hoja: habilitan las columnas virtuales de retiro. */
+  tableCapabilities: Set<TableCapability>;
   sheetConfig: SheetConfig;
 }
 
@@ -36,6 +38,7 @@ export function useColumnManager({
   headers,
   activeSheetTitle,
   activeView,
+  tableCapabilities,
   sheetConfig
 }: UseColumnManagerOptions): UseColumnManagerReturn {
   // Load column orders and hidden columns from localStorage
@@ -68,9 +71,9 @@ export function useColumnManager({
   const activeVirtualCols = useMemo(() => {
     const activeVCs = sheetConfig.activeVirtualColumns || [];
     return VIRTUAL_COLUMNS.filter(
-      vc => activeVCs.includes(vc.id) && (!vc.supportedViews || vc.supportedViews.includes(activeView as ViewKey))
+      vc => activeVCs.includes(vc.id) && (!vc.supportedCapabilities || vc.supportedCapabilities.some(c => tableCapabilities.has(c)))
     );
-  }, [sheetConfig.activeVirtualColumns, activeView]);
+  }, [sheetConfig.activeVirtualColumns, tableCapabilities]);
 
   // Map of virtual column IDs -> labels
   const virtualMap = useMemo(() => {

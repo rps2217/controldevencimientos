@@ -88,7 +88,8 @@ export interface VirtualColumnDataContext {
 export interface VirtualColumn {
   id: string;
   label: string;
-  supportedViews?: ViewKey[];
+  /** Capacidades de dominio que habilitan la columna (p. ej. `vencimiento`). */
+  supportedCapabilities?: TableCapability[];
   calculate: (item: SheetRecord, headers: string[], allData?: VirtualColumnDataContext) => string | number;
 }
 export type ColumnBehavior = 'none' | 'auto_id' | 'calc_fecha_vc' | 'calc_retiro' | 'sku_lookup';

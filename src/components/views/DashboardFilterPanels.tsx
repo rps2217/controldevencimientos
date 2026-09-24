@@ -15,7 +15,12 @@ export const DashboardFilterPanels: React.FC = () => {
   const activeQuickChip = dashboard.activeQuickChip ?? null;
   const setActiveQuickChip = dashboard.setActiveQuickChip ?? (() => {});
   const activeView = dashboard.activeView;
+  // Paneles de dominio por CAPACIDAD, no por nombre de vista: una hoja no canonica
+  // con FECHA VTO recibe el Radar PM igual que la canonica `main`.
+  const caps = dashboard.tableCapabilities;
   const activeSheet = dashboard.activeSheet;
+  const canExpire = caps?.has('vencimiento') ?? false;
+  const canLogEvents = caps?.has('incidencia') ?? false;
   const items = dashboard.items ?? [];
   const eventResolutionFilter = dashboard.eventResolutionFilter ?? [];
   const setEventResolutionFilter = dashboard.setEventResolutionFilter ?? (() => {});
@@ -68,8 +73,8 @@ export const DashboardFilterPanels: React.FC = () => {
         </div>
       )}
 
-      {/* INCIDENCIAS & FRC STRIP (When activeView === 'events') */}
-      {activeView === 'events' && activeSheet && (
+      {/* INCIDENCIAS & FRC STRIP (por capacidad de incidencia) */}
+      {canLogEvents && activeSheet && (
         <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-8 py-4 shrink-0 flex flex-col gap-4 shadow-xs">
           {/* Action and Summary Bar for Incidencias & FRC */}
           <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -133,8 +138,8 @@ export const DashboardFilterPanels: React.FC = () => {
         </div>
       )}
 
-      {/* RADAR COMERCIAL (Only in main view, exclusively for Vencimientos) */}
-      {activeView === 'main' && activeSheet && (
+      {/* RADAR COMERCIAL (por capacidad de vencimiento) */}
+      {canExpire && activeSheet && (
         <PmRadarCards 
           pmRadarFilter={pmRadarFilter} 
           onFilterClick={(val, isMulti) => setPmRadarFilter(prev => handleFilterToggle(prev, val, isMulti))}

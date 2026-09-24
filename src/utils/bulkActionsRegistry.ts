@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { SheetConfig } from '../types';
 import { findPhoneColumn, findEmailColumn, findColumnBySemantic } from './columnAliases';
+import { resolveTableCapabilities } from './sliceRegistry';
 
 export type BulkActionId = 
   | 'ticket' 
@@ -33,6 +34,10 @@ export interface BulkActionContext {
   hasPhoneColumn: boolean;
   hasEmailColumn: boolean;
   hasDateColumn: boolean;
+  /** La tabla tiene dominio de vencimiento (fechas/políticas de retiro). */
+  canExpire: boolean;
+  /** La tabla tiene dominio de incidencia (tipo de evento FRC). */
+  canLogEvents: boolean;
 }
 
 export interface BulkActionDefinition {
@@ -142,12 +147,12 @@ export const ALL_BULK_ACTIONS: BulkActionDefinition[] = [
     buttonClass: 'text-xs hover:bg-slate-700 px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 bg-orange-600/30 text-orange-200 border border-orange-500/30',
     iconClass: 'w-3.5 h-3.5 text-orange-400',
     defaultEnabled: (ctx) => {
-      if (ctx.activeView === 'main') return true;
+      if (ctx.canExpire) return true;
       const t = ctx.tableKey.toLowerCase();
       return /vencimiento|caducidad|radar|drenaje/i.test(t);
     },
     getContextualReason: (ctx) => {
-      if (ctx.activeView === 'main' || /vencimiento/i.test(ctx.tableKey)) {
+      if (ctx.canExpire || /vencimiento/i.test(ctx.tableKey)) {
         return 'Tabla principal de vencimientos y productos en drenaje';
       }
       return 'Solo aplica a tablas con fechas de caducidad y políticas de retiro';
@@ -163,12 +168,12 @@ export const ALL_BULK_ACTIONS: BulkActionDefinition[] = [
     buttonClass: 'text-xs hover:bg-slate-700 px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 bg-blue-600/40 text-blue-200 border border-blue-500/40',
     iconClass: 'w-3.5 h-3.5 text-blue-400',
     defaultEnabled: (ctx) => {
-      if (ctx.activeView === 'events') return true;
+      if (ctx.canLogEvents) return true;
       const t = ctx.tableKey.toLowerCase();
       return /evento|incidencia|frc|averia|merma|diferencia|transporte/i.test(t);
     },
     getContextualReason: (ctx) => {
-      if (ctx.activeView === 'events' || /evento|frc/i.test(ctx.tableKey)) {
+      if (ctx.canLogEvents || /evento|frc/i.test(ctx.tableKey)) {
         return 'Gestión de incidencias y estado de resolución de traspasos';
       }
       return 'Solo aplica a tablas de eventos o incidencias FRC';
@@ -200,6 +205,7 @@ export function buildBulkActionContext(
   const hasPhone = !!findPhoneColumn(headers);
   const hasEmail = !!findEmailColumn(headers);
   const hasDate = headers.some(h => /fecha|date|vto|venc|retiro/i.test(h));
+  const caps = resolveTableCapabilities(headers, undefined, activeSheetTitle, activeView);
 
   return {
     activeView,
@@ -208,7 +214,9 @@ export function buildBulkActionContext(
     headers,
     hasPhoneColumn: hasPhone,
     hasEmailColumn: hasEmail,
-    hasDateColumn: hasDate
+    hasDateColumn: hasDate,
+    canExpire: caps.has('vencimiento'),
+    canLogEvents: caps.has('incidencia')
   };
 }
 

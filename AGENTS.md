@@ -250,13 +250,25 @@ otra a medida.
 - **UI gateada por capacidad:** el contexto publica `dashboard.tableCapabilities`; los
   consumidores preguntan `has('conteo')` (Conteo/Pistoleo en `DashboardTopNav`,
   `DashboardMobileFABs` y `Sidebar`). Antes esa UI se ofrecía en toda hoja.
+- **`resolveTableCapabilities(headers, customAliases?, sheetTitle?, activeView?)`**
+  (`src/utils/sliceRegistry.ts`) es la variante que usa la app: parte de
+  `detectTableCapabilities` y **añade la capacidad por respaldo** cuando las columnas no la
+  declaran pero el nombre de hoja o la identidad de vista sí son de dominio. Existe porque en
+  modo demo/offline, al cambiar de vista con caché ya renderizada, `useInventoryData` retorna
+  temprano y deja `headers` y `activeSheet` con el valor anterior; el único estado fresco es
+  `activeView`. El dashboard resuelve las capacidades **una sola vez** con esta función y las
+  publica en el contexto; los consumidores no repiten la regla. Una hoja no canónica navega con
+  `activeView = <título>` ("Clientes"), que no colisiona con las identidades ni las regex, así
+  que el respaldo no filtra UI de dominio a hojas genéricas.
 - **Degradación segura:** sin `headers` no se detecta ninguna capacidad (0 slices nativos, no
   excepción). Cualquier llamada nueva **debe** pasar `headers` y, si aplica, `customAliases`.
 
 **Regla al añadir un módulo de dominio:** no lo actives por `activeView === '...'`. Declara su
 capacidad en `detectTableCapabilities` y gatea por ella, para que una hoja no canónica no lo
-arrastre. Los ~90 despachos por identidad que quedan son deuda medida (ver ROADMAP, Fase 7),
-no un patrón a imitar.
+arrastre. Si el gate vive en un componente, usa `dashboard.tableCapabilities` (ya efectivas) y
+`has(...)`, sin releer `activeView`. Tras este corte quedan **49** despachos por identidad
+(`grep -rEn "activeView\s*===\s*['\"]|tableKey\s*===\s*['\"]" src`), frente a **83** en el mismo
+`grep` sobre el baseline: deuda medida, no un patrón a imitar (ver ROADMAP, Fase 7).
 
 ---
 
@@ -377,7 +389,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
 | `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
-| `npm run test:e2e` | Arranca el build de producción y corre los 16 arneses de integridad (`tests/perf/run.cjs`). |
+| `npm run test:e2e` | Arranca el build de producción y corre los 17 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -405,7 +417,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 ### Arneses de medición (`tests/perf/`, requieren Chromium y un build servido)
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 16 arneses que cubren integridad de
+`npm run test:e2e` arranca el preview y corre los 17 arneses que cubren integridad de
 datos y navegación; devuelve código distinto de cero si alguno falla. El binario de Chrome
 se toma de `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`,
 etc.).

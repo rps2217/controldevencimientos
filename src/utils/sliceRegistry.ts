@@ -44,6 +44,36 @@ export function detectTableCapabilities(
   return caps;
 }
 
+/**
+ * Capacidades de dominio EFECTIVAS de la hoja activa, con respaldo por nombre de hoja e
+ * identidad de vista.
+ *
+ * La capacidad de columnas es la señal primaria: es lo que permite que una hoja no canónica
+ * con las columnas reciba su módulo (p. ej. "Bodega_Sur"). El respaldo existe porque en modo
+ * demo/offline, al cambiar de vista con caché ya renderizada, `useInventoryData` retorna
+ * temprano y deja `headers` y `activeSheet` con el valor anterior: el único estado fresco es
+ * `activeView`. Sin respaldo, gatear solo por capacidad ocultaría UI de dominio en la hoja
+ * correcta. Una hoja no canónica navega con `activeView = <título>` (p. ej. "Clientes"), que
+ * no coincide con las identidades canónicas ni con las regex de respaldo.
+ *
+ * Se resuelve una sola vez aquí para que ningún consumidor tenga que repetir la regla.
+ */
+export function resolveTableCapabilities(
+  headers: string[],
+  customAliases?: Record<string, string[]>,
+  sheetTitle?: string,
+  activeView?: string
+): Set<TableCapability> {
+  const caps = detectTableCapabilities(headers, customAliases);
+  if ((activeView === 'main' || /vencimiento|caducidad|stock|radar|drenaje/i.test(sheetTitle || '')) && !caps.has('vencimiento')) {
+    caps.add('vencimiento');
+  }
+  if ((activeView === 'events' || /frc|evento|incidenc|averia|merma|diferencia|transporte/i.test(sheetTitle || '')) && !caps.has('incidencia')) {
+    caps.add('incidencia');
+  }
+  return caps;
+}
+
 /** Un slice personalizado no declara capacidad: nunca se restringe. */
 function sliceFitsCapabilities(slice: TableSlice, caps: Set<TableCapability>): boolean {
   if (!slice.requiredCapability) return true;

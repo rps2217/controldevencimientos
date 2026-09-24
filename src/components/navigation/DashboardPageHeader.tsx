@@ -14,6 +14,7 @@ export const DashboardPageHeader: React.FC = () => {
   const rightDrawer = useRightDrawer();
 
   const activeView = dashboard.activeView;
+  const canLogEvents = dashboard.tableCapabilities?.has('incidencia') ?? false;
   const setIsBulkImportOpen = modalsActions.setIsBulkImportOpen;
   const onOpenCreateSlice = () => modalsActions.openSliceEditor(null);
   const onOpenSliceManager = () => modalsActions.setIsSliceManagerOpen(true);
@@ -119,8 +120,8 @@ export const DashboardPageHeader: React.FC = () => {
 
       {/* RIGHT ZONE: Minimal Unified Tools */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* Bulk Import FRC Quick Access */}
-        {activeView === 'events' && setIsBulkImportOpen && (
+        {/* Bulk Import FRC Quick Access (por capacidad de incidencia) */}
+        {canLogEvents && setIsBulkImportOpen && (
           <button
             onClick={() => setIsBulkImportOpen(true)}
             className="px-2.5 py-1 rounded-xl font-bold border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-98"

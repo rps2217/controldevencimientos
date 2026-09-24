@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { InventoryItem, ViewKey } from '../types';
+import { InventoryItem } from '../types';
 import { WorkerMetricsResult, WorkerOutMessage } from '../workers/inventoryWorker';
 
 export interface UseInventoryWorkerProps {
@@ -7,7 +7,10 @@ export interface UseInventoryWorkerProps {
   headers: string[];
   frcBodCol: string | null;
   searchableHeaders: string[];
-  activeView: ViewKey;
+  /** Capacidad de vencimiento de la hoja activa (gobierna el filtro del Radar PM). */
+  canExpire: boolean;
+  /** Capacidad de incidencia de la hoja activa (gobierna los filtros de eventos). */
+  canLogEvents: boolean;
   searchTerm: string;
   activeQuickChip: string | null;
   eventFilter: string[];
@@ -24,7 +27,8 @@ export function useInventoryWorker({
   headers,
   frcBodCol,
   searchableHeaders,
-  activeView,
+  canExpire,
+  canLogEvents,
   searchTerm,
   activeQuickChip,
   eventFilter,
@@ -80,7 +84,8 @@ export function useInventoryWorker({
   }, []);
 
   const buildFilterPayload = useCallback(() => ({
-    activeView,
+    canExpire,
+    canLogEvents,
     searchTerm: (searchTerm.trim() || activeQuickChip || '').toLowerCase(),
     eventFilter,
     frcBodFilter,
@@ -90,7 +95,7 @@ export function useInventoryWorker({
     columnFilters,
     dynamicMonthFilter,
     dynamicMonthRange
-  }), [activeView, searchTerm, activeQuickChip, eventFilter, frcBodFilter, frcBodCol, eventResolutionFilter, pmRadarFilter, columnFilters, dynamicMonthFilter, dynamicMonthRange]);
+  }), [canExpire, canLogEvents, searchTerm, activeQuickChip, eventFilter, frcBodFilter, frcBodCol, eventResolutionFilter, pmRadarFilter, columnFilters, dynamicMonthFilter, dynamicMonthRange]);
 
   // Ref always pointing at the latest payload builder: the dataset effect below must re-read it
   // when data changes without re-running PROCESS_DATA on every filter change.
@@ -122,7 +127,8 @@ export function useInventoryWorker({
       workerRef.current.postMessage({ type: 'FILTER_DATA', payload: buildFilterPayload() });
     }
   }, [
-    activeView,
+    canExpire,
+    canLogEvents,
     searchTerm,
     activeQuickChip,
     eventFilter,

@@ -51,6 +51,7 @@ export const DashboardTopNav: React.FC = () => {
   // El terminal de conteo/pistoleo solo tiene sentido si la hoja puede contar
   // existencias (SKU + cantidad). En una hoja sin esas columnas no se ofrece.
   const canCount = dashboard.tableCapabilities?.has('conteo') ?? false;
+  const canLogEvents = dashboard.tableCapabilities?.has('incidencia') ?? false;
   // Global Keyboard shortcut for search (Cmd+K / Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -223,8 +224,8 @@ export const DashboardTopNav: React.FC = () => {
         {/* PWA Install Button (Mobile Only) */}
         <PWAInstallButton variant="compact" className="md:hidden" />
 
-        {/* Special Action: Bulk Import FRC */}
-        {activeView === 'events' && setIsBulkImportOpen && (
+        {/* Special Action: Bulk Import FRC (por capacidad de incidencia) */}
+        {canLogEvents && setIsBulkImportOpen && (
           <button
             onClick={() => setIsBulkImportOpen(true)}
             className="h-10 flex items-center gap-1.5 px-3.5 rounded-2xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"

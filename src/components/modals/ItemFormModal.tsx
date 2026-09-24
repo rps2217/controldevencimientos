@@ -30,7 +30,10 @@ interface ItemFormModalProps {
   onSetEditingItem?: (item: InventoryItem | null) => void;
   existingItems?: InventoryItem[];
   activeSheet: SheetProperties | null;
-  activeView: string;
+  /** Capacidad de vencimiento de la hoja activa (columna virtual de retiro). */
+  canExpire?: boolean;
+  /** Capacidad de incidencia de la hoja activa (selector de evento). */
+  canLogEvents?: boolean;
   headers: string[];
   formData: Record<string, string>;
   formErrors: Record<string, string>;
@@ -52,7 +55,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   onSetEditingItem,
   existingItems = [],
   activeSheet,
-  activeView,
+  canExpire = false,
+  canLogEvents = false,
   headers,
   formData,
   formErrors,
@@ -101,7 +105,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
     return match.exists ? match : null;
   }, [editingItem, existingItems, formData, headers, sheetConfig?.customAliases, candidateCuVc]);
 
-  const isMainOrEvents = activeView === 'main' || activeView === 'events';
+  const isMainOrEvents = canExpire || canLogEvents;
   const categoryDef = EVENT_CATEGORIES[selectedEventCategory] || EVENT_CATEGORIES.VENCIMIENTO;
 
   // Identify key semantic columns in current headers
@@ -192,7 +196,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
 
   // Inject virtual FECHA_RETIRO_CALC in the form of the Vencimientos view if not physically present in headers
   const hasRetiroCalc = headers.some(h => /fecha(_|\s)?retiro/i.test(h) || /retiro(_|\s)?calc/i.test(h));
-  if (activeView === 'main' && !hasRetiroCalc) {
+  if (canExpire && !hasRetiroCalc) {
     evaluatedFields.push({
       header: 'FECHA_RETIRO_CALC',
       colSchema: { visible: true, searchable: false, type: 'date', behavior: 'calc_retiro', label: 'Fecha Retiro Calc.' },
@@ -442,7 +446,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             )}
 
             {/* Commercial Policy & Withdrawal Info Card (Políticas de Canje & Días de Retiro) */}
-            {(activeView === 'main' || activeView === 'events' || Boolean(resolvedPolicyInfo.matchedPolicyEntry || resolvedPolicyInfo.matchedProductEntry)) && (
+            {(isMainOrEvents || Boolean(resolvedPolicyInfo.matchedPolicyEntry || resolvedPolicyInfo.matchedProductEntry)) && (
               <div className="p-3.5 bg-gradient-to-r from-teal-50/90 via-emerald-50/70 to-blue-50/80 dark:from-teal-950/40 dark:via-emerald-950/30 dark:to-blue-950/30 border border-teal-200/90 dark:border-teal-800/80 rounded-2xl shadow-xs">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -594,8 +598,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             {/* Input Fields Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {visibleFields.map(({ header, colSchema, isKey }) => {
-                const isAutoCalc = (colSchema?.behavior === 'calc_fecha_vc' && activeView === 'main') || 
-                                   (colSchema?.behavior === 'calc_retiro' && activeView === 'main') || 
+                const isAutoCalc = (colSchema?.behavior === 'calc_fecha_vc' && canExpire) || 
+                                   (colSchema?.behavior === 'calc_retiro' && canExpire) || 
                                    colSchema?.behavior === 'auto_id' || 
                                    colSchema?.type === 'calculated' || 
                                    /^ID_VC$/i.test(String(header).trim()) ||

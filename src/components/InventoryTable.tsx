@@ -9,7 +9,6 @@ import { useDashboard } from '../context/DashboardContext';
 
 export const InventoryTable: React.FC = () => {
   const dashboard = useDashboard();
-
   const filteredItems = dashboard.filteredItems ?? [];
   const selectedRowIds = dashboard.selectedRowIds ?? [];
   const setSelectedRowIds = dashboard.setSelectedRowIds ?? (() => {});
@@ -17,6 +16,14 @@ export const InventoryTable: React.FC = () => {
   const visibleHeaders = dashboard.effectiveVisibleHeaders ?? dashboard.visibleHeaders ?? [];
   const visibleColumnMeta = dashboard.visibleColumnMeta ?? [];
   const activeView = dashboard.activeView;
+  // Las columnas virtuales de estado se rigen por la CAPACIDAD de la hoja, no por su
+  // nombre de vista: asi una hoja no canonica con columnas de vencimiento/incidencia
+  // recibe el mismo modulo que las canonicas (`main`/`events`).
+  const caps = dashboard.tableCapabilities;
+  const showExpiryCol = caps?.has('vencimiento') ?? false;
+  const showResolutionCol = caps?.has('incidencia') ?? false;
+  // Columnas extra del colSpan: la de acciones + las virtuales de estado presentes.
+  const extraCols = 3 + (showExpiryCol ? 1 : 0) + (showResolutionCol ? 1 : 0);
   const tableContainerRef = dashboard.tableContainerRef;
   const getColWidth = useMemo(
     () => dashboard.getColWidth ?? (() => 150),
@@ -160,7 +167,7 @@ export const InventoryTable: React.FC = () => {
                 </div>
               </th>
 
-              {activeView === 'main' && (
+              {showExpiryCol && (
                 <th 
                   style={{ width: `${getColWidth('_status', 'Estado / Radar PM')}px`, minWidth: `${getColWidth('_status', 'Estado / Radar PM')}px`, maxWidth: `${getColWidth('_status', 'Estado / Radar PM')}px` }} 
                   className={`${paddingClass} bg-slate-100 dark:bg-slate-700/90 text-slate-700 dark:text-slate-100 border-b border-slate-200 dark:border-slate-600/80 relative group font-bold`}
@@ -194,7 +201,7 @@ export const InventoryTable: React.FC = () => {
                 </th>
               )}
 
-              {activeView === 'events' && (
+              {showResolutionCol && (
                 <th 
                   style={{ width: `${getColWidth('_res_status', 'Estado Gestión')}px`, minWidth: `${getColWidth('_res_status', 'Estado Gestión')}px`, maxWidth: `${getColWidth('_res_status', 'Estado Gestión')}px` }} 
                   className={`${paddingClass} bg-slate-100 dark:bg-slate-700/90 text-slate-700 dark:text-slate-100 border-b border-slate-200 dark:border-slate-600/80 relative group font-bold`}
@@ -371,13 +378,13 @@ export const InventoryTable: React.FC = () => {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm text-slate-700 dark:text-slate-200 block md:table-row-group">
             {filteredItems.length === 0 ? (
               <tr>
-                <td colSpan={visibleHeaders.length + (activeView === 'main' || activeView === 'events' ? 4 : 3)} className="p-8 text-center text-slate-400 dark:text-slate-500">
+                <td colSpan={visibleHeaders.length + extraCols} className="p-8 text-center text-slate-400 dark:text-slate-500">
                   No hay datos en esta hoja.
                 </td>
               </tr>
             ) : (<>
               {paddingTop > 0 && (
-                <tr><td style={{ height: `${paddingTop}px` }} colSpan={visibleHeaders.length + (activeView === 'main' || activeView === 'events' ? 4 : 3)} /></tr>
+                <tr><td style={{ height: `${paddingTop}px` }} colSpan={visibleHeaders.length + extraCols} /></tr>
               )}
               {virtualRows.map((virtualRow) => {
                 const rowData = paginatedDisplayRows[virtualRow.index];
@@ -405,7 +412,7 @@ export const InventoryTable: React.FC = () => {
                       title={isCollapsed ? 'Clic para expandir grupo' : 'Clic para contraer grupo'}
                     >
                       <td
-                        colSpan={visibleHeaders.length + (activeView === 'main' || activeView === 'events' ? 4 : 3)}
+                        colSpan={visibleHeaders.length + extraCols}
                         className="px-4 py-2.5"
                       >
                         <div className="flex items-center justify-between">
@@ -479,6 +486,8 @@ export const InventoryTable: React.FC = () => {
                     headers={headers}
                     visibleColumnMeta={visibleColumnMeta}
                     activeView={activeView}
+                    showExpiryCol={showExpiryCol}
+                    showResolutionCol={showResolutionCol}
                     isSelected={selectedRowIds.includes(item._rowIndex as number)}
                     isActiveDetail={activeDetailRowIndex === item._rowIndex}
                     frcBodFilter={frcBodFilter}
@@ -502,7 +511,7 @@ export const InventoryTable: React.FC = () => {
                 );
               })}
               {paddingBottom > 0 && (
-                <tr><td style={{ height: `${paddingBottom}px` }} colSpan={visibleHeaders.length + (activeView === 'main' || activeView === 'events' ? 4 : 3)} /></tr>
+                <tr><td style={{ height: `${paddingBottom}px` }} colSpan={visibleHeaders.length + extraCols} /></tr>
               )}
             </>)}
           </tbody>

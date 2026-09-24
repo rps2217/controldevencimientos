@@ -24,6 +24,14 @@ const HOJAS = {
     ['22.222.222-2', 'Cliente Dos Ltda', '+56922222222', 'dos@example.com'],
     ['33.333.333-3', 'Cliente Tres SpA', '+56933333333', 'tres@example.com'],
   ],
+  // Hoja NO canonica pero CON dominio de vencimiento (Fase 7 paso 3b): el objetivo
+  // de la fase es que una hoja ajena con estas columnas reciba el modulo completo
+  // (slices ya lo hacen por capacidad), no solo el andamiaje.
+  Bodega_Sur: [
+    ['SKU', 'DESCRIPCION', 'CANTIDAD', 'FECHA VTO', 'PROVEEDOR', 'LOTE'],
+    ['S-2000', 'Producto bodega sur', '15', '2026-04-01', 'Proveedor A', 'B-1'],
+    ['S-2001', 'Producto bodega sur 2', '8', '2026-05-15', 'Proveedor B', 'B-2'],
+  ],
 };
 
 const SHEETS = Object.keys(HOJAS);

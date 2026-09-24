@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useDeferredValue } from 'react';
-import { InventoryItem, SheetConfig, SortConfig, DynamicMonthRange, ViewKey , SheetRecord } from '../types';
+import { InventoryItem, SheetConfig, SortConfig, DynamicMonthRange, SheetRecord, TableCapability } from '../types';
 import { 
   getItemStatus, 
   getEventCategory, 
@@ -9,6 +9,7 @@ import {
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { parseAnyDate, formatDisplayDate, createMetricsAccumulator } from '../utils/pureCalculations';
 import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
+import { detectTableCapabilities } from '../utils/sliceRegistry';
 import { sortInventoryItems, compareItemValues } from '../utils/sortUtils';
 import { useInventoryWorker } from './useInventoryWorker';
 
@@ -32,7 +33,8 @@ export type DisplayRow = DisplayRowItem | DisplayRowHeader;
 export interface UseInventoryFilteringProps {
   items: InventoryItem[];
   headers: string[];
-  activeView: ViewKey;
+  /** Capacidades EFECTIVAS ya resueltas por el dashboard. Si faltan, se derivan de `headers`. */
+  tableCapabilities?: Set<TableCapability>;
   frcBodCol: string | null;
   sheetConfig: SheetConfig;
   products: SheetRecord[];
@@ -79,7 +81,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
   const {
     items,
     headers,
-    activeView,
+    tableCapabilities,
     frcBodCol,
     sheetConfig,
     products,
@@ -93,6 +95,15 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
   } = props;
 
   const deferredSearchTerm = useDeferredValue(searchTerm);
+
+  // Capacidades EFECTIVAS de la hoja activa. El dashboard las resuelve una sola vez; aquí
+  // solo se derivan de las columnas como respaldo si no llegan por props.
+  const tableCaps = useMemo(
+    () => tableCapabilities ?? detectTableCapabilities(headers, sheetConfig.customAliases),
+    [tableCapabilities, headers, sheetConfig.customAliases]
+  );
+  const canExpire = tableCaps.has('vencimiento');
+  const canLogEvents = tableCaps.has('incidencia');
 
   // Filter and Sorting state (Fallback to local if props not provided)
   const [localSortConfig, setLocalSortConfig] = useState<SortConfig>(initialSort);
@@ -184,7 +195,8 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     headers,
     frcBodCol,
     searchableHeaders,
-    activeView,
+    canExpire,
+    canLogEvents,
     searchTerm: deferredSearchTerm,
     activeQuickChip,
     eventFilter,
@@ -261,7 +273,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     // Always ensure active virtual columns are included in columnOptionsMap
     const activeVCs = sheetConfig.activeVirtualColumns || [];
     const activeViewVCs = VIRTUAL_COLUMNS
-      .filter(vc => activeVCs.includes(vc.id) && (!vc.supportedViews || vc.supportedViews.includes(activeView)))
+      .filter(vc => activeVCs.includes(vc.id) && (!vc.supportedCapabilities || vc.supportedCapabilities.some(c => tableCaps.has(c))))
       .map(vc => vc.id);
 
     activeViewVCs.forEach(h => {
@@ -281,7 +293,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     });
 
     return map;
-  }, [augmentedItems, headers, sheetConfig.activeVirtualColumns, metrics, activeView]);
+  }, [augmentedItems, headers, sheetConfig.activeVirtualColumns, metrics, tableCaps]);
 
   // Fast filtering using Worker matching indices when available
   const filteredItems = useMemo(() => {
@@ -294,16 +306,16 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
       }
     } else {
       // Local single-pass fallback
-      const hasEventFilter = activeView === 'events' && eventFilter.length > 0;
+      const hasEventFilter = canLogEvents && eventFilter.length > 0;
       const eventFilterSet = hasEventFilter ? new Set(eventFilter) : null;
 
       const hasFrcBodFilter = frcBodFilter.length > 0 && !!frcBodCol;
       const frcBodFilterSet = hasFrcBodFilter ? new Set(frcBodFilter) : null;
 
-      const hasEventResFilter = activeView === 'events' && eventResolutionFilter.length > 0;
+      const hasEventResFilter = canLogEvents && eventResolutionFilter.length > 0;
       const eventResFilterSet = hasEventResFilter ? new Set(eventResolutionFilter) : null;
 
-      const hasPmRadarFilter = activeView === 'main' && pmRadarFilter.length > 0;
+      const hasPmRadarFilter = canExpire && pmRadarFilter.length > 0;
       const pmRadarFilterSet = hasPmRadarFilter ? new Set(pmRadarFilter) : null;
 
       const activeColFilterEntries = (Object.entries(columnFilters) as [string, string[]][])
@@ -323,7 +335,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
         const item = augmentedItems[i];
 
         // View constraints
-        if (activeView === 'main') {
+        if (canExpire) {
           const cat = getEventCategory(item, headers, fallbackColContext);
           if (cat !== 'VENCIMIENTO' && cat !== 'VENCIMIENTO_CERCANO') {
             continue;
@@ -373,7 +385,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
               continue;
             }
           }
-        } else if (activeView === 'events') {
+        } else if (canLogEvents) {
           if (eventFilterSet) {
             const cat = getEventCategory(item, headers, fallbackColContext);
             if (!cat || !eventFilterSet.has(cat)) continue;
@@ -441,7 +453,6 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     deferredSearchTerm, 
     activeQuickChip, 
     searchableHeaders, 
-    activeView, 
     eventFilter, 
     frcBodFilter, 
     frcBodCol, 
@@ -451,7 +462,9 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     dynamicMonthFilter,
     dynamicMonthRange,
     headers,
-    sortConfig
+    sortConfig,
+    canExpire,
+    canLogEvents
   ]);
 
   // Grouping logic

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { appendRow, updateRow, deleteRow, saveCloudConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
-import { InventoryItem, SheetConfig, ViewKey, EventCategory, VIEW_KEYS } from '../types';
+import { InventoryItem, SheetConfig, EventCategory, VIEW_KEYS } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
 import { useModalsActions } from '../context/ModalsContext';
 import { DashboardProvider, DashboardContextType } from '../context/DashboardContext';
@@ -11,7 +11,7 @@ import { AlertCircle, Package } from 'lucide-react';
 import { getEventCategory, getItemStatus, parseLocaleNumber } from '../utils/dateCalculations';
 import { rowToObject } from '../utils/pureCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
-import { detectTableCapabilities } from '../utils/sliceRegistry';
+import { resolveTableCapabilities } from '../utils/sliceRegistry';
 import { resolveItemIdentity } from '../utils/entityIdentityResolver';
 import { 
   findExistingItemByCuVc
@@ -289,6 +289,14 @@ export const InventoryDashboard: React.FC = () => {
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
+  // Capacidades EFECTIVAS de la hoja activa: gobiernan qué UI de dominio (conteo,
+  // pistoleo, columnas de estado, radar) se ofrece, en vez de asumir por identidad de
+  // vista. Incluye respaldo por nombre/identidad para el modo demo (ver `resolveTableCapabilities`).
+  const tableCapabilities = useMemo(
+    () => resolveTableCapabilities(headers, sheetConfig.customAliases, activeSheet?.title, activeView),
+    [headers, sheetConfig.customAliases, activeSheet?.title, activeView]
+  );
+
   const {
     isModalOpen,
     setIsModalOpen,
@@ -309,7 +317,7 @@ export const InventoryDashboard: React.FC = () => {
   } = useItemFormManager({
     headers,
     activeSheet,
-    activeView,
+    canLogEvents: tableCapabilities.has('incidencia'),
     sheetConfig,
     products,
     policies,
@@ -323,13 +331,6 @@ export const InventoryDashboard: React.FC = () => {
   const bulkActionCtx = useMemo(() => {
     return buildBulkActionContext(headers, activeView, activeSheet?.title);
   }, [headers, activeView, activeSheet?.title]);
-
-  // Capacidades de la hoja activa: gobiernan qué UI de dominio (conteo, pistoleo)
-  // se ofrece, en vez de asumir que toda hoja es de vencimientos.
-  const tableCapabilities = useMemo(
-    () => detectTableCapabilities(headers, sheetConfig.customAliases),
-    [headers, sheetConfig.customAliases]
-  );
 
 
   // Column Resizing Custom Hook
@@ -403,6 +404,7 @@ export const InventoryDashboard: React.FC = () => {
     headers,
     activeSheetTitle: activeSheet?.title,
     activeView,
+    tableCapabilities,
     sheetConfig
   });
 
@@ -478,7 +480,7 @@ export const InventoryDashboard: React.FC = () => {
   } = useInventoryFiltering({
     items,
     headers,
-    activeView: activeView as ViewKey,
+    tableCapabilities,
     frcBodCol,
     sheetConfig,
     products,
@@ -676,6 +678,7 @@ export const InventoryDashboard: React.FC = () => {
   } = useInventoryIngestion({
     activeSheet,
     activeView,
+    canExpire: tableCapabilities.has('vencimiento'),
     sheetConfig,
     headers,
     items,

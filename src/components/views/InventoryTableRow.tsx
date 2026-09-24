@@ -21,6 +21,10 @@ export interface InventoryTableRowProps {
   headers: string[];
   visibleColumnMeta: ColumnMetadata[];
   activeView: 'main' | 'events' | 'products' | 'policies' | string;
+  /** La hoja tiene dominio de vencimiento (columna virtual de estado de caducidad). */
+  showExpiryCol?: boolean;
+  /** La hoja tiene dominio de incidencia (columna virtual de estado de gestion). */
+  showResolutionCol?: boolean;
   isSelected: boolean;
   /** Registro cuyo detalle se muestra en el panel maestro-detalle. */
   isActiveDetail?: boolean;
@@ -49,6 +53,8 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   headers,
   visibleColumnMeta,
   activeView,
+  showExpiryCol = false,
+  showResolutionCol = false,
   isSelected,
   isActiveDetail = false,
   frcBodFilter,
@@ -71,7 +77,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
 }) => {
   const eventCategory = getEventCategory(item, headers);
   const status = getItemStatus(item, headers);
-  const isEventView = activeView === 'events';
+  const isEventView = showResolutionCol;
   const eventResStatus = isEventView ? getItemResolutionStatus(item, headers) : null;
   const isProductsView = activeView === 'products';
   
@@ -126,7 +132,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
           {/* Header Row: Badges + Checkbox */}
           <div className="flex justify-between items-start gap-2">
             <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
-              {activeView === 'main' ? (
+              {showExpiryCol ? (
                 <>
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${status.color} border shadow-2xs`}>
                     {status.icon} {status.label}
@@ -193,7 +199,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                 </span>
               </div>
             )}
-            {activeView === 'events' && eventResStatus && (
+            {showResolutionCol && eventResStatus && (
               <div className="flex flex-col col-span-2 sm:col-span-1">
                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Gestión</span>
                 <span className={`font-bold text-xs flex items-center gap-1 mt-0.5 ${eventResStatus.isResolved ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
@@ -279,7 +285,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       </td>
 
       {/* Expiration Status Badge (Main view) - Unified Single Badge */}
-      {activeView === 'main' && (
+      {showExpiryCol && (
         <td 
           style={{ width: `${getColWidth('_status', 'Estado / Radar PM')}px`, minWidth: `${getColWidth('_status', 'Estado / Radar PM')}px`, maxWidth: `${getColWidth('_status', 'Estado / Radar PM')}px` }}
           className={`hidden md:table-cell ${paddingClass} truncate`}
@@ -332,7 +338,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       )}
 
       {/* Incident Resolution Status Badge (Events view) */}
-      {activeView === 'events' && (
+      {showResolutionCol && (
         <td 
           style={{ width: `${getColWidth('_res_status', 'Estado Gestión')}px`, minWidth: `${getColWidth('_res_status', 'Estado Gestión')}px`, maxWidth: `${getColWidth('_res_status', 'Estado Gestión')}px` }}
           className={`hidden md:table-cell ${paddingClass} truncate`}
@@ -514,6 +520,8 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   if (prevProps.isActiveDetail !== nextProps.isActiveDetail) return false;
   if (prevProps.virtualIndex !== nextProps.virtualIndex) return false;
   if (prevProps.activeView !== nextProps.activeView) return false;
+  if (prevProps.showExpiryCol !== nextProps.showExpiryCol) return false;
+  if (prevProps.showResolutionCol !== nextProps.showResolutionCol) return false;
   if (prevProps.visibleColumnMeta !== nextProps.visibleColumnMeta) return false;
   if (prevProps.frcBodFilter !== nextProps.frcBodFilter) return false;
   if (prevProps.getColWidth !== nextProps.getColWidth) return false;

@@ -8,7 +8,7 @@ export const VIRTUAL_COLUMNS: VirtualColumn[] = [
   {
     id: 'fecha_retiro_calc',
     label: 'Fecha Retiro Calc.',
-    supportedViews: ['main'],
+    supportedCapabilities: ['vencimiento'],
     calculate: (item, headers, allData) => {
       const { products, policies } = allData || {};
       const resolved = resolveItemPolicyAndRetiro(item, headers, products, policies);
@@ -18,7 +18,7 @@ export const VIRTUAL_COLUMNS: VirtualColumn[] = [
   {
     id: 'politica_canje_calc',
     label: 'Política Canje (Relac.)',
-    supportedViews: ['main'],
+    supportedCapabilities: ['vencimiento'],
     calculate: (item, headers, allData) => {
       const { products, policies } = allData || {};
       const resolved = resolveItemPolicyAndRetiro(item, headers, products, policies);
@@ -28,7 +28,7 @@ export const VIRTUAL_COLUMNS: VirtualColumn[] = [
   {
     id: 'dias_retiro_calc',
     label: 'Días Retiro (Relac.)',
-    supportedViews: ['main'],
+    supportedCapabilities: ['vencimiento'],
     calculate: (item, headers, allData) => {
       const { products, policies } = allData || {};
       const resolved = resolveItemPolicyAndRetiro(item, headers, products, policies);
@@ -38,7 +38,7 @@ export const VIRTUAL_COLUMNS: VirtualColumn[] = [
   {
     id: 'proveedor_relacionado',
     label: 'Proveedor (Catálogo)',
-    supportedViews: ['main'],
+    supportedCapabilities: ['vencimiento'],
     calculate: (item, headers, allData) => {
       const { products, policies } = allData || {};
       const resolved = resolveItemPolicyAndRetiro(item, headers, products, policies);
