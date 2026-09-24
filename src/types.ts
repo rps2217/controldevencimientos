@@ -220,6 +220,13 @@ export interface TableSlice {
   name: string;
   description?: string;
   tableKey: string; // 'main' | 'events' | 'products' | 'policies' or custom sheet title
+  /**
+   * Capacidad de dominio que exige la hoja para que este slice tenga sentido.
+   * Los slices nativos la declaran; los personalizados no la usan. Permite que una
+   * hoja distinta de las canónicas (p. ej. otra bodega) reciba los slices de
+   * vencimiento si trae las columnas, y que una hoja sin ellas no los reciba.
+   */
+  requiredCapability?: SliceCapability;
   icon?: string; // Lucide icon identifier
   color?: SliceColor;
   isBuiltIn?: boolean;
@@ -229,6 +236,13 @@ export interface TableSlice {
   groupByDirection?: 'asc' | 'desc';
   visibleColumns?: string[];
 }
+
+/**
+ * Capacidades de dominio detectables por columnas (ver `detectTableCapabilities`).
+ * - `vencimiento`: la hoja puede calcular fechas de vencimiento/retiro.
+ * - `incidencia`: la hoja registra eventos (transporte, mermas, diferencias...).
+ */
+export type SliceCapability = 'vencimiento' | 'incidencia';
 
 // ==========================================
 // MÓDULO DE CONTEO MASIVO DE EXISTENCIAS

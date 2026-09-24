@@ -290,11 +290,37 @@ console.log('\n--- 6. Pruebas de bulkActionsRegistry.ts ---');
 
 console.log('\n--- 7. Pruebas de sliceRegistry.ts ---');
 {
-  const mainSlices = getSlicesForTable('main');
+  const mainSlices = getSlicesForTable('main', [], undefined, SAMPLE_HEADERS);
   assert(mainSlices.length > 0, 'getSlicesForTable retorna slices nativos de main');
 
   const counts = computeSliceCounts(SAMPLE_ITEMS, mainSlices, SAMPLE_HEADERS);
   assert(typeof counts[mainSlices[0].id] === 'number', 'computeSliceCounts calcula conteo numérico de filas');
+
+  // Los nativos se eligen por capacidad de la hoja, no por el nombre del modulo: una
+  // hoja no canonica con columnas de vencimiento los recibe igual.
+  const bodegaAjena = ['Codigo', 'Producto', 'Cant', 'Fecha Vto', 'Lote'];
+  const ajenosVenc = getSlicesForTable('Bodega Sur', [], undefined, bodegaAjena);
+  assert(ajenosVenc.length === mainSlices.length, 'hoja no canonica con fecha de vencimiento recibe los slices de vencimiento');
+  assert(ajenosVenc.every(s => s.requiredCapability === 'vencimiento'), 'solo entran slices de la capacidad detectada');
+
+  const bitacora = ['ID', 'Tipo Evento', 'Detalle', 'Fecha'];
+  const ajenosEv = getSlicesForTable('Bitacora', [], undefined, bitacora);
+  assert(ajenosEv.length > 0 && ajenosEv.every(s => s.requiredCapability === 'incidencia'), 'hoja con columna de evento recibe los slices de incidencia');
+
+  // Una hoja sin semantica de dominio no debe heredar nada: antes mostraba
+  // "Inventario en Regla" para un cliente (falso positivo silencioso).
+  const clientes = ['Razon Social', 'Contacto', 'Telefono', 'Email', 'Ciudad'];
+  assert(getSlicesForTable('Clientes', [], undefined, clientes).length === 0, 'hoja sin columnas de dominio no recibe slices nativos');
+
+  // Sin headers (llamada heredada) tampoco revienta ni inventa slices.
+  assert(getSlicesForTable('main').length === 0, 'getSlicesForTable sin headers degrada a cero slices, sin excepcion');
+
+  // Un alias definido por el usuario en Ajustes debe contar como capacidad: la hoja
+  // no trae "fecha_vc" reconocible, pero el usuario ya le dijo al sistema cual es.
+  const conAlias = ['Articulo', 'MiFechaRara', 'Cant'];
+  assert(getSlicesForTable('Bodega Alias', [], undefined, conAlias).length === 0, 'sin alias declarado la hoja no detecta capacidad');
+  const aliasCfg = { fecha_vc: ['MiFechaRara'] };
+  assert(getSlicesForTable('Bodega Alias', [], undefined, conAlias, aliasCfg).length === mainSlices.length, 'un alias de fecha_vc declarado por el usuario habilita los slices de vencimiento');
 }
 
 console.log('\n--- 8. Pruebas de universalImporter.ts ---');

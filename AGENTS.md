@@ -126,11 +126,13 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
 
 ### F. Slices y Vistas Personalizadas Estilo AppSheet (`src/utils/sliceRegistry.ts`)
 - **Concepto de Slice**: En AppSheet, un "Slice" es una vista filtrada de una tabla que define un subconjunto de filas (criterios y filtros guardados), un ordenamiento predeterminado, una columna de agrupación opcional y una selección personalizada de columnas visibles.
-- **Slices Nativos Preconfigurados (`BUILT_IN_SLICES`)**:
-  - Para `main` (Radar de Vencimientos): *Vencidos & Críticos*, *Próximos a Retiro*, *Lotes con Alto Stock*, *Pendientes de Liquidación/PM*.
-  - Para `events` (FRC / Incidencias): *Averías & Deterioro Transporte*, *Diferencias Pendientes Traspaso*, *Pendientes de Resolución*, *Incidencias de Calidad*.
-  - Para `products`: *Productos con Política Asignada*, *Sin Política Comercial*.
-  - Para `policies`: *Políticas con Mayor Anticipación (>60d)*.
+- **Slices Nativos Preconfigurados (`BUILT_IN_SLICES`)**: 12 en total, y **no se eligen por nombre de pestaña sino por capacidad detectada en las columnas** (ver abajo).
+  - Capacidad `vencimiento` (6): *Retiro Inmediato*, *Canje Proveedor*, *Merma Directa*, *Radar PM (Drenaje)*, *Próximos a Vencer*, *Inventario en Regla*.
+  - Capacidad `incidencia` (6): *Traspasos Pendientes*, *Transporte & Chofer*, *Diferencias Stock*, *Mermas y Averías*, *Canjes y Devoluciones*, *Regularizados*.
+- **Selección por capacidad, no por nombre de pestaña**: cada slice nativo declara `requiredCapability` (`'vencimiento' | 'incidencia'`). `detectTableCapabilities(headers, customAliases)` deduce la capacidad de la hoja reutilizando `findColumnBySemantic`: `fecha_vc` / `fecha_retiro` / `mes`+`anio` dan `vencimiento`; `tipo_evento` da `incidencia`; sin nada, la hoja no recibe slices nativos. Esto permite que una hoja **no canónica** (ej. "Bodega Sur" con columna `Fecha Vto`) reciba los slices de vencimiento sin configurar nada, y que una hoja sin dominio (ej. Clientes) no reciba ninguno.
+  - La precedencia `vencimiento > incidencia` es deliberada: `getEventCategory` asume `VENCIMIENTO` por defecto y `main` sí trae `FRC_EVEN`; sin ella, `main` heredaría los slices de incidencias.
+  - `customAliases` (Ajustes) se pasa a la detección: un alias declarado por el usuario cuenta como capacidad.
+  - Los slices **personalizados** no declaran capacidad y nunca se restringen.
 - **Slices Personalizados Creados por el Usuario**:
   - El usuario puede capturar en un clic sus filtros, agrupaciones, columnas visibles y ordenamiento actual con el modal `SliceEditorModal.tsx`.
   - Personalización de color, icono, nombre y descripción explicativa.

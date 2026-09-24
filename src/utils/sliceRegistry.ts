@@ -1,7 +1,43 @@
-import { TableSlice, InventoryItem } from '../types';
+import { TableSlice, InventoryItem, SliceCapability } from '../types';
 import { getItemStatus, getEventCategory, getItemResolutionStatus } from './dateCalculations';
+import { findColumnBySemantic, KnownFieldSemantic } from './columnAliases';
 
 import { STORAGE_KEYS, readStorage, stringArraySchema, objectArraySchema } from '../utils/appStorage';
+
+/**
+ * Deduce las capacidades de dominio de una hoja a partir de sus encabezados.
+ *
+ * Misma idea que las bulk actions: manda la columna, no el nombre de la pestaña. Es
+ * lo que permite que una hoja no canónica (otra bodega, otra sucursal) reciba los
+ * slices de vencimiento si trae las columnas, y que una hoja de Clientes no reciba
+ * ninguno.
+ *
+ * La precedencia vencimiento > incidencia es deliberada: `getEventCategory` asume
+ * VENCIMIENTO por defecto, así que una hoja con fecha de vencimiento se trata como
+ * tabla de vencimientos aunque además tenga columna de evento (es el caso de la
+ * pestaña `main`, que trae FRC_EVEN). Sin esa precedencia, `main` heredaría los
+ * slices de incidencias y cambiaría el comportamiento actual.
+ */
+export function detectTableCapabilities(
+  headers: string[],
+  customAliases?: Record<string, string[]>
+): Set<SliceCapability> {
+  if (!Array.isArray(headers) || headers.length === 0) return new Set();
+  const has = (semantic: KnownFieldSemantic) =>
+    findColumnBySemantic(headers, semantic, customAliases) !== undefined;
+
+  const canExpire = has('fecha_vc') || has('fecha_retiro') || (has('mes') && has('anio'));
+  if (canExpire) return new Set<SliceCapability>(['vencimiento']);
+  if (has('tipo_evento')) return new Set<SliceCapability>(['incidencia']);
+  return new Set();
+}
+
+/** Un slice personalizado no declara capacidad: nunca se restringe. */
+function sliceFitsCapabilities(slice: TableSlice, caps: Set<SliceCapability>): boolean {
+  if (!slice.requiredCapability) return true;
+  return caps.has(slice.requiredCapability);
+}
+
 export const BUILT_IN_SLICES: TableSlice[] = [
   // 1. Radar de Vencimientos (main)
   {
@@ -9,6 +45,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Retiro Inmediato',
     description: 'Lotes vencidos o que requieren retiro urgente hoy según política',
     tableKey: 'main',
+    requiredCapability: 'vencimiento',
     icon: 'AlertTriangle',
     color: 'rose',
     isBuiltIn: true,
@@ -21,6 +58,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Canje Proveedor',
     description: 'Lotes vencidos o próximos con política de cambio/devolución acordada',
     tableKey: 'main',
+    requiredCapability: 'vencimiento',
     icon: 'ArrowLeftRight',
     color: 'indigo',
     isBuiltIn: true,
@@ -33,6 +71,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Merma Directa',
     description: 'Lotes vencidos o sin política de canje que pasan a baja directa',
     tableKey: 'main',
+    requiredCapability: 'vencimiento',
     icon: 'Trash2',
     color: 'rose',
     isBuiltIn: true,
@@ -45,6 +84,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Radar PM (Drenaje)',
     description: 'Lotes en ventana de acción comercial para jefatura de Producto',
     tableKey: 'main',
+    requiredCapability: 'vencimiento',
     icon: 'Flame',
     color: 'amber',
     isBuiltIn: true,
@@ -57,6 +97,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Próximos a Vencer',
     description: 'Lotes dentro del margen de 30 días previos a la fecha de retiro',
     tableKey: 'main',
+    requiredCapability: 'vencimiento',
     icon: 'Clock',
     color: 'indigo',
     isBuiltIn: true,
@@ -69,6 +110,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Inventario en Regla',
     description: 'Lotes con vigencia óptima y sin riesgo de retiro inmediato',
     tableKey: 'main',
+    requiredCapability: 'vencimiento',
     icon: 'CheckCircle2',
     color: 'emerald',
     isBuiltIn: true,
@@ -83,6 +125,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Traspasos Pendientes',
     description: 'Incidencias registradas que aún no cuentan con folio TR generado',
     tableKey: 'events',
+    requiredCapability: 'incidencia',
     icon: 'Clock',
     color: 'amber',
     isBuiltIn: true,
@@ -95,6 +138,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Transporte & Chofer',
     description: 'Averías, daños en estiba o novedades durante traslado',
     tableKey: 'events',
+    requiredCapability: 'incidencia',
     icon: 'Truck',
     color: 'blue',
     isBuiltIn: true,
@@ -107,6 +151,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Diferencias Stock',
     description: 'Faltantes y sobrantes de recepción contra factura física',
     tableKey: 'events',
+    requiredCapability: 'incidencia',
     icon: 'Scale',
     color: 'purple',
     isBuiltIn: true,
@@ -119,6 +164,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Mermas y Averías',
     description: 'Roturas, frascos quebrados o deterioros físicos en bodega',
     tableKey: 'events',
+    requiredCapability: 'incidencia',
     icon: 'Flame',
     color: 'rose',
     isBuiltIn: true,
@@ -131,6 +177,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Canjes y Devoluciones',
     description: 'Mercadería para devolución al proveedor o canje 1x1',
     tableKey: 'events',
+    requiredCapability: 'incidencia',
     icon: 'RotateCcw',
     color: 'indigo',
     isBuiltIn: true,
@@ -143,6 +190,7 @@ export const BUILT_IN_SLICES: TableSlice[] = [
     name: 'Regularizados',
     description: 'Incidencias con folio TR concluido o regularizadas en sistema',
     tableKey: 'events',
+    requiredCapability: 'incidencia',
     icon: 'CheckCircle2',
     color: 'emerald',
     isBuiltIn: true,
@@ -195,9 +243,15 @@ export function saveHiddenSliceIds(hiddenIds: string[]): void {
 export function getSlicesForTable(
   tableKey: string,
   customSlices: TableSlice[] = [],
-  sheetConfigSlices?: TableSlice[]
+  sheetConfigSlices?: TableSlice[],
+  headers: string[] = [],
+  customAliases?: Record<string, string[]>
 ): TableSlice[] {
-  const builtIns = BUILT_IN_SLICES.filter(s => s.tableKey === tableKey);
+  const caps = detectTableCapabilities(headers, customAliases);
+
+  // Los nativos entran por capacidad, no por nombre de pestana: asi una hoja no
+  // canonica recibe lo que sus columnas permiten, y ninguna recibe lo que no.
+  const builtIns = BUILT_IN_SLICES.filter(s => sliceFitsCapabilities(s, caps));
   
   // Merge custom slices from localStorage and sheetConfig, avoiding duplicates by id
   const customMap = new Map<string, TableSlice>();
@@ -219,9 +273,11 @@ export function getVisibleSlicesForTable(
   tableKey: string,
   customSlices: TableSlice[] = [],
   sheetConfigSlices?: TableSlice[],
-  hiddenSliceIds: string[] = []
+  hiddenSliceIds: string[] = [],
+  headers: string[] = [],
+  customAliases?: Record<string, string[]>
 ): TableSlice[] {
-  const allSlices = getSlicesForTable(tableKey, customSlices, sheetConfigSlices);
+  const allSlices = getSlicesForTable(tableKey, customSlices, sheetConfigSlices, headers, customAliases);
   if (!hiddenSliceIds || hiddenSliceIds.length === 0) return allSlices;
   const hiddenSet = new Set(hiddenSliceIds);
   return allSlices.filter(slice => !hiddenSet.has(slice.id));
@@ -238,15 +294,16 @@ export function itemMatchesSlice(
 ): boolean {
   if (!slice || !item) return false;
   const filterConfig = slice.filterConfig || {};
-  const tableKey = slice.tableKey;
 
-  // View Category enforcement for 'main' and 'events'
-  if (tableKey === 'main') {
+  // Los slices nativos ya entran filtrados por capacidad de la hoja, así que aquí
+  // sólo se afina por ítem. Se decide por capacidad (no por nombre de pestaña) para
+  // que una hoja no canónica reciba el mismo trato que la canónica equivalente.
+  if (slice.requiredCapability === 'vencimiento') {
     const cat = getEventCategory(item, headers);
     if (cat !== 'VENCIMIENTO' && cat !== 'VENCIMIENTO_CERCANO') {
       return false;
     }
-  } else if (tableKey === 'events') {
+  } else if (slice.requiredCapability === 'incidencia') {
     const cat = getEventCategory(item, headers);
     if (cat === 'VENCIMIENTO' || cat === 'VENCIMIENTO_CERCANO') {
       return false;

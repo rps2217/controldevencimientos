@@ -1120,8 +1120,10 @@ existe y ya navega. Lo que falta no es *cargar*: es que no arrastre dominio.
 
 1. **`sliceRegistry.itemMatchesSlice`**: `if (tableKey === 'main')` fuerza que todo ítem sea
    `VENCIMIENTO`/`VENCIMIENTO_CERCANO`, y `'events'` lo contrario. En una hoja de Clientes,
-   `getEventCategory` no reconoce nada, así que los slices de `main` devolverían **0 filas**
-   silenciosamente. Es el síntoma más probable en producción.
+   `getEventCategory` no reconoce nada → devuelve `'VENCIMIENTO'` por defecto → el slice
+   "Inventario en Regla" marcaba **1 fila en una hoja de clientes**. *(Corrección del
+   2026-09-19: en el primer borrador escribí que daría "0 filas silenciosamente". Medido con
+   sonda, es un **falso positivo**, no un falso negativo: peor, porque pasa desapercibido.)*
 2. **`handleSave` / borrado** (`InventoryDashboard.tsx:776-784`, `883`, `955`): el estado solo
    se enruta a `main`/`products`/`policies`. Una hoja genérica **no persiste en el estado de la
    vista** (solo en `saveStoredDemoItems(activeView)`, que sí es genérico).
@@ -1139,6 +1141,53 @@ existe y ya navega. Lo que falta no es *cargar*: es que no arrastre dominio.
 (paso 3), hace falta **quitarle el dominio a lo que ya carga**. El paso 2 (slices por
 capacidad) es el que desbloquea el paso 3, y el punto exacto a intervenir es
 `itemMatchesSlice` + `BUILT_IN_SLICES` con `tableKey: 'main'` fijo.
+
+#### Paso 2 — slices por capacidad: hecho y medido (2026-09-19)
+
+**Diseño.** Se añadió `requiredCapability?: 'vencimiento' | 'incidencia'` a `TableSlice`. Los
+12 slices nativos la declaran; los personalizados no (nunca se restringen). `BUILT_IN_SLICES`
+ya no se filtra por `tableKey`, sino por `sliceFitsCapabilities`. El gating por ítem de
+`itemMatchesSlice` dejó de mirar `tableKey` y mira `requiredCapability`.
+
+**Dónde se detecta la capacidad.** `detectTableCapabilities(headers, customAliases)` en
+`sliceRegistry.ts`, reutilizando `findColumnBySemantic`:
+
+| Capacidad | Se detecta si hay | Nota |
+| --- | --- | --- |
+| `vencimiento` | `fecha_vc`, `fecha_retiro`, o `mes`+`anio` | precedencia sobre incidencia |
+| `incidencia` | `tipo_evento` | |
+| (ninguna) | — | la hoja recibe solo andamiaje y slices personalizados |
+
+La precedencia `vencimiento > incidencia` no es estética: `getEventCategory` asume
+`VENCIMIENTO` por defecto, y la pestaña `main` **sí** trae `FRC_EVEN`. Sin la precedencia,
+`main` habría heredado los 6 slices de incidencia y el comportamiento canónico cambiaría.
+
+**Resultado medido** (sonda, no supuesto):
+
+| Hoja | Antes | Ahora |
+| --- | --- | --- |
+| `main` (canónica) | 6 slices de vencimiento | 6 slices de vencimiento (igual) |
+| `events` (canónica) | 6 de incidencia | 6 de incidencia (igual) |
+| `Clientes` (sin dominio) | 6 de `main` → **"Inventario en Regla" contaba 1** | **0 slices** (arreglado) |
+| `Bodega Sur` (nueva, con `Fecha Vto`) | 0 (no era canónica) | **6 slices de vencimiento** (objetivo de la fase) |
+| `Bitácora` (nueva, con `Tipo Evento`) | 0 | **6 slices de incidencia** |
+
+**Alias del usuario.** `customAliases` (definible en Ajustes → GlobalConfigModal) se pasa a la
+detección. Sin esto, una hoja cuyo encabezado de vencimiento no matchea ningún patrón
+conocido no recibiría capacidad aunque el usuario ya la hubiera declarado. Cubierto por test.
+
+**Código tocado:** `types.ts` (+`SliceCapability`, +`requiredCapability`), `sliceRegistry.ts`
+(detección + filtros), `useTableSlices.ts` (pasa `headers` y `customAliases`),
+`ViewConfigControlDrawer.tsx` (deja de duplicar el filtro y consume `getSlicesForTable`, para
+que drawer y barra no se desincronicen).
+
+**Verificación.** `tsc` limpio, eslint 0 errores, **241 pruebas** (5 nuevas de capacidad/alias),
+18 xlsx, 10 componentes, 14 arneses E2E. **Mutación**: al forzar
+`sliceFitsCapabilities → true`, caen exactamente las 5 aserciones nuevas — los tests prueban la
+regla, no la acompañan.
+
+**Nota de degradación:** `getSlicesForTable` con `headers` omitido devuelve **0 slices nativos**
+(no lanza). Es intencional pero conviene saberlo: cualquier llamada nueva debe pasar `headers`.
 
 #### Relación con las fases en curso
 

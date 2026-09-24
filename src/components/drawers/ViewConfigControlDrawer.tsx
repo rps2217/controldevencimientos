@@ -27,7 +27,7 @@ import {
   Download
 } from 'lucide-react';
 import { TableSlice, SheetRecord } from '../../types';
-import { BUILT_IN_SLICES } from '../../utils/sliceRegistry';
+import { getSlicesForTable } from '../../utils/sliceRegistry';
 import { VIRTUAL_COLUMNS } from '../../utils/virtualColumns';
 import { parseAnyDate } from '../../utils/dateCalculations';
 import { exportToExcel } from '../../utils/exportUtils';
@@ -135,9 +135,11 @@ export const ViewConfigControlDrawer: React.FC = () => {
 
   const visibleColumnsCount = allHeaders.length - hiddenColumns.length;
 
-  // Available slices for this table
-  const tableBuiltInSlices = BUILT_IN_SLICES.filter(s => s.tableKey === activeTableKey);
-  const tableCustomSlices = (customSlices || []).filter(s => s.tableKey === activeTableKey);
+  // Misma fuente que la barra de slices: evita que el drawer muestre nativos que la
+  // barra no ofrece (o al revés) cuando la detección por capacidad los descarta.
+  const tableSlices = getSlicesForTable(activeTableKey, customSlices, dashboard.sheetConfig?.slices, allHeaders, dashboard.sheetConfig?.customAliases);
+  const tableBuiltInSlices = tableSlices.filter(s => s.isBuiltIn);
+  const tableCustomSlices = tableSlices.filter(s => !s.isBuiltIn);
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden select-none">

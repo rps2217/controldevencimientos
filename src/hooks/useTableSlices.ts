@@ -82,13 +82,13 @@ export function useTableSlices({
 
   // Compute all slices available for current table (built-in + custom)
   const currentTableSlices = useMemo(() => {
-    return getSlicesForTable(activeView, customSlices, sheetConfig.slices);
-  }, [activeView, customSlices, sheetConfig.slices]);
+    return getSlicesForTable(activeView, customSlices, sheetConfig.slices, headers, sheetConfig.customAliases);
+  }, [activeView, customSlices, sheetConfig.slices, headers, sheetConfig.customAliases]);
 
   // Filtered slices visible in the top bar (excluding hidden ones)
   const visibleTableSlices = useMemo(() => {
-    return getVisibleSlicesForTable(activeView, customSlices, sheetConfig.slices, hiddenSliceIds);
-  }, [activeView, customSlices, sheetConfig.slices, hiddenSliceIds]);
+    return getVisibleSlicesForTable(activeView, customSlices, sheetConfig.slices, hiddenSliceIds, headers, sheetConfig.customAliases);
+  }, [activeView, customSlices, sheetConfig.slices, hiddenSliceIds, headers, sheetConfig.customAliases]);
 
   const activeSlice = useMemo(() => {
     if (!activeSliceId) return null;
