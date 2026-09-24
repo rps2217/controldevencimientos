@@ -456,3 +456,60 @@ export function findEmailColumn(headers: string[], customAliases?: Record<string
     || headers.find(h => h && /email|e-mail|correo|mail/i.test(String(h)));
 }
 
+
+/**
+ * Etiquetas legibles por campo semantico. Las claves crudas de las hojas
+ * (`FECHA_VENCIMIENTO`, `FRC_EVEN`) son identificadores de columna, no material
+ * de lectura para el operario.
+ */
+export const FIELD_LABELS: Record<KnownFieldSemantic, string> = {
+  id: 'ID', sku: 'SKU', descripcion: 'Descripción', fecha_vc: 'Fecha Vencimiento',
+  fecha_retiro: 'Fecha Retiro', mes: 'Mes', anio: 'Año', cantidad: 'Cantidad',
+  lote: 'Lote', politica: 'Política', tipo_evento: 'Tipo de Evento', frc_bod: 'Bodega FRC',
+  observacion: 'Observación', proveedor: 'Proveedor', dias_anticipacion: 'Días Anticipación',
+  dias_retiro: 'Días Retiro', n_traspaso: 'N° Traspaso', telefono: 'Teléfono', email: 'Email',
+  categoria: 'Categoría', mundo: 'Mundo', pm: 'PM', ubicacion: 'Ubicación', local: 'Local',
+  venta: 'Venta', ingreso: 'Ingreso', egreso: 'Egreso', inv_inicial: 'Inv. Inicial',
+  stock_min: 'Stock Mínimo', stock_max: 'Stock Máximo', stock_critico: 'Stock Crítico',
+};
+
+/**
+ * Orden de lectura operativo, no el orden de columnas de la hoja: identidad del
+ * producto, luego lo que decide una accion (vencimiento/politica), luego el
+ * evento, y al final metricas y contacto.
+ */
+const DISPLAY_ORDER: KnownFieldSemantic[] = [
+  'id', 'sku', 'descripcion', 'proveedor', 'categoria', 'mundo', 'pm', 'local', 'ubicacion',
+  'fecha_vc', 'fecha_retiro', 'mes', 'anio', 'cantidad', 'lote', 'politica',
+  'tipo_evento', 'frc_bod', 'n_traspaso', 'observacion', 'dias_anticipacion', 'dias_retiro',
+  'inv_inicial', 'stock_min', 'stock_max', 'stock_critico', 'ingreso', 'egreso', 'venta',
+  'telefono', 'email',
+];
+
+function semanticOf(header: string, customAliases?: Record<string, string[]>): KnownFieldSemantic | undefined {
+  if (!header) return undefined;
+  return DISPLAY_ORDER.find(s => findColumnBySemantic([header], s, customAliases) === header);
+}
+
+function humanizeHeader(header: string): string {
+  return String(header).replace(/_/g, ' ').trim()
+    .toLowerCase()
+    .replace(/(^|\s)([a-záéíóúñ])/g, (_m, sp, c) => sp + c.toUpperCase());
+}
+
+/** Etiqueta legible de una columna, cayendo a la clave humanizada si no se reconoce. */
+export function getFieldLabel(header: string, customAliases?: Record<string, string[]>): string {
+  const semantic = semanticOf(header, customAliases);
+  return semantic ? FIELD_LABELS[semantic] : humanizeHeader(header);
+}
+
+/** Ordena las claves de un registro para mostrarlas en secuencia operativa. */
+export function orderFieldsForDisplay(keys: string[], customAliases?: Record<string, string[]>): string[] {
+  const rank = (k: string) => {
+    const s = semanticOf(k, customAliases);
+    const i = s ? DISPLAY_ORDER.indexOf(s) : -1;
+    return i === -1 ? DISPLAY_ORDER.length : i;
+  };
+  return [...keys].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
+

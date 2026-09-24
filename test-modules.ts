@@ -13,6 +13,7 @@ import {
   getCategoryFromEventValue,
   getItemResolutionStatus
 } from './src/utils/dateCalculations';
+import { createMetricsAccumulator } from './src/utils/pureCalculations';
 
 import { 
   findColumnBySemantic, 
@@ -1344,6 +1345,45 @@ console.log('\n--- 20. Pruebas de derivacion y filtrado de campanas (campaignAgg
   // (Cuidado: quitar el trim de la guarda NO cambia nada, porque q se recorta igual.)
   assert(filterAuditRows(matriz, 'DISCREPANCIA', 'ALL', ' SKU_DIF ').length === 1,
     'filtro de matriz: recorta espacios alrededor del termino de busqueda');
+
+  // createMetricsAccumulator: ruta compartida por el worker y el fallback sincronico.
+  {
+    const acc = createMetricsAccumulator(5);
+    acc.addEventCategory('TRANSPORTE', 'NORMAL', 'SIN_ACCION');
+    acc.addEventCategory('DIFERENCIA', 'NORMAL', 'SIN_ACCION');
+    acc.addEventCategory('CAL_INTERNA', 'NORMAL', 'SIN_ACCION');
+    acc.addEventCategory('CAL_EXTERNA', 'NORMAL', 'SIN_ACCION');
+    acc.addEventCategory('CANJES', 'NORMAL', 'SIN_ACCION');
+    acc.addEventCategory('AVERIA', 'NORMAL', 'SIN_ACCION');
+    acc.addEventCategory('DEVOLUCION', 'NORMAL', 'SIN_ACCION');
+    acc.addEventCategory('VENCIMIENTO_CERCANO', 'EXPIRED', 'CANJE_PROVEEDOR');
+    acc.addEventCategory('VENCIMIENTO', 'DRAINAGE_PM', 'MERMA_DIRECTA');
+    acc.addEventCategory('VENCIMIENTO', 'UPCOMING', 'VENTA_DRENAJE');
+    acc.addEventCategory('VENCIMIENTO', 'RETIRE_NOW', 'SIN_ACCION');
+    acc.addEventCategory('VENCIMIENTO', 'NORMAL', 'SIN_ACCION');
+    acc.addResolution(true);
+    acc.addResolution(false);
+    const r = acc.finish();
+    assert(r.eventMetrics.total === 5, 'acumulador: conserva el total de filas');
+    assert(r.eventMetrics.transporte === 1 && r.eventMetrics.diferencia === 1,
+      'acumulador: cuenta incidencias por categoria');
+    assert(r.eventMetrics.vencimientos === 5,
+      'acumulador: vencimientos agrupa cercano + los cuatro de vencimiento');
+    assert(r.eventMetrics.vencimientoCercano === 1,
+      'acumulador: vencimiento cercano se cuenta dentro de vencimientos');
+    assert(r.eventMetrics.drainagePm === 1 && r.eventMetrics.upcoming === 1
+      && r.eventMetrics.retireNow === 2,
+      'acumulador: reparte estados de vencimiento (EXPIRED y RETIRE_NOW juntos)');
+    assert(r.pmMetrics.canjeProveedor === 1 && r.pmMetrics.mermaDirecta === 1,
+      'acumulador: separa canje proveedor de merma directa');
+    assert(r.pmMetrics.enRegla === 1,
+      'acumulador: enRegla descuenta drenaje, proximos y retiro');
+    assert(r.eventResolutionMetrics.pending === 1 && r.eventResolutionMetrics.completed === 1,
+      'acumulador: resume resolucion pendiente/realizada');
+    assert(r.pmMetrics.total === r.eventMetrics.vencimientos,
+      'acumulador: total PM espeja vencimientos');
+  }
+
 }
 
 console.log(`\n========================================`);

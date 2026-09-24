@@ -7,7 +7,7 @@ import {
   createColumnsContext 
 } from '../utils/dateCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
-import { parseAnyDate, formatDisplayDate } from '../utils/pureCalculations';
+import { parseAnyDate, formatDisplayDate, createMetricsAccumulator } from '../utils/pureCalculations';
 import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
 import { sortInventoryItems, compareItemValues } from '../utils/sortUtils';
 import { useInventoryWorker } from './useInventoryWorker';
@@ -196,34 +196,17 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     dynamicMonthRange
   });
 
-  // Single-pass metrics fallback if worker metrics not yet ready
+  // Single-pass metrics fallback if worker metrics not yet ready. Comparte el
+  // acumulador con el worker para que ambas rutas no puedan divergir.
   const localMetrics = useMemo(() => {
     if (metrics) return metrics;
 
-    let vencimientos = 0;
-    let transporte = 0;
-    let diferencia = 0;
-    let calInterna = 0;
-    let calExterna = 0;
-    let canjes = 0;
-    let averia = 0;
-    let devolucion = 0;
-    let vencimientoCercano = 0;
-    let drainagePm = 0;
-    let upcoming = 0;
-    let retireNow = 0;
-    let canjeProveedorCount = 0;
-    let mermaDirectaCount = 0;
-    let pending = 0;
-    let completed = 0;
-
+    const acc = createMetricsAccumulator(items.length);
     const bodCounts: Record<string, number> = {};
     const bodSet = new Set<string>();
-
-    const len = items.length;
     const colContext = createColumnsContext(headers);
 
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < items.length; i++) {
       const item = items[i];
 
       if (frcBodCol) {
@@ -236,74 +219,16 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
       }
 
       const cat = getEventCategory(item, headers, colContext);
-      if (cat === 'TRANSPORTE') {
-        transporte++;
-      } else if (cat === 'DIFERENCIA') {
-        diferencia++;
-      } else if (cat === 'CAL_INTERNA') {
-        calInterna++;
-      } else if (cat === 'CAL_EXTERNA') {
-        calExterna++;
-      } else if (cat === 'CANJES') {
-        canjes++;
-      } else if (cat === 'AVERIA') {
-        averia++;
-      } else if (cat === 'DEVOLUCION') {
-        devolucion++;
-      } else {
-        if (cat === 'VENCIMIENTO_CERCANO') {
-          vencimientoCercano++;
-        }
-        vencimientos++;
-        const st = getItemStatus(item, headers, colContext);
-        if (st.code === 'DRAINAGE_PM') drainagePm++;
-        else if (st.code === 'UPCOMING') upcoming++;
-        else if (st.code === 'RETIRE_NOW' || st.code === 'EXPIRED') retireNow++;
-
-        if (st.actionType === 'CANJE_PROVEEDOR') canjeProveedorCount++;
-        else if (st.actionType === 'MERMA_DIRECTA') mermaDirectaCount++;
-      }
-
-      const res = getItemResolutionStatus(item, headers, colContext);
-      if (res.isResolved) completed++;
-      else pending++;
+      const st = getItemStatus(item, headers, colContext);
+      acc.addEventCategory(cat, st.code, st.actionType);
+      acc.addResolution(getItemResolutionStatus(item, headers, colContext).isResolved);
     }
 
-    const sortedBodValues = Array.from(bodSet).sort((a, b) => a.localeCompare(b));
-
     return {
-      eventMetrics: {
-        total: len,
-        vencimientos,
-        transporte,
-        diferencia,
-        calInterna,
-        calExterna,
-        canjes,
-        averia,
-        devolucion,
-        vencimientoCercano,
-        drainagePm,
-        upcoming,
-        retireNow
-      },
-      pmMetrics: {
-        total: vencimientos,
-        drainage: drainagePm,
-        upcoming,
-        retireNow,
-        enRegla: Math.max(0, vencimientos - drainagePm - upcoming - retireNow),
-        canjeProveedor: canjeProveedorCount,
-        mermaDirecta: mermaDirectaCount
-      },
-      eventResolutionMetrics: {
-        total: len,
-        pending,
-        completed
-      },
-      frcBodValues: sortedBodValues,
+      ...acc.finish(),
+      frcBodValues: Array.from(bodSet).sort((a, b) => a.localeCompare(b)),
       frcBodCounts: bodCounts,
-      columnOptionsMap: {}
+      columnOptionsMap: {},
     };
   }, [items, headers, frcBodCol, metrics]);
 

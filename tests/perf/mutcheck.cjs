@@ -74,12 +74,6 @@ function httpReq(method, urlPath) {
     const b = [...document.querySelectorAll('button')].find(x => new RegExp(${JSON.stringify(re)}, 'i').test((x.textContent || '') + ' ' + (x.getAttribute('title') || '')));
     if (!b) return false; b.click(); return true;
   })()`;
-  // El boton "Editar" del drawer tiene title="Editar registro", por lo que la
-  // coincidencia debe ser sobre el texto exacto del boton, no sobre la suma.
-  const clickExact = t => `(() => {
-    const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').trim() === ${JSON.stringify(t)});
-    if (!b) return false; b.click(); return true;
-  })()`;
   // El dialogo de confirmacion se monta al final del DOM y su boton primario es
   // el unico con autoFocus; el drawer tambien tiene un boton "Eliminar", asi que
   // hay que desambiguar por el autoFocus del dialogo.
@@ -120,8 +114,10 @@ function httpReq(method, urlPath) {
   const isolated = await ev(ROWS);
   const rowOpened = await ev(`(() => { const r = document.querySelector('[data-index]'); if (!r) return false; r.click(); return true; })()`);
   await sleep(800);
-  const drawerOpen = await ev(`document.body.innerText.includes('Editar')`);
-  const editClicked = await ev(clickExact('Editar'));
+  // El boton "Editar" del drawer paso a icono (title="Editar registro") para ganar
+  // espacio vertical, asi que se localiza por su title, no por el texto.
+  const drawerOpen = await ev(`!![...document.querySelectorAll('button')].find(x => /Editar registro/.test(x.getAttribute('title') || ''))`);
+  const editClicked = await ev(clickText('Editar registro'));
   await sleep(800);
   const editFormOpen = await ev(`!!document.querySelector('form')`);
   const NEW_DESC = 'DESCRIPCION REFACTOR E2E';

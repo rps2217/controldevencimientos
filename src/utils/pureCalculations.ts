@@ -528,6 +528,77 @@ export function getEventReason(item: InventoryItem, headers: string[]): string {
   return '-';
 }
 
+/**
+ * Acumulador de metricas de una pasada sobre el inventario. Vive aqui (puro, sin
+ * dependencias de UI) porque lo comparten el Web Worker y el fallback sincronico:
+ * una sola implementacion en vez de dos copias del mismo bloque de ramificacion.
+ */
+export interface MetricsResult {
+  eventMetrics: {
+    total: number; vencimientos: number; transporte: number; diferencia: number;
+    calInterna: number; calExterna: number; canjes: number; averia: number;
+    devolucion: number; vencimientoCercano: number; drainagePm: number;
+    upcoming: number; retireNow: number;
+  };
+  pmMetrics: {
+    total: number; drainage: number; upcoming: number; retireNow: number;
+    enRegla: number; canjeProveedor: number; mermaDirecta: number;
+  };
+  eventResolutionMetrics: { total: number; pending: number; completed: number };
+}
+
+export function createMetricsAccumulator(total: number) {
+  const eventMetrics: MetricsResult['eventMetrics'] = {
+    total, vencimientos: 0, transporte: 0, diferencia: 0, calInterna: 0, calExterna: 0,
+    canjes: 0, averia: 0, devolucion: 0, vencimientoCercano: 0, drainagePm: 0,
+    upcoming: 0, retireNow: 0,
+  };
+  let canjeProveedor = 0;
+  let mermaDirecta = 0;
+  let pending = 0;
+  let completed = 0;
+
+  return {
+    eventMetrics,
+    addEventCategory(cat: EventCategory, statusCode: ItemStatusCode, actionType: ItemActionType) {
+      if (cat === 'TRANSPORTE') eventMetrics.transporte++;
+      else if (cat === 'DIFERENCIA') eventMetrics.diferencia++;
+      else if (cat === 'CAL_INTERNA') eventMetrics.calInterna++;
+      else if (cat === 'CAL_EXTERNA') eventMetrics.calExterna++;
+      else if (cat === 'CANJES') eventMetrics.canjes++;
+      else if (cat === 'AVERIA') eventMetrics.averia++;
+      else if (cat === 'DEVOLUCION') eventMetrics.devolucion++;
+      else {
+        if (cat === 'VENCIMIENTO_CERCANO') eventMetrics.vencimientoCercano++;
+        eventMetrics.vencimientos++;
+        if (statusCode === 'DRAINAGE_PM') eventMetrics.drainagePm++;
+        else if (statusCode === 'UPCOMING') eventMetrics.upcoming++;
+        else if (statusCode === 'RETIRE_NOW' || statusCode === 'EXPIRED') eventMetrics.retireNow++;
+
+        if (actionType === 'CANJE_PROVEEDOR') canjeProveedor++;
+        else if (actionType === 'MERMA_DIRECTA') mermaDirecta++;
+      }
+    },
+    addResolution(isResolved: boolean) { if (isResolved) completed++; else pending++; },
+    finish(): MetricsResult {
+      const { vencimientos, drainagePm, upcoming, retireNow } = eventMetrics;
+      return {
+        eventMetrics,
+        pmMetrics: {
+          total: vencimientos,
+          drainage: drainagePm,
+          upcoming,
+          retireNow,
+          enRegla: Math.max(0, vencimientos - drainagePm - upcoming - retireNow),
+          canjeProveedor,
+          mermaDirecta,
+        },
+        eventResolutionMetrics: { total, pending, completed },
+      };
+    },
+  };
+}
+
 export function calculateWithdrawalDate(dVc: Date, diasRetiro: number): Date {
   const monthsToSubtract = Math.round(diasRetiro / 30);
   return new Date(dVc.getFullYear(), dVc.getMonth() - monthsToSubtract + 1, 0);

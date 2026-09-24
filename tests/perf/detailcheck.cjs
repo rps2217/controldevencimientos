@@ -82,9 +82,11 @@ function req(method, p) {
   await sleep(700);
 
   // El panel de detalle: contiene el rotulo "SKU:" y boton "Ticket Barra".
-  const panelSel = `[...document.querySelectorAll('div')].find(d => d.className && /shadow-2xl|flex-col/.test(d.className) && /SKU:/.test(d.textContent || '') && [...d.querySelectorAll('button')].some(b => /Ticket Barra/.test(b.textContent || '')))`;
+  // El panel se localiza por su estructura y el rotulo SKU, no por el texto de un boton
+  // (los botones del header pasaron a icono para ganar espacio vertical).
+  const panelSel = `[...document.querySelectorAll('div')].find(d => d.className && /shadow-2xl|flex-col/.test(d.className) && /SKU:/.test(d.textContent || '') && [...d.querySelectorAll('button')].some(b => /c[oó]digo de barras/i.test(b.title || '')))`;
   // El nodo raiz del drawer: el ancestro con overlay/clase inset-0 que contiene el panel.
-  const rootSel = `[...document.querySelectorAll('div[class*="inset-0"]')].find(d => /Ticket Barra/.test(d.textContent || ''))`;
+  const rootSel = `[...document.querySelectorAll('div[class*="inset-0"]')].find(d => /SKU:/.test(d.textContent || '') && [...d.querySelectorAll('button')].some(b => /c[oó]digo de barras/i.test(b.title || '')))`;
   const abrio = await ev2(`!!${panelSel}`);
   push('1. el detalle se abre al hacer clic en la fila', abrio === true, abrio);
   if (!abrio) return die(1);
@@ -134,6 +136,48 @@ function req(method, p) {
     return { position: cs.position, backdrop: cs.backdropFilter };
   })()`);
   push('7. en movil conserva el overlay (fixed + backdrop)', estiloMovil.position === 'fixed' && estiloMovil.backdrop !== 'none', estiloMovil);
+
+  // 9-12. Organizacion interna del detalle: lo operativo primero, referencia plegada,
+  // etiquetas legibles y sin acciones duplicadas. Se abre todo para medirlo.
+  await send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
+  await sleep(500);
+  await ev2(`[...document.querySelectorAll('button')].forEach(b => { if (/Datos del Registro|C[oó]digo de Barras|Ref: Cat/.test(b.textContent || '')) b.click(); })`);
+  await sleep(600);
+
+  const orden = await ev2(`(() => {
+    const body = [...document.querySelectorAll('[class*="overflow-y-auto"]')].find(b => /Datos del Registro|Vencimientos|Incidencias/.test(b.textContent || ''));
+    if (!body) return null;
+    const texto = (body.textContent || '');
+    return { venc: texto.indexOf('Vencimientos ('), incid: texto.indexOf('Incidencias & FRC ('), datos: texto.indexOf('Datos del Registro (') };
+  })()`);
+  push('9. lo operativo (vencimientos/incidencias) precede a los datos del registro',
+    !!orden && orden.venc > -1 && orden.incid > -1 && orden.datos > -1 && orden.venc < orden.datos && orden.incid < orden.datos, orden);
+
+  const etiquetas = await ev2(`(() => {
+    const body = [...document.querySelectorAll('[class*="overflow-y-auto"]')].find(b => /Datos del Registro/.test(b.textContent || ''));
+    if (!body) return null;
+    const spans = [...body.querySelectorAll('span')].filter(s => (s.className || '').includes('uppercase') && (s.className || '').includes('text-[10px]'));
+    return [...new Set(spans.map(s => (s.textContent || '').trim()))].filter(Boolean);
+  })()`);
+  const crudas = (etiquetas || []).filter(t => /^[A-Z0-9_]+$/.test(t) && t.length > 3);
+  push('10. los campos se muestran con etiqueta legible, no con la clave cruda',
+    Array.isArray(etiquetas) && etiquetas.includes('Fecha Vencimiento') && crudas.length === 0, { etiquetas, crudas });
+
+  const duplicados = await ev2(`(() => {
+    const raiz = ${rootSel};
+    if (!raiz) return null;
+    const etiquetas = [...raiz.querySelectorAll('button')].map(b => (b.textContent || '').replace(/\\s+/g, ' ').trim()).filter(Boolean);
+    return etiquetas.filter((b, i) => etiquetas.indexOf(b) !== i);
+  })()`);
+  push('11. no hay acciones duplicadas en el panel', Array.isArray(duplicados) && duplicados.length === 0, duplicados);
+
+  const monetario = await ev2(`(() => {
+    const raiz = ${rootSel};
+    if (!raiz) return null;
+    const texto = raiz.textContent || '';
+    return /precio|costo|margen|valorizado|utilidad|\\$\\s*[0-9]/i.test(texto);
+  })()`);
+  push('12. sin metricas monetarias en el panel', monetario === false, monetario);
 
   push('8. sin errores de consola', consoleErrors.length === 0, consoleErrors.slice(0, 3));
 

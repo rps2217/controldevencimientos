@@ -4,6 +4,8 @@ import {
   computeItemRawStatus, 
   getItemResolutionStatus, 
   createColumnsContext,
+  createMetricsAccumulator,
+  MetricsResult,
   ItemStatusCode,
   ItemActionType 
 } from '../utils/pureCalculations';
@@ -22,36 +24,7 @@ export interface WorkerNormalizedItem {
   bodegaVal: string;
 }
 
-export interface WorkerMetricsResult {
-  eventMetrics: {
-    total: number;
-    vencimientos: number;
-    transporte: number;
-    diferencia: number;
-    calInterna: number;
-    calExterna: number;
-    canjes: number;
-    averia: number;
-    devolucion: number;
-    vencimientoCercano: number;
-    drainagePm: number;
-    upcoming: number;
-    retireNow: number;
-  };
-  pmMetrics: {
-    total: number;
-    drainage: number;
-    upcoming: number;
-    retireNow: number;
-    enRegla: number;
-    canjeProveedor: number;
-    mermaDirecta: number;
-  };
-  eventResolutionMetrics: {
-    total: number;
-    pending: number;
-    completed: number;
-  };
+export interface WorkerMetricsResult extends MetricsResult {
   frcBodValues: string[];
   frcBodCounts: Record<string, number>;
   columnOptionsMap: Record<string, { label: string; value: string }[]>;
@@ -107,22 +80,7 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
     cachedHeaders = headers;
     cachedSearchableHeaders = searchableHeaders || [];
 
-    let vencimientos = 0;
-    let transporte = 0;
-    let diferencia = 0;
-    let calInterna = 0;
-    let calExterna = 0;
-    let canjes = 0;
-    let averia = 0;
-    let devolucion = 0;
-    let vencimientoCercano = 0;
-    let drainagePm = 0;
-    let upcoming = 0;
-    let retireNow = 0;
-    let canjeProveedorCount = 0;
-    let mermaDirectaCount = 0;
-    let pending = 0;
-    let completed = 0;
+    const metrics = createMetricsAccumulator(items.length);
 
     const bodCounts: Record<string, number> = {};
     const bodSet = new Set<string>();
@@ -179,35 +137,8 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
       const statusRaw = computeItemRawStatus(item, headers, colContext);
       const res = getItemResolutionStatus(item, headers, colContext);
 
-      if (cat === 'TRANSPORTE') {
-        transporte++;
-      } else if (cat === 'DIFERENCIA') {
-        diferencia++;
-      } else if (cat === 'CAL_INTERNA') {
-        calInterna++;
-      } else if (cat === 'CAL_EXTERNA') {
-        calExterna++;
-      } else if (cat === 'CANJES') {
-        canjes++;
-      } else if (cat === 'AVERIA') {
-        averia++;
-      } else if (cat === 'DEVOLUCION') {
-        devolucion++;
-      } else {
-        if (cat === 'VENCIMIENTO_CERCANO') {
-          vencimientoCercano++;
-        }
-        vencimientos++;
-        if (statusRaw.code === 'DRAINAGE_PM') drainagePm++;
-        else if (statusRaw.code === 'UPCOMING') upcoming++;
-        else if (statusRaw.code === 'RETIRE_NOW' || statusRaw.code === 'EXPIRED') retireNow++;
-
-        if (statusRaw.actionType === 'CANJE_PROVEEDOR') canjeProveedorCount++;
-        else if (statusRaw.actionType === 'MERMA_DIRECTA') mermaDirectaCount++;
-      }
-
-      if (res.isResolved) completed++;
-      else pending++;
+      metrics.addEventCategory(cat, statusRaw.code, statusRaw.actionType);
+      metrics.addResolution(res.isResolved);
 
       cachedNormalizedItems[i] = {
         index: i,
@@ -233,35 +164,7 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
     });
 
     const metricsResult: WorkerMetricsResult = {
-      eventMetrics: {
-        total: len,
-        vencimientos,
-        transporte,
-        diferencia,
-        calInterna,
-        calExterna,
-        canjes,
-        averia,
-        devolucion,
-        vencimientoCercano,
-        drainagePm,
-        upcoming,
-        retireNow
-      },
-      pmMetrics: {
-        total: vencimientos,
-        drainage: drainagePm,
-        upcoming,
-        retireNow,
-        enRegla: Math.max(0, vencimientos - drainagePm - upcoming - retireNow),
-        canjeProveedor: canjeProveedorCount,
-        mermaDirecta: mermaDirectaCount
-      },
-      eventResolutionMetrics: {
-        total: len,
-        pending,
-        completed
-      },
+      ...metrics.finish(),
       frcBodValues: Array.from(bodSet).sort((a, b) => a.localeCompare(b)),
       frcBodCounts: bodCounts,
       columnOptionsMap

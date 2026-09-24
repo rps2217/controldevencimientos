@@ -1,4 +1,4 @@
-import { findColumnBySemantic, KnownFieldSemantic } from './columnAliases';
+import { findColumnBySemantic, KnownFieldSemantic, normalizeHeaderString } from './columnAliases';
 import { rowToObject } from './pureCalculations';
 import { SheetRecord } from '../types';
 
@@ -304,11 +304,10 @@ export function generateSmartColumnMappings(
     }
 
     // 2. Normalized match (ignores accents, symbols, spaces and underscores)
-    const normTarget = target.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s\-_]+/g, '_').toLowerCase();
+    const normTarget = normalizeHeaderString(target);
     const normalizedMatch = sourceHeaders.find(s => {
       if (assignedSource.has(s)) return false;
-      const normSource = s.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s\-_]+/g, '_').toLowerCase();
-      return normSource === normTarget;
+      return normalizeHeaderString(s) === normTarget;
     });
 
     if (normalizedMatch) {
