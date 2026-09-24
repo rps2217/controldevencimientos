@@ -1201,10 +1201,17 @@ sirve las 4 hojas canónicas, así que **no permite medir** una hoja genérica. 
 Ambos quedaron en la puerta E2E (16 arneses).
 
 **Corrección al diagnóstico del ROADMAP.** El borrador del paso 3 afirmaba que una hoja
-genérica no persistía en el estado de la vista (`handleSave`): **era falso.** Medido en el
-código: `setItems` es el estado de la vista y corre siempre, y `saveStoredDemoItems(activeView, …)`
-ya era genérico. La sonda lo confirma: **una fila genérica se edita, guarda y muestra**. Esa
-parte del paso 3 **ya estaba resuelta** por el trabajo de los pasos 1 y 2.
+genérica no persistía en el estado de la vista (`handleSave`): **era falso.** Verificado por
+lectura de código: `setItems(nextItems)` corre para cualquier `activeView`
+(`InventoryDashboard.tsx:781`) y `saveStoredDemoItems(activeView, nextItems)` ya era genérico
+(`:785`); las ramas `if (activeView === 'main' | 'products' | 'policies')` son *adicionales* a
+`setItems`, no sustitutas. Esa parte del paso 3 **ya estaba resuelta** por los pasos 1 y 2.
+
+> **Límite de esta verificación (no confundir con la sonda).** Ese `handleSave` se comprobó por
+> **lectura**, no por sonda: el backend falso responde solo lecturas (no implementa `doPost`), y
+> `genericcheck.cjs` no edita ni guarda ninguna fila. Es decir, la ruta "editar y guardar en una
+> hoja genérica" es **correcta por inspección pero no está cubierta por un arnés**. Anotado como
+> deuda: es la única afirmación del paso 3 sin medición E2E.
 
 **Lo que sí faltaba (y es lo único que se cortó): la UI de conteo no miraba capacidades.**
 Los botones **Conteo** (`DashboardTopNav`), **Pistoleo** (`DashboardTopNav` móvil y

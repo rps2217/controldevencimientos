@@ -10,7 +10,11 @@
  *   1. La hoja generica aparece en "Otras Pestanas" y carga sus filas.
  *   2. NO muestra slices de dominio (vencimientos / canje) en una hoja sin esas columnas.
  *   3. Las acciones masivas por capacidad siguen activas (WhatsApp/Gmail por telefono/email).
- *   4. Editar y guardar una fila generica se refleja en la tabla (persiste en la vista).
+ *   4. NO ofrece UI de dominio: "Nuevo Vencimiento", Accion PM, Edicion FRC ni el terminal
+ *      de conteo/pistoleo.
+ *
+ * NO cubre editar+guardar una fila generica: el backend falso solo responde lecturas (sin
+ * doPost). Esa ruta esta verificada por lectura de codigo, no por este arnes.
  *
  * Uso: node genericcheck.cjs <url> <puerto-backend-falso>
  */
