@@ -12,6 +12,7 @@ export const DashboardMobileFABs: React.FC = () => {
   const activeSheet = dashboard.activeSheet;
   const onOpenPistoleo = () => modalsActions.setIsMobilePistoleoOpen?.(true);
   const onOpenNewItem = () => dashboard.handleOpenModal();
+  const canCount = dashboard.tableCapabilities?.has('conteo') ?? false;
 
   if (isZenMode || activeView === 'schema' || activeView === 'analytics' || !activeSheet) {
     return null;
@@ -19,14 +20,16 @@ export const DashboardMobileFABs: React.FC = () => {
 
   return (
     <div className="md:hidden fixed bottom-6 right-5 z-40 flex flex-col items-end gap-2.5">
-      <button
-        onClick={onOpenPistoleo}
-        className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-red-800 via-rose-900 to-red-800 text-white font-extrabold text-xs rounded-full shadow-[0_8px_25px_rgba(153,27,27,0.45)] border border-red-500/40 active:scale-95 transition-all cursor-pointer"
-        title="Abrir Terminal de Pistoleo Móvil (Cámara / Láser PDA)"
-      >
-        <Barcode className="w-4 h-4 text-rose-300 animate-pulse" />
-        <span>Pistoleo Móvil</span>
-      </button>
+      {canCount && (
+        <button
+          onClick={onOpenPistoleo}
+          className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-red-800 via-rose-900 to-red-800 text-white font-extrabold text-xs rounded-full shadow-[0_8px_25px_rgba(153,27,27,0.45)] border border-red-500/40 active:scale-95 transition-all cursor-pointer"
+          title="Abrir Terminal de Pistoleo Móvil (Cámara / Láser PDA)"
+        >
+          <Barcode className="w-4 h-4 text-rose-300 animate-pulse" />
+          <span>Pistoleo Móvil</span>
+        </button>
+      )}
 
       <button
         onClick={onOpenNewItem}

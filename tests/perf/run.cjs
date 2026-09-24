@@ -34,7 +34,12 @@ const HARNESSES = [
   'campaigncheck.cjs',
   'printcheck.cjs',
   'detailcheck.cjs',
+  'genericcheck.cjs',
 ];
+// Arneses que necesitan el backend falso (hojas no canonicas): el runner lo levanta
+// y le pasa el puerto como segundo argumento.
+const NEED_FAKE_BACKEND = new Set(['genericcheck.cjs']);
+const FAKE_BACKEND_PORT = Number(process.env.E2E_FAKE_PORT || 9820);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function findChrome() {
@@ -92,13 +97,25 @@ function get(url) {
   }
 
   const failed = [];
+  // Backend falso para el arnes de modo generico: se levanta una sola vez aqui, no
+  // dentro del arnes, para no acoplar cada prueba a su propio servidor.
+  const fakeBackend = spawn(process.execPath, [path.join(__dirname, 'fake-backend.cjs'), String(FAKE_BACKEND_PORT)],
+    { cwd: ROOT, stdio: ['ignore', 'ignore', 'ignore'] });
+  // Espera a que el backend falso acepte conexiones antes de correr los arneses.
+  for (let i = 0; i < 40; i++) {
+    try { await get(`http://127.0.0.1:${FAKE_BACKEND_PORT}/`); break; } catch (e) { await sleep(250); }
+  }
   // Un arnés puede fallar por contención de recursos (Chrome de corridas previas todavía
   // soltando procesos), no por una regresión: se vio `filas: 0` justo tras encadenar
   // arneses, y pasaba aislado. Un único reintento evita el falso rojo sin tapar un fallo
   // real, que vuelve a fallar. E2E_RETRIES=0 desactiva el reintento.
   const maxRetries = process.env.E2E_RETRIES === undefined ? 1 : Number(process.env.E2E_RETRIES);
-  const runHarness = h => spawnSync(process.execPath, [path.join(__dirname, h), BASE],
-    { cwd: ROOT, stdio: 'inherit', timeout: 180000, env: process.env });
+  const runHarness = h => {
+    const args = [path.join(__dirname, h), BASE];
+    if (NEED_FAKE_BACKEND.has(h)) args.push(String(FAKE_BACKEND_PORT));
+    return spawnSync(process.execPath, args,
+      { cwd: ROOT, stdio: 'inherit', timeout: 180000, env: process.env });
+  };
 
   for (const h of HARNESSES) {
     const t0 = Date.now();
@@ -119,5 +136,6 @@ function get(url) {
     ? `E2E: ${HARNESSES.length} arneses OK`
     : `E2E: ${failed.length} FALLARON -> ${failed.join(', ')}`);
   console.log('========================================');
+  try { fakeBackend.kill('SIGKILL'); } catch (e) {}
   killAll(failed.length === 0 ? 0 : 1);
 })().catch(e => { console.error('Fallo del runner E2E:', e.message); process.exit(1); });

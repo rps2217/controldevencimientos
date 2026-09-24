@@ -62,7 +62,8 @@ import {
 import { 
   BUILT_IN_SLICES, 
   getSlicesForTable, 
-  computeSliceCounts 
+  computeSliceCounts,
+  detectTableCapabilities 
 } from './src/utils/sliceRegistry';
 
 import { 
@@ -322,6 +323,27 @@ console.log('\n--- 7. Pruebas de sliceRegistry.ts ---');
   assert(getSlicesForTable('Bodega Alias', [], undefined, conAlias).length === 0, 'sin alias declarado la hoja no detecta capacidad');
   const aliasCfg = { fecha_vc: ['MiFechaRara'] };
   assert(getSlicesForTable('Bodega Alias', [], undefined, conAlias, aliasCfg).length === mainSlices.length, 'un alias de fecha_vc declarado por el usuario habilita los slices de vencimiento');
+
+  // Capacidad de conteo fisico: gobierna la UI de Conteo/Pistoleo. Exige las dos
+  // columnas que el terminal necesita para reconciliar (SKU + cantidad); una hoja
+  // generica (Clientes) no la tiene y por tanto no debe ofrecer el terminal.
+  const capsMain = detectTableCapabilities(SAMPLE_HEADERS);
+  assert(capsMain.has('conteo'), 'una hoja con SKU y cantidad tiene la capacidad de conteo');
+  assert(capsMain.has('vencimiento'), 'la hoja canonica mantiene ademas la capacidad de vencimiento');
+
+  assert(detectTableCapabilities(clientes).size === 0, 'una hoja de Clientes no tiene ninguna capacidad de dominio');
+  assert(!detectTableCapabilities(clientes).has('conteo'), 'sin SKU+cantidad no hay capacidad de conteo');
+
+  // Solo SKU (sin cantidad) o solo cantidad (sin SKU) no alcanza para contar.
+  assert(!detectTableCapabilities(['SKU', 'DESCRIPCION', 'PROVEEDOR']).has('conteo'), 'SKU sin cantidad no habilita el conteo');
+  assert(!detectTableCapabilities(['PRODUCTO', 'CANTIDAD', 'LOTE']).has('conteo'), 'cantidad sin SKU no habilita el conteo');
+
+  // El conteo convive con la incidencia (una bitacora con SKU+cantidad+evento).
+  const capsEventos = detectTableCapabilities(SAMPLE_EVENTS_HEADERS);
+  assert(capsEventos.has('conteo') && capsEventos.has('incidencia'), 'una bitacora FRC tiene conteo e incidencia');
+
+  // Sin headers no inventa capacidades.
+  assert(detectTableCapabilities([]).size === 0, 'sin headers no se detecta ninguna capacidad');
 }
 
 console.log('\n--- 8. Pruebas de universalImporter.ts ---');

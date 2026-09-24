@@ -226,7 +226,7 @@ export interface TableSlice {
    * hoja distinta de las canónicas (p. ej. otra bodega) reciba los slices de
    * vencimiento si trae las columnas, y que una hoja sin ellas no los reciba.
    */
-  requiredCapability?: SliceCapability;
+  requiredCapability?: TableCapability;
   icon?: string; // Lucide icon identifier
   color?: SliceColor;
   isBuiltIn?: boolean;
@@ -241,8 +241,9 @@ export interface TableSlice {
  * Capacidades de dominio detectables por columnas (ver `detectTableCapabilities`).
  * - `vencimiento`: la hoja puede calcular fechas de vencimiento/retiro.
  * - `incidencia`: la hoja registra eventos (transporte, mermas, diferencias...).
+ * - `conteo`: la hoja tiene SKU y cantidad, así que admite el conteo físico.
  */
-export type SliceCapability = 'vencimiento' | 'incidencia';
+export type TableCapability = 'vencimiento' | 'incidencia' | 'conteo';
 
 // ==========================================
 // MÓDULO DE CONTEO MASIVO DE EXISTENCIAS

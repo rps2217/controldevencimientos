@@ -11,6 +11,7 @@ import { AlertCircle, Package } from 'lucide-react';
 import { getEventCategory, getItemStatus, parseLocaleNumber } from '../utils/dateCalculations';
 import { rowToObject } from '../utils/pureCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
+import { detectTableCapabilities } from '../utils/sliceRegistry';
 import { resolveItemIdentity } from '../utils/entityIdentityResolver';
 import { 
   findExistingItemByCuVc
@@ -322,6 +323,13 @@ export const InventoryDashboard: React.FC = () => {
   const bulkActionCtx = useMemo(() => {
     return buildBulkActionContext(headers, activeView, activeSheet?.title);
   }, [headers, activeView, activeSheet?.title]);
+
+  // Capacidades de la hoja activa: gobiernan qué UI de dominio (conteo, pistoleo)
+  // se ofrece, en vez de asumir que toda hoja es de vencimientos.
+  const tableCapabilities = useMemo(
+    () => detectTableCapabilities(headers, sheetConfig.customAliases),
+    [headers, sheetConfig.customAliases]
+  );
 
 
   // Column Resizing Custom Hook
@@ -1157,6 +1165,7 @@ export const InventoryDashboard: React.FC = () => {
     setSelectedRowIds,
     handleBulkDelete,
     bulkActionCtx,
+    tableCapabilities,
     columnLabelsMap,
 
     // View & Presentation Controls

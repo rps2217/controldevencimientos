@@ -1190,6 +1190,109 @@ regla, no la acompañan.
 **Nota de degradación:** `getSlicesForTable` con `headers` omitido devuelve **0 slices nativos**
 (no lanza). Es intencional pero conviene saberlo: cualquier llamada nueva debe pasar `headers`.
 
+#### Paso 3 — modo genérico: hecho y medido (2026-09-19)
+
+**Método: sonda contra un backend falso, no lectura de código.** El modo demostración solo
+sirve las 4 hojas canónicas, así que **no permite medir** una hoja genérica. Se añadió
+`tests/perf/fake-backend.cjs`, un Web App de Apps Script en falso que responde el contrato real
+(`getMetadata`, `getAppProperties`, `getAllSheetsData`) sirviendo una hoja `Clientes` con
+`RUT / RAZON_SOCIAL / TELEFONO / EMAIL` (sin ninguna semántica de dominio). El arnés
+`tests/perf/genericcheck.cjs` apunta `SCRIPT_URL` ahí y mide la app real, sin instrumentarla.
+Ambos quedaron en la puerta E2E (16 arneses).
+
+**Corrección al diagnóstico del ROADMAP.** El borrador del paso 3 afirmaba que una hoja
+genérica no persistía en el estado de la vista (`handleSave`): **era falso.** Medido en el
+código: `setItems` es el estado de la vista y corre siempre, y `saveStoredDemoItems(activeView, …)`
+ya era genérico. La sonda lo confirma: **una fila genérica se edita, guarda y muestra**. Esa
+parte del paso 3 **ya estaba resuelta** por el trabajo de los pasos 1 y 2.
+
+**Lo que sí faltaba (y es lo único que se cortó): la UI de conteo no miraba capacidades.**
+Los botones **Conteo** (`DashboardTopNav`), **Pistoleo** (`DashboardTopNav` móvil y
+`DashboardMobileFABs`) y el ítem **"Conteo de Stock"** (`Sidebar`) se renderizaban en *toda*
+hoja, incluida una de Clientes sin SKU ni cantidad.
+
+**Diseño (idéntico a las bulk actions, como se decidió).** No se creó un detector nuevo: se
+extendió `detectTableCapabilities` con la capacidad `conteo` = **SKU + cantidad** (ambas, que
+son las que el terminal necesita para reconciliar). El tipo `SliceCapability` se renombró a
+`TableCapability` (grep: 0 referencias al nombre viejo) porque ya no es exclusivo de slices.
+La precedencia `vencimiento > incidencia` se preservó: son excluyentes entre sí pero
+**aditivas** respecto de `conteo`, y así las canónicas no cambian.
+
+**Resultado medido** (`genericcheck.cjs`, hoja `Clientes`):
+
+| Observable | Antes | Ahora |
+| --- | --- | --- |
+| La hoja aparece en "Otras Pestañas" y carga sus filas | sí | sí (igual) |
+| Recibe slices de vencimientos/canje | no | no (igual) |
+| Activa bulk actions por capacidad (teléfono/email) | sí | sí (igual) |
+| Ofrece Conteo / Pistoleo / "Conteo de Stock" | **sí (fuga)** | **no** (arreglado) |
+
+En la hoja canónica `main` (SKU+cantidad+fecha) el conteo **sigue disponible**: la capacidad
+`conteo` convive con `vencimiento`, verificado por test.
+
+**Código tocado:** `types.ts` (`SliceCapability`→`TableCapability`, +`conteo`),
+`sliceRegistry.ts` (detección aditiva), `DashboardContext.tsx` (+`tableCapabilities`),
+`InventoryDashboard.tsx` (calcula y publica la capacidad),
+`DashboardTopNav.tsx` / `Sidebar.tsx` / `DashboardMobileFABs.tsx` (gateo de la UI de conteo),
+`run.cjs` / `fake-backend.cjs` / `genericcheck.cjs` / `test-modules.ts` (verificación).
+
+**Verificación.** `tsc` limpio. **258 pruebas** (8 nuevas de capacidad de conteo), 18 xlsx, 10
+componentes. **E2E: 16 arneses OK**, incluido `genericcheck`. **Mutación**: al relajar la regla
+a `sku || cantidad`, caen exactamente 2 aserciones nuevas (SKU sin cantidad, cantidad sin SKU);
+restaurado, 258/258.
+
+**Despachos por identidad (`activeView === '...'`): estado real.** El paso 1 midió **89**. No
+se barrieron en este corte, y es deliberado: la medición muestra que la mayoría son **gates de
+dominio legítimos** que ahora *podrían* expresarse por capacidad, pero cada uno es una decisión
+de comportamiento. Barrerlos sin una medición por arnés sería precisamente el tipo de refactor
+de fe que la Fase 7 quiere evitar. Quedan como deuda explícita, no como pendiente difuso.
+
+## Auditoría Ponytail (2026-09-19) — cierre de Fase 7 paso 3
+
+Barrido sobre el corte del modo genérico. Método: medir antes de afirmar; cada hallazgo con su
+evidencia y, cuando aplica, con la mutación que lo demuestra. `tsc` 0 · eslint 0 errores (16
+warnings preexistentes) · **286 pruebas** · **16 arneses E2E** · build sin regresión.
+
+**Hallazgo 1 — La UI de conteo era el único frente real del paso 3; el resto del diagnóstico
+era falso.** El borrador del paso 3 decía que una hoja genérica no persistía en el estado de la
+vista. Medido en código y con sonda: `setItems` es el estado de la vista y ya era genérico; una
+fila de `Clientes` se edita, guarda y muestra. La única fuga real era que **Conteo / Pistoleo /
+"Conteo de Stock"** se ofrecían en toda hoja. **Corregido.** El patrón (capacidad + gateo) es el
+mismo de las bulk actions, como se decidió con el usuario. *Coste del frente: 3 componentes y un
+tipo extendido, no un barrido de 90 despachos.*
+
+**Hallazgo 2 — `refKeyCol` y `refLabelCol` tienen 0 lecturas fuera de su declaración.**
+`grep` en `src`: cada uno aparece **1 vez** (`types.ts:134`, `:135`). `refTable` sí tiene lecturas,
+pero como ya documentó el paso 2, son cosméticas (etiquetas/`option value`) o del **editor visual**
+(`VisualSchemaDesigner.tsx`), no del motor de resolución. Es el mismo cuadro de "esquema declarado
+en buena parte inerte" que la fase ya anotó. **No se toca**: cablearlos o eliminarlos es cirugía
+aparte (`AGENTS.md`, hallazgos de esquema), y borrar campos declarados que el editor visual sí
+configura cambiaría una UI sin necesidad. Queda **inventariado y con dueño**, no silenciado.
+
+**Hallazgo 3 (dorsal) — `AGENTS.md` declaraba "13 arneses" en 2 sitios; son 16.**
+`AGENTS.md:350` y `:378`. La puerta pasó a 14 con `printcheck`, a 15 al mover `genericcheck`, y a
+**16** con el backend falso. **Corregido** más abajo para que la memoria del repo no mienta.
+
+**Hallazgo 4 — `formula?: string` (`types.ts:128`) sigue sin consumidores.** Confirmado por
+`grep`: 0 lecturas, 0 escrituras (los matches de "formula" son texto de UI en español de
+"formulario"). Ya estaba anotado por la fase 7 y **sigue fuera de alcance a propósito**: es una
+promesa de UI, no código vivo. Sin cambio.
+
+**Lo que se cortó:** `detectTableCapabilities` ahora devuelve un `Set` aditivo con `conteo`
+(SKU + cantidad); el contexto publica `tableCapabilities`; `DashboardTopNav`, `Sidebar` y
+`DashboardMobileFABs` gatean por `has('conteo')`. Tipo `SliceCapability` → `TableCapability`
+(0 referencias al nombre viejo). **Lo que no se cortó, y por qué:** los 90 despachos por identidad
+— barrerlos sin medir cada uno es el refactor de fe que la fase prohíbe; quedan como deuda con
+dueño.
+
+**Puerta de la auditoría:** 8 pruebas unitarias nuevas (regla `conteo` = SKU **y** cantidad,
+convivencia con vencimiento/incidencia, hoja vacía), arnés E2E `genericcheck.cjs` con 5
+observables y backend falso, todo en CI. **Mutación doble:** relajar la regla unitaria a
+`sku || cantidad` cae 2 aserciones; forzar `conteo` siempre en producción hace fallar el arnés
+E2E. La prueba prueba la regla, no la acompaña.
+
+
+
 #### Relación con las fases en curso
 
 El corte 3 de Fase 5 (`CampaignConsolidationDashboard.tsx`) es **trabajo preparatorio de
@@ -1941,7 +2044,7 @@ dónde sigue el trabajo, sin tener que reconstruirlo leyendo todo el documento.
 | Rama | `main` |
 | Último commit | cortes 3 y 4 de Fase 5 (`CampaignMatrixTable.tsx`, `CampaignKpiSemaphore.tsx`) |
 | CI | `verify.yml` verde sobre los commits previos |
-| Gate actual | `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **234 + 10 + 18 = 262 pruebas** · **14 arneses E2E** |
+| Gate actual | `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **258 + 10 + 18 = 286 pruebas** · **16 arneses E2E** |
 
 Pendiente de commit en la jornada de cierre (sin frente nuevo): badge de campaña des-duplicado
 (`CampaignSkuBadges.tsx`), `printcheck.cjs` promovido a la puerta con aserciones, y la medición
@@ -2126,7 +2229,7 @@ lo justifica; quedan inventariados:
 | Fase 1.3 (particionar contextos) | Parcial — `ModalsContext` extraído; resto pendiente y medido como de bajo retorno |
 | Fase 7 paso 1 (claves) | Hecho (`08585b5`) |
 | Fase 7 paso 2 (slices por capacidad) | Hecho (`d3a62e3`) |
-| Fase 7 paso 3 (modo genérico) | **Pendiente** — 90 despachos por identidad en 12 archivos, ver abajo |
+| Fase 7 paso 3 (modo genérico) | **Hecho** (`genericcheck.cjs`): una hoja sin dominio carga, no arrastra slices ni el terminal de conteo. La corrección de UI medida fue Conteo/Pistoleo. |
 
 ### Paso 3 — coste real medido
 
@@ -2143,11 +2246,13 @@ en 12 archivos, concentradas en:
 | `InventoryTable.tsx` | 6 |
 
 El paso 2 ya demostró el patrón: sustituir el nombre por capacidad eliminó el gating sin
-cambiar el comportamiento canónico. El paso 3 es aplicar lo mismo a los módulos, y su tamaño
-real (90 sitios, no 139 referencias crudas) es abordable por cortes.
+cambiar el comportamiento canónico. El paso 3 **aplicó el patrón solo donde una sonda probó
+una fuga** (la UI de conteo); barrer los 90 despachos restantes sin medir cada uno sería
+refactor de fe, y quedan como deuda explícita por cortes.
 
 ### Verificación de esta pasada
 
-`tsc` 0 · eslint 0 errores (16 warnings preexistentes) · **241 + 10 + 18 pruebas** · 14 arneses
-E2E · mutación dirigida sobre el filtro de capacidad (caen exactamente las 5 aserciones nuevas)
-· build sin regresión de peso · CI `verify` y `e2e` verdes sobre `d3a62e3`.
+`tsc` 0 · eslint 0 errores (16 warnings preexistentes) · **258 + 10 + 18 pruebas** · **16 arneses**
+E2E (incluido `genericcheck.cjs` sobre backend falso) · mutación dirigida sobre la capacidad de
+conteo (caen exactamente las 2 aserciones nuevas) · build sin regresión de peso · CI `verify` y
+`e2e` verdes.

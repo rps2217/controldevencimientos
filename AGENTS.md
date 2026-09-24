@@ -230,6 +230,36 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
 
 ---
 
+### O. Capacidades de Tabla (Fase 7 — multi-hoja por capacidades)
+
+**Idea central:** una hoja se trata según **qué columnas tiene**, no según **cómo se llama**. Es
+el mismo principio que las bulk actions, extendido a los módulos completos. Así la misma app
+sirve datos que no son de vencimientos (una hoja de Clientes, una bitácora ajena) sin construir
+otra a medida.
+
+- **`detectTableCapabilities(headers, customAliases?)`** (`src/utils/sliceRegistry.ts`) devuelve
+  un `Set<TableCapability>` y reutiliza `findColumnBySemantic` (nunca compara nombres fijos):
+  - `vencimiento` — hay `fecha_vc`, `fecha_retiro`, o `mes`+`anio`.
+  - `incidencia` — hay `tipo_evento`. **Solo si no hay `vencimiento`** (precedencia deliberada:
+    `getEventCategory` asume `VENCIMIENTO` por defecto y `main` trae `FRC_EVEN`; sin la
+    precedencia, `main` heredaría los slices de incidencia).
+  - `conteo` — hay **`sku` Y `cantidad`** (ambas; son las que el terminal necesita para
+    reconciliar). Es **aditiva**: convive con las otras dos.
+- **`TableCapability`** (`src/types.ts`) es el tipo. `TableSlice.requiredCapability` lo usa para
+  filtrar slices nativos; los personalizados **no** declaran capacidad y nunca se restringen.
+- **UI gateada por capacidad:** el contexto publica `dashboard.tableCapabilities`; los
+  consumidores preguntan `has('conteo')` (Conteo/Pistoleo en `DashboardTopNav`,
+  `DashboardMobileFABs` y `Sidebar`). Antes esa UI se ofrecía en toda hoja.
+- **Degradación segura:** sin `headers` no se detecta ninguna capacidad (0 slices nativos, no
+  excepción). Cualquier llamada nueva **debe** pasar `headers` y, si aplica, `customAliases`.
+
+**Regla al añadir un módulo de dominio:** no lo actives por `activeView === '...'`. Declara su
+capacidad en `detectTableCapabilities` y gatea por ella, para que una hoja no canónica no lo
+arrastre. Los ~90 despachos por identidad que quedan son deuda medida (ver ROADMAP, Fase 7),
+no un patrón a imitar.
+
+---
+
 ## 4. Integración con Google Sheets y Google Apps Script
 
 La aplicación está diseñada para operar tanto con datos de ejemplo locales como con conexiones reales a Google Sheets a través de un script de Google Apps Script. El componente `ScriptCodeModal.tsx` proporciona el script necesario para desplegar como Web App en Google Sheets, permitiendo la sincronización bidireccional mediante JSON endpoints.
@@ -347,7 +377,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
 | `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
-| `npm run test:e2e` | Arranca el build de producción y corre los 13 arneses de integridad (`tests/perf/run.cjs`). |
+| `npm run test:e2e` | Arranca el build de producción y corre los 16 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -375,12 +405,14 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 ### Arneses de medición (`tests/perf/`, requieren Chromium y un build servido)
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 13 arneses que cubren integridad de
+`npm run test:e2e` arranca el preview y corre los 16 arneses que cubren integridad de
 datos y navegación; devuelve código distinto de cero si alguno falla. El binario de Chrome
 se toma de `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`,
 etc.).
 
 Para correr uno solo: `node tests/perf/<script>.cjs http://127.0.0.1:4173/`.
+Un arnés anunciado en `NEED_FAKE_BACKEND` (`run.cjs`) recibe además el puerto del backend
+falso que levanta el propio runner.
 
 | Script | En la puerta | Para qué sirve |
 |---|---|---|
@@ -397,10 +429,13 @@ Para correr uno solo: `node tests/perf/<script>.cjs http://127.0.0.1:4173/`.
 | `countcheck.cjs` | sí | El debounce de 300 ms no pierde la última lectura al descargar la página. |
 | `blindcheck.cjs` | sí | En BLIND no se filtra el stock del ERP a la pantalla (par discriminante con DOCUMENT). |
 | `campaigncheck.cjs` | sí | Matriz de consolidación de campaña: clasificación de los 4 estados, filtros, búsqueda acumulada y ajuste de venta persistido (12 verificaciones). |
+| `printcheck.cjs` | sí | Vista de impresión: el ticket solo monta con un registro pendiente (5 aserciones). |
+| `genericcheck.cjs` | sí | Modo genérico (Fase 7 paso 3): una hoja sin dominio carga sus filas, no arrastra slices ni el terminal de conteo, y conserva las bulk actions por capacidad. Requiere el backend falso. |
 | `modals.cjs` | no | Abrir modales: commits, long tasks y encabezado visible. |
 | `profile.cjs` | no | Renders reales de tabla/fila (tecleo). |
-| `printcheck.cjs` | no | Diagnóstico manual de la vista de impresión. No asserta: imprime el resultado y sale 0. No usarlo como verificación automática. |
 
+`tests/perf/fake-backend.cjs` no es un arnés: es el backend de Apps Script en falso que
+levanta el runner para medir hojas no canónicas (el modo demostración solo sirve las 4 fijas).
 `tests/perf/ctxdiff.cjs` **se retiró** (dependía de instrumentación ya eliminada).
 
 ### Robustez de arranque: la puerta de persistencia

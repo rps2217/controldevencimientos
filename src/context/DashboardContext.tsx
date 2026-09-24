@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { InventoryItem, SheetConfig, SheetProperties, SpreadsheetMetadata, EventCategory, GlobalTicketConfig, ViewTicketConfig, TableSlice, SheetRecord, SliceFilterConfig, SortConfig } from '../types';
+import { InventoryItem, SheetConfig, SheetProperties, SpreadsheetMetadata, EventCategory, GlobalTicketConfig, ViewTicketConfig, TableSlice, SheetRecord, SliceFilterConfig, SortConfig, TableCapability } from '../types';
 import { OfflineMutation, AuditLogEntry } from '../db/indexedDbService';
 import { ConnectionHealthStatus } from '../hooks/useOfflineSync';
 import { BulkActionContext } from '../utils/bulkActionsRegistry';
@@ -142,6 +142,8 @@ export interface DashboardContextType {
   setSelectedRowIds?: React.Dispatch<React.SetStateAction<number[]>> | ((ids: number[]) => void);
   handleBulkDelete?: () => Promise<void> | void;
   bulkActionCtx?: BulkActionContext;
+  /** Capacidades de dominio de la hoja activa (ver `detectTableCapabilities`). */
+  tableCapabilities?: Set<TableCapability>;
   columnLabelsMap?: Record<string, string>;
 
   // View & Presentation Controls

@@ -61,6 +61,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ forceExpanded = false, onNavig
   const otherSheets = dashboard.otherSheets ?? [];
   const onOpenConfig = () => { modalsActions.setIsConfigOpen(true); onNavigate?.(); };
   const onOpenStockCount = () => { modalsActions.setIsStockCountOpen?.(true); onNavigate?.(); };
+  // Solo se ofrece el conteo físico si la hoja puede contar (SKU + cantidad).
+  const canCount = dashboard.tableCapabilities?.has('conteo') ?? false;
 
   const navigate = (view: string) => {
     setActiveView(view);
@@ -113,14 +115,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ forceExpanded = false, onNavig
             collapsed={isSidebarCollapsed}
           />
 
-            <SidebarItem 
-              icon={<Barcode className="w-5 h-5" />} 
-              label="Conteo de Stock" 
-              active={false} 
-              onClick={onOpenStockCount}
-              collapsed={isSidebarCollapsed}
-              badge="Físico"
-            />
+            {canCount && (
+              <SidebarItem 
+                icon={<Barcode className="w-5 h-5" />} 
+                label="Conteo de Stock" 
+                active={false} 
+                onClick={onOpenStockCount}
+                collapsed={isSidebarCollapsed}
+                badge="Físico"
+              />
+            )}
           
           <div className="my-2 border-t border-slate-100 dark:border-slate-800"></div>
           

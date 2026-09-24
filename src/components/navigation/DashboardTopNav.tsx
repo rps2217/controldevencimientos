@@ -48,6 +48,9 @@ export const DashboardTopNav: React.FC = () => {
   const setIsScriptModalOpen = modalsActions.setIsScriptModalOpen;
   const onOpenViewConfig = () => rightDrawer.setIsRightDrawerOpen(true);
   const onOpenStockCount = () => modalsActions.setIsStockCountOpen?.(true);
+  // El terminal de conteo/pistoleo solo tiene sentido si la hoja puede contar
+  // existencias (SKU + cantidad). En una hoja sin esas columnas no se ofrece.
+  const canCount = dashboard.tableCapabilities?.has('conteo') ?? false;
   // Global Keyboard shortcut for search (Cmd+K / Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -189,7 +192,7 @@ export const DashboardTopNav: React.FC = () => {
             )}
 
             {/* Mobile Pistoleo Terminal Trigger */}
-            {setIsMobilePistoleoOpen && (
+            {setIsMobilePistoleoOpen && canCount && (
               <button
                 onClick={() => setIsMobilePistoleoOpen(true)}
                 className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-extrabold text-white bg-gradient-to-r from-red-700 to-rose-700 hover:from-red-600 hover:to-rose-600 rounded-xl shadow-xs transition-all mr-1 shrink-0 cursor-pointer active:scale-95"
@@ -257,14 +260,16 @@ export const DashboardTopNav: React.FC = () => {
         )}
 
         {/* Conteo Físico Terminal */}
-        <button
-          onClick={onOpenStockCount}
-          className="hidden md:flex h-10 items-center gap-1.5 px-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-2xs shrink-0 cursor-pointer active:scale-95"
-          title="Módulo de conteo masivo de existencias físicas"
-        >
-          <Barcode className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-          <span>Conteo</span>
-        </button>
+        {canCount && (
+          <button
+            onClick={onOpenStockCount}
+            className="hidden md:flex h-10 items-center gap-1.5 px-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-2xs shrink-0 cursor-pointer active:scale-95"
+            title="Módulo de conteo masivo de existencias físicas"
+          >
+            <Barcode className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span>Conteo</span>
+          </button>
+        )}
 
 
 

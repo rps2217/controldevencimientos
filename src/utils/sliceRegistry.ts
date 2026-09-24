@@ -1,4 +1,4 @@
-import { TableSlice, InventoryItem, SliceCapability } from '../types';
+import { TableSlice, InventoryItem, TableCapability } from '../types';
 import { getItemStatus, getEventCategory, getItemResolutionStatus } from './dateCalculations';
 import { findColumnBySemantic, KnownFieldSemantic } from './columnAliases';
 
@@ -21,19 +21,31 @@ import { STORAGE_KEYS, readStorage, stringArraySchema, objectArraySchema } from 
 export function detectTableCapabilities(
   headers: string[],
   customAliases?: Record<string, string[]>
-): Set<SliceCapability> {
+): Set<TableCapability> {
   if (!Array.isArray(headers) || headers.length === 0) return new Set();
   const has = (semantic: KnownFieldSemantic) =>
     findColumnBySemantic(headers, semantic, customAliases) !== undefined;
 
-  const canExpire = has('fecha_vc') || has('fecha_retiro') || (has('mes') && has('anio'));
-  if (canExpire) return new Set<SliceCapability>(['vencimiento']);
-  if (has('tipo_evento')) return new Set<SliceCapability>(['incidencia']);
-  return new Set();
+  const caps = new Set<TableCapability>();
+
+  // El conteo físico necesita identificar el SKU y cuantificar existencias: sin
+  // ambas columnas el terminal no tiene nada que reconciliar (p. ej. una hoja de
+  // Clientes con teléfono y email no debe ofrecerlo).
+  if (has('sku') && has('cantidad')) caps.add('conteo');
+
+  // La precedencia vencimiento > incidencia es deliberada: `getEventCategory`
+  // asume VENCIMIENTO por defecto, así que una hoja con fecha de vencimiento se
+  // trata como tabla de vencimientos aunque además tenga columna de evento (es el
+  // caso de la pestaña `main`, que trae FRC_EVEN). Sin esa precedencia, `main`
+  // heredaría los slices de incidencias y cambiaría el comportamiento actual.
+  if (has('fecha_vc') || has('fecha_retiro') || (has('mes') && has('anio'))) caps.add('vencimiento');
+  else if (has('tipo_evento')) caps.add('incidencia');
+
+  return caps;
 }
 
 /** Un slice personalizado no declara capacidad: nunca se restringe. */
-function sliceFitsCapabilities(slice: TableSlice, caps: Set<SliceCapability>): boolean {
+function sliceFitsCapabilities(slice: TableSlice, caps: Set<TableCapability>): boolean {
   if (!slice.requiredCapability) return true;
   return caps.has(slice.requiredCapability);
 }
