@@ -892,7 +892,7 @@ acumulado de la última lectura suma solo su SKU, y el teórico de los KPIs incl
 la operación real y no con el snapshot congelado.
 
 Gate: `tsc` 0, `eslint` 0 errores, **206 unitarias** (14 nuevas) + 10 de componente + 18 de
-hoja = 234, y 12 arneses E2E incluidos `countcheck` y `blindcheck`.
+hoja = 234, y 14 arneses E2E incluidos `countcheck` y `blindcheck`.
 
 
 #### Red de la cuadratura y del modo BLIND: unitaria primero, E2E donde el DOM es el punto
@@ -931,7 +931,7 @@ iteración: el gate `!isBlind` está duplicado en la rama de escritorio y en la 
 corre a 1600 px, así que la mutación tiene que apuntar a la rama de escritorio o el arnés pasa
 por la razón equivocada.
 
-Corre en CI dentro de `npm run test:e2e` (12 arneses).
+Corre en CI dentro de `npm run test:e2e` (14 arneses).
 
 ### Fase 6 — Rendimiento y empaquetado
 
@@ -1079,9 +1079,10 @@ lo que ya se hace con las bulk actions. Empezar por ahí, no por los perfiles.
 
 - **Lenguaje de fórmulas** y **relaciones N-a-N**. Ese es el camino a AppSheet y lleva el
   proyecto a meses; para el objetivo real (reusar las capacidades propias en otras hojas) no
-  hace falta. `formula` y `type: 'calculated'` siguen **sin consumidores** (ver hallazgo
-  abajo); cablearlos o eliminarlos es cirugía aparte, barata y de honestidad, no parte de
-  esta fase.
+  hace falta. `formula` sigue **sin consumidores** (ver hallazgo abajo); `type: 'calculated'`,
+  en cambio, **sí tiene** (`ItemFormModal:600`, `useItemFormManager:134`, `SchemaEditorView:419`),
+  así que la afirmación anterior de esta misma sección era imprecisa. Cablear o eliminar
+  `formula` es cirugía aparte, barata y de honestidad, no parte de esta fase.
 - **Vender a terceros / plataforma no-code.** Descartado explícitamente por el usuario.
 
 #### Paso 1 — centralización de claves: hecho y medido (2026-09-19)
@@ -1692,7 +1693,7 @@ limpieza oportunista. El **2** espera decisión de diseño y el **5** se cierra 
 intencional.
 
 Verificación del corte: `tsc` sin errores · `eslint` 0 errores / 16 warnings preexistentes ·
-**170 + 10 + 18 pruebas** (198; +18 de la sección 18) · **12 arneses E2E** en verde.
+**170 + 10 + 18 pruebas** (198; +18 de la sección 18) · **14 arneses E2E** en verde.
 
 ---
 
@@ -2045,9 +2046,108 @@ El corte que sí se hizo sacó ~200 líneas de lógica de agregación con interf
 
 ```bash
 npm run verify        # tsc + eslint + unitarias. Se corre en cada paso.
-npm run verify:all    # + build + 12 arneses E2E. Obligatorio antes de commitear.
+npm run verify:all    # + build + 14 arneses E2E. Obligatorio antes de commitear.
 ```
 
 Tarda varios minutos: conviene lanzarlo en segundo plano y escribir el `EXIT=` a un log
 (el patrón usado hoy), porque la salida final se pierde si la consola corta.
 
+
+---
+
+## Auditoría Ponytail (2026-09-19, tarde) — Fase 7 paso 2 y barrido de honestidad documental
+
+Barrido hecho a propósito bajo la Escalera de Ponytail, con la regla de que **toda afirmación
+se mide antes de escribirla**. El propio documento salió mal parado: tres afirmaciones escritas
+en pasadas anteriores resultaron falsas al comprobarlas.
+
+### Hallazgos
+
+**1. Un falso positivo silencioso en slices (corregido).** En el borrador del paso 1 escribí que
+los slices de `main` en una hoja genérica darían "0 filas silenciosamente". Medido con sonda:
+`getEventCategory` devuelve `'VENCIMIENTO'` por defecto, así que el slice "Inventario en Regla"
+**marcaba 1 fila en una hoja de Clientes**. Es un falso positivo, no un falso negativo — peor,
+porque nada lo delata. Corregido en el paso 2.
+
+**2. `BUILT_IN_SLICES` no coincidía con la documentación.** `AGENTS.md` listaba slices que no
+existen ("Vencidos & Críticos", "Lotes con Alto Stock", "Productos con Política Asignada"…).
+Los reales son 12, y desde el paso 2 se agrupan por **capacidad**, no por pestaña. `AGENTS.md`
+reescrito.
+
+**3. `type: 'calculated'` sí tiene consumidores.** El ROADMAP afirmaba que `formula` y
+`type: 'calculated'` estaban "sin consumidores". Cierto para `formula` (declarado en
+`types.ts:128`, nunca leído ni escrito); **falso** para `type: 'calculated'`
+(`ItemFormModal:600`, `useItemFormManager:134`, `SchemaEditorView:419`). Corregido.
+
+**4. Conteo de arneses desactualizado.** Cuatro sitios decían "12 arneses E2E"; la puerta corre
+**14** desde hace dos cortes. Corregido.
+
+### Código muerto real (medido, no eliminado)
+
+Exports cuyo único uso es interno: podrían dejar de exportarse sin tocar comportamiento.
+No se eliminan en esta pasada porque el valor es cosmético y el riesgo de tocar 14 archivos no
+lo justifica; quedan inventariados:
+
+| Símbolo | Archivo | Refs. totales |
+| --- | --- | --- |
+| `normalizeHeaderString` | `columnAliases.ts` | 2 (decl. + uso interno) |
+| `itemMatchesSlice` | `sliceRegistry.ts` | 2 (decl. + uso interno) |
+| `codesToBinaryString` | `barcodeGenerator.ts` | 2 |
+| `FAILED_ATTEMPTS_THRESHOLD` | `offlineQueueUtils.ts` | 2 |
+| `AUDIT_SHEET_DEFAULT_HEADERS` | `lib/sheets.ts` | 2 |
+| `consolidateBatchByCuVc` | `cuVcConsolidator.ts` | 2 |
+| `encodeCode128` | `barcodeGenerator.ts` | 2 |
+| `sanitizeHeader` | `universalImporter.ts` | 3 |
+| `normalizeRut` | `referenceResolver.ts` | 3 |
+| `getDefaultTicketGeneralSettings` | `ticketUtils.ts` | 3 |
+| `loadCampaignsFromCloud` | `lib/sheets.ts` | 3 |
+| `APPS_SCRIPT_TEMPLATE` | `lib/sheets.ts` | 3 |
+
+`formula?: string` (`types.ts:128`) es el único **campo sin ningún consumidor** (0 lecturas,
+0 escrituras). Candidato a eliminar o cablear, en cirugía aparte.
+
+### Calidad medida
+
+- **Tipado:** 1 solo `any` en todo `src`, y es legítimo (`[key: string]: any` de `InventoryItem`,
+  que es lo que hace genérico el motor). No hay `as any` injustificados.
+- **Lint:** 16 warnings, **todos** `react-hooks/exhaustive-deps` preexistentes; 0 errores.
+  Los 4 archivos tocados en el paso 2 dan 0 warnings.
+- **Bundle:** 353,40 KB gzip de arranque, contra 353,20 KB medido en Fase 6. **Sin regresión**
+  (0,2 KB, ruido de hashing). El paso 2 no añadió peso apreciable: la detección reutiliza
+  `findColumnBySemantic`, que ya estaba en el bundle.
+
+### Estado de los objetivos originales
+
+| Objetivo | Estado |
+| --- | --- |
+| Unificar lector de cámara | Hecho (previo) |
+| Agrupar filas por columna en "Vistas y Ajustes" | **Hecho y verificado** — UI en `ViewConfigControlDrawer.tsx:325-352`; `groupcheck.cjs` verde |
+| CI mínimo | Hecho — `verify.yml` con jobs `verify` y `e2e`, ambos verdes |
+| Fase 1.3 (particionar contextos) | Parcial — `ModalsContext` extraído; resto pendiente y medido como de bajo retorno |
+| Fase 7 paso 1 (claves) | Hecho (`08585b5`) |
+| Fase 7 paso 2 (slices por capacidad) | Hecho (`d3a62e3`) |
+| Fase 7 paso 3 (modo genérico) | **Pendiente** — 90 despachos por identidad en 12 archivos, ver abajo |
+
+### Paso 3 — coste real medido
+
+`grep` de despachos por identidad (`activeView === '…'`, `tableKey === '…'`): **90 ocurrencias**
+en 12 archivos, concentradas en:
+
+| Archivo | Ocurrencias |
+| --- | --- |
+| `InventoryDashboard.tsx` | 12 |
+| `useInventoryIngestion.ts` | 9 |
+| `DashboardTopNav.tsx` | 7 |
+| `InventoryTableRow.tsx` | 6 |
+| `Sidebar.tsx` | 6 |
+| `InventoryTable.tsx` | 6 |
+
+El paso 2 ya demostró el patrón: sustituir el nombre por capacidad eliminó el gating sin
+cambiar el comportamiento canónico. El paso 3 es aplicar lo mismo a los módulos, y su tamaño
+real (90 sitios, no 139 referencias crudas) es abordable por cortes.
+
+### Verificación de esta pasada
+
+`tsc` 0 · eslint 0 errores (16 warnings preexistentes) · **241 + 10 + 18 pruebas** · 14 arneses
+E2E · mutación dirigida sobre el filtro de capacidad (caen exactamente las 5 aserciones nuevas)
+· build sin regresión de peso · CI `verify` y `e2e` verdes sobre `d3a62e3`.
