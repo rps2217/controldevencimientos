@@ -36,7 +36,7 @@ function httpReq(method, urlPath) {
   let id=0; const pend=new Map(); const diag=[];
   ws.onmessage=ev2=>{
     const m=JSON.parse(ev2.data);
-    if(m.method==='Runtime.consoleAPICalled' && m.params.type==='error') diag.push(m.params.args.map(a=>a.value||a.description).join(' '));
+    if(m.method==='Runtime.consoleAPICalled') diag.push(m.params.type+': '+m.params.args.map(a=>a.value||a.description).join(' '));
     if(m.id&&pend.has(m.id)){const{res,rej}=pend.get(m.id);pend.delete(m.id);m.error?rej(new Error(JSON.stringify(m.error))):res(m.result);}
   };
   const send=(method,params={})=>new Promise((res,rej)=>{const i=++id;pend.set(i,{res,rej});ws.send(JSON.stringify({id:i,method,params}));});
@@ -65,8 +65,16 @@ function httpReq(method, urlPath) {
 
   // ---------- CAMBIO A VISTA EVENTOS (donde vive la ingesta FRC) ----------
   const navOk = await ev(clickText('Incidencias & FRC'));
-  await sleep(1200);
-  const inEvents = await ev(`document.body.innerText.includes('Importar FRC') || document.body.innerText.includes('Nueva Incidencia')`);
+  // En modo demo (sin SCRIPT_URL) el fetch agota su timeout (~6s) antes de caer al
+  // dataset de la vista. La ingesta usa `activeSheet`, que solo pasa a FRC cuando
+  // la vista asienta; importar antes escribiria en la hoja equivocada.
+  let inEvents = false;
+  for (let i = 0; i < 40; i++) {
+    inEvents = await ev(`[...document.querySelectorAll('thead th')].some(t => /FRC_N/i.test(t.textContent || ''))`);
+    if (inEvents) break;
+    await sleep(400);
+  }
+  await sleep(400);
   out.push({ paso: 'cambiar a vista Incidencias & FRC', nav: navOk, vistaEventos: inEvents, ok: navOk && inEvents });
 
   // ---------- ABRIR MODAL DE IMPORTACION ----------
@@ -88,34 +96,36 @@ function httpReq(method, urlPath) {
 
   // ---------- CONFIRMAR E INGESTAR ----------
   const confirmBtn = await ev(`(() => {
-    const b = [...document.querySelectorAll('button')].find(x => /^\\s*Ingestar\\b/i.test(x.textContent || ''));
+    const b = [...document.querySelectorAll('button')].find(x => /Ingestar\\b/i.test(x.textContent || ''));
     if (!b) return false; b.click(); return true;
   })()`);
-  // Sondeo: los avisos se auto-ocultan a los pocos segundos, asi que una
-  // instantanea unica es fragil. Se busca el aviso de consolidacion, que prueba
-  // que el handler extraido entro a procesar las filas.
-  let sawConsolidation = false;
-  for (let i = 0; i < 20; i++) {
-    const t = await ev(`document.body.innerText`);
-    if (/Consolidando importación/i.test(t)) { sawConsolidation = true; break; }
+  // Sondeo sobre el DATO persistido, no sobre el aviso: los toasts se
+  // autodesvanecen y su texto es fragil. La ingesta en modo demo guarda el
+  // resultado con `saveStoredDemoItems('events', ...)`, asi que la prueba de que
+  // la ruta extraida completo punta a punta es que el SKU importado quede en
+  // `app_demo_items_events`.
+  // Se sondea con holgura: sin backend el fetch agota reintentos con espera
+  // (1.2s + 1.8s) antes de caer al almacen de demo, asi que la escritura puede
+  // tardar ~6 s en aparecer.
+  let ingested = false;
+  for (let i = 0; i < 60; i++) {
+    const stored = await ev(`(JSON.parse(localStorage.getItem('app_demo_items_events') || '[]') || []).some(it => String(it.SKU || '') === 'SKU-E2E-IMP')`);
+    if (stored) { ingested = true; break; }
     await sleep(200);
   }
-  await sleep(800);
+  await sleep(500);
   const modalClosed = await ev(`!(document.body.innerText.includes('Copiar y Pegar') && document.querySelector('textarea'))`);
   out.push({ paso: 'confirmar importacion', boton: confirmBtn, modalCerrado: modalClosed, ok: confirmBtn && modalClosed });
 
   // ---------- LA INGESTA DEBE COMPLETAR ----------
   // Dos senales solidas de que la ruta extraida funciono de punta a punta:
-  //   1. aparecio el aviso de consolidacion (el handler proceso las filas);
+  //   1. las filas importadas quedaron persistidas en el almacen de la vista;
   //   2. el modal se cerro, y `onClose` solo corre tras resolver el `await
   //      onImportConfirmed`, luego el handler no lanzo.
-  // No se busca el SKU en la tabla: en modo demo, al cambiar de vista los items
-  // de `main` siguen en estado y la carga de `events` no ocurre, asi que la tabla
-  // no refleja la insercion. Tampoco se exige el aviso final, que se autodesvanece.
-  out.push({ paso: 'la ingesta completa y reporta exito', avisoConsolidacion: sawConsolidation, modalCerrado: modalClosed, ok: sawConsolidation && modalClosed });
+  out.push({ paso: 'la ingesta completa y persiste las filas', filasPersistidas: ingested, modalCerrado: modalClosed, ok: ingested && modalClosed });
 
   console.log(JSON.stringify(out, null, 2));
-  if (diag.length) console.log('ERRORES CONSOLA:', JSON.stringify(diag.slice(0,5)));
+  if (diag.length) console.log('ERRORES CONSOLA:', JSON.stringify(diag.filter(d=>!/^warning: \[AppsScript\]/.test(d)).slice(0,5)));
   const okAll = out.every(o => o.ok);
   console.log(okAll ? 'RESULTADO: OK' : 'RESULTADO: FALLO');
   try{ws.close();}catch(e){}

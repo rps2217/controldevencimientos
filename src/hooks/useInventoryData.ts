@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { getSpreadsheetMetadata, getAllSheetsData, getScriptPropertiesConfig, loadCloudConfig } from '../lib/sheets';
 import type { SheetRow } from '../lib/sheets';
 import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, SheetRecord } from '../types';
@@ -69,9 +69,21 @@ export function useInventoryData({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isBackgroundSyncing, setIsBackgroundSyncing] = useState<boolean>(false);
+  // Vista a la que pertenecen `items`/`headers` ya renderizados. El modo demo/offline
+  // no debe conservar datos de la vista anterior al cambiar de hoja (ver el catch).
+  const renderedViewRef = useRef<string | null>(null);
 
   const fetchData = useCallback(async (currentConfig = sheetConfig, currentView = activeView, forceRefresh = false) => {
     let hasRenderedCache = false;
+    // Hoja objetivo de la vista, resuelta ANTES del try para poder usarla tambien en el
+    // catch: alli decide si los datos ya renderizados pertenecen a la vista actual o son
+    // residuo de la anterior (ver el guard de conservacion de cache en modo demo/offline).
+    const expectedTargetSheet =
+      (currentView === 'main' || currentView === 'analytics') ? (currentConfig.main || 'Vencimientos_Inventario') :
+      currentView === 'events' ? (currentConfig.events || 'FRC') :
+      currentView === 'products' ? (currentConfig.products || 'Catalogo_Productos') :
+      currentView === 'policies' ? (currentConfig.policies || 'Politicas_Canje') :
+      currentView;
     try {
       const scriptUrl = localStorage.getItem(STORAGE_KEYS.SCRIPT_URL);
       if (!scriptUrl || !scriptUrl.trim()) {
@@ -83,12 +95,6 @@ export function useInventoryData({
       // =========================================================================
       // FASE 1: STALE-WHILE-REVALIDATE (Renderizado Instantáneo desde IndexedDB - 0ms)
       // =========================================================================
-      const expectedTargetSheet = 
-        (currentView === 'main' || currentView === 'analytics') ? (currentConfig.main || 'Vencimientos_Inventario') :
-        currentView === 'events' ? (currentConfig.events || 'FRC') :
-        currentView === 'products' ? (currentConfig.products || 'Catalogo_Productos') :
-        currentView === 'policies' ? (currentConfig.policies || 'Politicas_Canje') :
-        currentView;
 
       if (!forceRefresh) {
         try {
@@ -109,6 +115,7 @@ export function useInventoryData({
               return it;
             });
 
+            renderedViewRef.current = currentView;
             setItems(parsed);
             if (currentView === 'main') setAllMainItems(parsed);
             setLastCachedAt(cachedTarget.timestamp);
@@ -292,9 +299,11 @@ export function useInventoryData({
 
             return item;
           });
+          renderedViewRef.current = currentView;
           setItems(parsedItems);
           if (currentView === 'main') setAllMainItems(parsedItems);
         } else {
+          renderedViewRef.current = currentView;
           setHeaders([]);
           setItems([]);
         }
@@ -304,8 +313,12 @@ export function useInventoryData({
     } catch (err: unknown) {
       console.warn('Network or Apps Script error:', err);
 
-      // Si ya tenemos items renderizados desde caché IndexedDB o estado local, conservarlos y marcar estado offline
-      if (hasRenderedCache || items.length > 0) {
+      // Conservar lo ya renderizado SOLO si pertenece a la vista actual. Si el usuario
+      // cambio de hoja, los `items`/`headers` son residuo de la anterior: conservarlos
+      // dejaria el gate de capacidad (derivado de `headers`) desincronizado de
+      // `activeView`. En ese caso se cae al modo demo, que si carga la hoja correcta.
+      const renderedMatchesView = renderedViewRef.current === currentView;
+      if ((hasRenderedCache || items.length > 0) && renderedMatchesView) {
         setIsOffline(true);
         setIsRelationalActive(true);
         return;
@@ -341,6 +354,7 @@ export function useInventoryData({
         setItems(getStoredDemoItems('main', SAMPLE_ITEMS));
       }
 
+      renderedViewRef.current = currentView;
       setAllMainItems(getStoredDemoItems('main', SAMPLE_ITEMS));
       const defaultProds = SAMPLE_PRODUCTS.map((p, i) => ({ _rowIndex: i + 2, ...p }));
       setProducts(getStoredDemoItems('products', defaultProds));

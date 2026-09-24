@@ -36,6 +36,7 @@ const HARNESSES = [
   'detailcheck.cjs',
   'genericcheck.cjs',
   'bodegacheck.cjs',
+  'democheck.cjs',
 ];
 // Arneses que necesitan el backend falso (hojas no canonicas): el runner lo levanta
 // y le pasa el puerto como segundo argumento.

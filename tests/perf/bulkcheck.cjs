@@ -76,6 +76,23 @@ function httpReq(method, urlPath) {
     }
     return false;
   };
+  // En modo demo (sin SCRIPT_URL) el fetch agota su timeout (~6s) antes de caer al
+  // dataset de la vista. Un sleep fijo medía el residuo de la vista anterior; se
+  // espera a que los encabezados de la tabla sean los de la vista destino y el
+  // conteo se estabilice.
+  const settleRows = async (headerRe, maxMs = 14000) => {
+    const loaded = `[...document.querySelectorAll('thead th')].some(t => new RegExp(${JSON.stringify(headerRe)}, 'i').test(t.textContent || ''))`;
+    const t0 = Date.now();
+    let prev = -1, stable = 0;
+    while (Date.now() - t0 < maxMs) {
+      const n = await ev(ROWS);
+      const esVista = await ev(loaded);
+      if (esVista && n === prev && n > 0) { if (++stable >= 3) return n; } else { stable = 0; }
+      prev = n;
+      await sleep(400);
+    }
+    return prev;
+  };
   const setInputByLabel = (labelRe, value) => `(() => {
     const lab = [...document.querySelectorAll('label')].find(l => new RegExp(${JSON.stringify(labelRe)}, 'i').test(l.textContent || ''));
     if (!lab) return false;
@@ -91,8 +108,7 @@ function httpReq(method, urlPath) {
 
   // ---------- EDICION MASIVA (vista Incidencias & FRC) ----------
   const navEvents = await ev(clickText('Incidencias & FRC'));
-  await sleep(1200);
-  const rowsInEvents = await ev(ROWS);
+  const rowsInEvents = await settleRows('FRC_N');
   const selectedForEdit = await selectUntilBar();
   const editOpened = await ev(clickText('Edición Masiva FRC'));
   await sleep(700);
@@ -113,8 +129,7 @@ function httpReq(method, urlPath) {
 
   // ---------- ELIMINACION MASIVA (vista principal, donde la demo persiste) ----------
   const navMain = await ev(clickText('Vencimientos & Radar'));
-  await sleep(1500);
-  const rowsInMain = await ev(ROWS);
+  const rowsInMain = await settleRows('FECHA_VENCIMIENTO');
   out.push({ paso: 'cambiar a vista principal', nav: navMain, filas: rowsInMain, ok: navMain && rowsInMain > 0 });
 
   const selectedForDelete = await selectUntilBar();
