@@ -33,6 +33,7 @@ const HARNESSES = [
   'blindcheck.cjs',
   'campaigncheck.cjs',
   'printcheck.cjs',
+  'detailcheck.cjs',
 ];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 

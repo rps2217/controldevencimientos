@@ -30,6 +30,7 @@ export const InventoryTable: React.FC = () => {
   const handleFilterToggle = dashboard.handleFilterToggle ?? ((prev, _val) => prev);
   const onSelectRow = dashboard.onSelectRow ?? (() => {});
   const onClickItem = dashboard.onClickItem ?? dashboard.setSelectedProduct;
+  const activeDetailRowIndex = dashboard.selectedProduct?._rowIndex ?? null;
   const onDeleteRow = dashboard.onDeleteRow ?? dashboard.handleDelete;
   const onPmRadarFilterClick = dashboard.onPmRadarFilterClick ?? (() => {});
   const onEventResolutionFilterClick = dashboard.onEventResolutionFilterClick ?? (() => {});
@@ -479,6 +480,7 @@ export const InventoryTable: React.FC = () => {
                     visibleColumnMeta={visibleColumnMeta}
                     activeView={activeView}
                     isSelected={selectedRowIds.includes(item._rowIndex as number)}
+                    isActiveDetail={activeDetailRowIndex === item._rowIndex}
                     frcBodFilter={frcBodFilter}
                     getColWidth={getColWidth}
                     measureElementRef={measureElementRef}

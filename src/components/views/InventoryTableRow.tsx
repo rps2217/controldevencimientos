@@ -22,6 +22,8 @@ export interface InventoryTableRowProps {
   visibleColumnMeta: ColumnMetadata[];
   activeView: 'main' | 'events' | 'products' | 'policies' | string;
   isSelected: boolean;
+  /** Registro cuyo detalle se muestra en el panel maestro-detalle. */
+  isActiveDetail?: boolean;
   frcBodFilter: string[];
   getColWidth: (headerId: string, label: string) => number;
   measureElementRef?: (node: HTMLElement | null) => void;
@@ -48,6 +50,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   visibleColumnMeta,
   activeView,
   isSelected,
+  isActiveDetail = false,
   frcBodFilter,
   getColWidth,
   measureElementRef,
@@ -96,7 +99,10 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   }, [tableDensity]);
 
   let rowBgClass = 'hover:bg-slate-50/80 dark:hover:bg-slate-800/60';
-  if (isSelected) {
+  if (isActiveDetail) {
+    // La fila que alimenta el panel de detalle: se marca para saber que registro se ve.
+    rowBgClass = 'bg-blue-50/70 dark:bg-blue-950/50 ring-1 ring-inset ring-blue-300 dark:ring-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/60';
+  } else if (isSelected) {
     rowBgClass = 'bg-blue-50/50 dark:bg-blue-950/40 hover:bg-blue-50 dark:hover:bg-blue-950/60';
   } else if (isEventView) {
     rowBgClass = eventResStatus?.isResolved
@@ -505,6 +511,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   if (prevProps.tableDensity !== nextProps.tableDensity) return false;
   if (prevProps.item !== nextProps.item) return false;
   if (prevProps.isSelected !== nextProps.isSelected) return false;
+  if (prevProps.isActiveDetail !== nextProps.isActiveDetail) return false;
   if (prevProps.virtualIndex !== nextProps.virtualIndex) return false;
   if (prevProps.activeView !== nextProps.activeView) return false;
   if (prevProps.visibleColumnMeta !== nextProps.visibleColumnMeta) return false;

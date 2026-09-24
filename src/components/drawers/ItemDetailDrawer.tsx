@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Package, X, AlertCircle, CheckCircle2, Clock, Plus, Edit2, Eye, EyeOff, SlidersHorizontal, Link2, Trash2, Barcode as BarcodeIcon } from 'lucide-react';
 import { InventoryItem, EventCategory , SheetRecord } from '../../types';
 import { 
@@ -44,6 +44,23 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
     readStorage<Record<string, boolean>>(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS, booleanMapSchema, {})
   );
   const [isConfiguringFields, setIsConfiguringFields] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Al cambiar de registro con el panel abierto, el scroll vuelve arriba: si no, el
+  // detalle del registro nuevo entra a media altura del anterior.
+  const identityKey = product?._entityKey ?? product?._rowIndex;
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [identityKey]);
+
+  // Escape cierra el panel. En movil el backdrop ya lo permite; en escritorio el panel
+  // va en flujo y no hay backdrop, asi que sin esto solo cerraria el boton X.
+  useEffect(() => {
+    if (!product) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [product, onClose]);
 
   const toggleFieldVisibility = (key: string) => {
     setHiddenFields(prev => {
@@ -114,8 +131,19 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   const incidents = relatedRecords.filter(r => getEventCategory(r, Object.keys(r)) !== 'VENCIMIENTO');
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 h-full shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
+    /*
+     * Master-detail estilo AppSheet.
+     *
+     * En escritorio el panel NO flota: es un hermano en flujo dentro del `flex` del
+     * dashboard, así que divide la pantalla de verdad. La tabla queda viva a la
+     * izquierda y se puede cambiar de registro con el detalle abierto — al cambiar
+     * `product`, este componente se re-renderiza con los datos nuevos sin cerrarse.
+     *
+     * En móvil no hay ancho para dividir, así que conserva el patrón anterior:
+     * overlay con backdrop y foco atrapado.
+     */
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 lg:static lg:inset-auto lg:z-auto lg:bg-transparent lg:backdrop-blur-none lg:w-[28rem] xl:w-[32rem] 2xl:w-[36rem] lg:shrink-0 lg:border-l lg:border-slate-200 lg:dark:border-slate-800">
+      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 h-full shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 lg:max-w-none lg:shadow-none lg:border-l-0">
         
         {/* Header */}
         <div className="p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/90 flex items-start justify-between gap-4">
@@ -180,7 +208,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* Barcode Visualizer Card */}
           {sku && sku !== '-' && (

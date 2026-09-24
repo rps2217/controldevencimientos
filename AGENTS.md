@@ -69,7 +69,7 @@ El proyecto sigue una estructura modular limpia construida en **React 18+**, **T
         │   ├── PmReportModal.tsx     # Generador de reportes de drenaje y alertas
         │   └── ScriptCodeModal.tsx   # Visor y generador de código Google Apps Script
         └── drawers/
-            └── ItemDetailDrawer.tsx  # Panel lateral detallado para un SKU/producto específico
+            └── ItemDetailDrawer.tsx  # Panel de detalle maestro-detalle (dock en escritorio, overlay en móvil)
 ```
 
 ---
