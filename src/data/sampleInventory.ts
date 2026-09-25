@@ -19,9 +19,9 @@ export const SAMPLE_ITEMS = [
     FECHA_VENCIMIENTO: "2026-09-05",
     CANTIDAD: "320",
     PROVEEDOR: "Lácteos del Sur S.A.",
-    FRC_EVEN: "VENC. CERC.",
+    FRC_EVEN: "",
     N_TRASPASO: "TR-88190",
-    OBSERVACION: "Próximo a retiro comercial por política de 15 días"
+    OBSERVACION: "Lote en ventana de retiro por política de 15 días"
   },
   {
     _rowIndex: 3,
@@ -31,45 +31,45 @@ export const SAMPLE_ITEMS = [
     FECHA_VENCIMIENTO: "2026-08-22",
     CANTIDAD: "85",
     PROVEEDOR: "Lácteos del Sur S.A.",
-    FRC_EVEN: "VENC. CERC.",
+    FRC_EVEN: "",
     N_TRASPASO: "",
-    OBSERVACION: "Alerta crítica: Retiro inmediato o liquidación PM (Sin traspaso)"
+    OBSERVACION: "Alerta crítica: retiro inmediato o liquidación PM (sin traspaso)"
   },
   {
     _rowIndex: 4,
     SKU: "SKU-2045",
     DESCRIPCION: "Atún en Aceite Lata 140g",
     LOTE: "L-3310",
-    FECHA_VENCIMIENTO: "2027-03-15",
+    FECHA_VENCIMIENTO: "2026-12-15",
     CANTIDAD: "1250",
     PROVEEDOR: "Pesquera Mar Azul",
-    FRC_EVEN: "DET. PED",
-    N_TRASPASO: "TR-99412",
-    OBSERVACION: "Llegó con 3 latas abolladas por manipulación de transporte"
+    FRC_EVEN: "",
+    N_TRASPASO: "",
+    OBSERVACION: "Próximo a vencer: entrará en ventana de retiro según política"
   },
   {
     _rowIndex: 5,
     SKU: "SKU-3091",
     DESCRIPCION: "Detergente Líquido 3L",
     LOTE: "L-5541",
-    FECHA_VENCIMIENTO: "2028-01-10",
+    FECHA_VENCIMIENTO: "2027-06-30",
     CANTIDAD: "410",
     PROVEEDOR: "Kimberly Clean",
-    FRC_EVEN: "DIF. PED",
+    FRC_EVEN: "",
     N_TRASPASO: "",
-    OBSERVACION: "Diferencia de inventario física vs sistema: -5 unidades (Pendiente)"
+    OBSERVACION: "Vigencia óptima. Rotación normal sin riesgo de retiro"
   },
   {
     _rowIndex: 6,
     SKU: "SKU-4022",
     DESCRIPCION: "Pan de Molde Integral 500g",
     LOTE: "L-7719",
-    FECHA_VENCIMIENTO: "2026-08-21",
+    FECHA_VENCIMIENTO: "2028-01-10",
     CANTIDAD: "45",
     PROVEEDOR: "Panificadora Central",
-    FRC_EVEN: "CAL. INTER",
-    N_TRASPASO: "TR-77210",
-    OBSERVACION: "No conformidad en control de calidad interno. Traspaso ejecutado."
+    FRC_EVEN: "",
+    N_TRASPASO: "",
+    OBSERVACION: "Inventario en regla. Sin acción comercial pendiente"
   }
 ];
 

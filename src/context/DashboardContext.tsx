@@ -191,6 +191,8 @@ export interface DashboardContextType {
   eventFilter?: string[];
   setEventFilter?: React.Dispatch<React.SetStateAction<string[]>>;
   eventMetrics?: WorkerMetricsResult['eventMetrics'];
+  /** Total de filas del dominio del módulo, no de la hoja cruda (píldora «Todas»). */
+  domainItemsCount?: number;
   frcBodValues?: string[];
   frcBodCounts?: Record<string, number>;
   frcBodFilter?: string[];

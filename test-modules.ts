@@ -2,6 +2,7 @@
  * Test Suite para verificación modular y funcional según el protocolo Ponytail
  * Ejecuta pruebas unitarias e integrales sobre cada utilidad, servicio y módulo
  */
+import type { TableSlice } from './src/types';
 import { 
   parseAnyDate, 
   parseLocaleNumber, 
@@ -64,6 +65,7 @@ import {
   BUILT_IN_SLICES, 
   getSlicesForTable, 
   computeSliceCounts,
+  itemMatchesSlice,
   detectTableCapabilities,
   resolveTableCapabilities,
   getCapabilityOverrideStatus,
@@ -396,6 +398,44 @@ console.log('\n--- 7. Pruebas de sliceRegistry.ts ---');
   const slicesForzados = getSlicesForTable('Hoja X', [], undefined, ambigua, undefined, { enabled: ['vencimiento'] });
   assert(slicesForzados.length > 0 && slicesForzados.every(s => s.requiredCapability === 'vencimiento'), 'forzar la capacidad habilita los slices nativos correspondientes');
   assert(getSlicesForTable('Hoja X', [], undefined, ambigua).length === 0, 'sin forzar, la hoja ambigua no recibe slices nativos');
+}
+
+console.log('\n--- 7b. Particion de dominio: VENC. CERC. es incidencia, no vencimiento ---');
+{
+  // `VENC. CERC.` significa "llego con poca vida util": es un evento FRC, no una
+  // categoria de vencimiento. El radar de vencimientos y el registro FRC deben ser
+  // una particion estricta: ninguna fila puede contarse en ambos ni desaparecer.
+  const headersVc = ['SKU', 'DESCRIPCION', 'FECHA_VENCIMIENTO', 'CANTIDAD', 'TIPO_EVENTO'];
+  const filaVenc = { _rowIndex: 2, SKU: 'A', FECHA_VENCIMIENTO: '2027-01-01', TIPO_EVENTO: '' };
+  const filaCercano = { _rowIndex: 3, SKU: 'B', FECHA_VENCIMIENTO: '2026-09-01', TIPO_EVENTO: 'VENC. CERC.' };
+  const filaTransporte = { _rowIndex: 4, SKU: 'C', FECHA_VENCIMIENTO: '2027-05-01', TIPO_EVENTO: 'DET. PED' };
+
+  // El gate por item de los slices nativos. Se usa un slice sintetico (solo con la
+  // capacidad) para aislar la particion de dominio: los nativos reales añaden ademas
+  // filtros de estado PM, que no son el objeto de esta prueba.
+  const sliceVc: TableSlice = { id: 'test_vc', name: 'vc', tableKey: 'main', requiredCapability: 'vencimiento', isBuiltIn: false, filterConfig: {} };
+  const sliceInc: TableSlice = { id: 'test_inc', name: 'inc', tableKey: 'events', requiredCapability: 'incidencia', isBuiltIn: false, filterConfig: {} };
+  const tieneCapacidad = (s: TableSlice) => BUILT_IN_SLICES.some(b => b.requiredCapability === s.requiredCapability);
+  assert(tieneCapacidad(sliceVc) && tieneCapacidad(sliceInc), 'existen slices nativos de ambos dominios');
+  assert(itemMatchesSlice(filaVenc, sliceVc, headersVc), 'slice de vencimiento acepta un VENCIMIENTO puro');
+  assert(!itemMatchesSlice(filaCercano, sliceVc, headersVc), 'slice de vencimiento RECHAZA VENC. CERC. (es FRC)');
+  assert(!itemMatchesSlice(filaTransporte, sliceVc, headersVc), 'slice de vencimiento rechaza transporte');
+  assert(itemMatchesSlice(filaCercano, sliceInc, headersVc), 'slice de incidencia acepta VENC. CERC.');
+
+  // El conteo de la pildora «Todas» en el radar no puede incluir filas FRC.
+  const counts = computeSliceCounts([filaVenc, filaCercano, filaTransporte], [sliceVc], headersVc);
+  assert(counts[sliceVc.id] === 1, 'el radar de vencimientos cuenta solo la fila de vencimiento puro');
+
+  // Particion estricta medida con el acumulador compartido (worker + fallback): cada
+  // fila cae en exactamente uno de los dos dominios.
+  const acc = createMetricsAccumulator(3);
+  const catOf = getEventCategory;
+  [filaVenc, filaCercano, filaTransporte].forEach(f => acc.addEventCategory(catOf(f, headersVc), 'NORMAL', 'SIN_ACCION'));
+  const m = acc.finish();
+  assert(m.eventMetrics.vencimientos === 1, 'metricas: solo la fila de vencimiento puro cuenta como vencimiento');
+  assert(m.eventMetrics.vencimientoCercano === 1, 'metricas: VENC. CERC. cuenta en su propia categoria de incidencia');
+  assert(m.eventMetrics.vencimientos + m.eventMetrics.vencimientoCercano + m.eventMetrics.transporte === 3,
+    'metricas: la particion cubre las 3 filas sin solaparse ni perder ninguna');
 }
 
 console.log('\n--- 8. Pruebas de universalImporter.ts ---');
@@ -1456,15 +1496,15 @@ console.log('\n--- 20. Pruebas de derivacion y filtrado de campanas (campaignAgg
     assert(r.eventMetrics.total === 5, 'acumulador: conserva el total de filas');
     assert(r.eventMetrics.transporte === 1 && r.eventMetrics.diferencia === 1,
       'acumulador: cuenta incidencias por categoria');
-    assert(r.eventMetrics.vencimientos === 5,
-      'acumulador: vencimientos agrupa cercano + los cuatro de vencimiento');
+    assert(r.eventMetrics.vencimientos === 4,
+      'acumulador: vencimientos EXCLUYE vencimiento cercano (es evento FRC, no vencimiento)');
     assert(r.eventMetrics.vencimientoCercano === 1,
-      'acumulador: vencimiento cercano se cuenta dentro de vencimientos');
+      'acumulador: vencimiento cercano se cuenta como incidencia, no dentro de vencimientos');
     assert(r.eventMetrics.drainagePm === 1 && r.eventMetrics.upcoming === 1
-      && r.eventMetrics.retireNow === 2,
-      'acumulador: reparte estados de vencimiento (EXPIRED y RETIRE_NOW juntos)');
-    assert(r.pmMetrics.canjeProveedor === 1 && r.pmMetrics.mermaDirecta === 1,
-      'acumulador: separa canje proveedor de merma directa');
+      && r.eventMetrics.retireNow === 1,
+      'acumulador: reparte estados de vencimiento entre los 3 VENCIMIENTO puros');
+    assert(r.pmMetrics.canjeProveedor === 0 && r.pmMetrics.mermaDirecta === 1,
+      'acumulador: el radar PM no absorbe eventos FRC (cercano ya no aporta canje)');
     assert(r.pmMetrics.enRegla === 1,
       'acumulador: enRegla descuenta drenaje, proximos y retiro');
     assert(r.eventResolutionMetrics.pending === 1 && r.eventResolutionMetrics.completed === 1,

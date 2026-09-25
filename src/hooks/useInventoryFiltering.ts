@@ -334,10 +334,12 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
       for (let i = 0; i < len; i++) {
         const item = augmentedItems[i];
 
-        // View constraints
+        // View constraints. `VENC. CERC.` es un evento FRC, no vencimiento: el radar
+        // sólo admite VENCIMIENTO puro y el registro FRC todo lo demás. Mismo gate que
+        // el worker (`inventoryWorker.ts`), para que las dos rutas no puedan divergir.
         if (canExpire) {
           const cat = getEventCategory(item, headers, fallbackColContext);
-          if (cat !== 'VENCIMIENTO' && cat !== 'VENCIMIENTO_CERCANO') {
+          if (cat !== 'VENCIMIENTO') {
             continue;
           }
           if (frcBodFilterSet && frcBodCol) {
@@ -609,6 +611,12 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     clearAllFilters,
     isWorkerProcessing: isProcessing,
     isWorkerReady,
+    // Total de filas del DOMINIO del módulo, no de la hoja cruda. Se deriva de la
+    // misma pasada que alimenta las métricas para que la píldora «Todas» y la tabla
+    // no puedan divergir: en el radar de vencimientos sólo cuentan las filas de
+    // vencimiento; en cualquier otro módulo cuentan todas (una fila sin código de
+    // evento reconocido nunca se oculta por conteo).
+    domainItemsCount: canExpire ? localMetrics.eventMetrics.vencimientos : localMetrics.eventMetrics.total,
     eventMetrics: localMetrics.eventMetrics,
     pmMetrics: localMetrics.pmMetrics,
     eventResolutionMetrics: localMetrics.eventResolutionMetrics,

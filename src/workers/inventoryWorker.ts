@@ -216,9 +216,10 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
     for (let i = 0; i < len; i++) {
       const item = cachedNormalizedItems[i];
 
-      // View constraints
+      // View constraints. `VENC. CERC.` es un evento FRC, no vencimiento: el radar
+      // sólo admite VENCIMIENTO puro y el registro FRC todo lo demás.
       if (canExpire) {
-        if (item.eventCategory !== 'VENCIMIENTO' && item.eventCategory !== 'VENCIMIENTO_CERCANO') {
+        if (item.eventCategory !== 'VENCIMIENTO') {
           continue;
         }
         if (frcBodFilterSet && frcBodCol) {

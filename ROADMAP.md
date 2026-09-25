@@ -3013,7 +3013,7 @@ configurar la URL») y sale con código 1. Restaurado el corte, 7/7 OK. Es discr
 `tsc` 0 · `eslint` 0 errores (16 warnings `exhaustive-deps` preexistentes) · **284 pruebas** +
 10 componente + 18 hoja de cálculo · **23/23 arneses E2E** · build 0. Sin dependencias nuevas.
 
-### Deuda que queda abierta (honesta)
+### Deuda que queda abierta (honesta) — RESUELTA en la sección 27
 
 - **Discrepancia medida, no corregida:** la píldora «Todas» anuncia 5 filas y la tabla muestra 2.
   No es paginación: en la vista de vencimientos el filtro descarta toda fila cuya categoría de
@@ -3023,3 +3023,49 @@ configurar la URL») y sale con código 1. Restaurado el corte, 7/7 OK. Es discr
   decisión de diseño (esas filas podrían pertenecer a Incidencias), por eso **no se tocó sin
   confirmación del usuario**.
 
+
+---
+
+## 27. Partición estricta de dominio: `VENC. CERC.` es una incidencia FRC
+
+### El hallazgo, con la taxonomía confirmada por el usuario
+
+La deuda de la sección anterior (píldora «Todas» = 5 vs. tabla = 2) se resuelve al confirmar la
+regla de negocio: **`VENC. CERC.` no es una categoría de vencimiento**, es un evento FRC
+(mercadería recibida con vida útil < 12 meses). Medido en el navegador antes del corte: las 5
+filas de la hoja de vencimientos traían código FRC, así que las 2 visibles eran justamente
+incidencias `VENC. CERC.`. El radar estaba mostrando lo que no debía y el contador no coincidía
+con la tabla.
+
+### El corte (mínimo, tres gates + conteo)
+
+1. **`sliceRegistry.itemMatchesSlice`**: vencimiento = sólo `VENCIMIENTO` puro; incidencia = todo
+   lo demás. Un sólo predicado por capacidad, sin listas de categorías.
+2. **Worker y fallback síncrono**: el mismo gate en `inventoryWorker.ts` y en
+   `useInventoryFiltering.ts` (las dos rutas de filtrado no pueden divergir).
+3. **Acumulador de métricas** (`pureCalculations.ts`): `VENCIMIENTO_CERCANO` sale de la rama de
+   vencimiento; `vencimientos` ya no lo absorbe y el radar PM deja de contarlo (era un falso
+   positivo de canje proveedor). Es la única fuente del conteo, compartida por worker y fallback.
+4. **Conteo del badge** (`domainItemsCount`): la píldora «Todas» y el pie usan las filas del
+   dominio, no `items.length`. Con esto la píldora no puede volver a mentir.
+5. **Dato demo y semilla E2E**: la hoja de vencimientos del demo (y las 400 filas de `seed.js`)
+   pasan a ser vencimiento puro; los códigos FRC viven sólo en la hoja FRC.
+
+### Medición real (navegador, modo demo)
+
+| Módulo | Antes | Después |
+|---|---|---|
+| Vencimientos | píldora 5 / tabla 2 (y ambas filas eran FRC) | **píldora 5 / tabla 5, sin códigos FRC** |
+| FRC | píldora 6 / tabla 6 | **píldora 6 / tabla 6, con `VENC. CERC.`** |
+
+Con la hoja mixta del arnés (5 filas: 3 vencimiento + 2 FRC): radar = 3/3, FRC = 6/6.
+
+### Validación por mutación
+
+Se revirtió el gate en worker y fallback (volviendo a admitir `VENCIMIENTO_CERCANO` en el radar) y
+se reconstruyó: `domaincheck.cjs` **falla en 3 de sus 6 pasos**. Restaurado el corte, 6/6 OK. El
+arnés es discriminante.
+
+### Puerta
+
+`tsc` 0 · **293 pruebas** unitarias · **24/24 arneses E2E** · build 0. Sin dependencias nuevas.

@@ -28,7 +28,7 @@
         FECHA_VENCIMIENTO: '2026-' + mm + '-' + dd,
         CANTIDAD: String(10 + (i % 90)),
         PROVEEDOR: 'Proveedor ' + (i % 7),
-        FRC_EVEN: 'VENC. CERC.',
+        FRC_EVEN: '',
         N_TRASPASO: '',
         OBSERVACION: 'Fila sintetica para perfilado ' + i,
       });

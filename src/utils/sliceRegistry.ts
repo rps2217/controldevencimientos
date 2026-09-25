@@ -393,14 +393,16 @@ export function itemMatchesSlice(
   // Los slices nativos ya entran filtrados por capacidad de la hoja, así que aquí
   // sólo se afina por ítem. Se decide por capacidad (no por nombre de pestaña) para
   // que una hoja no canónica reciba el mismo trato que la canónica equivalente.
+  //
+  // `VENC. CERC.` es un evento FRC (mercadería recibida con poca vida útil), no una
+  // categoría de vencimiento: pertenece al dominio de incidencia. Por eso el radar de
+  // vencimientos sólo admite VENCIMIENTO puro y el registro FRC admite todo lo demás.
   if (slice.requiredCapability === 'vencimiento') {
-    const cat = getEventCategory(item, headers);
-    if (cat !== 'VENCIMIENTO' && cat !== 'VENCIMIENTO_CERCANO') {
+    if (getEventCategory(item, headers) !== 'VENCIMIENTO') {
       return false;
     }
   } else if (slice.requiredCapability === 'incidencia') {
-    const cat = getEventCategory(item, headers);
-    if (cat === 'VENCIMIENTO' || cat === 'VENCIMIENTO_CERCANO') {
+    if (getEventCategory(item, headers) === 'VENCIMIENTO') {
       return false;
     }
   }

@@ -5,7 +5,7 @@ import { useDashboard } from '../../context/DashboardContext';
 export const DashboardTableContainer: React.FC = () => {
   const dashboard = useDashboard();
 
-  const totalItemsCount = dashboard.items?.length ?? 0;
+  const totalItemsCount = dashboard.domainItemsCount ?? dashboard.items?.length ?? 0;
   const groupedItems = dashboard.groupedItems ?? null;
   const groupByDirection = dashboard.groupByDirection ?? 'asc';
   const toggleGroupByDirection = dashboard.toggleGroupByDirection;

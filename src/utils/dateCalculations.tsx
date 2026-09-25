@@ -58,7 +58,7 @@ export const EVENT_CATEGORIES: Record<EventCategory, EventTypeDefinition> = {
     rawCode: 'VENC. CERC.',
     name: 'Vencimiento Cercano',
     shortLabel: 'Venc. Cercano',
-    description: 'Control de lotes con vencimiento próximo para rotación',
+    description: 'Incidencia FRC: mercadería recibida con vida útil menor a 12 meses',
     badgeBg: 'bg-indigo-50 dark:bg-indigo-950/60',
     badgeText: 'text-indigo-700 dark:text-indigo-300',
     badgeBorder: 'border-indigo-200 dark:border-indigo-800',

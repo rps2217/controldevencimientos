@@ -290,7 +290,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
           style={{ width: `${getColWidth('_status', 'Estado / Radar PM')}px`, minWidth: `${getColWidth('_status', 'Estado / Radar PM')}px`, maxWidth: `${getColWidth('_status', 'Estado / Radar PM')}px` }}
           className={`hidden md:table-cell ${paddingClass} truncate`}
         >
-          {eventCategory === 'VENCIMIENTO' || eventCategory === 'VENCIMIENTO_CERCANO' ? (
+          {eventCategory === 'VENCIMIENTO' ? (
             <button 
               onClick={(e) => {
                 e.stopPropagation();

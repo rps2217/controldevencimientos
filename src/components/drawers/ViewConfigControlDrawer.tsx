@@ -84,7 +84,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
   const onOpenGlobalConfig = () => modalsActions.setIsConfigOpen?.(true);
   const onOpenBulkActionsConfig = () => modalsActions.setIsBulkActionsConfigOpen?.(true);
   const onOpenSchemaEditor = () => dashboard.setActiveView?.('schema');
-  const totalItemsCount = dashboard.items?.length ?? 0;
+  const totalItemsCount = dashboard.domainItemsCount ?? dashboard.items?.length ?? 0;
   const filteredItemsCount = dashboard.filteredItems?.length ?? 0;
   const groupByColumn = dashboard.groupByColumn ?? 'none';
   const setGroupByColumn = dashboard.handleSetGroupByColumn;

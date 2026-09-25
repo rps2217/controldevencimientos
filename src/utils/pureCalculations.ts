@@ -568,8 +568,12 @@ export function createMetricsAccumulator(total: number) {
       else if (cat === 'CANJES') eventMetrics.canjes++;
       else if (cat === 'AVERIA') eventMetrics.averia++;
       else if (cat === 'DEVOLUCION') eventMetrics.devolucion++;
+      // `VENC. CERC.` es un evento FRC (mercadería recibida con poca vida útil), no una
+      // categoría de vencimiento: cuenta como incidencia y por eso NO suma a
+      // `vencimientos`. Así el radar de vencimientos y el registro FRC son una
+      // partición estricta del inventario y sus conteos no pueden divergir.
+      else if (cat === 'VENCIMIENTO_CERCANO') eventMetrics.vencimientoCercano++;
       else {
-        if (cat === 'VENCIMIENTO_CERCANO') eventMetrics.vencimientoCercano++;
         eventMetrics.vencimientos++;
         if (statusCode === 'DRAINAGE_PM') eventMetrics.drainagePm++;
         else if (statusCode === 'UPCOMING') eventMetrics.upcoming++;

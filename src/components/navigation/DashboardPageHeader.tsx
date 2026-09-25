@@ -23,7 +23,7 @@ export const DashboardPageHeader: React.FC = () => {
   const activeSliceId = dashboard.activeSliceId ?? null;
   const onSelectSlice = dashboard.handleSelectSlice ?? (() => {});
   const sliceCounts = dashboard.sliceCounts ?? {};
-  const totalItemsCount = dashboard.items?.length ?? 0;
+  const totalItemsCount = dashboard.domainItemsCount ?? dashboard.items?.length ?? 0;
   const hasSlices = slices.length > 0 && activeView !== 'schema' && activeView !== 'analytics';
 
   return (
