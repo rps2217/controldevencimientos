@@ -126,7 +126,6 @@ export interface ColumnSchema {
   type: ColumnType;
   behavior: ColumnBehavior;
   options?: string; // Comma-separated options for enum and enumlist
-  formula?: string;
   isKey?: boolean; // Primary key for table relation
   isLabel?: boolean; // Main display label when referenced
   label?: string; // Custom display label

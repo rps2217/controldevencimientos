@@ -80,11 +80,9 @@ export const ALL_BULK_ACTIONS: BulkActionDefinition[] = [
     icon: Barcode,
     buttonClass: 'text-xs hover:bg-slate-700 px-3 py-1.5 rounded-xl font-bold transition-colors flex items-center gap-1.5 bg-indigo-600/40 text-indigo-200 border border-indigo-500/40 shadow-sm',
     iconClass: 'w-3.5 h-3.5 text-indigo-300',
-    defaultEnabled: (ctx) => {
-      // Enabled by default if SKU or code column is detected, or for main/products/events views
-      const hasSku = ctx.headers.some(h => findColumnBySemantic([h], 'sku') !== undefined);
-      return hasSku || ['main', 'products', 'events'].includes(ctx.activeView);
-    },
+    defaultEnabled: (ctx) =>
+      // La capacidad manda: código de barras donde haya SKU/Código, sin importar la vista.
+      ctx.headers.some(h => findColumnBySemantic([h], 'sku') !== undefined),
     getContextualReason: (ctx) => {
       const hasSku = ctx.headers.some(h => findColumnBySemantic([h], 'sku') !== undefined);
       if (hasSku) return 'Detectada columna de SKU/Código en la tabla para generar código de barras';
