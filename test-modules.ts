@@ -17,9 +17,10 @@ import {
 import { createMetricsAccumulator } from './src/utils/pureCalculations';
 import { getDefaultTicketTitle } from './src/utils/ticketUtils';
 
-import { 
-  findColumnBySemantic, 
-  FIELD_PATTERNS 
+import {
+  findColumnBySemantic,
+  FIELD_PATTERNS,
+  SEMANTIC_FIELD_OPTIONS
 } from './src/utils/columnAliases';
 
 import { 
@@ -1541,6 +1542,49 @@ console.log('\n--- 21. Titulo del ticket por columnas (Fase 7 / Hallazgo 1) ---'
   // El defecto medido: una hoja de catalogo no debe imprimir su nombre de pestana.
   assert(!/MAESTRO_FARMACIA/i.test(titulo(['SKU', 'DESCRIPCION', 'PROVEEDOR', 'CATEGORIA'], 'Maestro_Farmacia')),
     'titulo: no se filtra el nombre de la pestana en hojas con dominio detectable');
+}
+
+console.log('\n--- 22. Diccionario semantico: fuente unica y auto-mapeo (Ponytail) ---');
+{
+  // Guardian de sincronia: el motor de auto-mapeo deriva de FIELD_PATTERNS y el
+  // editor de alias de SEMANTIC_FIELD_OPTIONS. Si alguien vuelve a escribir una
+  // lista paralela, esto cae.
+  const dict = Object.keys(FIELD_PATTERNS) as import('./src/utils/columnAliases').KnownFieldSemantic[];
+  const editor = SEMANTIC_FIELD_OPTIONS.map(o => o.key);
+  assert(editor.length === dict.length && dict.every(s => editor.includes(s)),
+    'diccionario: el editor de alias expone TODAS las semanticas, sin lista paralela');
+
+  // El defecto medido: 8 semanticas de inventario/ERP no se auto-mapeaban porque el
+  // motor llevaba una lista hardcodeada de 23 de 31.
+  const farmTarget = ['LOCAL', 'CODIGO_SKU', 'VENTA', 'INGRESO', 'EGRESO', 'INV_INICIAL', 'STOCK_MIN', 'STOCK_MAX', 'STOCK_CRITICO'];
+  const farmSource = ['Sucursal', 'C\u00f3d. Art\u00edculo', 'Ventas del Periodo', 'Recepci\u00f3n', 'Salidas', 'Inventario Inicial', 'M\u00ednimo', 'M\u00e1ximo', 'Cr\u00edtico'];
+  const farmMap = generateSmartColumnMappings(farmTarget, farmSource);
+  assert(farmMap.every(m => m.sourceHeader !== null),
+    'auto-mapeo: las 8 semanticas de inventario/ERP se reconocen por diccionario (antes 0/9)');
+  assert(farmMap.find(m => m.targetHeader === 'LOCAL')?.sourceHeader === 'Sucursal',
+    'auto-mapeo: LOCAL reconoce el sinonimo Sucursal');
+  assert(farmMap.find(m => m.targetHeader === 'INV_INICIAL')?.sourceHeader === 'Inventario Inicial',
+    'auto-mapeo: INV_INICIAL reconoce Inventario Inicial');
+
+  // Cabeceras canonicas con separador: la app debe reconocer lo que ella misma escribe.
+  assert(findColumnBySemantic(['INV_INICIAL'], 'inv_inicial') === 'INV_INICIAL',
+    'diccionario: INV_INICIAL (guion bajo) se reconoce a si misma');
+  assert(findColumnBySemantic(['Inv. Inicial'], 'inv_inicial') === 'Inv. Inicial',
+    'diccionario: "Inv. Inicial" con punto se reconoce');
+  assert(findColumnBySemantic(['F. Vto'], 'fecha_vc') === 'F. Vto',
+    'diccionario: "F. Vto" se reconoce');
+  assert(findColumnBySemantic(['C\u00f3d. Art\u00edculo'], 'sku') === 'C\u00f3d. Art\u00edculo',
+    'diccionario: "Cod. Articulo" se reconoce');
+  assert(findColumnBySemantic(['Fecha de Vencimiento'], 'fecha_vc') === 'Fecha de Vencimiento',
+    'diccionario: "Fecha de Vencimiento" (con "de") se reconoce');
+  assert(findColumnBySemantic(['N\u00b0 Lote'], 'lote') === 'N\u00b0 Lote',
+    'diccionario: "N Lote" (ordinal) se reconoce');
+
+  // No-regreso: una hoja de catalogo no debe contaminar el dominio de incidencias.
+  assert(!findColumnBySemantic(['CATEGORIA'], 'tipo_evento'),
+    'no-regreso: CATEGORIA no se clasifica como tipo_evento');
+  assert(findColumnBySemantic(['CATEGORIA'], 'categoria') === 'CATEGORIA',
+    'no-regreso: CATEGORIA si se clasifica como categoria');
 }
 
 console.log(`\n========================================`);

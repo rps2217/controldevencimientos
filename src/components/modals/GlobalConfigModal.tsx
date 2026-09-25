@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, X, Database, FileSpreadsheet, Package, FileText, CheckCircle2, Sliders, BookOpen, Plus, Server, Sparkles } from 'lucide-react';
 import { SheetConfig, SpreadsheetMetadata } from '../../types';
+import { SEMANTIC_FIELD_OPTIONS } from '../../utils/columnAliases';
 import { TableBulkActionsPanel } from '../settings/TableBulkActionsPanel';
 import { TableCapabilitiesPanel } from '../settings/TableCapabilitiesPanel';
 import { BackendMirrorPanel } from '../settings/BackendMirrorPanel';
@@ -19,22 +20,7 @@ interface GlobalConfigModalProps {
   initialTab?: 'sheets' | 'dictionary' | 'bulkActions' | 'capabilities' | 'backendMirror';
 }
 
-const SEMANTIC_FIELDS = [
-  { key: 'sku', label: 'SKU / Código de Producto' },
-  { key: 'descripcion', label: 'Descripción / Nombre' },
-  { key: 'fecha_vc', label: 'Fecha de Vencimiento (Vto)' },
-  { key: 'fecha_retiro', label: 'Fecha de Retiro / Canje' },
-  { key: 'tipo_evento', label: 'Tipo de Incidencia / Evento (FRC)' },
-  { key: 'frc_bod', label: 'Bodega / FRC Bodega (FRC_BOD)' },
-  { key: 'cantidad', label: 'Cantidad / Unidades' },
-  { key: 'lote', label: 'Lote / Batch' },
-  { key: 'n_traspaso', label: 'N° de Traspaso / Resolución' },
-  { key: 'observacion', label: 'Observación / Comentarios' },
-  { key: 'proveedor', label: 'Proveedor / Laboratorio' },
-  { key: 'telefono', label: 'Teléfono / WhatsApp / Contacto' },
-  { key: 'email', label: 'Correo Electrónico / Email' },
-  { key: 'id', label: 'ID / Folio' }
-];
+const SEMANTIC_FIELDS = SEMANTIC_FIELD_OPTIONS;
 
 export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
   isOpen,

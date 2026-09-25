@@ -62,10 +62,12 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^cant(_|\s)?egreso$/i
   ],
   inv_inicial: [
-    /^inv(\.|\s)?inicial$/i,
-    /^inventario(_|\s)?inicial$/i,
-    /^stock(_|\s)?inicial$/i,
-    /^saldo(_|\s)?inicial$/i
+    // El separador debe incluir guion bajo: `INV_INICIAL` es la cabecera canonica
+    // que la propia app documenta para campanas, y antes no se reconocia a si misma.
+    /^inv([.\s_])?inicial$/i,
+    /^inventario([.\s_])?inicial$/i,
+    /^stock([.\s_])?inicial$/i,
+    /^saldo([.\s_])?inicial$/i
   ],
   stock_min: [
     /^stock(_|\s)?min(imo)?$/i,
@@ -147,6 +149,8 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
   ],
   fecha_vc: [
     /^fecha(_|\s)?(vc|vencimiento|caducidad|exp|expiracion|expiraci[oó]n|vto|vcto)$/i,
+    // "Fecha de Vencimiento" es la cabecera mas comun en espanol y no estaba cubierta.
+    /^fecha(_|\s)?(de(_|\s)?)?(vc|vencimiento|caducidad|expiraci[oó]n|vto|vcto)$/i,
     /^vencimiento$/i,
     /^caducidad$/i,
     /^expiraci[oó]n$/i,
@@ -160,6 +164,7 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
   fecha_retiro: [
     /^fecha(_|\s)?retiro(_|\s)?(calc|calculada)?$/i,
     /^fecha(_|\s)?(retiro|canje|limite|l[ií]mite)$/i,
+    /^fecha(_|\s)?(de(_|\s)?)?(retiro|canje|limite|l[ií]mite)$/i,
     /^retiro$/i,
     /^canje$/i,
     /^f(_|\s)?(retiro|canje)$/i,
@@ -207,6 +212,7 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^n[uú]mero(_|\s)?(de)?(_|\s)?lote$/i,
     /^num(_|\s)?lote$/i,
     /^nro(_|\s)?lote$/i,
+    /^n(_|\s)?lote$/i,
     /^no(_|\s)?lote$/i,
     /^lot(_|\s)?(number|no|num)?$/i
   ],
@@ -358,7 +364,11 @@ export function normalizeHeaderString(str: unknown): string {
     .trim()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[\s\-_]+/g, '_')
+    // El punto y los ordinales son separadores/ruido, no parte del nombre: sin esto
+    // cabeceras corrientes como "F. Vto", "Cód. Artículo", "Inv. Inicial" o "N° Lote"
+    // no se reconocian aunque el diccionario conociera su forma normalizada.
+    .replace(/[°º]/g, '')
+    .replace(/[\s\-_.]+/g, '_')
     .toLowerCase();
 }
 
@@ -488,6 +498,17 @@ const DISPLAY_ORDER: KnownFieldSemantic[] = [
   'inv_inicial', 'stock_min', 'stock_max', 'stock_critico', 'ingreso', 'egreso', 'venta',
   'telefono', 'email',
 ];
+
+/**
+ * Campos semanticos en orden de lectura operativo, con su etiqueta legible.
+ * Fuente unica para cualquier UI que liste el diccionario (el editor de alias
+ * llevaba su propia copia recortada a 14 de 31 y no dejaba personalizar las
+ * semanticas de inventario/ERP: `local`, `venta`, `ingreso`, `egreso`,
+ * `inv_inicial`, `stock_min/max/critico`).
+ */
+export const SEMANTIC_FIELD_OPTIONS: Array<{ key: KnownFieldSemantic; label: string }> =
+  DISPLAY_ORDER.map(key => ({ key, label: FIELD_LABELS[key] }));
+
 
 function semanticOf(header: string, customAliases?: Record<string, string[]>): KnownFieldSemantic | undefined {
   if (!header) return undefined;

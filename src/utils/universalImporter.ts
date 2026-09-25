@@ -1,4 +1,4 @@
-import { findColumnBySemantic, KnownFieldSemantic, normalizeHeaderString } from './columnAliases';
+import { findColumnBySemantic, KnownFieldSemantic, normalizeHeaderString, FIELD_PATTERNS } from './columnAliases';
 import { rowToObject } from './pureCalculations';
 import { SheetRecord } from '../types';
 
@@ -280,11 +280,25 @@ export function generateSmartColumnMappings(
   const suggestions: ColumnMappingSuggestion[] = [];
   const assignedSource = new Set<string>();
 
-  const allSemantics: KnownFieldSemantic[] = [
+  // Los semanticos se derivan del diccionario (`FIELD_PATTERNS`), que es la fuente
+  // unica: antes habia aqui una lista paralela que se quedo en 23 de 31 y el
+  // auto-mapeo dejaba sin reconocer las 8 de inventario/ERP (`local`, `venta`,
+  // `ingreso`, `egreso`, `inv_inicial`, `stock_min/max/critico`).
+  // El orden importa: el motor es first-match-wins y agrupa por familia para que
+  // las semantica mas especifica gane a la generica (p. ej. `inv_inicial` antes
+  // de `cantidad`, que ya captura `Stock`, o `stock_min` antes que `cantidad`).
+  const SEMANTIC_ORDER: KnownFieldSemantic[] = [
     'id', 'sku', 'descripcion', 'fecha_vc', 'fecha_retiro', 'mes', 'anio',
-    'cantidad', 'lote', 'politica', 'tipo_evento', 'frc_bod',
-    'observacion', 'proveedor', 'dias_anticipacion', 'dias_retiro',
-    'n_traspaso', 'telefono', 'email', 'categoria', 'mundo', 'pm', 'ubicacion'
+    'lote', 'politica', 'tipo_evento', 'frc_bod', 'n_traspaso',
+    'observacion', 'proveedor', 'telefono', 'email',
+    'categoria', 'mundo', 'pm', 'ubicacion', 'local',
+    'inv_inicial', 'stock_min', 'stock_max', 'stock_critico',
+    'venta', 'ingreso', 'egreso', 'cantidad', 'dias_anticipacion', 'dias_retiro',
+  ];
+  const allSemantics = Object.keys(FIELD_PATTERNS) as KnownFieldSemantic[];
+  const orderedSemantics = [
+    ...SEMANTIC_ORDER.filter(s => allSemantics.includes(s)),
+    ...allSemantics.filter(s => !SEMANTIC_ORDER.includes(s)),
   ];
 
   for (const target of targetHeaders) {
@@ -326,7 +340,7 @@ export function generateSmartColumnMappings(
     let matchConfidence = 0;
     let matchSemantic: KnownFieldSemantic | null = null;
 
-    for (const sem of allSemantics) {
+    for (const sem of orderedSemantics) {
       const targetMatchesSem = findColumnBySemantic([target], sem, customAliases);
       if (targetMatchesSem) {
         const availableSources = sourceHeaders.filter(s => !assignedSource.has(s));
