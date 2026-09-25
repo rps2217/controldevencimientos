@@ -11,7 +11,7 @@ import { AlertCircle, Package } from 'lucide-react';
 import { getEventCategory, getItemStatus, parseLocaleNumber } from '../utils/dateCalculations';
 import { rowToObject } from '../utils/pureCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
-import { resolveTableCapabilities } from '../utils/sliceRegistry';
+import { detectTableCapabilities } from '../utils/sliceRegistry';
 import { resolveItemIdentity } from '../utils/entityIdentityResolver';
 import { 
   findExistingItemByCuVc
@@ -289,12 +289,12 @@ export const InventoryDashboard: React.FC = () => {
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  // Capacidades EFECTIVAS de la hoja activa: gobiernan qué UI de dominio (conteo,
-  // pistoleo, columnas de estado, radar) se ofrece, en vez de asumir por identidad de
-  // vista. Incluye respaldo por nombre/identidad para el modo demo (ver `resolveTableCapabilities`).
+  // Capacidades de dominio de la hoja activa, derivadas de sus columnas: gobiernan qué UI
+  // de dominio (conteo, pistoleo, columnas de estado, radar) se ofrece, en vez de asumir
+  // por identidad de vista o nombre de pestaña.
   const tableCapabilities = useMemo(
-    () => resolveTableCapabilities(headers, sheetConfig.customAliases, activeSheet?.title, activeView),
-    [headers, sheetConfig.customAliases, activeSheet?.title, activeView]
+    () => detectTableCapabilities(headers, sheetConfig.customAliases),
+    [headers, sheetConfig.customAliases]
   );
 
   const {

@@ -250,16 +250,18 @@ otra a medida.
 - **UI gateada por capacidad:** el contexto publica `dashboard.tableCapabilities`; los
   consumidores preguntan `has('conteo')` (Conteo/Pistoleo en `DashboardTopNav`,
   `DashboardMobileFABs` y `Sidebar`). Antes esa UI se ofrecía en toda hoja.
-- **`resolveTableCapabilities(headers, customAliases?, sheetTitle?, activeView?)`**
-  (`src/utils/sliceRegistry.ts`) es la variante que usa la app: parte de
-  `detectTableCapabilities` y **añade la capacidad por respaldo** cuando las columnas no la
-  declaran pero el nombre de hoja o la identidad de vista sí son de dominio. Existe porque en
-  modo demo/offline, al cambiar de vista con caché ya renderizada, `useInventoryData` retorna
-  temprano y deja `headers` y `activeSheet` con el valor anterior; el único estado fresco es
-  `activeView`. El dashboard resuelve las capacidades **una sola vez** con esta función y las
-  publica en el contexto; los consumidores no repiten la regla. Una hoja no canónica navega con
-  `activeView = <título>` ("Clientes"), que no colisiona con las identidades ni las regex, así
-  que el respaldo no filtra UI de dominio a hojas genéricas.
+- **Detección única:** `detectTableCapabilities(headers, customAliases?)`
+  (`src/utils/sliceRegistry.ts`) es la fuente de verdad: pregunta **qué columnas hay**, nunca
+  cómo se llama la tabla. El dashboard la resuelve **una sola vez** con `useMemo` y publica el
+  `Set` en `dashboard.tableCapabilities`; los consumidores no repiten la regla.
+- **Sin respaldo por identidad ni nombre de hoja.** Existió
+  `resolveTableCapabilities(headers, …, sheetTitle, activeView)`, que añadía capacidad cuando el
+  nombre de hoja o la identidad de vista eran de dominio, para tapar que en modo demo/offline
+  `headers` y `activeSheet` quedaban obsoletos al cambiar de vista. Corregida la causa raíz en
+  `useInventoryData` (`renderedViewRef`), se probó por mutación que el gate E2E seguía verde sin
+  el respaldo, y se eliminó: era andamiaje y además un falso positivo latente (una hoja llamada
+  "Stock General" sin columnas de vencimiento heredaba la capacidad). `democheck.cjs` es ahora
+  la guardia directa de esa causa raíz, sin nada que la enmascare.
 - **Degradación segura:** sin `headers` no se detecta ninguna capacidad (0 slices nativos, no
   excepción). Cualquier llamada nueva **debe** pasar `headers` y, si aplica, `customAliases`.
 

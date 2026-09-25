@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { SheetConfig } from '../types';
 import { findPhoneColumn, findEmailColumn, findColumnBySemantic } from './columnAliases';
-import { resolveTableCapabilities } from './sliceRegistry';
+import { detectTableCapabilities } from './sliceRegistry';
 
 export type BulkActionId = 
   | 'ticket' 
@@ -205,7 +205,7 @@ export function buildBulkActionContext(
   const hasPhone = !!findPhoneColumn(headers);
   const hasEmail = !!findEmailColumn(headers);
   const hasDate = headers.some(h => /fecha|date|vto|venc|retiro/i.test(h));
-  const caps = resolveTableCapabilities(headers, undefined, activeSheetTitle, activeView);
+  const caps = detectTableCapabilities(headers);
 
   return {
     activeView,

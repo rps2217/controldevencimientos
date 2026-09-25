@@ -2049,9 +2049,14 @@ dónde sigue el trabajo, sin tener que reconstruirlo leyendo todo el documento.
 | | |
 | --- | --- |
 | Rama | `main` |
-| Último commit | cortes 3 y 4 de Fase 5 (`CampaignMatrixTable.tsx`, `CampaignKpiSemaphore.tsx`) |
+| Último commit | `fc92411` + corte de andamiaje (retiro del respaldo por identidad) |
 | CI | `verify.yml` verde sobre los commits previos |
-| Gate actual | `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **258 + 10 + 18 = 286 pruebas** · **16 arneses E2E** |
+| Gate actual | `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **286 pruebas** · **18 arneses E2E** |
+
+> **Nota:** esta sección quedó anotada al cierre de la jornada del 19-09 y sus «pendientes»
+> de abajo ya se ejecutaron o se re-midieron en las auditorías posteriores (ver las secciones
+> «Auditoría Ponytail» al final). Se conserva por trazabilidad; para el estado vigente, leer
+> las últimas auditorías y «Andamiaje retirado».
 
 Pendiente de commit en la jornada de cierre (sin frente nuevo): badge de campaña des-duplicado
 (`CampaignSkuBadges.tsx`), `printcheck.cjs` promovido a la puerta con aserciones, y la medición
@@ -2237,7 +2242,7 @@ lo justifica; quedan inventariados:
 | Fase 7 paso 1 (claves) | Hecho (`08585b5`) |
 | Fase 7 paso 2 (slices por capacidad) | Hecho (`d3a62e3`) |
 | Fase 7 paso 3 (modo genérico) | **Hecho** (`genericcheck.cjs`): una hoja sin dominio carga, no arrastra slices ni el terminal de conteo. La corrección de UI medida fue Conteo/Pistoleo. |
-| Fase 7 paso 3b (gateo de UI de dominio por capacidad) | **Hecho** (`bodegacheck.cjs` + 17/17 E2E): los gates de dominio pasaron de identidad a capacidad; `supportedViews` → `supportedCapabilities`. La puerta E2E cazó una regresión (headers obsoletos en modo demo) corregida con respaldo por identidad de vista. |
+| Fase 7 paso 3b (gateo de UI de dominio por capacidad) | **Hecho** (`bodegacheck.cjs` + 17/17 E2E): los gates de dominio pasaron de identidad a capacidad; `supportedViews` → `supportedCapabilities`. La puerta E2E cazó una regresión (headers obsoletos en modo demo) corregida primero con respaldo por identidad de vista y, tras corregir la causa raíz, **retirando ese respaldo** (era andamiaje; ver "Andamiaje retirado"). |
 
 ### Paso 3 — coste real medido
 
@@ -2336,12 +2341,28 @@ propio si no llega) y `buildBulkActionContext` lo resuelve igual. Una hoja no ca
 `activeView = <título>` ("Clientes"), que no colisiona con esas identidades ni con las regex, por
 lo que **`genericcheck` y `bodegacheck` siguen verdes** (2/2 en el par discriminante).
 
+### Andamiaje retirado (2026-09-25) — el respaldo por identidad era el síntoma, no la cura
+
+Corregida la causa raíz en `useInventoryData` (`renderedViewRef`, commit `6a4d55d`), el respaldo
+por identidad que la enmascaraba dejó de tener justificación. **Se probó por mutación:** se
+eliminó el respaldo de `resolveTableCapabilities` y el gate E2E completo siguió **18/18 verde**,
+luego era andamiaje puro, no una red de seguridad. Se eliminó la función entera —`sliceRegistry`
+queda con `detectTableCapabilities` como única fuente— y los dos consumidores
+(`InventoryDashboard`, `buildBulkActionContext`) pasaron a llamarla directamente.
+
+No era solo código muerto: el respaldo por **nombre de hoja** era un **falso positivo latente**
+que contradecía la arquitectura de la fase (manda la columna, no el nombre). Una hoja llamada
+"Stock General" **sin** columnas de vencimiento heredaba la capacidad `vencimiento` y habría
+mostrado el Radar PM. `democheck.cjs` queda como guardia **directa** de la causa raíz: ya no hay
+respaldo que tape una reaparición de `headers` obsoletos.
+
 **Verificación final (medida):** `tsc` 0 · eslint 0 errores (16 warnings preexistentes) ·
-**286 pruebas** (258 + 10 componente + 18 xlsx) · **17/17 arneses E2E** · build 0.
+**286 pruebas** · **18/18 arneses E2E** · build 0.
 
 **Deuda por identidad, medida con `grep` idéntico en ambos árboles:**
 `grep -rEn "activeView\s*===\s*['\"]|tableKey\s*===\s*['\"]" src` → **83** en baseline, **49**
-tras este corte (**−34**). `supportedViews` quedó en **0** referencias. Los 49 restantes son
-despachos de comportamiento no cubiertos por la sonda (productos, políticas, analítica, etc.):
-siguen inventariados, no silenciados.
+tras el corte 3b (**−34**), y **47** tras retirar el respaldo (**−2** adicionales: la lista de
+vías de resolución de capacidades). `supportedViews` quedó en **0** referencias. Los 47 restantes
+son despachos de comportamiento no cubiertos por la sonda (productos, políticas, analítica,
+etc.): siguen inventariados, no silenciados.
 

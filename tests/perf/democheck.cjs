@@ -5,9 +5,13 @@
  * `catch` de `useInventoryData.fetchData` hace `return` temprano si ya hay items
  * (`hasRenderedCache || items.length > 0`) y NO refresca `headers` ni `activeSheet`.
  * Al cambiar de vista, los items de la vista anterior siguen ahi y el gate de
- * capacidad derivado de `headers` queda desincronizado de `activeView`. Esto obligo
- * a meter un respaldo por identidad de vista en `resolveTableCapabilities`; esta
- * sonda mide si la causa raiz sigue presente.
+ * capacidad derivado de `headers` queda desincronizado de `activeView`.
+ *
+ * La causa raiz se corrigio en `useInventoryData` (`renderedViewRef`), y el respaldo
+ * por identidad que la enmascaraba se elimino de `resolveTableCapabilities` tras
+ * probar por mutacion que el gate E2E seguia verde sin el. Esta sonda es ahora la
+ * guardia DIRECTA de la causa raiz: si `headers`/`activeSheet` vuelven a quedar
+ * obsoletos, ya no hay respaldo que lo tape y el arnes cae.
  *
  * Observable exigido (una sola invariante, la del bug): tras navegar de la hoja de
  * vencimientos a la de incidencias en modo demo, la UI debe corresponder a
