@@ -402,7 +402,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
 | `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
-| `npm run test:e2e` | Arranca el build de producción y corre los 21 arneses de integridad (`tests/perf/run.cjs`). |
+| `npm run test:e2e` | Arranca el build de producción y corre los 22 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -430,7 +430,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 ### Arneses de medición (`tests/perf/`, requieren Chromium y un build servido)
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 21 arneses que cubren integridad de
+`npm run test:e2e` arranca el preview y corre los 22 arneses que cubren integridad de
 datos y navegación; devuelve código distinto de cero si alguno falla. El binario de Chrome
 se toma de `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`,
 etc.).
@@ -455,6 +455,9 @@ falso que levanta el propio runner.
 | `blindcheck.cjs` | sí | En BLIND no se filtra el stock del ERP a la pantalla (par discriminante con DOCUMENT). |
 | `campaigncheck.cjs` | sí | Matriz de consolidación de campaña: clasificación de los 4 estados, filtros, búsqueda acumulada y ajuste de venta persistido (12 verificaciones). |
 | `printcheck.cjs` | sí | Vista de impresión: el ticket solo monta con un registro pendiente (5 aserciones). |
+| `titlecheck.cjs` | sí | Título del ticket por columnas (Fase 7 Hallazgo 1): una hoja no canónica de catálogo imprime «CATÁLOGO DE PRODUCTOS», no su nombre de pestaña. Discriminante (verificado por mutación). Requiere el backend falso. |
+| `detailcheck.cjs` | sí | Master-detail del panel lateral: la tabla sigue viva con el panel abierto y el detalle se actualiza sin cerrarse. |
+| `democheck.cjs` | sí | Bug latente de `headers`/`activeSheet` obsoletos en modo demo: guardia directa de la causa raíz en `useInventoryData`. |
 | `genericcheck.cjs` | sí | Modo genérico (Fase 7 paso 3): una hoja sin dominio carga sus filas, no arrastra slices ni el terminal de conteo, y conserva las bulk actions por capacidad. Requiere el backend falso. |
 | `bodegacheck.cjs` | sí | Gateo de UI de dominio por capacidad (Fase 7 paso 3b): una hoja no canónica con columnas de vencimiento recibe el módulo; una sin dominio no. Requiere el backend falso. |
 | `capabilitycheck.cjs` | sí | Corrección manual de capacidades (Fase 7 paso 4): tri-estado `auto`/`enabled`/`disabled` persistido y reversible. Requiere el backend falso. |

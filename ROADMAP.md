@@ -1,10 +1,10 @@
 # Plan de Reforma Arquitectónica
 
 Estado: **Fases 0, 2 y 4 completadas**; Fase 5 en curso (2 cortes hechos), Fase 6 con el
-primer corte hecho, Fases 1.3 y 3 pendientes. **Fase 7 (multi-hoja por capacidades) pasos 1–6
-hechos** (detección automática por columnas con corrección manual; el núcleo y el catálogo ya
-deciden por columnas, no por pestaña), más el **Hallazgo 1** (el título del ticket también sale
-de las columnas). Deuda `any`
+primer corte hecho. **Fase 1.3 y Fase 3 cerradas por medición** (lo extraíble ya se extrajo; el
+resto traslada acoplamiento o tiene ganancia marginal). **Fase 7 (multi-hoja por capacidades)
+pasos 1–6 hechos** (detección automática por columnas con corrección manual; el núcleo, el
+catálogo y el ticket ya deciden por columnas, no por pestaña). Deuda `any`
 saldada en todo `src`: **1 solo `any`** declarado (la firma de índice de `SheetRecord`,
 justificada abajo). Riesgo `xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
@@ -2820,6 +2820,58 @@ ticket**. El Hallazgo 1 es el corte de mayor valor que queda: mismo antipatrón 
 veces (pasos 5 y 6), con defecto visible hoy en hojas no canónicas, y con la pieza que falta
 (`detectTableCapabilities`) ya construida y probada. Los hallazgos 2 y 3 son limpieza acotada y
 deben acompañar al 1, no competir con él.
+
+---
+
+## Auditoría Ponytail (2026-09-19) — Fases 1.3 y 3: re-medidas y cerradas por evidencia
+
+Antes de reabrir las dos fases que quedaban «pendientes», se re-midió el dashboard actual
+(**1.315 líneas, 10 `useState`**) con el mismo método AST de cohesión que usó el corte 1 de
+Fase 3, para no dar por buena una medición de hace dos jornadas.
+
+### Bloques candidatos, medidos hoy
+
+| Bloque | Líneas | Deps externas | Veredicto |
+| --- | --- | --- | --- |
+| `dashboardContextValue` | 217 | **195** | Es el contexto, no un hook |
+| `handleSave` | 142 | **52** | Extraer traslada el problema |
+| `handleSavePistoleoItem` | 86 | 34 | Extraer traslada el problema |
+| `handleDelete` | 59 | 34 | Extraer traslada el problema |
+| `quickChips` | 47 | **8** (3 reales) | Único candidato con deps bajas |
+
+La medición **confirma** la conclusión previa, y sube los números: `handleSave` pasó de 18 a
+52 deps y `handleDelete` de 13 a 34. Un hook con esa interfaz no reduce acoplamiento, lo
+renombra.
+
+### `quickChips`: el único corte posible, descartado por medición
+
+Es lógica **pura** de verdad (solo `items`, `headers`, `tableCapabilities`) y codifica la
+personalidad por capacidad — el tema central de Fase 7. Candidato aparente a `utils/`.
+
+Se descarta por dos razones medidas, no por pereza:
+
+1. **Ya tiene red, y es discriminante.** Dos arneses E2E lo cubren desde los pasos 5 y 6:
+   `genericpersonalitycheck.cjs` (chip «Lote:» por capacidad, no por nombre) y
+   `catalogpersonalitycheck.cjs` (chips de proveedor/categoría en hoja de catálogo no
+   canónica). Extraerlo no añadiría cobertura; solo movería 40 líneas y un `useMemo`.
+2. **Ganancia marginal.** El resto de candidatos (`columnLabelsMap` + `searchableHeaders`,
+   5 deps) son `useMemo` derivados pequeños: cortarlos ahorra ~20 líneas y añade un archivo.
+   La Escalera de Ponytail pide reutilizar, no fragmentar.
+
+**Fase 3 queda cerrada**: lo único con dependencias bajas ya se extrajo en el corte 1
+(`useOfflineSyncFeedback`), y lo demás está medido y descartado. **Fase 1.3 queda cerrada**:
+el estado de vista ya vive en `useModuleViewState`; los `useState` restantes (10) son
+selección de fila, paginación, configuración de hoja y flags de guardado — estado del
+componente, no un dominio extraíble. Las particiones de contexto por frecuencia de cambio se
+descartaron antes por no mover lo medido (0 tareas largas, ~205 ms percibidos).
+
+### Corrección de documentación desactualizada
+
+`AGENTS.md` declaraba **21 arneses** en dos sitios y su tabla omitía tres que sí están en la
+puerta (`titlecheck.cjs`, `detailcheck.cjs`, `democheck.cjs`). Corregido a **22** y añadidas
+las tres filas. Es el mismo patrón de afirmación obsoleta que la medición de botones (22 vs
+42): los conteos escritos a mano se pudren. Se dejan ahora verificables contra
+`HARNESSES` de `run.cjs`.
 
 ---
 
