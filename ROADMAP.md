@@ -2434,3 +2434,72 @@ riesgo del `:215` de paso.
 E2E** · build 0. Sin dependencias nuevas.
 
 Commits: `08769f9` (A1+A2), `7963982` (C1), sobre `8dca0ee` (retiro del andamiaje).
+
+---
+
+## Auditoría Ponytail (2026-09-25) — Fase 3, corte 1: orquestación offline
+
+### La medición que decidió el corte
+
+Se midió la cohesión de **todos** los bloques candidatos del dashboard con un AST de
+TypeScript (dependencias externas reales por bloque, no a ojo):
+
+| Bloque candidato | Líneas | Deps externas | Veredicto |
+| --- | --- | --- | --- |
+| `dashboardContextValue` | 217 | **175** | Descartado (es el contexto, no un hook) |
+| `handleSave` | 140 | 18 | Descartado |
+| `handleSavePistoleoItem` | 86 | 10 | Limítrofe |
+| `handleDelete` | 59 | 13 | Descartado |
+| **Orquestación offline** | **107** | **3** | **Elegido** |
+
+**El CRUD no es buen candidato.** El ROADMAP ya lo intuía («al medir `useInventoryActions`
+la interfaz daba ~23 parámetros, señal de que traslada el problema»). La medición lo
+confirma y lo explica: `handleSave` depende de 18 valores externos y `handleDelete` de 13.
+Extraerlos habría creado justo ese hook de ~20 parámetros. **No se corta.**
+
+### El corte
+
+La orquestación offline es cohesiva de verdad: **cola + feedback** (el `onSyncSuccess` con
+sus toasts, el efecto de transición online/offline y `handleSyncOfflineQueue`). Y hay un
+dato que decide el diseño: **`useOfflineSync` tiene un solo consumidor** (el dashboard).
+Eso permite *disolver* la coordinación en vez de trasladarla: el hook nuevo se queda con
+su propio feedback, en lugar de devolver eventos para que el llamante arme los toasts.
+
+- **Nuevo**: `src/hooks/useOfflineSyncFeedback.ts` (123 líneas). Envuelve `useOfflineSync`
+  y devuelve su API completa + `handleSyncOfflineQueue`.
+- **`InventoryDashboard.tsx`: 1.381 → 1.306 líneas (−75).** Se retiran del componente los
+  **24 valores** del destructuring de `useOfflineSync`, las 2 refs de toast y las 3
+  funciones de feedback.
+
+Detalle de implementación: el conteo del callback se lee de un `queuedCountRef` en vez de
+`offline.offlineQueue` (evita una referencia a `offline` dentro de su propio callback, que
+sería TDZ latente). `tsc` no la marcaba, pero es frágil.
+
+### Verificación por mutación
+
+Reemplazar `offline.syncQueue()` por un resultado falso dentro del hook extraído hace caer
+**exactamente `offlinecheck.cjs`, y sólo ese**. El arnés ejerce la ruta real: siembra cola
+→ Sync con backend caído → conserva como `failed` → reintenta → drena y aplica append.
+Mutación revertida; 18/18 verde.
+
+### Flakiness observada
+
+En una corrida, `groupcheck.cjs` y `campaigncheck.cjs` fallaron y **ambos pasaron al
+reintentar** y en la corrida siguiente completa. Es contención de recursos (los arneses
+comparten el mismo preview), no regresión: la mutación de arriba cae en un solo arnés
+determinista, lo que confirma que la red discrimina de verdad.
+
+### Verificación
+
+`tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **286 pruebas** · **18/18 E2E** ·
+build 0. Sin dependencias nuevas.
+
+Commit: `e25bca1`.
+
+### Lo que sigue (medido)
+
+Cortes de Fase 3 que **quedan descartados por medición**, no por pereza: el CRUD del
+dashboard (18/13 deps). Lo único con dependencias bajas ya se extrajo. Los candidatos
+restantes (`columnLabelsMap` + `searchableHeaders`, 5 deps) son `useMemo` derivados
+pequeños cuyo corte ahorraría ~20 líneas y añadiría un archivo: **ganancia marginal, no se
+hace**. Fase 3 queda así con lo que valía la pena.
