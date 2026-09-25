@@ -48,6 +48,15 @@ export interface TableGroupingSetting {
   groupByDirection?: 'asc' | 'desc';
 }
 
+/**
+ * Corrección manual de las capacidades detectadas por columnas. Mismo tri-estado que
+ * `TableBulkActionSetting`: vacío = automático (manda la detección por columnas).
+ */
+export interface TableCapabilitySetting {
+  enabled?: TableCapability[];
+  disabled?: TableCapability[];
+}
+
 export interface BackendMirrorConfig {
   enabled: boolean;
   endpointUrl: string;
@@ -69,6 +78,7 @@ export interface SheetConfig {
   customAliases?: Record<string, string[]>;
   tableBulkActions?: Record<string, TableBulkActionSetting>;
   tableGroupings?: Record<string, TableGroupingSetting>;
+  tableCapabilities?: Record<string, TableCapabilitySetting>;
   slices?: TableSlice[];
   hiddenSliceIds?: string[];
   ticketPrintConfig?: GlobalTicketConfig;

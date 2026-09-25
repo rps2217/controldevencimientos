@@ -1,4 +1,4 @@
-import { TableSlice, InventoryItem, TableCapability } from '../types';
+import { TableSlice, InventoryItem, TableCapability, TableCapabilitySetting, SheetConfig } from '../types';
 import { getItemStatus, getEventCategory, getItemResolutionStatus } from './dateCalculations';
 import { findColumnBySemantic, KnownFieldSemantic } from './columnAliases';
 
@@ -42,6 +42,81 @@ export function detectTableCapabilities(
   else if (has('tipo_evento')) caps.add('incidencia');
 
   return caps;
+}
+
+/**
+ * Capacidades efectivas = detección por columnas + corrección manual del usuario.
+ *
+ * El automático es el valor por defecto (Ponytail: sin UI obligatoria, una hoja nueva
+ * funciona sola). El override existe solo para el caso ambiguo que la detección no puede
+ * resolver: una hoja con columna `Fecha` genérica que el usuario sí sabe que es de
+ * vencimiento, o una hoja de vencimientos con datos sucios que no detecta nada.
+ */
+export function resolveTableCapabilities(
+  headers: string[],
+  customAliases?: Record<string, string[]>,
+  override?: TableCapabilitySetting
+): Set<TableCapability> {
+  const caps = detectTableCapabilities(headers, customAliases);
+  override?.enabled?.forEach(c => caps.add(c));
+  override?.disabled?.forEach(c => caps.delete(c));
+  return caps;
+}
+
+/** Todas las capacidades de dominio, con su etiqueta y explicación para la UI. */
+export const ALL_TABLE_CAPABILITIES: { id: TableCapability; label: string; description: string }[] = [
+  { id: 'vencimiento', label: 'Vencimientos y Retiro', description: 'Fechas de vencimiento, retiro preventivo, políticas comerciales y radar PM.' },
+  { id: 'incidencia', label: 'Eventos e Incidencias', description: 'Registro FRC: transporte, diferencias, mermas, averías y calidad.' },
+  { id: 'conteo', label: 'Conteo Físico y Cuadratura', description: 'Terminal de pistoleo y cuadratura. Requiere columna de SKU y de cantidad.' }
+];
+
+/**
+ * Estado del override para la UI de 3 estados: 'auto' | 'enabled' | 'disabled'.
+ */
+export function getCapabilityOverrideStatus(
+  capability: TableCapability,
+  tableKey: string,
+  sheetConfig?: SheetConfig
+): 'auto' | 'enabled' | 'disabled' {
+  const setting = sheetConfig?.tableCapabilities?.[tableKey];
+  if (setting?.disabled?.includes(capability)) return 'disabled';
+  if (setting?.enabled?.includes(capability)) return 'enabled';
+  return 'auto';
+}
+
+/** Aplica una corrección manual de capacidad para una tabla, de forma inmutable. */
+export function setTableCapabilityOverride(
+  currentConfig: SheetConfig,
+  tableKey: string,
+  capability: TableCapability,
+  override: 'auto' | 'enabled' | 'disabled'
+): SheetConfig {
+  const all = currentConfig.tableCapabilities || {};
+  const setting = all[tableKey] || { enabled: [], disabled: [] };
+
+  const enabled = (setting.enabled || []).filter(c => c !== capability);
+  const disabled = (setting.disabled || []).filter(c => c !== capability);
+
+  if (override === 'enabled') enabled.push(capability);
+  else if (override === 'disabled') disabled.push(capability);
+
+  return {
+    ...currentConfig,
+    tableCapabilities: {
+      ...all,
+      [tableKey]: { enabled, disabled }
+    }
+  };
+}
+
+/** Devuelve una tabla a detección automática pura, sin correcciones. */
+export function resetTableCapabilitiesToAuto(
+  currentConfig: SheetConfig,
+  tableKey: string
+): SheetConfig {
+  const all = { ...(currentConfig.tableCapabilities || {}) };
+  delete all[tableKey];
+  return { ...currentConfig, tableCapabilities: all };
 }
 
 /** Un slice personalizado no declara capacidad: nunca se restringe. */
@@ -257,9 +332,10 @@ export function getSlicesForTable(
   customSlices: TableSlice[] = [],
   sheetConfigSlices?: TableSlice[],
   headers: string[] = [],
-  customAliases?: Record<string, string[]>
+  customAliases?: Record<string, string[]>,
+  capabilityOverride?: TableCapabilitySetting
 ): TableSlice[] {
-  const caps = detectTableCapabilities(headers, customAliases);
+  const caps = resolveTableCapabilities(headers, customAliases, capabilityOverride);
 
   // Los nativos entran por capacidad, no por nombre de pestana: asi una hoja no
   // canonica recibe lo que sus columnas permiten, y ninguna recibe lo que no.
@@ -287,9 +363,10 @@ export function getVisibleSlicesForTable(
   sheetConfigSlices?: TableSlice[],
   hiddenSliceIds: string[] = [],
   headers: string[] = [],
-  customAliases?: Record<string, string[]>
+  customAliases?: Record<string, string[]>,
+  capabilityOverride?: TableCapabilitySetting
 ): TableSlice[] {
-  const allSlices = getSlicesForTable(tableKey, customSlices, sheetConfigSlices, headers, customAliases);
+  const allSlices = getSlicesForTable(tableKey, customSlices, sheetConfigSlices, headers, customAliases, capabilityOverride);
   if (!hiddenSliceIds || hiddenSliceIds.length === 0) return allSlices;
   const hiddenSet = new Set(hiddenSliceIds);
   return allSlices.filter(slice => !hiddenSet.has(slice.id));

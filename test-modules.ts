@@ -63,7 +63,11 @@ import {
   BUILT_IN_SLICES, 
   getSlicesForTable, 
   computeSliceCounts,
-  detectTableCapabilities 
+  detectTableCapabilities,
+  resolveTableCapabilities,
+  getCapabilityOverrideStatus,
+  setTableCapabilityOverride,
+  resetTableCapabilitiesToAuto
 } from './src/utils/sliceRegistry';
 
 import { 
@@ -124,7 +128,7 @@ import {
   getAuditProviders,
   filterAuditRows
 } from './src/utils/campaignAggregation';
-import { InventoryCampaign, StockCountSession, CampaignSnapshotItem, StockCountEntry, StockCountReconciliationItem, InventoryItem } from './src/types';
+import { InventoryCampaign, StockCountSession, CampaignSnapshotItem, StockCountEntry, StockCountReconciliationItem, InventoryItem, SheetConfig } from './src/types';
 import { createMimeMessage, escapeHtml } from './src/lib/gmailService';
 
 
@@ -344,6 +348,51 @@ console.log('\n--- 7. Pruebas de sliceRegistry.ts ---');
 
   // Sin headers no inventa capacidades.
   assert(detectTableCapabilities([]).size === 0, 'sin headers no se detecta ninguna capacidad');
+
+  // Corrección manual: el automático manda salvo que el usuario lo corrija. Una hoja
+  // ambigua (columna "Fecha" genérica) no detecta vencimiento; el usuario sí puede forzarlo.
+  const ambigua = ['Articulo', 'Fecha', 'Cantidad'];
+  const sinForzar = resolveTableCapabilities(ambigua);
+  assert(!sinForzar.has('vencimiento'), 'una columna "Fecha" genérica no detecta vencimiento sola');
+  assert(
+    resolveTableCapabilities(ambigua, undefined, { enabled: ['vencimiento'] }).has('vencimiento'),
+    'el usuario puede forzar la capacidad de vencimiento en una hoja ambigua'
+  );
+
+  // El override también puede quitar una capacidad que la detección sí encontró: una hoja
+  // con fechas de vencimiento usada como bitácora de otra cosa.
+  assert(
+    !resolveTableCapabilities(SAMPLE_HEADERS, undefined, { disabled: ['vencimiento'] }).has('vencimiento'),
+    'el usuario puede excluir una capacidad aunque las columnas la detecten'
+  );
+  assert(
+    resolveTableCapabilities(SAMPLE_HEADERS, undefined, { disabled: ['vencimiento'] }).has('conteo'),
+    'excluir una capacidad no toca las demás'
+  );
+
+  // Excluir y habilitar a la vez: la exclusión gana (el usuario quitó ruido, no lo añadió).
+  assert(
+    !resolveTableCapabilities(clientes, undefined, { enabled: ['vencimiento'], disabled: ['vencimiento'] }).has('vencimiento'),
+    'si una capacidad esta habilitada y excluida a la vez, gana la exclusion'
+  );
+
+  // Los helpers de UI mueven el tri-estado y vuelven a Auto.
+  const baseCfg = {} as SheetConfig;
+  const forzado = setTableCapabilityOverride(baseCfg, 'Hoja X', 'conteo', 'enabled');
+  assert(getCapabilityOverrideStatus('conteo', 'Hoja X', forzado) === 'enabled', 'setTableCapabilityOverride marca Forzado');
+  assert(getCapabilityOverrideStatus('vencimiento', 'Hoja X', forzado) === 'auto', 'las demas capacidades siguen en Auto');
+  const excluido = setTableCapabilityOverride(forzado, 'Hoja X', 'conteo', 'disabled');
+  assert(getCapabilityOverrideStatus('conteo', 'Hoja X', excluido) === 'disabled', 'cambiar a Excluir retira el Forzado previo');
+  assert(getCapabilityOverrideStatus('conteo', 'Hoja X', resetTableCapabilitiesToAuto(excluido, 'Hoja X')) === 'auto', 'reset devuelve la tabla a Auto');
+  assert(
+    Object.keys(resetTableCapabilitiesToAuto(excluido, 'Hoja X').tableCapabilities || {}).length === 0,
+    'reset no deja entradas vacias en la config'
+  );
+
+  // El override llega a los slices: forzar vencimiento en una hoja ambigua habilita sus nativos.
+  const slicesForzados = getSlicesForTable('Hoja X', [], undefined, ambigua, undefined, { enabled: ['vencimiento'] });
+  assert(slicesForzados.length > 0 && slicesForzados.every(s => s.requiredCapability === 'vencimiento'), 'forzar la capacidad habilita los slices nativos correspondientes');
+  assert(getSlicesForTable('Hoja X', [], undefined, ambigua).length === 0, 'sin forzar, la hoja ambigua no recibe slices nativos');
 }
 
 console.log('\n--- 8. Pruebas de universalImporter.ts ---');

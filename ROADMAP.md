@@ -1,8 +1,8 @@
 # Plan de Reforma Arquitectónica
 
 Estado: **Fases 0, 2 y 4 completadas**; Fase 5 en curso (2 cortes hechos), Fase 6 con el
-primer corte hecho, Fases 1.3 y 3 pendientes. **Fase 7 (multi-hoja por capacidades) anotada**
-como fase futura, después de 5 y 6. Deuda `any`
+primer corte hecho, Fases 1.3 y 3 pendientes. **Fase 7 (multi-hoja por capacidades) pasos 1–4
+hechos** (detección automática por columnas con corrección manual). Deuda `any`
 saldada en todo `src`: **1 solo `any`** declarado (la firma de índice de `SheetRecord`,
 justificada abajo). Riesgo `xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
@@ -2243,6 +2243,7 @@ lo justifica; quedan inventariados:
 | Fase 7 paso 2 (slices por capacidad) | Hecho (`d3a62e3`) |
 | Fase 7 paso 3 (modo genérico) | **Hecho** (`genericcheck.cjs`): una hoja sin dominio carga, no arrastra slices ni el terminal de conteo. La corrección de UI medida fue Conteo/Pistoleo. |
 | Fase 7 paso 3b (gateo de UI de dominio por capacidad) | **Hecho** (`bodegacheck.cjs` + 17/17 E2E): los gates de dominio pasaron de identidad a capacidad; `supportedViews` → `supportedCapabilities`. La puerta E2E cazó una regresión (headers obsoletos en modo demo) corregida primero con respaldo por identidad de vista y, tras corregir la causa raíz, **retirando ese respaldo** (era andamiaje; ver "Andamiaje retirado"). |
+| Fase 7 paso 4 (corrección manual de capacidades) | **Hecho** (`capabilitycheck.cjs` + 19/19 E2E): tri-estado `auto`/`enabled`/`disabled` por capacidad en `SheetConfig.tableCapabilities`, con UI en «Módulos de la Hoja». El automático manda; el override solo lo ajusta. Ver auditoría 2026-09-19. |
 
 ### Paso 3 — coste real medido
 
@@ -2503,3 +2504,63 @@ dashboard (18/13 deps). Lo único con dependencias bajas ya se extrajo. Los cand
 restantes (`columnLabelsMap` + `searchableHeaders`, 5 deps) son `useMemo` derivados
 pequeños cuyo corte ahorraría ~20 líneas y añadiría un archivo: **ganancia marginal, no se
 hace**. Fase 3 queda así con lo que valía la pena.
+
+---
+
+## Auditoría Ponytail (2026-09-19) — Fase 7 paso 4: corrección manual de capacidades
+
+### El hueco que cierra
+
+El paso 3 dejó una hoja sin dominio cargando limpia (`genericcheck.cjs`), pero la detección
+automática tiene un caso que **no puede resolver sola**: una columna `Fecha` genérica no dice
+«vencimiento», y una hoja de vencimientos con encabezados sucios puede quedar fuera. El paso 4
+añade la corrección manual que el ROADMAP ya recomendaba (detección automática **con** corrección
+manual), sin sustituir el automático.
+
+### Diseño: el automático manda, la corrección solo lo ajusta
+
+`resolveTableCapabilities(headers, customAliases?, override?)` compone las dos capas en una
+sola función; los consumidores pasan el override como un parámetro opcional y **no** ganan una
+rama nueva. Precedencia decidida: **`disabled` gana sobre `enabled`** (el usuario quitó ruido,
+no lo añadió); probado por mutación.
+
+Tri-estado por capacidad en `SheetConfig.tableCapabilities[tableKey]`: `auto` (sin entrada) ·
+`enabled` (forzado) · `disabled` (excluido). Helpers en `sliceRegistry.ts` junto al resolutor:
+`getCapabilityOverrideStatus`, `setTableCapabilityOverride`, `resetTableCapabilitiesToAuto`
+(este último borra la entrada, para que Auto no deje basura en la config).
+
+### Decisión no obvia: una sola clave de tabla
+
+El repo tenía **dos** convenciones de `tableKey`: los slices usan `activeView` canónico, las
+bulk actions usan `activeSheetTitle || activeView`. Medido en el árbol: para una hoja no
+canónica, `activeView` **es** el título de pestaña (el `Sidebar` navega con
+`setActiveView(title)`), así que indexar capacidades por `activeView` cubre ambos casos con una
+clave y evita duplicar el estado. La convención mixta de bulk actions se dejó intacta: unificar
+la de capacidades **no** exige tocar la otra.
+
+### UI mínima
+
+`TableCapabilitiesPanel.tsx` sigue el patrón de `TableBulkActionsPanel` y vive en la nueva
+pestaña «Módulos de la Hoja» de `GlobalConfigModal`. Muestra qué detectó la hoja (o «Sin
+semántica de dominio»), el tri-estado por módulo y un «Restablecer a Auto» deshabilitado cuando
+no hay nada que restablecer.
+
+### Verificación (medida)
+
+`tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **298 pruebas** (12 nuevas de
+override) · **19/19 arneses E2E** · build 0. Sin dependencias nuevas.
+
+- **Por mutación:** ignorar el override `enabled` tumba 2 aserciones; ignorar `disabled` tumba
+  las otras 2. Las pruebas discriminan de verdad, no pasan por construcción.
+- **E2E nuevo (`capabilitycheck.cjs`):** par discriminante sobre la hoja «Clientes» — sin forzar
+  oculta el módulo · forzado lo muestra y lo persiste en `localStorage` · «Restablecer a Auto»
+  vuelve a ocultarlo.
+- **Persistencia:** confirmado que `sheetConfigShapeSchema` es `z.record(z.string(),
+  z.unknown())`, así que `tableCapabilities` sobrevive la recarga sin tocar el esquema.
+
+### Deuda que NO se abrió
+
+- **Clave de tabla de bulk actions**: sigue con su convención mixta. No se unifica sin síntoma.
+- **Slices personalizados sin capacidad declarada**: se conservan siempre (no se restringen).
+  Correcto: el usuario los creó a mano; excluirlos sería silenciar trabajo suyo.
+

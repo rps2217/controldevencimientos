@@ -9,9 +9,9 @@ import {
   Trash2,
   LucideIcon 
 } from 'lucide-react';
-import { SheetConfig } from '../types';
+import { SheetConfig, TableCapabilitySetting } from '../types';
 import { findPhoneColumn, findEmailColumn, findColumnBySemantic } from './columnAliases';
-import { detectTableCapabilities } from './sliceRegistry';
+import { resolveTableCapabilities } from './sliceRegistry';
 
 export type BulkActionId = 
   | 'ticket' 
@@ -197,13 +197,14 @@ export const ALL_BULK_ACTIONS: BulkActionDefinition[] = [
 export function buildBulkActionContext(
   headers: string[],
   activeView: string,
-  activeSheetTitle?: string
+  activeSheetTitle?: string,
+  capabilityOverride?: TableCapabilitySetting
 ): BulkActionContext {
   const tableKey = activeSheetTitle || activeView;
   const hasPhone = !!findPhoneColumn(headers);
   const hasEmail = !!findEmailColumn(headers);
   const hasDate = headers.some(h => /fecha|date|vto|venc|retiro/i.test(h));
-  const caps = detectTableCapabilities(headers);
+  const caps = resolveTableCapabilities(headers, undefined, capabilityOverride);
 
   return {
     activeView,

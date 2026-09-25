@@ -11,7 +11,7 @@ import { AlertCircle, Package } from 'lucide-react';
 import { getEventCategory, getItemStatus, parseLocaleNumber } from '../utils/dateCalculations';
 import { rowToObject } from '../utils/pureCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
-import { detectTableCapabilities } from '../utils/sliceRegistry';
+import { resolveTableCapabilities } from '../utils/sliceRegistry';
 import { resolveItemIdentity } from '../utils/entityIdentityResolver';
 import { 
   findExistingItemByCuVc
@@ -216,10 +216,12 @@ export const InventoryDashboard: React.FC = () => {
 
   // Capacidades de dominio de la hoja activa, derivadas de sus columnas: gobiernan qué UI
   // de dominio (conteo, pistoleo, columnas de estado, radar) se ofrece, en vez de asumir
-  // por identidad de vista o nombre de pestaña.
+  // por identidad de vista o nombre de pestaña. La corrección manual del usuario se aplica
+  // encima, indexada por `activeView` (la misma clave que usan los slices; para hojas no
+  // canónicas `activeView` es el título de la pestaña).
   const tableCapabilities = useMemo(
-    () => detectTableCapabilities(headers, sheetConfig.customAliases),
-    [headers, sheetConfig.customAliases]
+    () => resolveTableCapabilities(headers, sheetConfig.customAliases, sheetConfig.tableCapabilities?.[activeView]),
+    [headers, sheetConfig.customAliases, sheetConfig.tableCapabilities, activeView]
   );
 
   const {
@@ -254,8 +256,8 @@ export const InventoryDashboard: React.FC = () => {
 
   // Contextual intelligence for bulk actions on the current table
   const bulkActionCtx = useMemo(() => {
-    return buildBulkActionContext(headers, activeView, activeSheet?.title);
-  }, [headers, activeView, activeSheet?.title]);
+    return buildBulkActionContext(headers, activeView, activeSheet?.title, sheetConfig.tableCapabilities?.[activeView]);
+  }, [headers, activeView, activeSheet?.title, sheetConfig.tableCapabilities]);
 
 
   // Column Resizing Custom Hook

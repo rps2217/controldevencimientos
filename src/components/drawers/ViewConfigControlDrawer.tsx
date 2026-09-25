@@ -115,8 +115,8 @@ export const ViewConfigControlDrawer: React.FC = () => {
   const [columnSearch, setColumnSearch] = useState('');
 
   const bulkActionCtx = useMemo(() => {
-    return buildBulkActionContext(allHeaders, activeTableKey, activeSheetTitle);
-  }, [allHeaders, activeTableKey, activeSheetTitle]);
+    return buildBulkActionContext(allHeaders, activeTableKey, activeSheetTitle, dashboard.sheetConfig?.tableCapabilities?.[activeTableKey]);
+  }, [allHeaders, activeTableKey, activeSheetTitle, dashboard.sheetConfig?.tableCapabilities]);
 
   const isWhatsAppActive = isActionEnabledForTable('whatsapp', bulkActionCtx, sheetConfig);
   const isGmailActive = isActionEnabledForTable('gmail', bulkActionCtx, sheetConfig);
@@ -136,7 +136,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
 
   // Misma fuente que la barra de slices: evita que el drawer muestre nativos que la
   // barra no ofrece (o al revés) cuando la detección por capacidad los descarta.
-  const tableSlices = getSlicesForTable(activeTableKey, customSlices, dashboard.sheetConfig?.slices, allHeaders, dashboard.sheetConfig?.customAliases);
+  const tableSlices = getSlicesForTable(activeTableKey, customSlices, dashboard.sheetConfig?.slices, allHeaders, dashboard.sheetConfig?.customAliases, dashboard.sheetConfig?.tableCapabilities?.[activeTableKey]);
   const tableBuiltInSlices = tableSlices.filter(s => s.isBuiltIn);
   const tableCustomSlices = tableSlices.filter(s => !s.isBuiltIn);
 
