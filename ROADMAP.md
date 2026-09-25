@@ -2366,3 +2366,71 @@ vías de resolución de capacidades). `supportedViews` quedó en **0** referenci
 son despachos de comportamiento no cubiertos por la sonda (productos, políticas, analítica,
 etc.): siguen inventariados, no silenciados.
 
+---
+
+## Auditoría Ponytail (2026-09-25) — cierre de Fase 7 y limpieza de persistencia
+
+### El dato que cambió el plan: los pasos 2 y 3 ya estaban hechos
+
+La recomendación inicial era ejecutar «Fase 7 pasos 2 y 3» (slices de dominio por capacidad y
+modo genérico). **Medir antes de cortar lo evitó: ya estaban hechos.** La tabla «Estado de los
+objetivos originales» los registra desde antes:
+
+- **Paso 2** (`d3a62e3`): los 12 slices nativos llevan `requiredCapability` y
+  `getSlicesForTable` filtra por la capacidad de los encabezados, **no por `tableKey`**. El
+  `tableKey` de los nativos quedó como metadato informativo (los slices personalizados sí lo
+  usan para filtrarse).
+- **Paso 3** (`genericcheck.cjs`): una hoja sin semántica de dominio carga y no arrastra slices
+  ni el terminal de conteo. `otherSheets` abre hojas no canónicas hoy mismo.
+- **Paso 3b** (`bodegacheck.cjs`): gateo de UI de dominio por capacidad, ya cerrado.
+
+Habría re-hecho trabajo existente. **Lección otra vez: el ROADMAP ya dice lo que falta; hay que
+leerlo antes de proponer.**
+
+### Lo que sí faltaba, y se hizo
+
+**A1 — campo muerto `ColumnSchema.formula`.** Medido con `grep`: aparecía **1 sola vez** en todo
+`src` (su propia declaración). Eliminado. Precisión importante: **no** confundir con
+`ColumnType 'calculated'`, que **sí tiene consumidores** (`ItemFormModal:604`,
+`useItemFormManager:135`, `SchemaEditorView:384`) y se conserva. El schema se valida laxo
+(`z.record`), así que quitar la clave no rompe configuraciones ya guardadas.
+
+**A2 — literal por identidad en `barcode_ticket`.** `defaultEnabled` añadía
+`['main','products','events'].includes(activeView)` pese a que la línea **ya** preguntaba por
+columna SKU. Es el antipatrón que Fase 7 persigue (manda la columna, no el nombre) y era
+redundante: `SAMPLE_PRODUCTS` trae SKU, así que `hasSku` ya cubría esas vistas.
+
+**C1 — tres escrituras de `SHEET_CONFIG` con tres políticas de error.** El hallazgo no era
+«escritura directa» sino **inconsistencia**, y una de ellas con riesgo real:
+
+| Sitio | Política previa | Riesgo |
+| --- | --- | --- |
+| `useInventoryData:200` | `try/catch {}` mudo | Bajo |
+| **`useInventoryData:215`** | **sin `try/catch`** | **Podía lanzar dentro del `fetch` y abortar la carga** (storage lleno / modo privado) |
+| `InventoryDashboard:360` | `try/catch` + `console.warn` | Bajo |
+
+`writeStorage` ya existía exactamente para eso («en modo privado o cuota llena no debe tumbar la
+acción») y es el patrón establecido en `useColumnResize`, `useColumnManager`,
+`useDashboardChromeState` y `dashboardConfigUtils`. Las tres pasaron a usarlo; se cierra el
+riesgo del `:215` de paso.
+
+### Deuda medida y NO abierta (a propósito)
+
+- **~27 escrituras directas** a otras claves (`OFFLINE_QUEUE`, `AUDIT_LOG`, `DARK_MODE`,
+  `STOCK_COUNT_SESSIONS`…) repartidas en 13 archivos. Es un **frente propio**, no un anexo: van
+  desde `db/indexedDbService.ts` (dueño legítimo de su clave) hasta `App.tsx`. Cerrarlo exige
+  decidir caso a caso quién es dueño de cada clave; convertirlo en una barrida masiva sería
+  cambio de comportamiento sin síntoma que lo pida.
+- **Deuda de identidad: 47 despachos, sin cambio** en este corte (`InventoryDashboard` 12,
+  `useInventoryIngestion` 9, …). Dos lecturas honestas: el `grep` mide `activeView ===`, así que
+  el literal de A2 (`includes(activeView)`) no entra en la cifra aunque se haya retirado; y los
+  despachos de dashboard/ingesta son **persistencia** (a qué bucket de estado va la fila
+  editada), no gates de dominio. Envolverlos en un mapa de setters ahorraría ~4 líneas y
+  añadiría una indirección. **Ganancia marginal: no se hace** (Ponytail).
+
+### Verificación (medida)
+
+`tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **286 pruebas** · **18/18 arneses
+E2E** · build 0. Sin dependencias nuevas.
+
+Commits: `08769f9` (A1+A2), `7963982` (C1), sobre `8dca0ee` (retiro del andamiaje).
