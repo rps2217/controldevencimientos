@@ -28,7 +28,7 @@ import type { FetchDataFn } from '../hooks/useInventoryData';
 import { useTicketPrinting } from '../hooks/useTicketPrinting';
 import { useModuleViewState } from '../hooks/useModuleViewState';
 import { indexedDbService } from '../db/indexedDbService';
-import { STORAGE_KEYS, readStorage, sheetConfigShapeSchema, isDemoMode } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, writeStorage, sheetConfigShapeSchema, isDemoMode } from '../utils/appStorage';
 
 // Helpers para almacenamiento persistente y configuración modular
 import { saveStoredDemoItems, mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
@@ -356,11 +356,7 @@ export const InventoryDashboard: React.FC = () => {
       updatedAt: new Date().toISOString()
     };
     setSheetConfig(configWithTimestamp);
-    try {
-      localStorage.setItem(STORAGE_KEYS.SHEET_CONFIG, JSON.stringify(configWithTimestamp));
-    } catch (e) {
-      console.warn('LocalStorage save error:', e);
-    }
+    writeStorage(STORAGE_KEYS.SHEET_CONFIG, configWithTimestamp);
 
     // Auto-sync background push to Google Apps Script PropertiesService / Cloud Config if connected
     const scriptUrl = localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();

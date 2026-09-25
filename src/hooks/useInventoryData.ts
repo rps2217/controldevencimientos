@@ -13,7 +13,7 @@ import {
   SAMPLE_PRODUCTS,
   SAMPLE_POLICIES
 } from '../data/sampleInventory';
-import { STORAGE_KEYS } from '../utils/appStorage';
+import { STORAGE_KEYS, writeStorage } from '../utils/appStorage';
 import { getStoredDemoItems, mergeCloudConfigs } from '../utils/dashboardConfigUtils';
 import type { ConfigStorageMode } from './useCloudConfigSync';
 import type { ToastType } from '../components/common/ToastContainer';
@@ -196,9 +196,7 @@ export function useInventoryData({
 
       if (remoteConfigToMerge) {
         currentConfig = mergeCloudConfigs(currentConfig, remoteConfigToMerge);
-        try {
-          localStorage.setItem(STORAGE_KEYS.SHEET_CONFIG, JSON.stringify(currentConfig));
-        } catch {}
+        writeStorage(STORAGE_KEYS.SHEET_CONFIG, currentConfig);
       }
 
       const mainSheetTitle = currentConfig.main || allSheets.find((t: string) => /vencimiento|caducidad/i.test(t)) || allSheets[0];
@@ -212,7 +210,7 @@ export function useInventoryData({
       if (!currentConfig.policies && polSheetTitle) currentConfig.policies = polSheetTitle;
       if (currentConfig !== sheetConfig) {
         setSheetConfig(currentConfig);
-        localStorage.setItem(STORAGE_KEYS.SHEET_CONFIG, JSON.stringify(currentConfig));
+        writeStorage(STORAGE_KEYS.SHEET_CONFIG, currentConfig);
       }
       
       // Determinar hoja objetivo para la vista activa
