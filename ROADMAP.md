@@ -2768,17 +2768,32 @@ Costo de quitarlos: ~30 líneas y una rama. Beneficio: una fuente de verdad meno
 sincronizada con las otras dos (que es exactamente cómo divergieron). **Hacerlo junto con el
 Hallazgo 1**, no por separado: el corte del título ya toca esos tres bloques.
 
-### Hallazgo 3 (menor) — 22 botones solo-icono sin nombre accesible
+### Hallazgo 3 — 42 botones solo-icono sin nombre accesible  ·  CERRADO
 
-Medido con un barrido de las 547 etiquetas `<button>` de `src`: 38 tienen contenido
-exclusivamente de icono y **22 de ellas no llevan `title` ni `aria-label`**. De esas 22, **19
-son el cierre `<X />`** (uno por modal/panel, en 19 archivos distintos) y las 3 restantes son el
-rayo y el ± de cantidades de `MobilePistoleoTerminalModal`. La app respeta contraste WCAG AA,
-pero un lector de pantalla anuncia estos 22 como «botón» sin más.
+**La medición previa (22) estaba corta.** Un barrido con el AST de TypeScript sobre las 547
+etiquetas `<button>` de `src` da **112 botones solo-icono**, de los cuales **42 no llevan `title`
+ni `aria-label` ni `aria-labelledby`**. La cuenta de 22 se quedaba con el `<X />` como primer
+hijo directo; se le escapaban los iconos dentro de un ternario (`{isHidden ? <EyeOff/> :
+<Eye/>}`) y los que son `<span>` de un conmutador.
 
-**Alcance honesto: pequeño y barato** — 22 atributos `aria-label`, cero dependencias, cero
-cambios de comportamiento. **No es un corte de arquitectura y no debería presentarse como tal.**
-Si se hace, hacerlo como barrido único; si no, dejarlo documentado como deuda acotada.
+Desglose real de los 42: **30 cierres/limpiar `<X>`**, **5 conmutadores** (3 en
+`ViewConfigControlDrawer`, 1 en `BackendMirrorPanel`), **2 de cantidad** (`Minus`/`Plus`),
+**2 de borrado** (`Trash2`), **1 linterna** (`Zap`), **2 de visibilidad de columna**.
+
+**Barrido único, cero dependencias, cero cambios de comportamiento.** Los nombres se asignaron
+por contexto de operación (no «botón» genérico): `Cerrar`, `Limpiar SKU`, `Limpiar búsqueda`,
+`Disminuir/Aumentar cantidad`, `Eliminar lectura`, `Omitir vencimiento`, `Linterna`… En los
+conmutadores se añadió además `aria-pressed`, que es el estado que el control ya comunica
+visualmente. En el ojo de columnas el nombre es dinámico:
+`` `Mostrar columna ${header}` `` / `` `Ocultar columna ${header}` ``.
+
+El barrido se aplicó con una herramienta que localiza la etiqueta de apertura exacta por AST e
+inserta el atributo tras el último existente con su misma indentación; se retiró después. Es la
+única forma razonable de tocar 42 puntos en 29 archivos sin deriva de formato.
+
+**Verificación:** el mismo barrido AST da **0 hallazgos** después del corte. No se añadió una
+regla de lint porque exigiría `eslint-plugin-jsx-a11y`, dependencia nueva que el protocolo
+descarta; queda como la red que no se compró, y por eso el barrido se documenta aquí.
 
 ### Lo que se midió y se descartó (para no reabrirlo)
 
@@ -2805,6 +2820,34 @@ ticket**. El Hallazgo 1 es el corte de mayor valor que queda: mismo antipatrón 
 veces (pasos 5 y 6), con defecto visible hoy en hojas no canónicas, y con la pieza que falta
 (`detectTableCapabilities`) ya construida y probada. Los hallazgos 2 y 3 son limpieza acotada y
 deben acompañar al 1, no competir con él.
+
+---
+
+## Auditoría Ponytail (2026-09-19) — Fase 7 · Hallazgo 3: los 42 botones solo-icono ya tienen nombre
+
+Barrido único sobre 29 archivos. La medición del ROADMAP (22) era corta: el AST da **42**. El
+detalle y el desglose están en la sección del Hallazgo 3. Aquí solo el cierre.
+
+- **Qué:** `aria-label` contextual en los 42 botones solo-icono sin nombre accesible, más
+  `aria-pressed` en los 5 conmutadores. Nombres por operación, no genéricos.
+- **Cómo:** herramienta de un solo uso que localiza la etiqueta por AST e inserta el atributo
+  tras el último existente con su indentación; retirada tras aplicar. 42/42 sin deriva de formato.
+- **Verificación:** el mismo barrido AST da **0 hallazgos** después del corte (antes: 42).
+- **Sin** dependencias nuevas. Se descartó `eslint-plugin-jsx-a11y` por el protocolo; la red es
+  el barrido documentado, no una regla de lint.
+- **Hallazgo 2** ya había quedado cerrado dentro del Hallazgo 1: los tres fallbacks inalcanzables
+  y el `defaultTitle` muerto se retiraron en `b4d32d2`.
+
+**Puerta:** `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **306 pruebas** ·
+**22/22 arneses E2E** · build 0.
+
+### Deuda que queda abierta (honesta)
+
+- **Fase 1.3 y Fase 3**: pendientes, sin tocar en esta jornada.
+- **Falta red E2E para los nombres accesibles.** El barrido es una herramienta de un solo uso,
+  no una prueba en la puerta: un botón nuevo sin `aria-label` no romperá nada. Convertirlo en
+  arnés permanente costaría una regla de lint (dependencia) o un chequeo AST propio en
+  `tests/perf/` (más código que el problema). Queda medido y sin red, a conciencia.
 
 ---
 

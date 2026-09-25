@@ -226,6 +226,7 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
           <button 
             onClick={onClose} 
             className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            aria-label="Cerrar"
           >
             <X className="w-5 h-5" />
           </button>

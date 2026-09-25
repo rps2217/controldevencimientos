@@ -288,6 +288,7 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
           <button
             onClick={onClose}
             className="p-1.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+            aria-label="Cerrar"
           >
             <X className="w-5 h-5" />
           </button>

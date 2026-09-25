@@ -62,6 +62,7 @@ export const PWAReloadPrompt: React.FC = () => {
               type="button"
               onClick={close}
               className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              aria-label="Cerrar"
             >
               <X className="w-3.5 h-3.5" />
             </button>

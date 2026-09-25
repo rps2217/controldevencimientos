@@ -57,6 +57,7 @@ export const MobileExpiryPrompt: React.FC<MobileExpiryPromptProps> = ({
           type="button"
           onClick={onClose}
           className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-slate-400"
+          aria-label="Cerrar"
         >
           <X className="w-5 h-5" />
         </button>

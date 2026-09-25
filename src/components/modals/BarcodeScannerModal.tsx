@@ -55,6 +55,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           <button
             onClick={onClose}
             className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-200/60 transition-colors"
+            aria-label="Cerrar"
           >
             <X className="w-5 h-5" />
           </button>

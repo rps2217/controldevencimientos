@@ -1477,6 +1477,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                                 type="button"
                                 onClick={() => handleSkuChange('')}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                                aria-label="Limpiar SKU"
                               >
                                 <X className="w-4 h-4" />
                               </button>
@@ -1859,6 +1860,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                             playBeep('skip');
                           }}
                           className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                          aria-label="Omitir vencimiento"
                         >
                           <X className="w-5 h-5" />
                         </button>
@@ -1987,6 +1989,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                                 type="button"
                                 onClick={() => handleSkuChange('')}
                                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                                aria-label="Limpiar SKU"
                               >
                                 <X className="w-4 h-4" />
                               </button>
@@ -2053,6 +2056,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                             type="button"
                             onClick={() => setCountQuantity(Math.max(1, countQuantity - 1))}
                             className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+                            aria-label="Disminuir cantidad"
                           >
                             <Minus className="w-5 h-5" />
                           </button>
@@ -2069,6 +2073,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                             type="button"
                             onClick={() => setCountQuantity(countQuantity + 1)}
                             className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+                            aria-label="Aumentar cantidad"
                           >
                             <Plus className="w-5 h-5" />
                           </button>

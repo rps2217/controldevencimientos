@@ -376,6 +376,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
                           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                             isSummaryView ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'
                           }`}
+                          aria-label="Vista Resumida" aria-pressed={isSummaryView}
                         >
                           <span
                             className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
@@ -396,6 +397,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
                           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                             areFiltersVisible ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'
                           }`}
+                          aria-label="Mostrar Tarjetas KPI" aria-pressed={areFiltersVisible}
                         >
                           <span
                             className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
@@ -419,6 +421,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
                           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                             isStickyEnabled ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'
                           }`}
+                          aria-label="Fijar Primera Columna" aria-pressed={isStickyEnabled}
                         >
                           <span
                             className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
@@ -551,6 +554,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
                                 ? 'text-slate-300 dark:text-slate-600 hover:text-slate-500' 
                                 : 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60'
                             }`}
+                            aria-label={`${isHidden ? 'Mostrar' : 'Ocultar'} columna ${header}`} aria-pressed={!isHidden}
                           >
                             {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </button>

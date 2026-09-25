@@ -835,6 +835,7 @@ export const VisualSchemaDesigner: React.FC<VisualSchemaDesignerProps> = ({
               <button
                 onClick={() => setIsCreatingRelation(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+                aria-label="Cancelar"
               >
                 <X className="w-4 h-4" />
               </button>

@@ -145,6 +145,7 @@ export const MobileReadingsList: React.FC<MobileReadingsListProps> = ({
                   type="button"
                   onClick={() => onRemoveSkuAllEntries(group.sku, group.descripcion)}
                   className="text-slate-400 hover:text-red-600 p-2 ml-0.5"
+                  aria-label="Eliminar lecturas del SKU"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -174,7 +175,8 @@ export const MobileReadingsList: React.FC<MobileReadingsListProps> = ({
                 <span className="font-black text-sm text-slate-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-lg font-mono">
                   +{entry.cantidad}
                 </span>
-                <button onClick={() => onRemoveEntry(entry.id)} className="text-slate-400 hover:text-red-600 p-1">
+                <button onClick={() => onRemoveEntry(entry.id)} className="text-slate-400 hover:text-red-600 p-1"
+                aria-label="Eliminar lectura">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

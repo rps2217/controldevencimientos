@@ -82,6 +82,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
                 type="button"
                 onClick={() => setShowIOSGuide(false)}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                aria-label="Cerrar guía"
               >
                 <X className="w-4 h-4" />
               </button>

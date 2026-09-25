@@ -201,6 +201,7 @@ export const CampaignQuickScanModal: React.FC<CampaignQuickScanModalProps> = ({
               type="button"
               onClick={onClose}
               className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              aria-label="Cerrar"
             >
               <X className="w-5 h-5" />
             </button>
@@ -225,6 +226,7 @@ export const CampaignQuickScanModal: React.FC<CampaignQuickScanModalProps> = ({
                   type="button"
                   onClick={() => setInputCode('')}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1"
+                  aria-label="Limpiar código"
                 >
                   <X className="w-4 h-4" />
                 </button>

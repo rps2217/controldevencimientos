@@ -108,6 +108,7 @@ export const ColumnFilterMenu: React.FC<ColumnFilterMenuProps> = ({
                   <button
                     onClick={() => setSearch('')}
                     className="absolute right-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    aria-label="Limpiar búsqueda"
                   >
                     <X className="w-3 h-3" />
                   </button>

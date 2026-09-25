@@ -310,6 +310,7 @@ export const SliceManagerModal: React.FC<SliceManagerModalProps> = ({
             type="button"
             onClick={onClose}
             className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            aria-label="Cerrar"
           >
             <X className="w-5 h-5" />
           </button>
@@ -332,6 +333,7 @@ export const SliceManagerModal: React.FC<SliceManagerModalProps> = ({
                   type="button" 
                   onClick={() => setSearchTerm('')} 
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  aria-label="Limpiar búsqueda"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>

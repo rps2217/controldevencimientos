@@ -93,6 +93,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
           <button
             onClick={onClose}
             className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            aria-label="Cerrar"
           >
             <X className="w-4 h-4" />
           </button>

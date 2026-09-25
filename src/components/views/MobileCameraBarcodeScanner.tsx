@@ -123,6 +123,7 @@ export const MobileCameraBarcodeScanner: React.FC<MobileCameraBarcodeScannerProp
               onClose();
             }}
             className="p-2.5 bg-slate-800 hover:bg-red-600/80 border border-slate-700 text-slate-300 hover:text-white rounded-xl transition-colors"
+            aria-label="Cerrar escáner"
           >
             <X className="w-5 h-5" />
           </button>

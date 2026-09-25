@@ -405,6 +405,7 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
                 className={`absolute top-2 right-2 p-2 rounded-xl border backdrop-blur-md transition-all ${
                   torchOn ? 'bg-amber-500 border-amber-300 text-slate-950 font-bold' : 'bg-black/60 border-slate-700 text-white'
                 }`}
+                aria-label="Linterna" aria-pressed={torchOn}
               >
                 <Zap className="w-4 h-4" />
               </button>
@@ -649,6 +650,7 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
                   type="button"
                   onClick={handleDecreaseQty}
                   className="w-11 h-11 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-90 border border-slate-700 text-white font-extrabold text-xl flex items-center justify-center transition-transform shadow-md"
+                  aria-label="Disminuir cantidad"
                 >
                   <Minus className="w-5 h-5 text-rose-400" />
                 </button>
@@ -665,6 +667,7 @@ export const MobilePistoleoTerminalModal: React.FC<MobilePistoleoTerminalModalPr
                   type="button"
                   onClick={handleIncreaseQty}
                   className="w-11 h-11 rounded-full bg-rose-600 hover:bg-rose-500 active:scale-90 border border-rose-400 text-white font-extrabold text-xl flex items-center justify-center transition-transform shadow-lg shadow-rose-900/40"
+                  aria-label="Aumentar cantidad"
                 >
                   <Plus className="w-5 h-5 text-white" />
                 </button>
