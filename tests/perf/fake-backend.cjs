@@ -80,7 +80,31 @@ function handler(req, res) {
     if (action === 'getSheetData') {
       return res.end(JSON.stringify({ success: true, values: HOJAS[payload.sheetName] || [] }));
     }
-    // Escrituras: aceptadas en falso (no persisten entre recargas).
+
+    // Escrituras en memoria. Antes se respondia `success: true` a ciegas, asi que
+    // ningun arnes podia distinguir una escritura real de una perdida: el ida y
+    // vuelta online (append/update/delete y su relectura) quedaba sin cubrir.
+    // La fila 1 es el encabezado, por eso `_rowIndex` 2 es `filas[1]`.
+    const filas = () => (HOJAS[payload.sheetName] || (HOJAS[payload.sheetName] = []));
+    if (action === 'appendRow') {
+      filas().push((payload.values || []).map(String));
+      return res.end(JSON.stringify({ success: true }));
+    }
+    if (action === 'updateRow') {
+      const f = filas();
+      const idx = Number(payload.rowIndex);
+      if (idx >= 1 && idx <= f.length) f[idx - 1] = (payload.values || []).map(String);
+      return res.end(JSON.stringify({ success: true }));
+    }
+    if (action === 'deleteRow' || action === 'deleteRows') {
+      const f = filas();
+      const idxs = action === 'deleteRows' ? (payload.rowIndexes || []) : [payload.rowIndex];
+      // Descendente: borrar de arriba hacia abajo desplazaria los indices restantes.
+      idxs.map(Number).filter(n => Number.isFinite(n) && n >= 1 && n <= f.length)
+        .sort((a, b) => b - a)
+        .forEach(n => f.splice(n - 1, 1));
+      return res.end(JSON.stringify({ success: true }));
+    }
     return res.end(JSON.stringify({ success: true }));
   });
 }
