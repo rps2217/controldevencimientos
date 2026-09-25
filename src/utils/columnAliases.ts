@@ -399,10 +399,21 @@ export function findColumnBySemantic(
     for (const alias of customAliases[semantic]) {
       if (alias && String(alias).trim()) {
         const trimmed = String(alias).trim();
-        // Exact match regex and case-insensitive substring regex
         const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // 1) Coincidencia exacta literal (rapida, por si el usuario copio la cabecera tal cual).
         patterns.push(new RegExp(`^${escaped}$`, 'i'));
-        patterns.push(new RegExp(escaped, 'i'));
+        // 2) Coincidencia alineada a token sobre la cabecera normalizada. Antes se usaba
+        //    un substring crudo (`new RegExp(escaped)`) y un alias corto capturaba
+        //    cabeceras ajenas ("COD" -> "CODIGO DE BARRAS" o "ZCODIFICADO"). Ademas el
+        //    alias se compilaba sin normalizar, asi que "CODIGO INTERNO" no encontraba
+        //    la cabecera "CODIGO INTERNO". Normalizando ambos lados y exigiendo frontera
+        //    de token se conserva el uso util ("PRODUCTO" encuentra "NOMBRE_PRODUCTO")
+        //    sin el desborde.
+        const normAlias = normalizeHeaderString(trimmed);
+        if (normAlias) {
+          const escapedNorm = normAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          patterns.push(new RegExp(`(^|_)${escapedNorm}(?=_|$)`, 'i'));
+        }
       }
     }
   }

@@ -1587,6 +1587,31 @@ console.log('\n--- 22. Diccionario semantico: fuente unica y auto-mapeo (Ponytai
     'no-regreso: CATEGORIA si se clasifica como categoria');
 }
 
+console.log('\n--- 23. Sinonimos manuales: acentos y no-desborde (Ponytail) ---');
+{
+  // Acentos: el alias se normaliza igual que la cabecera (antes se compilaba crudo).
+  assert(findColumnBySemantic(['CODIGO INTERNO'], 'sku', { sku: ['C\u00f3digo Interno'] }) === 'CODIGO INTERNO',
+    'alias: un alias con acento encuentra la cabecera sin acento');
+  assert(findColumnBySemantic(['C\u00f3digo Interno'], 'sku', { sku: ['CODIGO INTERNO'] }) === 'C\u00f3digo Interno',
+    'alias: un alias sin acento encuentra la cabecera con acento');
+
+  // Uso util que debe seguir funcionando: sinonimo alineado a token.
+  assert(findColumnBySemantic(['NOMBRE_PRODUCTO'], 'descripcion', { descripcion: ['PRODUCTO'] }) === 'NOMBRE_PRODUCTO',
+    'alias: un token del sinonimo encuentra la cabecera que lo contiene');
+  assert(findColumnBySemantic(['COD ART INTERNO'], 'sku', { sku: ['COD ART'] }) === 'COD ART INTERNO',
+    'alias: un sinonimo de varios tokens encuentra la cabecera');
+
+  // El defecto medido: un alias corto capturaba cabeceras ajenas por substring crudo.
+  assert(findColumnBySemantic(['ZCODIFICADO'], 'sku', { sku: ['COD'] }) === undefined,
+    'alias: "COD" ya no desborda a "ZCODIFICADO"');
+  assert(findColumnBySemantic(['CODIFICADO_RARO'], 'sku', { sku: ['COD'] }) === undefined,
+    'alias: "COD" ya no desborda a "CODIFICADO_RARO"');
+
+  // El exacto sigue ganando.
+  assert(findColumnBySemantic(['COD'], 'sku', { sku: ['COD'] }) === 'COD',
+    'alias: la coincidencia exacta del sinonimo se conserva');
+}
+
 console.log(`\n========================================`);
 console.log(`RESULTADOS DE PRUEBAS: ${passed} PASADAS, ${failed} FALLADAS`);
 console.log(`========================================\n`);
