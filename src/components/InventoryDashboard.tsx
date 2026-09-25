@@ -541,36 +541,33 @@ export const InventoryDashboard: React.FC = () => {
 
   // Critical items for PM drainage report
   const drainageReportItems = useMemo(() => {
-    const source = activeView === 'main' ? items : allMainItems;
+    // La capacidad manda: una hoja con columnas de vencimiento alimenta su propio informe.
+    const source = tableCapabilities.has('vencimiento') ? items : allMainItems;
     return source.filter(item => {
       const cat = getEventCategory(item, Object.keys(item));
       if (cat !== 'VENCIMIENTO') return false;
       const st = getItemStatus(item, Object.keys(item));
       return st.code === 'DRAINAGE_PM' || st.code === 'UPCOMING' || st.code === 'RETIRE_NOW';
     });
-  }, [items, allMainItems, activeView]);
+  }, [items, allMainItems, tableCapabilities]);
 
   const quickChips = useMemo(() => {
-    if (activeView === 'products') {
-      const providerCol = headers.find(h => /proveedor|marca|fabricante/i.test(h));
-      const categoryCol = headers.find(h => /categor[ií]a|familia|tipo/i.test(h));
-      const chips: string[] = [];
-      
-      if (providerCol) {
-        const topProviders = Array.from(new Set(items.map(i => i[providerCol]))).filter(Boolean).slice(0, 3);
-        topProviders.forEach(p => chips.push(String(p)));
-      }
-      if (categoryCol) {
-        const topCategories = Array.from(new Set(items.map(i => i[categoryCol]))).filter(Boolean).slice(0, 2);
-        topCategories.forEach(c => chips.push(String(c)));
+    const chips: string[] = [];
+
+    // La capacidad manda: los chips describen el dominio de la hoja, no su nombre.
+    if (tableCapabilities.has('vencimiento')) {
+      const batchCol = headers.find(h => /lote|batch/i.test(h));
+      if (batchCol) {
+        const topBatches = Array.from(new Set(items.map(i => i[batchCol]))).filter(Boolean).slice(0, 3);
+        topBatches.forEach(b => chips.push(`Lote: ${b}`));
       }
       return chips;
     }
-    if (activeView === 'events') {
+
+    if (tableCapabilities.has('incidencia')) {
       const respCol = headers.find(h => /responsable|usuario|creado_por|registrado/i.test(h));
       const originCol = headers.find(h => /origen|tienda|almac[eé]n/i.test(h));
-      const chips: string[] = [];
-      
+
       if (respCol) {
         const topResp = Array.from(new Set(items.map(i => i[respCol]))).filter(Boolean).slice(0, 2);
         topResp.forEach(r => chips.push(String(r)));
@@ -581,18 +578,25 @@ export const InventoryDashboard: React.FC = () => {
       }
       return chips;
     }
-    if (activeView === 'main') {
-      const batchCol = headers.find(h => /lote|batch/i.test(h));
-      const chips: string[] = [];
-      if (batchCol) {
-        // Just extract some common distinct batches if any
-        const topBatches = Array.from(new Set(items.map(i => i[batchCol]))).filter(Boolean).slice(0, 3);
-        topBatches.forEach(b => chips.push(`Lote: ${b}`));
+
+    // Catálogo aún no tiene capacidad propia (Fase 7 paso 6): por identidad mientras tanto.
+    if (activeView === 'products') {
+      const providerCol = headers.find(h => /proveedor|marca|fabricante/i.test(h));
+      const categoryCol = headers.find(h => /categor[ií]a|familia|tipo/i.test(h));
+
+      if (providerCol) {
+        const topProviders = Array.from(new Set(items.map(i => i[providerCol]))).filter(Boolean).slice(0, 3);
+        topProviders.forEach(p => chips.push(String(p)));
+      }
+      if (categoryCol) {
+        const topCategories = Array.from(new Set(items.map(i => i[categoryCol]))).filter(Boolean).slice(0, 2);
+        topCategories.forEach(c => chips.push(String(c)));
       }
       return chips;
     }
-    return [];
-  }, [items, headers, activeView]);
+
+    return chips;
+  }, [items, headers, activeView, tableCapabilities]);
 
   const {
     handleSaveQuickTraspaso,
@@ -655,11 +659,13 @@ export const InventoryDashboard: React.FC = () => {
       const now = new Date();
       const currentFormattedDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' ');
 
-      // Intelligent CU_VC Collision Detection: If creating a new record in main/vencimientos table, check if SKU + MM/YYYY already exists
+      // Intelligent CU_VC Collision Detection: solo donde la hoja tiene dominio de
+      // vencimiento. El respaldo por nombre se conserva para no perder hojas de stock
+      // que hoy si consolidan; lo que se elimina es la identidad `activeView === 'main'`.
       let targetExistingItem = editingItem;
       let isConsolidatingWithExisting = false;
 
-      if (!targetExistingItem && (activeView === 'main' || /vencimiento|caducidad|stock/i.test(activeSheet.title))) {
+      if (!targetExistingItem && (tableCapabilities.has('vencimiento') || /vencimiento|caducidad|stock/i.test(activeSheet.title))) {
         const matched = findExistingItemByCuVc(formData, items, headers, sheetConfig.customAliases);
         if (matched.exists && matched.existingItem) {
           targetExistingItem = matched.existingItem;

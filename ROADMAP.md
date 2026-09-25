@@ -2160,7 +2160,7 @@ El corte que sí se hizo sacó ~200 líneas de lógica de agregación con interf
 
 ```bash
 npm run verify        # tsc + eslint + unitarias. Se corre en cada paso.
-npm run verify:all    # + build + 19 arneses E2E. Obligatorio antes de commitear.
+npm run verify:all    # + build + 20 arneses E2E. Obligatorio antes de commitear.
 ```
 
 Tarda varios minutos: conviene lanzarlo en segundo plano y escribir el `EXIT=` a un log
@@ -2169,7 +2169,8 @@ Tarda varios minutos: conviene lanzarlo en segundo plano y escribir el `EXIT=` a
 **Cifras: solo aquí y en la última auditoría son vigentes.** Las secciones fechadas citan el
 conteo de su día (p. ej. «14 arneses»), y es correcto: eran ciertas entonces. Para el estado
 actual, manda la verificación de la auditoría más reciente. Última medición (2026-09-19):
-**298 pruebas** (270 unitarias + 10 de componente + 18 de hoja) y **19 arneses E2E**.
+**298 pruebas** (270 unitarias + 10 de componente + 18 de hoja) y **20 arneses E2E**
+(19 + `genericpersonalitycheck` del paso 5).
 
 
 ---
@@ -2581,5 +2582,61 @@ pero ya eran falsas; se corrigieron **solo** donde el texto habla del hoy:
 
 Las secciones fechadas que citan «14 arneses» o «286 pruebas» **no se tocaron**: eran ciertas
 el día que se escribieron. Reescribirlas sería falsear el histórico. En su lugar se añadió una
-nota en la guía de verificación fijando cuál es la cifra vigente (298 pruebas · 19 arneses).
+nota en la guía de verificación fijando cuál es la cifra vigente (298 pruebas · 20 arneses
+tras el paso 5; 19 en el momento de este barrido).
+
+
+---
+
+## Fase 7 · Paso 5 — El núcleo decide por columnas, no por pestaña
+
+### El hueco que cierra
+
+Los pasos 2–4 hicieron que **slices, bulk actions y el gateo de UI** se eligieran por
+capacidad (columnas), no por el nombre de la pestaña. Pero el **núcleo del dashboard** seguía
+despachando por identidad. Tres gates concretos:
+
+| Gate | Decidía con | Efecto |
+| --- | --- | --- |
+| `drainageReportItems` | `activeView === 'main'` | una hoja no canónica nunca alimentaba el informe PM |
+| `quickChips` | `activeView === 'products'/'events'/'main'` | una hoja no canónica nunca ofrecía chips |
+| consolidación CU_VC en `handleSave` | `activeView === 'main' \|\| regex título` | una hoja no canónica sin «vencimiento» en el título no consolidaba |
+
+Los tres pasaron a `tableCapabilities.has(...)`, la misma señal que ya usaban `canExpire` y
+`canLogEvents`. En `quickChips` el catálogo (`products`) **conserva** su rama por identidad:
+no tiene capacidad propia todavía — eso es el paso 6.
+
+### La medición que autorizó el corte
+
+Antes de tocar código se midió cohesión. El resultado fue contundente: el gate de CU_VC
+**ya estaba migrado** en `useInventoryIngestion.ts:117` con exactamente el patrón
+`canExpire || regex(título)`. El del dashboard era una **copia rezagada** del mismo gate. Eso
+bajó el riesgo: no se inventaba un patrón nuevo, se alineaba una copia con su original.
+
+Los otros dos (`drainageReportItems`, `quickChips`) tenían cohesión baja: dependen solo de
+`items`, `headers` y `tableCapabilities`, todos en scope.
+
+### El arnés discrimina (no solo pasa)
+
+`genericpersonalitycheck.cjs` mide el par completo sobre `Bodega_Sur` (hoja **no canónica**
+con columnas de vencimiento y lote) y `Clientes` (sin semántica de dominio):
+
+- La canónica **conserva** su chip `Lote:` (sin regresión).
+- `Bodega_Sur` **ahora** muestra el chip `Lote:` (antes no: lo bloqueaba el nombre).
+- `Clientes` **no inventa** el chip (control: no se forzó para todas las hojas).
+
+**Verificado por mutación**: se revirtió el gate de `quickChips` a `activeView === 'main'`,
+se reconstruyó y el arnés cayó **solo** en la aserción de `Bodega_Sur`; las de slices
+siguieron verdes (correcto: esos gates no se tocaron). Restaurado el código, verde.
+
+Detalle de implementación del arnés: el observable (chips) solo se monta con las tarjetas KPI
+visibles (`areFiltersVisible`, que arranca en `false`). El arnés las activa desde el panel
+lateral antes de medir; sin eso mediría un falso negativo.
+
+### Gate
+
+`tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **298 pruebas** · **20/20 arneses
+E2E** · build 0. Sin dependencias nuevas. `campaigncheck.cjs` falló una vez por contención de
+Chrome al encadenar arneses y pasó aislado y en el reintento (flake conocido, documentado en
+`run.cjs`).
 
