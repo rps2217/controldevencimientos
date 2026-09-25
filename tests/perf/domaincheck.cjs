@@ -100,15 +100,34 @@ function req(method, p) {
     return { pillN, rows: rows.length, tieneCodigoFrc: FRC_CODES.test(texto), tieneVencCerc: /VENC\\. CERC\\./.test(texto) };
   })()`;
 
+  // Ancla de preparacion: `tbody tr` incluye la fila de estado vacio, asi que "rows > 0"
+  // NO prueba que cargaron datos. En un runner lento se medía la tabla vacia (pildora 0 /
+  // 1 fila) antes de renderizar el demo, como paso en CI. Se espera a que los SKU
+  // sembrados esten en el DOM: en el radar solo se ven los de vencimiento puro (los FRC
+  // estan filtrados fuera), por eso el ancla no puede exigir los FRC aqui.
+  for (let i = 0; i < 80; i++) {
+    const listo = await ev2(`(() => {
+      const t = document.body.innerText || '';
+      return t.includes('SKU-V1') && t.includes('SKU-V2') && t.includes('SKU-V3');
+    })()`);
+    if (listo) break;
+    await sleep(500);
+  }
+
   let main = { rows: 0 };
-  for (let i = 0; i < 40; i++) { main = await ev2(measure); if (main && main.rows > 0) break; await sleep(400); }
+  for (let i = 0; i < 60; i++) {
+    main = await ev2(measure);
+    if (main && main.rows > 0 && main.pillN > 0) break;
+    await sleep(500);
+  }
 
   const results = [];
   const push = (paso, ok, detalle) => results.push({ paso, ok: !!ok, detalle });
 
-  // 1. El radar de vencimientos no puede alojar incidencias FRC.
+  // 1. El radar de vencimientos no puede alojar incidencias FRC. Se exige pildora > 0 para
+  //    que una tabla aun no cargada (pildora 0) no pase la asercion por vacio.
   push('en Vencimientos, ninguna fila es un codigo de incidencia FRC',
-    main.rows > 0 && !main.tieneCodigoFrc, main);
+    main.pillN > 0 && !main.tieneCodigoFrc, main);
 
   // 2. La pildora «Todas» del radar cuenta el dominio, no la hoja cruda. Sin filtros de
   //    usuario, debe coincidir exactamente con las filas visibles.
