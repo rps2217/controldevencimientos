@@ -20,7 +20,7 @@ import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
 import { useColumnResize } from '../hooks/useColumnResize';
 import { useColumnManager } from '../hooks/useColumnManager';
 import { useInventoryFiltering, handleFilterToggle } from '../hooks/useInventoryFiltering';
-import { useOfflineSync } from '../hooks/useOfflineSync';
+import { useOfflineSyncFeedback } from '../hooks/useOfflineSyncFeedback';
 import { useCloudConfigSync } from '../hooks/useCloudConfigSync';
 import { useDashboardChromeState } from '../hooks/useDashboardChromeState';
 import { useInventoryData } from '../hooks/useInventoryData';
@@ -70,7 +70,7 @@ export const InventoryDashboard: React.FC = () => {
     openWhatsApp: handleOpenWhatsApp,
     openEmail: handleOpenEmail,
   } = useModalsActions();
-  const { showToast, updateToast, removeToast } = useToast();
+  const { showToast } = useToast();
   const confirm = useConfirm();
   const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
   
@@ -79,115 +79,6 @@ export const InventoryDashboard: React.FC = () => {
   // Advanced features: Pagination, Offline Cache & Concurrency
   const [pageSize] = useState<number | 'all'>(100);
   const [currentPage, setCurrentPage] = useState<number>(1);
-
-  // Local-First IndexedDB Offline Sync Hook with Transition Refs
-  const prevIsOfflineRef = useRef<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false);
-  const activeSyncToastIdRef = useRef<string | null>(null);
-
-  // Puente hacia `useInventoryData.fetchData`: se asigna tras declararlo. El
-  // callback de sincronización lo lee al vaciar la cola, no durante el render,
-  // así que un ref rompe el ciclo sin provocar cierres obsoletos.
-  const fetchDataRef = useRef<FetchDataFn | null>(null);
-
-  const {
-    offlineQueue,
-    auditLog,
-    isOffline,
-    setIsOffline,
-    isSyncing: isSyncingCloud,
-    setIsSyncing: setIsSyncingCloud,
-    lastCachedAt,
-    setLastCachedAt,
-    latencyMs,
-    connectionStatus,
-    lastHealthCheck,
-    healthErrorMessage,
-    testConnectionHealth,
-    enqueueMutation,
-    syncQueue,
-    removeMutation,
-    discardMutation,
-    discardAllFailedMutations,
-    retryMutation,
-    retryAllFailedMutations,
-    forkMutationAsAppend,
-    failedMutations,
-    failedCount,
-    clearQueue,
-    clearAuditLog
-  } = useOfflineSync(async (syncedCount?: number) => {
-    await fetchDataRef.current?.(sheetConfig, activeView, true);
-
-    // Auto-sync visual feedback toast resolution upon recovering connection
-    if (activeSyncToastIdRef.current) {
-      const count = syncedCount || offlineQueue.length || 1;
-      updateToast(
-        activeSyncToastIdRef.current,
-        `¡Sincronización automática completada! Se subieron ${count} cambios pendientes y tus datos ya están reflejados en Google Sheets.`,
-        'success',
-        'Datos Sincronizados',
-        4000
-      );
-      activeSyncToastIdRef.current = null;
-    } else if (syncedCount && syncedCount > 0) {
-      // Background sync succeeded without a preceding offline transition (e.g. periodic sync)
-      showToast(
-        `Se subieron automáticamente ${syncedCount} cambios pendientes en segundo plano.`,
-        'success',
-        'Sincronización en Segundo Plano'
-      );
-    }
-  });
-
-  // Track transitions of connection status to show high-quality informative toasts
-  useEffect(() => {
-    if (prevIsOfflineRef.current !== isOffline) {
-      if (isOffline) {
-        // Online -> Offline transition
-        showToast(
-          'Sin conexión a Internet. Cambiando de forma segura a modo local. Puedes continuar registrando datos sin problemas.',
-          'warning',
-          'Modo Local Activo'
-        );
-      } else {
-        // Offline -> Online transition
-        if (offlineQueue.length > 0) {
-          // Sync is automatically triggered by handleOnline in useOfflineSync.ts
-          const toastId = showToast(
-            `¡Conexión recuperada! Sincronizando de forma automática ${offlineQueue.length} cambios guardados localmente...`,
-            'loading',
-            'Sincronizando Cambios',
-            0 // Persistent toast until resolved
-          );
-          activeSyncToastIdRef.current = toastId;
-        } else {
-          showToast(
-            '¡Conexión restablecida con éxito! La aplicación se encuentra en línea y conectada.',
-            'success',
-            'Conexión Recuperada'
-          );
-        }
-      }
-      prevIsOfflineRef.current = isOffline;
-    }
-  }, [isOffline, offlineQueue.length, showToast, updateToast]);
-
-  const handleSyncOfflineQueue = async () => {
-    if (offlineQueue.length === 0) return;
-    const toastId = showToast(`Sincronizando ${offlineQueue.length} cambios pendientes con Google Sheets...`, 'loading', 'Sincronización', 0);
-    try {
-      const res = await syncQueue();
-      if (res && res.success) {
-        updateToast(toastId, `¡Se sincronizaron exitosamente ${res.count} mutaciones en Google Sheets!`, 'success', 'Sincronización Exitosa');
-      } else if (res && res.errors && res.errors.length > 0) {
-        updateToast(toastId, `Hubo errores al sincronizar: ${res.errors.join(', ')}`, 'error', 'Sincronización Parcial');
-      } else {
-        removeToast(toastId);
-      }
-    } catch (err: unknown) {
-      updateToast(toastId, `Error sincronizando cola offline: ${getErrorMessage(err)}`, 'error', 'Error de Sincronización');
-    }
-  };
 
   const [activeView, setActiveView] = useState<string>('main');
 
@@ -227,6 +118,40 @@ export const InventoryDashboard: React.FC = () => {
   const [sheetConfig, setSheetConfig] = useState<SheetConfig>(() =>
     readStorage<SheetConfig>(STORAGE_KEYS.SHEET_CONFIG, sheetConfigShapeSchema, {})
   );
+
+  // Puente hacia `useInventoryData.fetchData`: se asigna tras declararlo. El
+  // callback de sincronización lo lee al vaciar la cola, no durante el render,
+  // así que un ref rompe el ciclo sin provocar cierres obsoletos.
+  const fetchDataRef = useRef<FetchDataFn | null>(null);
+
+  const {
+    offlineQueue,
+    auditLog,
+    isOffline,
+    setIsOffline,
+    isSyncing: isSyncingCloud,
+    setIsSyncing: setIsSyncingCloud,
+    lastCachedAt,
+    setLastCachedAt,
+    latencyMs,
+    connectionStatus,
+    lastHealthCheck,
+    healthErrorMessage,
+    testConnectionHealth,
+    enqueueMutation,
+    syncQueue,
+    removeMutation,
+    discardMutation,
+    discardAllFailedMutations,
+    retryMutation,
+    retryAllFailedMutations,
+    forkMutationAsAppend,
+    failedMutations,
+    failedCount,
+    clearQueue,
+    clearAuditLog,
+    handleSyncOfflineQueue,
+  } = useOfflineSyncFeedback({ fetchDataRef, sheetConfig, activeView });
 
   const {
     hasCloudConfigSheet,
@@ -271,9 +196,9 @@ export const InventoryDashboard: React.FC = () => {
     setConfigStorageMode
   });
 
-  // `useOfflineSync` necesita recargar los datos al vaciar su cola, y este hook
-  // necesita sus setters de estado offline: el ciclo se rompe con un ref, que
-  // el callback diferido lee en el momento de la sincronización (no en render).
+  // `useOfflineSyncFeedback` necesita recargar los datos al vaciar su cola, y
+  // este hook necesita sus setters de estado offline: el ciclo se rompe con un
+  // ref, que el callback diferido lee en la sincronización (no en render).
   fetchDataRef.current = fetchData;
 
   const frcBodCol = useMemo<string | null>(() => {
