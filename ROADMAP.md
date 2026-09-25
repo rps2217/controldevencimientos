@@ -2696,3 +2696,112 @@ las de la canónica y el control siguieron verdes. Restaurado el código, verde.
 `tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **298 pruebas** · **21/21 arneses
 E2E** (incluye el nuevo) · build 0. Sin dependencias nuevas.
 
+
+
+---
+
+## Auditoría Ponytail (2026-09-19, noche) — el ticket sigue despachando por pestaña
+
+Barrido sobre el árbol con la puerta completa en verde (298 pruebas · 21/21 arneses · build 0).
+Un hallazgo principal, con defecto observable y evidencia; dos menores; y el descarte medido de
+tres candidatos que parecían deuda y no lo eran.
+
+### Hallazgo 1 (principal) — La personalidad del ticket se decide por nombre de vista, no por columnas
+
+**Es el mismo antipatrón que los pasos 5 y 6 acaban de cerrar en el núcleo, intacto en el
+módulo de impresión.** El paso 6 dio capacidad a `quickChips` y al SKU de fila; el título del
+ticket siguió atado a `activeView`.
+
+Y no en un sitio, sino en **tres**, con **tres reglas distintas** para lo mismo:
+
+| Sitio | Ramas | Qué produce |
+| --- | --- | --- |
+| `ticketUtils.ts:15-26` | 4 (`events`, `products`, `policies`, resto) | `CATÁLOGO DE PRODUCTOS`, `POLÍTICAS DE RETIRO`, … |
+| `TicketConfigModal.tsx:72,109` | 2 (`events` / resto) | duplicado literal, dos veces |
+| `TicketPrintView.tsx:35-37` | 2 (`events` / resto) | duplicado literal, una vez |
+
+**El defecto observable**, medido ejecutando `getDefaultTicketGeneralSettings` sobre las hojas
+del backend falso:
+
+```
+main               -> REPORTE VENCIMIENTOS
+events             -> REGISTRO DE INCIDENCIAS
+products           -> CATÁLOGO DE PRODUCTOS
+policies           -> POLÍTICAS DE RETIRO
+Maestro_Farmacia   -> REPORTE - MAESTRO_FARMACIA     <-- es catálogo, por columnas
+Bodega_Sur         -> REPORTE - BODEGA_SUR           <-- es vencimiento, por columnas
+```
+
+La hoja `Maestro_Farmacia` —la misma que el paso 6 reconoce como catálogo por sus columnas—
+imprime «REPORTE - MAESTRO_FARMACIA» en vez de «CATÁLOGO DE PRODUCTOS». La capacidad que ya
+existe (`catalogo`) y el dato que ya existe (`headers`) están ahí; el título no los mira.
+
+**Y las tres copias discrepan entre sí.** `ticketUtils` conoce 4 personalidades;
+`TicketConfigModal` y `TicketPrintView` conocen 2. Si el usuario imprime sin abrir el modal de
+configuración, `TicketPrintView` calcula su propio `defaultTitle`… que **nunca se usa** (ver
+Hallazgo 2). Tres fuentes de verdad para una decisión que el paso 6 ya sabe tomar por columnas.
+
+**Corte recomendado (Ponytail, mínimo efectivo):** una función pura en `ticketUtils.ts` que
+reciba `headers` (y `customAliases`) y derive el título de las **mismas capacidades** que ya usa
+el resto de la app — `catalogo` → «CATÁLOGO DE PRODUCTOS», `vencimiento` → «REPORTE
+VENCIMIENTOS», `incidencia` → «REGISTRO DE INCIDENCIAS» — con el nombre de la hoja como último
+recurso. Los tres sitios la consumen; se borran las tres copias. No es una capacidad nueva ni un
+campo nuevo: es reusar `detectTableCapabilities`, que ya está en `sliceRegistry.ts`.
+
+**Riesgo del corte: bajo-medio.** La firma de `getDefaultTicketGeneralSettings` cambia (hoy
+recibe un `string`), y tiene 3 consumidores directos más el reenvío por `normalizeTicketConfig`
+y `getDefaultViewTicketSettings`. **Medido: `printcheck.cjs` no asserta el título** — sus 5
+aserciones buscan el botón de imprimir por `title` y comprueban que el ticket monta, nada más.
+Así que hoy **el corte entra sin red**: primero hay que añadir la aserción del título (mismo
+orden que el paso 5: arnés que discrimine, luego el corte), o el cambio viaja sin verificación.
+
+### Hallazgo 2 (menor) — Tres bloques de respaldo inalcanzables, uno con variable muerta
+
+`normalizeTicketConfig` **siempre** devuelve `general` (todas sus ramas lo asignan:
+`getDefaultViewTicketSettings(...)` o `generalSettings`, que arranca de `defaultGeneral`). Se
+probó con los 4 casos posibles (`undefined`, `{}`, legacy plano, con `general`) y en los 4
+`general` es truthy. Consecuencia: los tres `normalized.general || { ... }` / `defaults.general || { ... }` son **código muerto**, y con ellos la variable
+`defaultTitle` de `TicketPrintView.tsx:33-37`, cuyo **único** uso está dentro de ese bloque.
+
+Costo de quitarlos: ~30 líneas y una rama. Beneficio: una fuente de verdad menos que mantener
+sincronizada con las otras dos (que es exactamente cómo divergieron). **Hacerlo junto con el
+Hallazgo 1**, no por separado: el corte del título ya toca esos tres bloques.
+
+### Hallazgo 3 (menor) — 22 botones solo-icono sin nombre accesible
+
+Medido con un barrido de las 547 etiquetas `<button>` de `src`: 38 tienen contenido
+exclusivamente de icono y **22 de ellas no llevan `title` ni `aria-label`**. De esas 22, **19
+son el cierre `<X />`** (uno por modal/panel, en 19 archivos distintos) y las 3 restantes son el
+rayo y el ± de cantidades de `MobilePistoleoTerminalModal`. La app respeta contraste WCAG AA,
+pero un lector de pantalla anuncia estos 22 como «botón» sin más.
+
+**Alcance honesto: pequeño y barato** — 22 atributos `aria-label`, cero dependencias, cero
+cambios de comportamiento. **No es un corte de arquitectura y no debería presentarse como tal.**
+Si se hace, hacerlo como barrido único; si no, dejarlo documentado como deuda acotada.
+
+### Lo que se midió y se descartó (para no reabrirlo)
+
+- **`StockCountTerminal.tsx` (2.615 líneas, 36 `useState`) — parece el monolito a partir.**
+  Ya está medido y descartado en el ROADMAP («medir antes de cortar»): extraer los bloques de
+  render exigiría 43 y 65 identidades del padre, y la costura real (la lógica de agregación) ya
+  se cortó a `countAggregation.ts`. **No reabrir sin un síntoma concreto.** Las 2.615 líneas son
+  mayormente JSX de dos vistas (móvil/escritorio) que comparten estado; partir por presentación
+  trasladaría el acoplamiento a una interfaz.
+- **`catalogo` "debería" ser un módulo navegable en el sidebar.** No: el sidebar sigue ofreciendo
+  las 4 canónicas por identidad (`main`, `events`, `products`, `policies`) y las hojas no
+  canónicas por su título en «Otras Pestañas» (`Sidebar.tsx:155-164`). Eso **no es el antipatrón**
+  que persigue Fase 7: ahí el nombre de la vista es **el destino de navegación**, no una
+  inferencia de dominio. Convertirlo en capacidades sería abstracción sin consumidor. YAGNI.
+- **Gate duplicado de consolidación CU_VC** (`useInventoryIngestion.ts:117` y
+  `InventoryDashboard.tsx:669`): mismo `canExpire || /vencimiento|caducidad|stock/i` en dos
+  sitios, ya identificado y **ya justificado** en el paso 5 (una copia rezagada alineada con su
+  original, no un patrón nuevo). Queda como deuda de 1 línea duplicada, no como hallazgo.
+
+### Veredicto
+
+El eje de Fase 7 (la columna manda, no el nombre) está cerrado en el núcleo y **abierto en el
+ticket**. El Hallazgo 1 es el corte de mayor valor que queda: mismo antipatrón ya resuelto dos
+veces (pasos 5 y 6), con defecto visible hoy en hojas no canónicas, y con la pieza que falta
+(`detectTableCapabilities`) ya construida y probada. Los hallazgos 2 y 3 son limpieza acotada y
+deben acompañar al 1, no competir con él.
+
