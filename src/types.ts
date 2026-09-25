@@ -196,6 +196,16 @@ export interface ViewTicketSettings {
   general?: TicketGeneralSettings;
 }
 
+/**
+ * Forma garantizada de `normalizeTicketConfig` y `getDefaultViewTicketSettings`:
+ * ambas resuelven siempre un `general` (a partir de los defaults o de la config
+ * guardada), así que los consumidores no necesitan un respaldo que nunca se usa.
+ */
+export interface NormalizedTicketSettings {
+  columns: Record<string, TicketColumnConfig>;
+  general: TicketGeneralSettings;
+}
+
 export type ViewTicketConfig = Record<string, TicketColumnConfig> | ViewTicketSettings;
 export type GlobalTicketConfig = Record<string, ViewTicketConfig>;
 

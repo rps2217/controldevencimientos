@@ -14,6 +14,7 @@ import {
   getItemResolutionStatus
 } from './src/utils/dateCalculations';
 import { createMetricsAccumulator } from './src/utils/pureCalculations';
+import { getDefaultTicketTitle } from './src/utils/ticketUtils';
 
 import { 
   findColumnBySemantic, 
@@ -1455,6 +1456,34 @@ console.log('\n--- 20. Pruebas de derivacion y filtrado de campanas (campaignAgg
       'acumulador: total PM espeja vencimientos');
   }
 
+}
+
+console.log('\n--- 21. Titulo del ticket por columnas (Fase 7 / Hallazgo 1) ---');
+{
+  const titulo = (headers: string[], activeView: string) =>
+    getDefaultTicketTitle({ headers, activeView });
+
+  // Canonicas: sin regresion (es el contrato que ya existia).
+  assert(titulo(SAMPLE_HEADERS, 'main') === 'REPORTE VENCIMIENTOS',
+    'titulo: hoja canonica de vencimientos conserva su titulo');
+  assert(titulo(SAMPLE_EVENTS_HEADERS, 'events') === 'REGISTRO DE INCIDENCIAS',
+    'titulo: hoja canonica de incidencias conserva su titulo');
+  assert(titulo(Object.keys(SAMPLE_PRODUCTS[0] || {}), 'products') === 'CATÁLOGO DE PRODUCTOS',
+    'titulo: hoja canonica de catalogo conserva su titulo');
+  assert(titulo(Object.keys(SAMPLE_POLICIES[0] || {}), 'policies') === 'POLÍTICAS DE RETIRO',
+    'titulo: hoja de politicas sin capacidad detectable conserva su titulo por respaldo');
+
+  // Hojas NO canonicas: el titulo debe salir de las COLUMNAS, no del nombre.
+  assert(titulo(['SKU', 'DESCRIPCION', 'PROVEEDOR', 'CATEGORIA'], 'Maestro_Farmacia') === 'CATÁLOGO DE PRODUCTOS',
+    'titulo: hoja no canonica de catalogo obtiene su titulo por columnas');
+  assert(titulo(['SKU', 'DESCRIPCION', 'CANTIDAD', 'FECHA VTO', 'PROVEEDOR', 'LOTE'], 'Bodega_Sur') === 'REPORTE VENCIMIENTOS',
+    'titulo: hoja no canonica con FECHA VTO obtiene el titulo de vencimientos');
+  assert(titulo(['RUT', 'RAZON_SOCIAL', 'TELEFONO', 'EMAIL'], 'Clientes') === 'REPORTE - CLIENTES',
+    'titulo: hoja sin dominio cae al respaldo por nombre de vista');
+
+  // El defecto medido: una hoja de catalogo no debe imprimir su nombre de pestana.
+  assert(!/MAESTRO_FARMACIA/i.test(titulo(['SKU', 'DESCRIPCION', 'PROVEEDOR', 'CATEGORIA'], 'Maestro_Farmacia')),
+    'titulo: no se filtra el nombre de la pestana en hojas con dominio detectable');
 }
 
 console.log(`\n========================================`);

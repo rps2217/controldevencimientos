@@ -25,24 +25,12 @@ export const TicketPrintView: React.FC<TicketPrintViewProps> = ({
 }) => {
   if (!items || items.length === 0) return null;
 
-  // Normalize configuration with backward and forward compatibility
+  // Normalize configuration with backward and forward compatibility. El título por
+  // defecto sale de las columnas (capacidad), no del nombre de la vista.
   const normalized = normalizeTicketConfig(config, headers, activeView);
   const colConfig = normalized.columns;
   const isBarcodeMode = mode === 'barcode';
-
-  const defaultTitle = isBarcodeMode
-    ? 'ETIQUETAS CÓDIGO DE BARRAS'
-    : activeView === 'events' 
-      ? 'REGISTRO DE INCIDENCIAS' 
-      : 'REPORTE VENCIMIENTOS';
-
-  const general = normalized.general || {
-    title: defaultTitle,
-    paperWidth: '80mm',
-    showDateTime: true,
-    showTotalCount: true,
-    footerText: isBarcodeMode ? '--- FIN DE ETIQUETAS ---' : '--- FIN DEL REPORTE ---'
-  };
+  const general = normalized.general;
 
   // Detect semantic columns
   const skuHeader = headers.find(h => findColumnBySemantic([h], 'sku') !== undefined);

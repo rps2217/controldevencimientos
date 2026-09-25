@@ -3,7 +3,8 @@
 Estado: **Fases 0, 2 y 4 completadas**; Fase 5 en curso (2 cortes hechos), Fase 6 con el
 primer corte hecho, Fases 1.3 y 3 pendientes. **Fase 7 (multi-hoja por capacidades) pasos 1–6
 hechos** (detección automática por columnas con corrección manual; el núcleo y el catálogo ya
-deciden por columnas, no por pestaña). Deuda `any`
+deciden por columnas, no por pestaña), más el **Hallazgo 1** (el título del ticket también sale
+de las columnas). Deuda `any`
 saldada en todo `src`: **1 solo `any`** declarado (la firma de índice de `SheetRecord`,
 justificada abajo). Riesgo `xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
@@ -2804,4 +2805,57 @@ ticket**. El Hallazgo 1 es el corte de mayor valor que queda: mismo antipatrón 
 veces (pasos 5 y 6), con defecto visible hoy en hojas no canónicas, y con la pieza que falta
 (`detectTableCapabilities`) ya construida y probada. Los hallazgos 2 y 3 son limpieza acotada y
 deben acompañar al 1, no competir con él.
+
+---
+
+## Auditoría Ponytail (2026-09-19) — Fase 7 · Hallazgo 1: el título del ticket sale de las columnas
+
+**Corte hecho.** El título del ticket térmico se decidía por `activeView` en tres sitios con
+reglas divergentes (`ticketUtils.ts`, `TicketPrintView.tsx`, `TicketConfigModal.tsx`). Se movió
+a una única función pura, `getDefaultTicketTitle`, que resuelve por **capacidad** con
+`detectTableCapabilities` y deja el nombre de vista **solo** como último recurso.
+
+#### El defecto medido (antes del corte)
+
+`Maestro_Farmacia` (SKU + descripción + proveedor + categoría, sin fechas ni evento) imprimía
+`REPORTE - MAESTRO_FARMACIA` en vez de `CATÁLOGO DE PRODUCTOS`, aunque el resto de la app ya la
+trataba como catálogo por columnas desde el paso 6. Es exactamente el antipatrón que Fase 7
+persigue: la columna manda, el nombre de pestaña no.
+
+#### Decisión de diseño
+
+```
+capacidad catalogo    → CATÁLOGO DE PRODUCTOS
+capacidad vencimiento → REPORTE VENCIMIENTOS
+capacidad incidencia  → REGISTRO DE INCIDENCIAS
+sin capacidad         → título por vista canónica (main/events/products/policies)
+                        o `REPORTE - ${activeView}` si no es canónica
+```
+
+El respaldo por nombre **no es andamiaje**: `policies` no detecta capacidad (sus columnas
+`FAMILIA/DIAS_RETIRO/ACCION` no son SKU/descripción/fecha/evento). Migrar ciegamente a
+capacidades le habría quitado «POLÍTICAS DE RETIRO» sin ganar nada. Medido antes de cortar, y
+fijado con prueba unitaria.
+
+#### Cambios
+
+| Archivo | Cambio |
+| --- | --- |
+| `ticketUtils.ts` | Nueva `getDefaultTicketTitle`; `getDefaultTicketGeneralSettings`, `getDefaultViewTicketSettings` y `normalizeTicketConfig` aceptan `headers`/`customAliases` |
+| `types.ts` | Nuevo `NormalizedTicketSettings` (`general` no opcional): expresa que la normalización **siempre** lo resuelve |
+| `TicketPrintView.tsx` | Se retira el `defaultTitle` que solo vivía en la rama muerta `normalized.general \|\| {...}` |
+| `TicketConfigModal.tsx` | Se retiran los dos fallbacks `activeView === 'events' ? ... : ...`, inalcanzables |
+| `titlecheck.cjs` | Arnés E2E discriminante del título (hojas no canónicas) |
+| `test-modules.ts` | 8 aserciones unitarias de la función pura, incluidas las 4 canónicas sin regresión |
+
+#### Validación del arnés (por mutación)
+
+Con la lógica revertida al comportamiento anterior, `titlecheck.cjs` **falla** y reproduce el
+defecto exacto (`REPORTE - MAESTRO_FARMACIA`, `REPORTE - BODEGA_SUR`). Con el corte, pasa. El
+arnés es discriminante, no decorativo.
+
+#### Puerta
+
+`tsc` 0 · `eslint` 0 errores (16 warnings `exhaustive-deps` preexistentes) · **306 pruebas** ·
+**22/22 arneses E2E** · build 0. Sin dependencias nuevas.
 

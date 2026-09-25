@@ -2,30 +2,60 @@ import {
   TicketColumnConfig, 
   TicketGeneralSettings, 
   ViewTicketConfig, 
-  ViewTicketSettings, 
-  GlobalTicketConfig 
+  NormalizedTicketSettings, 
+  GlobalTicketConfig,
+  TableCapability
 } from '../types';
 import { findColumnBySemantic } from './columnAliases';
 
 import { z } from 'zod';
 import { STORAGE_KEYS, readStorage } from '../utils/appStorage';
-/**
- * Returns default general ticket settings based on the view
- */
-export function getDefaultTicketGeneralSettings(activeView: string = 'main'): TicketGeneralSettings {
-  let title = 'REPORTE VENCIMIENTOS';
-  if (activeView === 'events') {
-    title = 'REGISTRO DE INCIDENCIAS';
-  } else if (activeView === 'products') {
-    title = 'CATÁLOGO DE PRODUCTOS';
-  } else if (activeView === 'policies') {
-    title = 'POLÍTICAS DE RETIRO';
-  } else if (activeView !== 'main') {
-    title = `REPORTE - ${activeView.toUpperCase()}`;
-  }
+import { detectTableCapabilities } from './sliceRegistry';
 
+/**
+ * Título por defecto del ticket, decidido por las COLUMNAS (capacidad), no por el
+ * nombre de la pestaña. Es el mismo criterio que el resto de la app: manda la
+ * columna.
+ *
+ * El respaldo por nombre de vista existe solo para hojas sin semántica detectable
+ * (p. ej. una hoja de políticas, cuyas columnas FAMILIA/DIAS_RETIRO/ACCION no son
+ * una capacidad). Sin él, esa hoja perdería su título sin ganar nada a cambio.
+ */
+const TITULO_POR_CAPACIDAD: Array<[TableCapability, string]> = [
+  ['catalogo', 'CATÁLOGO DE PRODUCTOS'],
+  ['vencimiento', 'REPORTE VENCIMIENTOS'],
+  ['incidencia', 'REGISTRO DE INCIDENCIAS'],
+];
+
+const TITULO_POR_VISTA_CANONICA: Record<string, string> = {
+  main: 'REPORTE VENCIMIENTOS',
+  events: 'REGISTRO DE INCIDENCIAS',
+  products: 'CATÁLOGO DE PRODUCTOS',
+  policies: 'POLÍTICAS DE RETIRO',
+};
+
+export function getDefaultTicketTitle(params: {
+  headers?: string[];
+  customAliases?: Record<string, string[]>;
+  activeView?: string;
+} = {}): string {
+  const { headers, customAliases, activeView = 'main' } = params;
+  const caps = detectTableCapabilities(headers ?? [], customAliases);
+  for (const [cap, titulo] of TITULO_POR_CAPACIDAD) {
+    if (caps.has(cap)) return titulo;
+  }
+  return TITULO_POR_VISTA_CANONICA[activeView] ?? `REPORTE - ${activeView.toUpperCase()}`;
+}
+
+/**
+ * Returns default general ticket settings based on the table's capabilities.
+ */
+export function getDefaultTicketGeneralSettings(
+  activeView: string = 'main',
+  opts: { headers?: string[]; customAliases?: Record<string, string[]> } = {}
+): TicketGeneralSettings {
   return {
-    title,
+    title: getDefaultTicketTitle({ ...opts, activeView }),
     paperWidth: '80mm',
     orientation: 'portrait',
     showDateTime: true,
@@ -89,7 +119,11 @@ export function getDefaultColumnConfig(header: string): TicketColumnConfig {
 /**
  * Creates full default settings for all headers
  */
-export function getDefaultViewTicketSettings(headers: string[], activeView: string = 'main'): ViewTicketSettings {
+export function getDefaultViewTicketSettings(
+  headers: string[],
+  activeView: string = 'main',
+  opts: { customAliases?: Record<string, string[]> } = {}
+): NormalizedTicketSettings {
   const columns: Record<string, TicketColumnConfig> = {};
   headers.forEach(h => {
     columns[h] = getDefaultColumnConfig(h);
@@ -97,22 +131,23 @@ export function getDefaultViewTicketSettings(headers: string[], activeView: stri
 
   return {
     columns,
-    general: getDefaultTicketGeneralSettings(activeView)
+    general: getDefaultTicketGeneralSettings(activeView, { ...opts, headers })
   };
 }
 
 /**
- * Normalizes any legacy or partial ticket config into a complete ViewTicketSettings object
+ * Normalizes any legacy or partial ticket config into a complete settings object (con `general` siempre resuelto)
  */
 export function normalizeTicketConfig(
   rawConfig: ViewTicketConfig | undefined,
   headers: string[],
-  activeView: string = 'main'
-): ViewTicketSettings {
-  const defaultGeneral = getDefaultTicketGeneralSettings(activeView);
-  
+  activeView: string = 'main',
+  opts: { customAliases?: Record<string, string[]> } = {}
+): NormalizedTicketSettings {
+  const defaultGeneral = getDefaultTicketGeneralSettings(activeView, { ...opts, headers });
+
   if (!rawConfig) {
-    return getDefaultViewTicketSettings(headers, activeView);
+    return getDefaultViewTicketSettings(headers, activeView, opts);
   }
 
   let rawColumns: Record<string, TicketColumnConfig> = {};

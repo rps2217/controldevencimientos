@@ -68,14 +68,7 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
     if (isOpen && !wasOpenRef.current) {
       const normalized = normalizeTicketConfig(config, headers, activeView);
       setLocalColumns(normalized.columns);
-      setLocalGeneral(normalized.general || {
-        title: activeView === 'events' ? 'REGISTRO DE INCIDENCIAS' : 'REPORTE VENCIMIENTOS',
-        paperWidth: '80mm',
-        orientation: 'portrait',
-        showDateTime: true,
-        showTotalCount: true,
-        footerText: '--- FIN DEL REPORTE ---'
-      });
+      setLocalGeneral(normalized.general);
       setColumnSearch('');
     }
     wasOpenRef.current = isOpen;
@@ -105,13 +98,7 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
   const handleResetToSmartDefaults = () => {
     const defaults = getDefaultViewTicketSettings(headers, activeView);
     setLocalColumns(defaults.columns);
-    setLocalGeneral(defaults.general || {
-      title: activeView === 'events' ? 'REGISTRO DE INCIDENCIAS' : 'REPORTE VENCIMIENTOS',
-      paperWidth: '80mm',
-      showDateTime: true,
-      showTotalCount: true,
-      footerText: '--- FIN DEL REPORTE ---'
-    });
+    setLocalGeneral(defaults.general);
   };
 
   const filteredHeaders = useMemo(() => {
