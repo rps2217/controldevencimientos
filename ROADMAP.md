@@ -1,8 +1,9 @@
 # Plan de Reforma Arquitectónica
 
 Estado: **Fases 0, 2 y 4 completadas**; Fase 5 en curso (2 cortes hechos), Fase 6 con el
-primer corte hecho, Fases 1.3 y 3 pendientes. **Fase 7 (multi-hoja por capacidades) pasos 1–4
-hechos** (detección automática por columnas con corrección manual). Deuda `any`
+primer corte hecho, Fases 1.3 y 3 pendientes. **Fase 7 (multi-hoja por capacidades) pasos 1–6
+hechos** (detección automática por columnas con corrección manual; el núcleo y el catálogo ya
+deciden por columnas, no por pestaña). Deuda `any`
 saldada en todo `src`: **1 solo `any`** declarado (la firma de índice de `SheetRecord`,
 justificada abajo). Riesgo `xlsx` cerrado (alias a 0.20.3, `npm audit` limpio).
 Regla de oro: una fase entra a `main` solo cuando la anterior está verde (`npm run verify`).
@@ -2160,7 +2161,7 @@ El corte que sí se hizo sacó ~200 líneas de lógica de agregación con interf
 
 ```bash
 npm run verify        # tsc + eslint + unitarias. Se corre en cada paso.
-npm run verify:all    # + build + 20 arneses E2E. Obligatorio antes de commitear.
+npm run verify:all    # + build + 21 arneses E2E. Obligatorio antes de commitear.
 ```
 
 Tarda varios minutos: conviene lanzarlo en segundo plano y escribir el `EXIT=` a un log
@@ -2169,8 +2170,8 @@ Tarda varios minutos: conviene lanzarlo en segundo plano y escribir el `EXIT=` a
 **Cifras: solo aquí y en la última auditoría son vigentes.** Las secciones fechadas citan el
 conteo de su día (p. ej. «14 arneses»), y es correcto: eran ciertas entonces. Para el estado
 actual, manda la verificación de la auditoría más reciente. Última medición (2026-09-19):
-**298 pruebas** (270 unitarias + 10 de componente + 18 de hoja) y **20 arneses E2E**
-(19 + `genericpersonalitycheck` del paso 5).
+**298 pruebas** (270 unitarias + 10 de componente + 18 de hoja) y **21 arneses E2E**
+(19 + `genericpersonalitycheck` del paso 5 + `catalogpersonalitycheck` del paso 6).
 
 
 ---
@@ -2639,4 +2640,59 @@ lateral antes de medir; sin eso mediría un falso negativo.
 E2E** · build 0. Sin dependencias nuevas. `campaigncheck.cjs` falló una vez por contención de
 Chrome al encadenar arneses y pasó aislado y en el reintento (flake conocido, documentado en
 `run.cjs`).
+
+
+---
+
+## Fase 7 · Paso 6 — La personalidad de catálogo también sale de las columnas
+
+### La medición que redujo el alcance
+
+El paso 5 dejó anotado que `quickChips` conservaba una rama por identidad
+(`activeView === 'products'`) «hasta el paso 6», dando por supuesto que había que inventar
+una capacidad de catálogo *y* otra de políticas. Medido antes de cortar, el supuesto era
+falso en dos de tres partes:
+
+| Supuesto | Medición | Veredicto |
+| --- | --- | --- |
+| Catálogo necesita capacidad propia | `quickChips` ramifica por `products` y el SKU de fila se marca DETALLE por `products` | **Cierto**: 2 gates reales |
+| Políticas necesita capacidad propia | `resolveItemPolicyAndRetiro` consume `policies` **si están**, sea cual sea la vista; ningún gate por `activeView === 'policies'` | **Falso**: capacidad sin efecto. YAGNI |
+| El botón DETALLE de fila dependía de la vista | El click de fila ya abre el detalle en todas las vistas (`onClick` en `<tr>`); la marca DETALLE solo estiliza el SKU | Cierto pero cosmético: se resuelve con la misma capacidad |
+
+Resultado: **una** capacidad nueva (`catalogo`), no dos. Se documenta explícitamente en
+`types.ts` por qué no existe `politicas`.
+
+### El bug latente que la capacidad destapó
+
+`Maestro_Farmacia` (SKU + DESCRIPCION + PROVEEDOR + CATEGORIA) se clasificaba como
+**incidencia**, no como catálogo. Causa: el patrón de `tipo_evento` era
+`/^categor[ií]a(_|\s)?(evento|incidencia)?$/i`, con el calificador **opcional** — así que
+`CATEGORIA` pelado (categoría de producto) también mapeaba a tipo de evento. Se corrigió
+haciendo obligatorio el calificador (`categoria evento`, `categoria incidencia`, …).
+
+Es un bug real preexistente, no una consecuencia del paso 6: cualquier hoja de productos con
+columna `CATEGORIA` perdía su semántica de catálogo y entraba al módulo de incidencias.
+
+### Precedencia de detección
+
+`catalogo` es la **rama final** (`vencimiento` > `incidencia` > `catalogo`): describir
+productos es lo que queda cuando la hoja no tiene fechas ni registra eventos. Así una hoja
+canónica con SKU+DESCRIPCION (p. ej. `main`, que trae FECHA_VENCIMIENTO) **no** se marca
+catálogo, y su comportamiento no cambia.
+
+### El arnés discrimina (no solo pasa)
+
+`catalogpersonalitycheck.cjs` mide sobre `Maestro_Farmacia` (catálogo no canónico), la
+canónica y `Clientes` (control). El observable son los **chips de la barra «Filtros Rápidos:»**,
+no el texto de la tabla: los valores del catálogo («Lab Norte») también aparecen en las
+celdas, así que medir sobre `innerText` daría un falso positivo.
+
+**Verificado por mutación**: revertido el gate a `activeView === 'products'`, reconstruido y
+el arnés cayó **solo** en las dos aserciones de catálogo (chips de proveedor y de categoría);
+las de la canónica y el control siguieron verdes. Restaurado el código, verde.
+
+### Gate
+
+`tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **298 pruebas** · **21/21 arneses
+E2E** (incluye el nuevo) · build 0. Sin dependencias nuevas.
 

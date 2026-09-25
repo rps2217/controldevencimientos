@@ -579,8 +579,9 @@ export const InventoryDashboard: React.FC = () => {
       return chips;
     }
 
-    // Catálogo aún no tiene capacidad propia (Fase 7 paso 6): por identidad mientras tanto.
-    if (activeView === 'products') {
+    // Catálogo: la hoja describe productos (SKU + descripción) sin fechas ni evento.
+    // Se decide por capacidad, así una hoja ajena de catálogo también lo recibe.
+    if (tableCapabilities.has('catalogo')) {
       const providerCol = headers.find(h => /proveedor|marca|fabricante/i.test(h));
       const categoryCol = headers.find(h => /categor[ií]a|familia|tipo/i.test(h));
 
@@ -596,7 +597,7 @@ export const InventoryDashboard: React.FC = () => {
     }
 
     return chips;
-  }, [items, headers, activeView, tableCapabilities]);
+  }, [items, headers, tableCapabilities]);
 
   const {
     handleSaveQuickTraspaso,

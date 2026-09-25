@@ -38,11 +38,12 @@ const HARNESSES = [
   'bodegacheck.cjs',
   'capabilitycheck.cjs',
   'genericpersonalitycheck.cjs',
+  'catalogpersonalitycheck.cjs',
   'democheck.cjs',
 ];
 // Arneses que necesitan el backend falso (hojas no canonicas): el runner lo levanta
 // y le pasa el puerto como segundo argumento.
-const NEED_FAKE_BACKEND = new Set(['genericcheck.cjs', 'bodegacheck.cjs', 'capabilitycheck.cjs', 'genericpersonalitycheck.cjs']);
+const NEED_FAKE_BACKEND = new Set(['genericcheck.cjs', 'bodegacheck.cjs', 'capabilitycheck.cjs', 'genericpersonalitycheck.cjs', 'catalogpersonalitycheck.cjs']);
 const FAKE_BACKEND_PORT = Number(process.env.E2E_FAKE_PORT || 9820);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 

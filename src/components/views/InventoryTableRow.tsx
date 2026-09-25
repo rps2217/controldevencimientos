@@ -20,11 +20,12 @@ export interface InventoryTableRowProps {
   virtualIndex: number;
   headers: string[];
   visibleColumnMeta: ColumnMetadata[];
-  activeView: 'main' | 'events' | 'products' | 'policies' | string;
   /** La hoja tiene dominio de vencimiento (columna virtual de estado de caducidad). */
   showExpiryCol?: boolean;
   /** La hoja tiene dominio de incidencia (columna virtual de estado de gestion). */
   showResolutionCol?: boolean;
+  /** La hoja describe productos (capacidad `catalogo`): el SKU se marca como enlace al detalle. */
+  isCatalog?: boolean;
   isSelected: boolean;
   /** Registro cuyo detalle se muestra en el panel maestro-detalle. */
   isActiveDetail?: boolean;
@@ -52,9 +53,9 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   virtualIndex,
   headers,
   visibleColumnMeta,
-  activeView,
   showExpiryCol = false,
   showResolutionCol = false,
+  isCatalog = false,
   isSelected,
   isActiveDetail = false,
   frcBodFilter,
@@ -79,8 +80,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   const status = getItemStatus(item, headers);
   const isEventView = showResolutionCol;
   const eventResStatus = isEventView ? getItemResolutionStatus(item, headers) : null;
-  const isProductsView = activeView === 'products';
-  
+  const isProductsView = isCatalog ?? false;
   const hasPhone = useMemo(() => {
     const pCol = findPhoneColumn(headers);
     return !!pCol && !!item[pCol];
@@ -519,9 +519,9 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   if (prevProps.isSelected !== nextProps.isSelected) return false;
   if (prevProps.isActiveDetail !== nextProps.isActiveDetail) return false;
   if (prevProps.virtualIndex !== nextProps.virtualIndex) return false;
-  if (prevProps.activeView !== nextProps.activeView) return false;
   if (prevProps.showExpiryCol !== nextProps.showExpiryCol) return false;
   if (prevProps.showResolutionCol !== nextProps.showResolutionCol) return false;
+  if (prevProps.isCatalog !== nextProps.isCatalog) return false;
   if (prevProps.visibleColumnMeta !== nextProps.visibleColumnMeta) return false;
   if (prevProps.frcBodFilter !== nextProps.frcBodFilter) return false;
   if (prevProps.getColWidth !== nextProps.getColWidth) return false;

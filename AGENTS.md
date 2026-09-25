@@ -245,6 +245,16 @@ otra a medida.
     precedencia, `main` heredaría los slices de incidencia).
   - `conteo` — hay **`sku` Y `cantidad`** (ambas; son las que el terminal necesita para
     reconciliar). Es **aditiva**: convive con las otras dos.
+  - `catalogo` — hay **`sku` Y `descripcion`**, y no se detectó `vencimiento` ni `incidencia`.
+    Es la **rama final** (`vencimiento` > `incidencia` > `catalogo`): describe productos es lo
+    que queda cuando la hoja no tiene fechas ni registra eventos. Alimenta los chips de
+    proveedor/categoría y la marca DETALLE del SKU.
+- **No existe capacidad `politicas`** (deliberado): una hoja de políticas no gatea ningún
+  comportamiento propio — `resolveItemPolicyAndRetiro` consume `policies` si están, sea cual
+  sea la vista. Añadirla sería una capacidad sin efecto (YAGNI).
+- **`tipo_evento` exige calificador:** `/^categor[ií]a(_|\s)?(evento|incidencia|falla|novedad)$/i`.
+  `CATEGORIA` pelado es la categoría de *producto* (semántico `categoria`), no el tipo de evento.
+  Sin esta restricción una hoja de catálogo con columna `CATEGORIA` se clasificaba como incidencia.
 - **`TableCapability`** (`src/types.ts`) es el tipo. `TableSlice.requiredCapability` lo usa para
   filtrar slices nativos; los personalizados **no** declaran capacidad y nunca se restringen.
 - **UI gateada por capacidad:** el contexto publica `dashboard.tableCapabilities`; los
@@ -268,9 +278,10 @@ otra a medida.
 **Regla al añadir un módulo de dominio:** no lo actives por `activeView === '...'`. Declara su
 capacidad en `detectTableCapabilities` y gatea por ella, para que una hoja no canónica no lo
 arrastre. Si el gate vive en un componente, usa `dashboard.tableCapabilities` (ya efectivas) y
-`has(...)`, sin releer `activeView`. Tras este corte quedan **49** despachos por identidad
+`has(...)`, sin releer `activeView`. Tras el paso 6 quedan **42** despachos por identidad
 (`grep -rEn "activeView\s*===\s*['\"]|tableKey\s*===\s*['\"]" src`), frente a **83** en el mismo
-`grep` sobre el baseline: deuda medida, no un patrón a imitar (ver ROADMAP, Fase 7).
+`grep` sobre el baseline: deuda medida, no un patrón a imitar (ver ROADMAP, Fase 7). El paso 6
+quitó 2 (`quickChips` y la marca DETALLE del SKU en `InventoryTableRow`).
 
 ---
 
@@ -391,7 +402,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
 | `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
-| `npm run test:e2e` | Arranca el build de producción y corre los 17 arneses de integridad (`tests/perf/run.cjs`). |
+| `npm run test:e2e` | Arranca el build de producción y corre los 21 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -419,7 +430,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 ### Arneses de medición (`tests/perf/`, requieren Chromium y un build servido)
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 17 arneses que cubren integridad de
+`npm run test:e2e` arranca el preview y corre los 21 arneses que cubren integridad de
 datos y navegación; devuelve código distinto de cero si alguno falla. El binario de Chrome
 se toma de `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`,
 etc.).
@@ -445,6 +456,10 @@ falso que levanta el propio runner.
 | `campaigncheck.cjs` | sí | Matriz de consolidación de campaña: clasificación de los 4 estados, filtros, búsqueda acumulada y ajuste de venta persistido (12 verificaciones). |
 | `printcheck.cjs` | sí | Vista de impresión: el ticket solo monta con un registro pendiente (5 aserciones). |
 | `genericcheck.cjs` | sí | Modo genérico (Fase 7 paso 3): una hoja sin dominio carga sus filas, no arrastra slices ni el terminal de conteo, y conserva las bulk actions por capacidad. Requiere el backend falso. |
+| `bodegacheck.cjs` | sí | Gateo de UI de dominio por capacidad (Fase 7 paso 3b): una hoja no canónica con columnas de vencimiento recibe el módulo; una sin dominio no. Requiere el backend falso. |
+| `capabilitycheck.cjs` | sí | Corrección manual de capacidades (Fase 7 paso 4): tri-estado `auto`/`enabled`/`disabled` persistido y reversible. Requiere el backend falso. |
+| `genericpersonalitycheck.cjs` | sí | El núcleo decide por columnas, no por pestaña (Fase 7 paso 5): chips de filtro rápido por capacidad. Requiere el backend falso. |
+| `catalogpersonalitycheck.cjs` | sí | Personalidad de catálogo por columnas (Fase 7 paso 6): una hoja de productos no canónica recibe sus chips; la canónica conserva el suyo; una sin dominio no inventa ninguno. Requiere el backend falso. |
 | `modals.cjs` | no | Abrir modales: commits, long tasks y encabezado visible. |
 | `profile.cjs` | no | Renders reales de tabla/fila (tecleo). |
 

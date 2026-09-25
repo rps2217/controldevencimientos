@@ -33,13 +33,18 @@ export function detectTableCapabilities(
   // Clientes con teléfono y email no debe ofrecerlo).
   if (has('sku') && has('cantidad')) caps.add('conteo');
 
-  // La precedencia vencimiento > incidencia es deliberada: `getEventCategory`
-  // asume VENCIMIENTO por defecto, así que una hoja con fecha de vencimiento se
-  // trata como tabla de vencimientos aunque además tenga columna de evento (es el
-  // caso de la pestaña `main`, que trae FRC_EVEN). Sin esa precedencia, `main`
-  // heredaría los slices de incidencias y cambiaría el comportamiento actual.
+  // La precedencia vencimiento > incidencia es deliberada: `getEventCategory` asume
+  // VENCIMIENTO por defecto, así que una hoja con fecha de vencimiento se trata como
+  // tabla de vencimientos aunque además tenga columna de evento (es el caso de la
+  // pestaña `main`, que trae FRC_EVEN). Sin esa precedencia, `main` heredaría los
+  // slices de incidencias y cambiaría el comportamiento actual.
+  //
+  // `catalogo` es la rama final: describir productos es lo que queda cuando la hoja
+  // no tiene fechas ni registra eventos. Así una hoja ajena de catálogo (SKU +
+  // descripción + proveedor) se detecta sin depender del nombre de la pestaña.
   if (has('fecha_vc') || has('fecha_retiro') || (has('mes') && has('anio'))) caps.add('vencimiento');
   else if (has('tipo_evento')) caps.add('incidencia');
+  else if (has('sku') && has('descripcion')) caps.add('catalogo');
 
   return caps;
 }
@@ -67,7 +72,8 @@ export function resolveTableCapabilities(
 export const ALL_TABLE_CAPABILITIES: { id: TableCapability; label: string; description: string }[] = [
   { id: 'vencimiento', label: 'Vencimientos y Retiro', description: 'Fechas de vencimiento, retiro preventivo, políticas comerciales y radar PM.' },
   { id: 'incidencia', label: 'Eventos e Incidencias', description: 'Registro FRC: transporte, diferencias, mermas, averías y calidad.' },
-  { id: 'conteo', label: 'Conteo Físico y Cuadratura', description: 'Terminal de pistoleo y cuadratura. Requiere columna de SKU y de cantidad.' }
+  { id: 'conteo', label: 'Conteo Físico y Cuadratura', description: 'Terminal de pistoleo y cuadratura. Requiere columna de SKU y de cantidad.' },
+  { id: 'catalogo', label: 'Catálogo de Productos', description: 'Maestro de productos (SKU y descripción) sin fechas ni eventos. Alimenta la de-referenciación.' }
 ];
 
 /**

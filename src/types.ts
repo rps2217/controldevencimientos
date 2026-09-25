@@ -252,8 +252,13 @@ export interface TableSlice {
  * - `vencimiento`: la hoja puede calcular fechas de vencimiento/retiro.
  * - `incidencia`: la hoja registra eventos (transporte, mermas, diferencias...).
  * - `conteo`: la hoja tiene SKU y cantidad, así que admite el conteo físico.
+ * - `catalogo`: la hoja describe productos (SKU + descripción) sin fechas ni evento.
+ *
+ * No existe una capacidad `politicas`: una hoja de políticas no gatea ningún
+ * comportamiento propio (el resolvedor de política consume los datos si están,
+ * sea cual sea la vista). Añadirla sería una capacidad sin efecto.
  */
-export type TableCapability = 'vencimiento' | 'incidencia' | 'conteo';
+export type TableCapability = 'vencimiento' | 'incidencia' | 'conteo' | 'catalogo';
 
 // ==========================================
 // MÓDULO DE CONTEO MASIVO DE EXISTENCIAS

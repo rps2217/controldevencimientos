@@ -244,7 +244,10 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^tipo(_|\s)?(de)?(_|\s)?(evento|registro|incidencia|fallo|novedad)$/i,
     /^evento$/i,
     /^incidencia$/i,
-    /^categor[ií]a(_|\s)?(evento|incidencia)?$/i,
+    // El calificador es obligatorio: "CATEGORIA" pelado es la categoría de producto
+    // (semantico `categoria`), no el tipo de evento. Sin esto, una hoja de catalogo
+    // con columna CATEGORIA se clasificaba como tabla de incidencias.
+    /^categor[ií]a(_|\s)?(evento|incidencia|falla|novedad)$/i,
     /^tipo$/i,
     /^motivo$/i,
     /^concepto$/i,

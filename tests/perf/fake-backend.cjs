@@ -32,6 +32,14 @@ const HOJAS = {
     ['S-2000', 'Producto bodega sur', '15', '2026-04-01', 'Proveedor A', 'B-1'],
     ['S-2001', 'Producto bodega sur 2', '8', '2026-05-15', 'Proveedor B', 'B-2'],
   ],
+  // Hoja NO canonica de CATALOGO (Fase 7 paso 6): SKU + descripcion + proveedor,
+  // sin fechas ni evento. Debe recibir la personalidad de catalogo por columnas.
+  Maestro_Farmacia: [
+    ['SKU', 'DESCRIPCION', 'PROVEEDOR', 'CATEGORIA'],
+    ['M-3000', 'Ibuprofeno 400mg', 'Lab Norte', 'Analgesicos'],
+    ['M-3001', 'Paracetamol 500mg', 'Lab Sur', 'Analgesicos'],
+    ['M-3002', 'Vitamina C 1g', 'Lab Norte', 'Vitaminas'],
+  ],
 };
 
 const SHEETS = Object.keys(HOJAS);
