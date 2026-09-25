@@ -1095,7 +1095,7 @@ desincronizarse. Tres sitios que *enumeraban* las claves pasaron a iterarlas:
 | --- | --- | --- |
 | `InventoryDashboard.tsx:1036` (`mappedSheets`) | array literal de 4 accesos | `VIEW_KEYS.map(k => sheetConfig[k])` |
 | `TableBulkActionsPanel.tsx:46-49` | 4 `if` sueltos | `VIEW_KEYS.forEach(...)` |
-| `bulkActionsRegistry.ts:81` | `['main','products','events']` literal | (pendiente: es un subconjunto con criterio de dominio, ver abajo) |
+| `bulkActionsRegistry.ts:81` | `['main','products','events']` literal | **Resuelto** (corte A2, 2026-09-19): se retiró el literal; el gate es por columna SKU (`findColumnBySemantic`). Ya no cita vistas. |
 
 **Corrección a la cifra del diagnóstico.** El ROADMAP decía **139 referencias**. Medido ahora:
 **166**, pero ese número mezcla cuatro cosas muy distintas, y tratarlas igual era el error:
@@ -2131,15 +2131,14 @@ El corte que sí se hizo sacó ~200 líneas de lógica de agregación con interf
    Ojo: al medir `useInventoryActions` la interfaz daba ~23 parámetros, señal de que traslada
    el problema en vez de reducir acoplamiento. Cortar por sub-bloques cohesionados (los ya
    hechos fueron de 9, 13 y 15), no en bloque.
-5. **Fase 7 — multi-hoja por capacidades** (anotada 2026-09-19, ver su sección). Objetivo del
+5. **Fase 7 — multi-hoja por capacidades** (pasos 1–4 hechos 2026-09-19). Objetivo del
    usuario: apuntar la app a **otras hojas de Google Sheets con datos distintos** sin
    construir otra app a medida. Diagnóstico: el motor ya es genérico (las filas son objetos
-   por encabezado), lo que está atado son las **4 claves de tabla** (139 referencias sin
-   constante) y los slices de dominio. El mecanismo a extender ya existe: activación por
-   capacidades, como hacen las bulk actions con teléfono/email.
-   **Entra después de 5 y 6.** El corte 3 de Fase 5 es trabajo preparatorio.
-   Antes del paso 3 hay que cerrar con el usuario una decisión: detección automática sola
-   vs. perfiles de tabla declarados (recomendación: automática con corrección manual).
+   por encabezado), lo que estaba atado eran las **4 claves de tabla** y los slices de
+   dominio. El mecanismo a extender ya existe: activación por capacidades, como hacen las
+   bulk actions con teléfono/email.
+   **Decisión cerrada**: detección automática **con corrección manual** (paso 4). Lo que
+   queda es decidir si las 4 canónicas dejan de atarse por nombre; ver la sección de Fase 7.
 
 ### Deuda y trampas conocidas (no reabrir sin síntoma real)
 
@@ -2161,11 +2160,16 @@ El corte que sí se hizo sacó ~200 líneas de lógica de agregación con interf
 
 ```bash
 npm run verify        # tsc + eslint + unitarias. Se corre en cada paso.
-npm run verify:all    # + build + 14 arneses E2E. Obligatorio antes de commitear.
+npm run verify:all    # + build + 19 arneses E2E. Obligatorio antes de commitear.
 ```
 
 Tarda varios minutos: conviene lanzarlo en segundo plano y escribir el `EXIT=` a un log
 (el patrón usado hoy), porque la salida final se pierde si la consola corta.
+
+**Cifras: solo aquí y en la última auditoría son vigentes.** Las secciones fechadas citan el
+conteo de su día (p. ej. «14 arneses»), y es correcto: eran ciertas entonces. Para el estado
+actual, manda la verificación de la auditoría más reciente. Última medición (2026-09-19):
+**298 pruebas** (270 unitarias + 10 de componente + 18 de hoja) y **19 arneses E2E**.
 
 
 ---
@@ -2563,4 +2567,19 @@ override) · **19/19 arneses E2E** · build 0. Sin dependencias nuevas.
 - **Clave de tabla de bulk actions**: sigue con su convención mixta. No se unifica sin síntoma.
 - **Slices personalizados sin capacidad declarada**: se conservan siempre (no se restringen).
   Correcto: el usuario los creó a mano; excluirlos sería silenciar trabajo suyo.
+
+### Corrección de honestidad documental (mismo corte)
+
+Barrido con `grep` sobre el propio ROADMAP. Tres afirmaciones se leían como estado actual
+pero ya eran falsas; se corrigieron **solo** donde el texto habla del hoy:
+
+| Sitio | Decía | Realidad medida |
+| --- | --- | --- |
+| Guía de verificación | «build + 14 arneses E2E» | **19** en `run.cjs` |
+| F7 paso 1, tabla de claves | `bulkActionsRegistry.ts:81` «(pendiente)» | **Resuelto** en A2: el gate es por columna SKU; no cita vistas |
+| Punto 5 de lo prioritario | Fase 7 «anotada… entra después de 5 y 6» | Pasos 1–4 **hechos**; la decisión está **cerrada** |
+
+Las secciones fechadas que citan «14 arneses» o «286 pruebas» **no se tocaron**: eran ciertas
+el día que se escribieron. Reescribirlas sería falsear el histórico. En su lugar se añadió una
+nota en la guía de verificación fijando cuál es la cifra vigente (298 pruebas · 19 arneses).
 
