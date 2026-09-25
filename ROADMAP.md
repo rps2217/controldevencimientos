@@ -2954,3 +2954,72 @@ arnés es discriminante, no decorativo.
 `tsc` 0 · `eslint` 0 errores (16 warnings `exhaustive-deps` preexistentes) · **306 pruebas** ·
 **22/22 arneses E2E** · build 0. Sin dependencias nuevas.
 
+---
+
+## Mejora palpable para el usuario: puerta de demostración en el onboarding
+
+**Fecha:** 2026-09-19. **Origen:** el usuario pidió una mejora palpable antes de seguir con el
+plan de fases. Se midió la app como usuario real (build de producción + navegador), no por lectura
+de código.
+
+### Hallazgo (medido)
+
+Con el build servido y sin `SCRIPT_URL`, la app muestra la pantalla **«Conectar Google Sheets»**.
+`handleSetupSubmit` rechaza cualquier URL que no contenga `script.google.com/macros/s/`, y el input
+es `required`. Es decir: **no había ninguna forma de ver la aplicación sin un backend real.**
+
+El modo demostración, en cambio, funciona completo y es inalcanzable desde la UI. Se comprobó
+entrando con la sonda de los arneses: carga 5 vencimientos, 4 pestañas, KPIs, slices y chips. Lo
+dejó escrito el propio `tests/perf/seed.js`: *«App.tsx exige SCRIPT_URL para saltar la pantalla de
+onboarding»*. Sin URL, `fetchData` lanza `'No script URL configured, loading demo mode'` y cae a
+`SAMPLE_ITEMS`.
+
+El coste real: para evaluar la app sin backend había que **saber** que basta con escribir una URL
+falsa con la forma correcta. Un gerente de tienda, un colega o quien evalúe el proyecto se queda
+en el muro.
+
+### Corte
+
+Botón secundario **«Explorar con datos de demostración»** en el onboarding, tras un separador «o».
+Coste mínimo y sin tocar la invariante de datos:
+
+- **Bandera propia (`appsheet_clone_demoEntry`), no `SCRIPT_URL`.** Escribir una URL falsa habría
+  hecho que la app se creyera con backend y **encolara mutaciones contra un endpoint inexistente**;
+  es exactamente el tipo de corrupción silenciosa que el proyecto prohíbe. El modo demo sigue
+  definiéndolo `isDemoMode` (ausencia de `SCRIPT_URL`).
+- **Recordar la elección**, para que recargar no devuelva al muro.
+- **Salida conservada**: el botón «URL de Apps Script» del encabezado sigue disponible.
+- `handleSetupSubmit` **limpia la bandera** al conectar de verdad: si luego se borra la URL, el
+  onboarding vuelve a verse (sin esto, la bandera sobreviviría y el muro nunca reaparecería).
+
+### Archivos
+
+| Archivo | Cambio |
+| --- | --- |
+| `appStorage.ts` | Clave `DEMO_ENTRY` + `hasDemoEntry()` / `setDemoEntry()` (junto a `isDemoMode`, fuente única de "modo demo") |
+| `App.tsx` | Import; gate de montaje `!storedUrl && !hasDemoEntry()`; `handleExploreDemo`; `setDemoEntry(false)` al conectar; botón con icono `Compass` y nombre accesible |
+| `test-modules.ts` | 6 aserciones del flag (incluye: entrar a demo **no** escribe `SCRIPT_URL`; valor corrupto no abre la puerta) |
+| `demoentrycheck.cjs` | Arnés E2E nuevo, 7 verificaciones |
+| `run.cjs` | Registro del arnés (23 en total) |
+
+### Validación del arnés (por mutación)
+
+Se quitó `hasDemoEntry()` del gate de montaje y se reconstruyó: el arnés **falla** en 3 pasos
+(«al recargar no vuelve a pedir la URL», «el onboarding queda cerrado», «existe la salida a
+configurar la URL») y sale con código 1. Restaurado el corte, 7/7 OK. Es discriminante.
+
+### Puerta
+
+`tsc` 0 · `eslint` 0 errores (16 warnings `exhaustive-deps` preexistentes) · **284 pruebas** +
+10 componente + 18 hoja de cálculo · **23/23 arneses E2E** · build 0. Sin dependencias nuevas.
+
+### Deuda que queda abierta (honesta)
+
+- **Discrepancia medida, no corregida:** la píldora «Todas» anuncia 5 filas y la tabla muestra 2.
+  No es paginación: en la vista de vencimientos el filtro descarta toda fila cuya categoría de
+  evento no sea `VENCIMIENTO`, y 3 de las 5 filas de ejemplo traen `FRC_EVEN` de transporte,
+  diferencia o calidad. La hoja canónica **sí** tiene esa columna, así que le pega a una operación
+  real: un producto con fecha de vencimiento desaparece del radar por su columna de evento. Es una
+  decisión de diseño (esas filas podrían pertenecer a Incidencias), por eso **no se tocó sin
+  confirmación del usuario**.
+

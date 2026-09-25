@@ -227,6 +227,7 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
   - `getReconciliationProviders` / `filterReconciliation` / `getPendingItems` — proveedores distintos, filtros de estado y proveedor (`DIF` = todo lo que no está cuadrado, **no** solo faltantes), y checklist de pendientes (`teorico > 0 && contado === 0`).
   - `StockCountReconciliationView` ya no declara `ReconciliationFilter` ni `ReconciliationMetrics`: los importa de este módulo.
 - **`isDemoMode()` en `appStorage.ts`**: fuente única de "no hay backend configurado" (`!localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim()`). Estaba escrita idéntica en 5 sitios. El `.trim()` no es adorno: `SCRIPT_URL` con solo espacios es modo demo.
+- **`hasDemoEntry()` / `setDemoEntry()` en `appStorage.ts`**: la elección explícita de "explorar la demostración" desde el onboarding (`appsheet_clone_demoEntry === '1'`). Es **independiente** de `SCRIPT_URL`: entrar a demo no escribe una URL falsa, porque entonces la app creería tener backend y encolaría mutaciones contra un endpoint inexistente. El modo demo sigue definiéndolo `isDemoMode` (ausencia de `SCRIPT_URL`); esta bandera sólo evita volver a pedir la URL en cada recarga. `handleSetupSubmit` la limpia al conectar de verdad, para que borrar la URL después devuelva al onboarding. Antes, la única forma de ver la app sin backend era escribir una URL con la forma de Apps Script: el modo demostración existía pero era inalcanzable desde la UI (`tests/perf/seed.js` lo sembraba a mano).
 
 ---
 
@@ -402,7 +403,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
 | `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
-| `npm run test:e2e` | Arranca el build de producción y corre los 22 arneses de integridad (`tests/perf/run.cjs`). |
+| `npm run test:e2e` | Arranca el build de producción y corre los 23 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -430,7 +431,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 ### Arneses de medición (`tests/perf/`, requieren Chromium y un build servido)
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 22 arneses que cubren integridad de
+`npm run test:e2e` arranca el preview y corre los 23 arneses que cubren integridad de
 datos y navegación; devuelve código distinto de cero si alguno falla. El binario de Chrome
 se toma de `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`,
 etc.).
@@ -458,6 +459,7 @@ falso que levanta el propio runner.
 | `titlecheck.cjs` | sí | Título del ticket por columnas (Fase 7 Hallazgo 1): una hoja no canónica de catálogo imprime «CATÁLOGO DE PRODUCTOS», no su nombre de pestaña. Discriminante (verificado por mutación). Requiere el backend falso. |
 | `detailcheck.cjs` | sí | Master-detail del panel lateral: la tabla sigue viva con el panel abierto y el detalle se actualiza sin cerrarse. |
 | `democheck.cjs` | sí | Bug latente de `headers`/`activeSheet` obsoletos en modo demo: guardia directa de la causa raíz en `useInventoryData`. |
+| `demoentrycheck.cjs` | sí | Puerta de demostración del onboarding: sin sembrar `SCRIPT_URL`, el arranque limpio muestra el onboarding, el botón «Explorar con datos de demostración» entra al dashboard con datos, la elección sobrevive a la recarga y sigue existiendo la salida a configurar la URL (7 verificaciones, discriminante por mutación). |
 | `genericcheck.cjs` | sí | Modo genérico (Fase 7 paso 3): una hoja sin dominio carga sus filas, no arrastra slices ni el terminal de conteo, y conserva las bulk actions por capacidad. Requiere el backend falso. |
 | `bodegacheck.cjs` | sí | Gateo de UI de dominio por capacidad (Fase 7 paso 3b): una hoja no canónica con columnas de vencimiento recibe el módulo; una sin dominio no. Requiere el backend falso. |
 | `capabilitycheck.cjs` | sí | Corrección manual de capacidades (Fase 7 paso 4): tri-estado `auto`/`enabled`/`disabled` persistido y reversible. Requiere el backend falso. |

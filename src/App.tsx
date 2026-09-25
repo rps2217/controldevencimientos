@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Link as LinkIcon, Settings2, CheckCircle2, Moon, Sun, Contrast, Check } from 'lucide-react';
+import { Link as LinkIcon, Settings2, CheckCircle2, Moon, Sun, Contrast, Check, Compass } from 'lucide-react';
 import InventoryDashboard from './components/InventoryDashboard';
 import { ToastProvider } from './components/common/ToastContainer';
 import { ConfirmProvider } from './components/common/ConfirmDialog';
@@ -9,7 +9,7 @@ import { AppLogo } from './components/common/AppLogo';
 import { RightDrawerProvider } from './context/RightDrawerContext';
 import { ModalsProvider } from './context/ModalsContext';
 
-import { STORAGE_KEYS } from './utils/appStorage';
+import { STORAGE_KEYS, hasDemoEntry, setDemoEntry } from './utils/appStorage';
 export type ThemeMode = 'light' | 'dark-slate' | 'dark-gray';
 
 export default function App() {
@@ -33,7 +33,7 @@ export default function App() {
       setSecurityToken(storedToken);
       setSpreadsheetId(storedSheetId);
 
-      if (!storedUrl) {
+      if (!storedUrl && !hasDemoEntry()) {
         setNeedsSetup(true);
       }
     } catch (err) {
@@ -98,6 +98,16 @@ export default function App() {
     } catch (err) {
       console.warn('LocalStorage error setting config:', err);
     }
+    // Conectar de verdad deshace la elección de demostración: si no, la bandera
+    // sobreviviría a un borrado posterior de la URL y el onboarding no volvería a verse.
+    setDemoEntry(false);
+    setNeedsSetup(false);
+    setIsChangingUrl(false);
+    setSetupError('');
+  };
+
+  const handleExploreDemo = () => {
+    setDemoEntry(true);
     setNeedsSetup(false);
     setIsChangingUrl(false);
     setSetupError('');
@@ -188,6 +198,27 @@ export default function App() {
                 <span>{isChangingUrl ? 'Actualizar Ajustes' : 'Conectar y Abrir'}</span>
               </button>
             </div>
+
+            {!isChangingUrl && (
+              <div className="pt-1">
+                <div className="flex items-center gap-3 py-2">
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                  <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500">o</span>
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExploreDemo}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2 text-xs"
+                >
+                  <Compass className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span>Explorar con datos de demostración</span>
+                </button>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 text-center">
+                  Recorre la aplicación con datos de ejemplo, sin conectar ninguna planilla.
+                </p>
+              </div>
+            )}
           </form>
         </div>
       </div>

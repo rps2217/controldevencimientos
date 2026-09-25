@@ -97,7 +97,9 @@ import {
   objectArraySchema,
   booleanMapSchema,
   cachedSheetSchema,
-  isDemoMode
+  isDemoMode,
+  hasDemoEntry,
+  setDemoEntry
 } from './src/utils/appStorage';
 
 import {
@@ -456,6 +458,21 @@ console.log('\n--- 11. Pruebas de appStorage.ts ---');
   assert(isDemoMode() === true, 'appStorage: SCRIPT_URL con solo espacios sigue siendo modo demo');
   store.set(STORAGE_KEYS.SCRIPT_URL, 'https://script.google.com/macros/s/abc/exec');
   assert(isDemoMode() === false, 'appStorage: con SCRIPT_URL real no hay modo demo');
+
+  // Puerta de demostración del onboarding. La bandera es independiente de SCRIPT_URL:
+  // entrar a demo NO debe escribir una URL falsa (haría que la app creyera tener backend
+  // y encolara mutaciones contra un endpoint inexistente).
+  store.clear();
+  assert(hasDemoEntry() === false, 'appStorage: sin elección previa no hay entrada a demo');
+  assert(store.has(STORAGE_KEYS.SCRIPT_URL) === false, 'appStorage: entrar a demo no escribe SCRIPT_URL');
+  setDemoEntry(true);
+  assert(hasDemoEntry() === true, 'appStorage: setDemoEntry(true) recuerda la elección');
+  assert(isDemoMode() === true, 'appStorage: entrar a demo sigue siendo modo demo (sin SCRIPT_URL)');
+  setDemoEntry(false);
+  assert(hasDemoEntry() === false, 'appStorage: setDemoEntry(false) deshace la elección');
+  // Un valor corrupto no debe abrir la puerta: sólo '1' significa "elegido".
+  store.set(STORAGE_KEYS.DEMO_ENTRY, 'si');
+  assert(hasDemoEntry() === false, 'appStorage: un valor distinto de 1 no abre la puerta de demo');
 
   // Migración: la canónica ausente se promueve desde la heredada
   store.clear();

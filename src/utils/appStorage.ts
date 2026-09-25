@@ -17,6 +17,9 @@ export const STORAGE_KEYS = {
   // Configuración de la hoja (schema, columnas, slices, backendMirror)
   SHEET_CONFIG: 'appsheet_clone_config',
 
+  // Puerta de demostración del onboarding: abrir la app sin backend configurado
+  DEMO_ENTRY: 'appsheet_clone_demoEntry',
+
   // Cola offline y auditoría
   OFFLINE_QUEUE: 'appsheet_clone_offline_queue',
   AUDIT_LOG: 'appsheet_audit_log',
@@ -61,6 +64,27 @@ export const demoItemsKey = (view: string): string => `app_demo_items_${view}`;
  */
 export const isDemoMode = (): boolean =>
   !localStorage.getItem(STORAGE_KEYS.SCRIPT_URL)?.trim();
+
+/**
+ * El usuario eligió explícitamente "explorar la demostración" desde el onboarding.
+ *
+ * No se reutiliza `SCRIPT_URL` para esto: apuntarla a un valor falso haría que la app
+ * creyera tener backend y encolara mutaciones contra un endpoint inexistente. El modo
+ * demo sigue definiéndose por la ausencia de `SCRIPT_URL` (`isDemoMode`); esta bandera
+ * sólo recuerda que el usuario ya decidió entrar, para no volver a pedirle una URL en
+ * cada recarga.
+ */
+export const hasDemoEntry = (): boolean =>
+  localStorage.getItem(STORAGE_KEYS.DEMO_ENTRY) === '1';
+
+export function setDemoEntry(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(STORAGE_KEYS.DEMO_ENTRY, '1');
+    else localStorage.removeItem(STORAGE_KEYS.DEMO_ENTRY);
+  } catch {
+    // Storage no disponible o lleno: la sesión sigue, sólo se pierde la memoria de la elección.
+  }
+}
 
 /**
  * Lectura validada de una clave de localStorage.
