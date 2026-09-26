@@ -171,6 +171,7 @@ export interface DashboardModalsManagerProps {
   connectionStatus: ConnectionHealthStatus;
   lastHealthCheck: Date | null;
   healthErrorMessage: string | null;
+  scriptSupportsAtomicSave?: boolean | null;
   testConnectionHealth: () => Promise<{ success: boolean; latencyMs: number; status: ConnectionHealthStatus; error?: string }>;
   syncQueue: (targetMutationId?: string) => Promise<{ success: boolean; count: number; errors: string[] }>;
   removeMutation: (id: string) => Promise<void>;
@@ -255,6 +256,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     connectionStatus,
     lastHealthCheck,
     healthErrorMessage,
+    scriptSupportsAtomicSave,
     testConnectionHealth,
     syncQueue,
     removeMutation,
@@ -556,6 +558,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
         connectionStatus={connectionStatus}
         lastHealthCheck={lastHealthCheck}
         healthErrorMessage={healthErrorMessage}
+        scriptSupportsAtomicSave={scriptSupportsAtomicSave}
         testConnectionHealth={testConnectionHealth}
         syncQueue={syncQueue}
         removeMutation={removeMutation}

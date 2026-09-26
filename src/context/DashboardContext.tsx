@@ -125,6 +125,7 @@ export interface DashboardContextType {
   connectionStatus: ConnectionHealthStatus;
   lastHealthCheck: Date | null;
   healthErrorMessage: string | null;
+  scriptSupportsAtomicSave: boolean | null;
   testConnectionHealth: () => Promise<{ success: boolean; latencyMs: number; status: ConnectionHealthStatus; error?: string }>;
   syncQueue: (targetMutationId?: string) => Promise<{ success: boolean; count: number; errors: string[] }>;
   removeMutation: (id: string) => Promise<void>;

@@ -396,6 +396,43 @@ export async function pingGoogleSheets(): Promise<{
   }
 }
 
+/**
+ * Sondea si el Web App desplegado conoce el guardado atomico de campanas.
+ *
+ * Por que existe: el cliente degrada al respaldo no atomico cuando el script es
+ * antiguo, y ese respaldo puede perder lecturas entre terminales. Antes el aviso
+ * solo quedaba en consola, asi que una instalacion sin redesplegar parecia correcta.
+ * Se usa una accion de SOLO LECTURA para no escribir nada al sondear.
+ */
+export async function probeScriptCapabilities(): Promise<{
+  reachable: boolean;
+  atomicCampaignSave: boolean;
+  error?: string;
+}> {
+  if (!getScriptUrl()) {
+    return { reachable: false, atomicCampaignSave: false, error: 'URL de script no configurada (Modo Local)' };
+  }
+  try {
+    const res = await fetchFromScript<{ success?: boolean; capabilities?: { atomicCampaignSave?: boolean } }>({
+      action: 'getScriptCapabilities',
+      spreadsheetId: SPREADSHEET_ID
+    });
+    return {
+      reachable: true,
+      atomicCampaignSave: res?.capabilities?.atomicCampaignSave === true
+    };
+  } catch (err) {
+    // Un script anterior responde "Accion no soportada": alcanzable, pero sin la accion.
+    const msg = getErrorMessage(err);
+    const noSoportada = /Acci[oó]n no soportada/.test(msg);
+    return {
+      reachable: !noSoportada,
+      atomicCampaignSave: false,
+      error: noSoportada ? 'El script desplegado es anterior: no conoce el guardado atómico.' : msg
+    };
+  }
+}
+
 // PropertiesService storage (zero extra sheets needed)
 export async function getScriptPropertiesConfig(forceRefresh = false): Promise<ScriptResponse['config'] | null> {
   const now = Date.now();
@@ -1022,6 +1059,17 @@ function doPost(e) {
       const sheet = ss.getSheetByName(payload.sheetName);
       if (!sheet) return responseJson({ error: 'Hoja no encontrada: ' + payload.sheetName, values: [] });
       return responseJson({ values: getCleanSheetValues(sheet) });
+    }
+
+    // 3.5 CAPACIDADES DEL SCRIPT DESPLEGADO (solo lectura, nunca escribe)
+    // Permite que el cliente avise si el Web App desplegado es anterior y no conoce
+    // el guardado atomico. Un script viejo responde "Accion no soportada" a esta
+    // misma accion, que es justo lo que se quiere distinguir.
+    if (action === 'getScriptCapabilities') {
+      return responseJson({
+        success: true,
+        capabilities: { atomicCampaignSave: true }
+      });
     }
 
     // 4. AGREGAR FILA O FILAS EN LOTE (BATCH APPEND)

@@ -53,6 +53,9 @@ const metadata = {
 /** Latencia artificial de lectura, configurable por `setReadDelay` (0 = sin retardo). */
 let READ_DELAY_MS = 0;
 
+/** Si es true, el backend finge ser un Web App con una version anterior del script. */
+let LEGACY_SCRIPT = false;
+
 function handler(req, res) {
   // La app corre en otro origen (el preview): sin CORS el fetch falla y cae a demo.
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -92,6 +95,24 @@ function handler(req, res) {
     if (action === 'setReadDelay') {
       READ_DELAY_MS = Number(payload.ms) || 0;
       return res.end(JSON.stringify({ success: true, readDelayMs: READ_DELAY_MS }));
+    }
+
+    // Simula un Web App desplegado con una version anterior del script: no conoce
+    // las acciones nuevas y responde como el template real ante una desconocida.
+    if (action === 'setLegacyScript') {
+      LEGACY_SCRIPT = !!payload.enabled;
+      return res.end(JSON.stringify({ success: true, legacyScript: LEGACY_SCRIPT }));
+    }
+
+    // Capacidades del script desplegado (solo lectura). Un script anterior responde
+    // "Accion no soportada", que es lo que el cliente usa para avisar.
+    if (action === 'getScriptCapabilities') {
+      if (LEGACY_SCRIPT) return res.end(JSON.stringify({ error: 'Acción no soportada: getScriptCapabilities' }));
+      return res.end(JSON.stringify({ success: true, capabilities: { atomicCampaignSave: true } }));
+    }
+
+    if (LEGACY_SCRIPT && (action === 'saveCampaignsAtomic')) {
+      return res.end(JSON.stringify({ error: 'Acción no soportada: ' + action }));
     }
 
     // Escrituras en memoria. Antes se respondia `success: true` a ciegas, asi que

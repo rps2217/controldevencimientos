@@ -27,6 +27,7 @@ const path = require('path');
 const FAKE_PORT = Number(process.argv[3] || 9861);
 const READ_DELAY_MS = Number(process.argv[4] || 800);
 const TERMINAL = path.join(__dirname, 'campaign-sync-terminal.ts');
+const PROBE = path.join(__dirname, 'script-capability-probe.ts');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function post(payload) {
@@ -77,6 +78,23 @@ function correrTerminal(sessionId, entryId, label, startAt = 0) {
     p.on('close', () => {
       const line = out.trim().split('\n').find(l => l.trim().startsWith('{'));
       resolve(line ? JSON.parse(line) : { label, success: false, error: err.slice(0, 300) });
+    });
+  });
+}
+
+// Sondea las capacidades del script desplegado con el codigo REAL de produccion.
+function correrSondaCapacidades() {
+  return new Promise(resolve => {
+    const p = spawn('npx', ['tsx', PROBE, String(FAKE_PORT)], {
+      cwd: '/workspace/project/controldevencimientos',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let out = '', err = '';
+    p.stdout.on('data', c => out += c);
+    p.stderr.on('data', c => err += c);
+    p.on('close', () => {
+      const line = out.trim().split('\n').find(l => l.trim().startsWith('{'));
+      resolve(line ? JSON.parse(line) : { reachable: false, atomicCampaignSave: false, error: err.slice(0, 300) });
     });
   });
 }
@@ -158,6 +176,31 @@ function idsPersistidos(data) {
     error: salidaNuevo.error,
   });
 
+  // ---------- 5. SONDA DE CAPACIDADES ----------
+  // Con el script al dia, la sonda debe reportar el guardado atomico; con un Web
+  // App anterior, debe reportarlo ausente para que la UI avise. Sin el segundo
+  // caso, la sonda podria estar siempre en verde y no avisar nunca.
+  await post({ action: 'setLegacyScript', enabled: false });
+  const sondaNueva = await correrSondaCapacidades();
+  await post({ action: 'setLegacyScript', enabled: true });
+  const sondaVieja = await correrSondaCapacidades();
+  await post({ action: 'setLegacyScript', enabled: false });
+
+  resultados.push({
+    caso: 'SONDA: script al dia',
+    ok: sondaNueva.reachable === true && sondaNueva.atomicCampaignSave === true && !sondaNueva.harnessError,
+    detalle: sondaNueva,
+  });
+  resultados.push({
+    caso: 'SONDA: script anterior (debe avisar)',
+    // Debe avisar por la razon correcta (accion no soportada), no por un fallo
+    // cualquiera: si no, un arnes roto haria pasar este caso en falso.
+    ok: sondaVieja.atomicCampaignSave === false
+      && !sondaVieja.harnessError
+      && /script desplegado es anterior/.test(String(sondaVieja.error || '')),
+    detalle: sondaVieja,
+  });
+
   console.log(JSON.stringify(resultados, null, 2));
   console.log('DISPAROS DE LA CARRERA: ' + JSON.stringify(salidasCarrera.map(s => ({ label: s.label, disparo: s.disparo, duracionMs: s.duracionMs, ok: s.success }))));
 
@@ -165,16 +208,20 @@ function idsPersistidos(data) {
   const carrera = resultados[1].ok;
   const secuencial = resultados[2].ok;
   const libroNuevo = resultados[3].ok;
+  const sondaNuevaOk = resultados[4].ok;
+  const sondaViejaOk = resultados[5].ok;
 
   // Diagnostico: distingue "el merge esta roto" de "hay carrera".
   let veredicto;
   if (!control) veredicto = 'INDETERMINADO: el caso de control falla, la reproduccion no es valida.';
   else if (!libroNuevo) veredicto = 'LIBRO NUEVO ROTO: el primer guardado sin _CONFIG_APP falla o no persiste.';
+  else if (!sondaNuevaOk) veredicto = 'SONDA MUDA: con el script al dia la sonda no reporta el guardado atomico.';
+  else if (!sondaViejaOk) veredicto = 'SONDA CIEGA: con un script anterior la sonda no avisa, la UI no advertiria nada.';
   else if (!secuencial) veredicto = 'FALLO DE FUSION: incluso secuencial se pierden lecturas. El merge esta roto.';
   else if (!carrera) veredicto = 'CARRERA CONFIRMADA: secuencial funciona, simultaneo pierde lecturas (lost update).';
   else veredicto = 'SIN CARRERA: simultaneo conserva ambas lecturas (compare-and-swap activo).';
   console.log('DIAGNOSTICO: ' + veredicto);
-  const todoOk = carrera && libroNuevo;
+  const todoOk = carrera && libroNuevo && sondaNuevaOk && sondaViejaOk;
   console.log(todoOk ? 'RESULTADO: OK' : 'RESULTADO: FALLO');
   process.exit(todoOk ? 0 : 1);
 })().catch(e => { console.error('Fallo del arnes:', e.message); process.exit(1); });

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { indexedDbService, OfflineMutation, AuditLogEntry, MutationValues } from '../db/indexedDbService';
-import { appendRow, updateRow, deleteRow, getSheetData, pingGoogleSheets } from '../lib/sheets';
+import { appendRow, updateRow, deleteRow, getSheetData, pingGoogleSheets, probeScriptCapabilities } from '../lib/sheets';
 import type { SheetMatrix } from '../lib/sheets';
 import { matchRowIndexByIdentity, buildRowIdentityIndex } from '../utils/entityIdentityResolver';
 import { findColumnBySemantic } from '../utils/columnAliases';
@@ -64,6 +64,9 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
   );
   const [lastHealthCheck, setLastHealthCheck] = useState<Date | null>(null);
   const [healthErrorMessage, setHealthErrorMessage] = useState<string | null>(null);
+  // null = aun no sondeado; false = el script desplegado es anterior y el guardado
+  // atomico no protege. Se expone para que la UI lo advierta.
+  const [scriptSupportsAtomicSave, setScriptSupportsAtomicSave] = useState<boolean | null>(null);
 
   const isSyncingRef = useRef<boolean>(false);
   isSyncingRef.current = isSyncing;
@@ -154,6 +157,15 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
         setLatencyMs(res.latencyMs);
         setHealthErrorMessage(null);
         setIsOffline(false);
+        // Se sondea en la misma pasada de salud (sin temporizador propio): si el
+        // script desplegado es anterior, el guardado atomico no protege nada y el
+        // usuario debe saberlo, no descubrirlo por un console.warn.
+        probeScriptCapabilities().then(cap => {
+          setScriptSupportsAtomicSave(cap.atomicCampaignSave);
+          if (!cap.atomicCampaignSave) {
+            setHealthErrorMessage(cap.error || 'El script desplegado no soporta el guardado atómico.');
+          }
+        }).catch(() => setScriptSupportsAtomicSave(false));
         return { success: true, latencyMs: res.latencyMs, status: 'connected' };
       } else {
         setConnectionStatus('error');
@@ -570,6 +582,7 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
     connectionStatus,
     lastHealthCheck,
     healthErrorMessage,
+    scriptSupportsAtomicSave,
     testConnectionHealth,
     enqueueMutation,
     syncQueue,

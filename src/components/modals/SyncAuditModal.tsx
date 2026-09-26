@@ -22,6 +22,7 @@ interface SyncAuditModalProps {
   connectionStatus: ConnectionHealthStatus;
   lastHealthCheck: Date | null;
   healthErrorMessage: string | null;
+  scriptSupportsAtomicSave?: boolean | null;
   testConnectionHealth: () => Promise<{ success: boolean; latencyMs: number; status: ConnectionHealthStatus; error?: string }>;
   syncQueue: (targetMutationId?: string) => Promise<{ success: boolean; count: number; errors: string[] }>;
   removeMutation: (id: string) => Promise<void>;
@@ -44,6 +45,8 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
   isSyncing,
   latencyMs,
   connectionStatus,
+  healthErrorMessage,
+  scriptSupportsAtomicSave,
   testConnectionHealth,
   syncQueue,
   removeMutation,
@@ -332,6 +335,18 @@ export const SyncAuditModal: React.FC<SyncAuditModalProps> = ({
               <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-mono">
                 <Activity className="w-3.5 h-3.5 text-blue-500" />
                 <span>{latencyMs} ms</span>
+              </div>
+            )}
+
+            {/* Guardado atomico: si el script desplegado es anterior, el aviso debe
+                verse aqui y no solo en la consola del navegador. */}
+            {scriptSupportsAtomicSave === false && (
+              <div
+                className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400"
+                title={healthErrorMessage || 'El Web App desplegado no conoce el guardado atómico: con varias terminales pueden perderse conteos. Vuelve a desplegar el script desde Configuración.'}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                <span className="font-semibold">Script sin guardado atómico · redesplegar</span>
               </div>
             )}
 
