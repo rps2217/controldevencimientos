@@ -145,20 +145,36 @@ function idsPersistidos(data) {
     perdidas: ['E-D', 'E-E'].filter(x => !ids.has(x)),
   });
 
+  // ---------- 4. LIBRO NUEVO: sin hoja _CONFIG_APP ----------
+  // La ruta atomica no debe romper el primer guardado de una instalacion nueva.
+  await post({ action: 'deleteSheet', sheetName: '_CONFIG_APP' });
+  await sleep(150);
+  const salidaNuevo = await correrTerminal('SES-N', 'E-N', 'TERMINAL-N');
+  ids = idsPersistidos(await leerNube());
+  resultados.push({
+    caso: 'LIBRO NUEVO (sin _CONFIG_APP)',
+    lecturas: [...ids].sort(),
+    ok: !!salidaNuevo.success && ids.has('E-N'),
+    error: salidaNuevo.error,
+  });
+
   console.log(JSON.stringify(resultados, null, 2));
   console.log('DISPAROS DE LA CARRERA: ' + JSON.stringify(salidasCarrera.map(s => ({ label: s.label, disparo: s.disparo, duracionMs: s.duracionMs, ok: s.success }))));
 
   const control = resultados[0].ok;
   const carrera = resultados[1].ok;
   const secuencial = resultados[2].ok;
+  const libroNuevo = resultados[3].ok;
 
   // Diagnostico: distingue "el merge esta roto" de "hay carrera".
   let veredicto;
   if (!control) veredicto = 'INDETERMINADO: el caso de control falla, la reproduccion no es valida.';
+  else if (!libroNuevo) veredicto = 'LIBRO NUEVO ROTO: el primer guardado sin _CONFIG_APP falla o no persiste.';
   else if (!secuencial) veredicto = 'FALLO DE FUSION: incluso secuencial se pierden lecturas. El merge esta roto.';
   else if (!carrera) veredicto = 'CARRERA CONFIRMADA: secuencial funciona, simultaneo pierde lecturas (lost update).';
   else veredicto = 'SIN CARRERA: simultaneo conserva ambas lecturas (compare-and-swap activo).';
   console.log('DIAGNOSTICO: ' + veredicto);
-  console.log(carrera ? 'RESULTADO: OK' : 'RESULTADO: FALLO');
-  process.exit(carrera ? 0 : 1);
+  const todoOk = carrera && libroNuevo;
+  console.log(todoOk ? 'RESULTADO: OK' : 'RESULTADO: FALLO');
+  process.exit(todoOk ? 0 : 1);
 })().catch(e => { console.error('Fallo del arnes:', e.message); process.exit(1); });

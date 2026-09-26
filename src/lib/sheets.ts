@@ -672,12 +672,15 @@ export async function loadCampaignsFromCloud(configSheetName = '_CONFIG_APP'): P
   // 1. Intentar cargar desde la hoja _CONFIG_APP con ensamblado de chunks (soporta fotos ERP de cualquier tamaño)
   try {
     const rows = await getSheetData(configSheetName, true);
-    if (rows && rows.length >= 2) {
+    if (rows && rows.length >= 1) {
       const rowKeyMap = new Map<string, string>();
-      for (let i = 1; i < rows.length; i++) {
+      // La fila 0 es encabezado solo si lo parece: si la hoja se creo sin el, saltarla
+      // ocultaria la primera clave (mismo criterio que saveCampaignsAtomic en el script).
+      const tieneEncabezado = String(rows[0]?.[0] || '').trim() === 'CLAVE';
+      for (let i = tieneEncabezado ? 1 : 0; i < rows.length; i++) {
         const k = String(rows[i][0] || '').trim();
         const v = String(rows[i][1] || '');
-        if (k) rowKeyMap.set(k, v);
+        if (k && k !== 'CLAVE') rowKeyMap.set(k, v);
       }
 
       // A. Verificar si existen CHUNKS
@@ -1192,15 +1195,23 @@ function doPost(e) {
     // Si expectedVersion no coincide con la guardada, devuelve el estado vigente
     // para que el cliente re-fusione en lugar de pisarlo.
     if (action === 'saveCampaignsAtomic') {
-      const sheet = payload.sheetName ? ss.getSheetByName(payload.sheetName) : null;
-      if (!sheet) return responseJson({ error: 'Hoja no encontrada: ' + payload.sheetName });
+      let sheet = payload.sheetName ? ss.getSheetByName(payload.sheetName) : null;
+      if (!sheet) {
+        if (!payload.sheetName) return responseJson({ error: 'Hoja no encontrada: ' + payload.sheetName });
+        sheet = ss.insertSheet(payload.sheetName);
+      }
+      if (sheet.getLastRow() === 0) {
+        sheet.appendRow(['CLAVE', 'VALOR_JSON', 'ULTIMA_ACTUALIZACION']);
+      }
 
       const CAS_CHUNK = 30000; // Limite por celda de Sheets: 50.000
       const rows = sheet.getDataRange().getValues();
       const keyRow = {};
-      for (var kr = 1; kr < rows.length; kr++) {
+      // Se recorre desde 0 y no desde 1: si la hoja se creo sin encabezado (o el
+      // encabezado se borro), saltarse la primera fila ocultaria la clave CAMPAIGNS_DATA.
+      for (var kr = 0; kr < rows.length; kr++) {
         var kk = String(rows[kr][0] || '').trim();
-        if (kk) keyRow[kk] = kr + 1;
+        if (kk && kk !== 'CLAVE') keyRow[kk] = kr + 1;
       }
 
       const currentVersion = keyRow['CAMPAIGNS_VERSION'] ? String(rows[keyRow['CAMPAIGNS_VERSION'] - 1][1] || '') : '';

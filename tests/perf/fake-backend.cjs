@@ -122,12 +122,19 @@ function handler(req, res) {
     // Compare-and-swap del estado de campanas: misma semantica que el template de
     // Apps Script. Se relee la version AQUI (no del payload) y se rechaza si no
     // coincide con la que el cliente dice haber leido.
+    if (action === 'deleteSheet') {
+      delete HOJAS[payload.sheetName];
+      return res.end(JSON.stringify({ success: true }));
+    }
+
     if (action === 'saveCampaignsAtomic') {
+      // Igual que Apps Script: la hoja se crea si no existe (libro nuevo).
+      if (!HOJAS[payload.sheetName]) HOJAS[payload.sheetName] = [['CLAVE', 'VALOR_JSON', 'ULTIMA_ACTUALIZACION']];
       const f = filas();
       const keyRow = {};
-      for (let i = 1; i < f.length; i++) {
+      for (let i = 0; i < f.length; i++) {
         const k = String(f[i][0] || '').trim();
-        if (k) keyRow[k] = i;
+        if (k && k !== 'CLAVE') keyRow[k] = i;
       }
       const currentVersion = keyRow['CAMPAIGNS_VERSION'] !== undefined ? String(f[keyRow['CAMPAIGNS_VERSION']][1] || '') : '';
       const expected = payload.expectedVersion === undefined ? null : payload.expectedVersion;
