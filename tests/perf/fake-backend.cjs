@@ -50,6 +50,9 @@ const metadata = {
   })),
 };
 
+/** Latencia artificial de lectura, configurable por `setReadDelay` (0 = sin retardo). */
+let READ_DELAY_MS = 0;
+
 function handler(req, res) {
   // La app corre en otro origen (el preview): sin CORS el fetch falla y cae a demo.
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -78,7 +81,17 @@ function handler(req, res) {
       return res.end(JSON.stringify({ success: true, data }));
     }
     if (action === 'getSheetData') {
-      return res.end(JSON.stringify({ success: true, values: HOJAS[payload.sheetName] || [] }));
+      const enviar = () => res.end(JSON.stringify({ success: true, values: HOJAS[payload.sheetName] || [] }));
+      // Latencia de lectura configurable: es lo que abre la ventana de carrera entre
+      // el load y el save de dos terminales. En Apps Script real son ~2.500 ms.
+      if (READ_DELAY_MS > 0) return setTimeout(enviar, READ_DELAY_MS);
+      return enviar();
+    }
+
+    // Control de la latencia de lectura (para reproducir la carrera de sincronizacion).
+    if (action === 'setReadDelay') {
+      READ_DELAY_MS = Number(payload.ms) || 0;
+      return res.end(JSON.stringify({ success: true, readDelayMs: READ_DELAY_MS }));
     }
 
     // Escrituras en memoria. Antes se respondia `success: true` a ciegas, asi que
@@ -105,6 +118,50 @@ function handler(req, res) {
         .forEach(n => f.splice(n - 1, 1));
       return res.end(JSON.stringify({ success: true }));
     }
+
+    // Compare-and-swap del estado de campanas: misma semantica que el template de
+    // Apps Script. Se relee la version AQUI (no del payload) y se rechaza si no
+    // coincide con la que el cliente dice haber leido.
+    if (action === 'saveCampaignsAtomic') {
+      const f = filas();
+      const keyRow = {};
+      for (let i = 1; i < f.length; i++) {
+        const k = String(f[i][0] || '').trim();
+        if (k) keyRow[k] = i;
+      }
+      const currentVersion = keyRow['CAMPAIGNS_VERSION'] !== undefined ? String(f[keyRow['CAMPAIGNS_VERSION']][1] || '') : '';
+      const expected = payload.expectedVersion === undefined ? null : payload.expectedVersion;
+
+      if (expected !== null && expected !== currentVersion) {
+        let current = null;
+        const raw = keyRow['CAMPAIGNS_DATA'] !== undefined ? String(f[keyRow['CAMPAIGNS_DATA']][1] || '') : '';
+        if (raw && !raw.startsWith('[CHUNKED:')) { try { current = JSON.parse(raw); } catch {} }
+        return res.end(JSON.stringify({ success: false, conflict: true, current, version: currentVersion }));
+      }
+
+      const str = typeof payload.config === 'string' ? payload.config : JSON.stringify(payload.config);
+      const nowIso = new Date().toISOString();
+      const newVersion = String(Date.now()) + '-' + Math.random().toString(36).slice(2, 8);
+
+      const writeKey = (key, value) => {
+        if (keyRow[key] !== undefined) f[keyRow[key]] = [key, value, nowIso];
+        else { f.push([key, value, nowIso]); keyRow[key] = f.length - 1; }
+      };
+
+      const CHUNK = 30000;
+      const chunks = [];
+      for (let i = 0; i < str.length; i += CHUNK) chunks.push(str.slice(i, i + CHUNK));
+      const prevChunks = keyRow['CAMPAIGNS_DATA_CHUNKS'] !== undefined ? parseInt(String(f[keyRow['CAMPAIGNS_DATA_CHUNKS']][1] || '0'), 10) : 0;
+
+      writeKey('CAMPAIGNS_DATA_CHUNKS', String(chunks.length));
+      for (let c = 0; c < chunks.length; c++) writeKey('CAMPAIGNS_DATA_CHUNK_' + c, chunks[c]);
+      for (let c = chunks.length; c < prevChunks; c++) writeKey('CAMPAIGNS_DATA_CHUNK_' + c, '');
+      writeKey('CAMPAIGNS_DATA', str.length < 40000 ? str : '[CHUNKED:' + chunks.length + ']');
+      writeKey('CAMPAIGNS_VERSION', newVersion);
+
+      return res.end(JSON.stringify({ success: true, version: newVersion }));
+    }
+
     return res.end(JSON.stringify({ success: true }));
   });
 }

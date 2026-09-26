@@ -3,7 +3,7 @@ import { Download, RefreshCw, UploadCloud, FileSpreadsheet, Calendar, Layers, Pl
 import { InventoryCampaign, CampaignConsolidationMatrix, CampaignAuditRow, StockCountSession, SheetRecord } from '../../types';
 import { computeCampaignConsolidationMatrix, importPharmacySnapshotToCampaign, markSkuAsClosedInCampaign, reopenSkuInCampaign, setCampaignManualSalesAdjustment, exportCampaignReportToExcel, exportDiscrepanciesForRecountSheet, createNewCampaign, saveCampaignsToStorage, buildAuditRowsFromCampaignMatrix } from '../../utils/campaignUtils';
 import { saveStockCountSessionsToStorage, playBeep } from '../../utils/stockCountUtils';
-import { saveCampaignsToCloud, syncCampaignsWithCloud, saveAuditRowsToDedicatedSheet } from '../../lib/sheets';
+import { syncCampaignsWithCloud, saveAuditRowsToDedicatedSheet } from '../../lib/sheets';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { resolveActiveCampaign, collectAllAuditRows, getAuditProviders, filterAuditRows } from '../../utils/campaignAggregation';
 import { parseDelimitedText, detectDelimiter } from '../../utils/universalImporter';
@@ -71,14 +71,21 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
     }
   });
 
-  // Background Auto-Sync to Google Sheets / Cloud so mobile PDAs get updates instantly
+  // Background Auto-Sync to Google Sheets / Cloud so mobile PDAs get updates instantly.
+  // Va por syncCampaignsWithCloud (load->merge->CAS) y no por saveCampaignsToCloud:
+  // el guardado directo evita la comprobacion de version y puede pisar las lecturas
+  // que otra terminal haya escrito en el intervalo.
   const autoSyncCampaignsToCloud = async (camps: InventoryCampaign[], actId: string | null) => {
     try {
-      await saveCampaignsToCloud({
+      const res = await syncCampaignsWithCloud({
         campaigns: camps,
         activeCampaignId: actId,
         sessions
       });
+      if (res && res.success) {
+        onUpdateCampaigns(res.mergedCampaigns);
+        if (onUpdateSessions) onUpdateSessions(res.mergedSessions);
+      }
       const nowStr = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
       setLastCloudSyncDate(nowStr);
       try {
@@ -291,11 +298,17 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
       );
 
       try {
-        await saveCampaignsToCloud({
+        // Ruta protegida (load->merge->CAS): evita pisar conteos que otra terminal
+        // haya escrito entre la lectura y el guardado de la foto ERP.
+        const syncRes = await syncCampaignsWithCloud({
           campaigns: allUpdated,
           activeCampaignId: activeCampaign.id,
           sessions
         });
+        if (syncRes && syncRes.success) {
+          onUpdateCampaigns(syncRes.mergedCampaigns);
+          if (onUpdateSessions) onUpdateSessions(syncRes.mergedSessions);
+        }
         const nowStr = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
         setLastCloudSyncDate(nowStr);
         try {

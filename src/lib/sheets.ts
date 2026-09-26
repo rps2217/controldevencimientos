@@ -487,9 +487,27 @@ export async function saveCloudConfig(config: SheetConfig, configSheetName = '_C
   }
 }
 
+/** Resultado de un guardado de campañas: `conflict` indica que otra terminal escribió antes. */
+export interface CampaignSaveResult {
+  success: boolean;
+  conflict?: boolean;
+  current?: {
+    campaigns?: InventoryCampaign[];
+    sessions?: StockCountSession[];
+    activeCampaignId?: string | null;
+    lastUpdated?: string;
+  } | null;
+}
+
 /**
  * Persistencia en la nube de Campañas de Inventario y Sesiones de Conteo.
  * Permite que cualquier dispositivo conectado a Google Sheets comparta y consulte las campañas.
+ *
+ * `expectedVersion` activa concurrencia optimista: el servidor compara la versión
+ * almacenada contra la que el cliente leyó y, si otra terminal escribió antes,
+ * rechaza el guardado devolviendo el estado vigente. Sin esto, dos terminales que
+ * leen antes de que la otra escriba producen un lost update: la segunda guarda un
+ * estado fusionado sobre una lectura obsoleta y borra las lecturas de la primera.
  */
 export async function saveCampaignsToCloud(
   campaignsPayload: {
@@ -498,11 +516,12 @@ export async function saveCampaignsToCloud(
     sessions?: StockCountSession[];
     lastUpdated?: string;
   },
-  configSheetName = '_CONFIG_APP'
-): Promise<boolean> {
+  configSheetName = '_CONFIG_APP',
+  expectedVersion: string | null = null
+): Promise<CampaignSaveResult> {
   if (!getScriptUrl()) {
     console.warn('[Sheets] saveCampaignsToCloud omitido: URL de script no configurada (Modo Demo)');
-    return false;
+    return { success: false };
   }
   try {
     const nowIso = new Date().toISOString();
@@ -510,6 +529,33 @@ export async function saveCampaignsToCloud(
       ...campaignsPayload,
       lastUpdated: nowIso
     });
+
+    // 1. Intento atómico (compare-and-swap) en una sola llamada al servidor. El
+    //    candado de Apps Script no basta por sí solo: el respaldo en chunks son
+    //    varias peticiones HTTP, y entre una y otra otra terminal puede escribir.
+    //    Un único POST con verificación de versión elimina esa ventana.
+    try {
+      const cas = await fetchFromScript<{ success?: boolean; conflict?: boolean; current?: CampaignSaveResult['current']; version?: string }>({
+        action: 'saveCampaignsAtomic',
+        sheetName: configSheetName,
+        config: jsonStr,
+        expectedVersion,
+        spreadsheetId: SPREADSHEET_ID
+      });
+      if (cas && cas.conflict) {
+        return { success: false, conflict: true, current: cas.current || null };
+      }
+      if (cas && cas.success) {
+        clearSheetsCache(configSheetName);
+        return { success: true };
+      }
+    } catch (casErr) {
+      // Web App desplegada con una versión anterior del script: no conoce la acción.
+      // Se degrada al camino no atómico para no romper instalaciones existentes.
+      const msg = getErrorMessage(casErr);
+      if (!/Acción no soportada|Accion no soportada/.test(msg)) throw casErr;
+      console.warn('[Sheets] saveCampaignsAtomic no soportado por el script desplegado; usando respaldo no atómico (riesgo de lost update con varias terminales).');
+    }
 
     const CHUNK_SIZE = 30000; // 30KB por celda (máximo permitido por Google Sheets: 50.000)
     const chunks: string[] = [];
@@ -600,7 +646,7 @@ export async function saveCampaignsToCloud(
       throw sheetErr;
     }
 
-    return true;
+    return { success: true };
   } catch (err) {
     console.error('[Sheets] Error al guardar campañas en la nube:', err);
     throw err;
@@ -616,6 +662,8 @@ export async function loadCampaignsFromCloud(configSheetName = '_CONFIG_APP'): P
   activeCampaignId?: string | null;
   sessions?: StockCountSession[];
   lastUpdated?: string;
+  /** Versión del estado leído: se devuelve al guardar para detectar escrituras ajenas. */
+  version?: string;
 } | null> {
   if (!getScriptUrl()) {
     console.warn('[Sheets] loadCampaignsFromCloud omitido: URL de script no configurada (Modo Demo)');
@@ -645,7 +693,7 @@ export async function loadCampaignsFromCloud(configSheetName = '_CONFIG_APP'): P
           if (fullJson) {
             const parsed = JSON.parse(fullJson);
             if (parsed && Array.isArray(parsed.campaigns)) {
-              return parsed;
+              return { ...parsed, version: rowKeyMap.get('CAMPAIGNS_VERSION') || undefined };
             }
           }
         }
@@ -656,7 +704,7 @@ export async function loadCampaignsFromCloud(configSheetName = '_CONFIG_APP'): P
       if (singleData && !singleData.startsWith('[CHUNKED:')) {
         const parsed = JSON.parse(singleData);
         if (parsed && Array.isArray(parsed.campaigns)) {
-          return parsed;
+          return { ...parsed, version: rowKeyMap.get('CAMPAIGNS_VERSION') || undefined };
         }
       }
     }
@@ -714,22 +762,53 @@ export async function syncCampaignsWithCloud(
   try {
     const { mergeCampaignsAndSessions } = await import('../utils/stockCountUtils');
     
-    // 1. Descargar estado remoto
-    const remoteData = await loadCampaignsFromCloud(configSheetName);
+    // Reintento sobre conflicto de version: si otra terminal escribio entre el load
+    // y el save, se re-fusiona contra el estado vigente y se reintenta.
+    const MAX_INTENTOS = 4;
+    for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+      // 1. Descargar estado remoto
+      const remoteData = await loadCampaignsFromCloud(configSheetName);
 
-    // 2. Fusionar inteligentemente sesiones y campañas
-    const mergeResult = mergeCampaignsAndSessions(localPayload, remoteData);
+      // 2. Fusionar inteligentemente sesiones y campañas
+      const mergeResult = mergeCampaignsAndSessions(localPayload, remoteData);
 
-    // 3. Empujar estado fusionado a la nube
-    await saveCampaignsToCloud({
-      campaigns: mergeResult.mergedCampaigns,
-      activeCampaignId: mergeResult.activeCampaignId,
-      sessions: mergeResult.mergedSessions
-    }, configSheetName);
+      // 3. Empujar estado fusionado con la version leida (compare-and-swap). El
+      //    reintento cubre el caso de que otra terminal haya escrito entre el load
+      //    y el save: se re-fusiona contra el estado vigente. La fusion es
+      //    idempotente por entrada, asi que reintentar no duplica lecturas.
+      const saveRes = await saveCampaignsToCloud({
+        campaigns: mergeResult.mergedCampaigns,
+        activeCampaignId: mergeResult.activeCampaignId,
+        sessions: mergeResult.mergedSessions
+      }, configSheetName, remoteData?.version ?? '');
 
+      if (saveRes.success) {
+        return {
+          ...mergeResult,
+          success: true
+        };
+      }
+
+      if (!saveRes.conflict) {
+        return {
+          mergedCampaigns: localPayload.campaigns,
+          mergedSessions: localPayload.sessions,
+          activeCampaignId: localPayload.activeCampaignId || null,
+          newRemoteSessionsCount: 0,
+          success: false
+        };
+      }
+
+      console.warn(`[Sheets] Conflicto de version al sincronizar campanas (intento ${intento}/${MAX_INTENTOS}); re-fusionando con el estado vigente.`);
+    }
+
+    console.error('[Sheets] No se pudo sincronizar campanas tras varios conflictos de version.');
     return {
-      ...mergeResult,
-      success: true
+      mergedCampaigns: localPayload.campaigns,
+      mergedSessions: localPayload.sessions,
+      activeCampaignId: localPayload.activeCampaignId || null,
+      newRemoteSessionsCount: 0,
+      success: false
     };
   } catch (err) {
     console.error('[Sheets] Error durante syncCampaignsWithCloud:', err);
@@ -864,7 +943,7 @@ function doPost(e) {
     // OPTIMIZACIÓN 1: El candado de exclusión SOLO se activa en escrituras/mutaciones
     // Las operaciones de lectura (getMetadata, getSheetData, getAllSheetsData, getAppProperties)
     // corren concurrentemente a máxima velocidad sin colas ni tiempos de espera.
-    const writeActions = ['appendRow', 'updateRow', 'deleteRow', 'deleteRows', 'saveAppProperties'];
+    const writeActions = ['appendRow', 'appendRows', 'updateRow', 'deleteRow', 'deleteRows', 'saveAppProperties', 'setSheetData', 'batchSetSheetData', 'saveCampaignsAtomic'];
     isWriteAction = writeActions.indexOf(action) !== -1;
     if (isWriteAction) {
       lock = LockService.getScriptLock();
@@ -1103,6 +1182,83 @@ function doPost(e) {
         sheet.deleteRow(sortedIndexes[j]);
       }
       return responseJson({ success: true });
+    }
+
+    // 6.5 GUARDADO ATOMICO DE CAMPANAS (COMPARE-AND-SWAP)
+    // El respaldo normal son varias peticiones (contador + un update por chunk), asi
+    // que dos terminales pueden intercalarse entre ellas y perder lecturas. Aqui el
+    // chunking ocurre DENTRO de esta unica peticion, con el candado tomado y
+    // verificando la version: o se escribe el estado completo, o se rechaza.
+    // Si expectedVersion no coincide con la guardada, devuelve el estado vigente
+    // para que el cliente re-fusione en lugar de pisarlo.
+    if (action === 'saveCampaignsAtomic') {
+      const sheet = payload.sheetName ? ss.getSheetByName(payload.sheetName) : null;
+      if (!sheet) return responseJson({ error: 'Hoja no encontrada: ' + payload.sheetName });
+
+      const CAS_CHUNK = 30000; // Limite por celda de Sheets: 50.000
+      const rows = sheet.getDataRange().getValues();
+      const keyRow = {};
+      for (var kr = 1; kr < rows.length; kr++) {
+        var kk = String(rows[kr][0] || '').trim();
+        if (kk) keyRow[kk] = kr + 1;
+      }
+
+      const currentVersion = keyRow['CAMPAIGNS_VERSION'] ? String(rows[keyRow['CAMPAIGNS_VERSION'] - 1][1] || '') : '';
+      const expected = payload.expectedVersion === undefined ? null : payload.expectedVersion;
+
+      function assembleCurrent() {
+        var count = keyRow['CAMPAIGNS_DATA_CHUNKS'] ? parseInt(String(rows[keyRow['CAMPAIGNS_DATA_CHUNKS'] - 1][1] || '0'), 10) : 0;
+        if (count > 0) {
+          var acc = '';
+          for (var c = 0; c < count; c++) {
+            var ck = 'CAMPAIGNS_DATA_CHUNK_' + c;
+            acc += keyRow[ck] ? String(rows[keyRow[ck] - 1][1] || '') : '';
+          }
+          if (acc) { try { return JSON.parse(acc); } catch (e) { return null; } }
+        }
+        var single = keyRow['CAMPAIGNS_DATA'] ? String(rows[keyRow['CAMPAIGNS_DATA'] - 1][1] || '') : '';
+        if (single && single.indexOf('[CHUNKED:') !== 0) {
+          try { return JSON.parse(single); } catch (e) { return null; }
+        }
+        return null;
+      }
+
+      if (expected !== null && expected !== currentVersion) {
+        return responseJson({ success: false, conflict: true, current: assembleCurrent(), version: currentVersion });
+      }
+
+      const str = typeof payload.config === 'string' ? payload.config : JSON.stringify(payload.config);
+      const nowIso = new Date().toISOString();
+      const newVersion = String(new Date().getTime()) + '-' + Math.random().toString(36).slice(2, 8);
+
+      const writeKey = function(key, value) {
+        if (keyRow[key]) {
+          sheet.getRange(keyRow[key], 1, 1, 3).setValues([[key, value, nowIso]]);
+        } else {
+          sheet.appendRow([key, value, nowIso]);
+          keyRow[key] = sheet.getLastRow();
+        }
+      };
+
+      var chunks = [];
+      for (var ci = 0; ci < str.length; ci += CAS_CHUNK) {
+        chunks.push(str.substring(ci, ci + CAS_CHUNK));
+      }
+
+      var prevChunks = keyRow['CAMPAIGNS_DATA_CHUNKS'] ? parseInt(String(rows[keyRow['CAMPAIGNS_DATA_CHUNKS'] - 1][1] || '0'), 10) : 0;
+
+      writeKey('CAMPAIGNS_DATA_CHUNKS', String(chunks.length));
+      for (var w = 0; w < chunks.length; w++) {
+        writeKey('CAMPAIGNS_DATA_CHUNK_' + w, chunks[w]);
+      }
+      // Limpiar chunks sobrantes de un guardado anterior mas grande.
+      for (var ob = chunks.length; ob < prevChunks; ob++) {
+        writeKey('CAMPAIGNS_DATA_CHUNK_' + ob, '');
+      }
+      writeKey('CAMPAIGNS_DATA', str.length < 40000 ? str : '[CHUNKED:' + chunks.length + ']');
+      writeKey('CAMPAIGNS_VERSION', newVersion);
+
+      return responseJson({ success: true, version: newVersion });
     }
 
     // 7. LEER SCRIPT PROPERTIES (Sin crear hojas)
