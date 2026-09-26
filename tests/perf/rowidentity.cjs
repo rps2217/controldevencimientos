@@ -19,7 +19,7 @@
 const http = require('http');
 
 const args = process.argv.slice(2).filter(a => a !== undefined && a !== null && a !== '');
-const FAKE_PORT = Number(args.filter(a => /^\d+$/.test(String(a))).pop() || 9871);
+const FAKE_PORT = Number(args.filter(a => /^\d+$/.test(String(a))).pop() || 9100);
 
 function post(payload) {
   return new Promise((res, rej) => {

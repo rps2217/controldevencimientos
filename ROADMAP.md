@@ -3135,3 +3135,75 @@ arneses E2E** · build 0. Sin dependencias nuevas.
 > corrió el baseline con `git stash`: también falló, pero **otro** arnés (`bodegacheck.cjs`), y una
 > segunda corrida dio 27/27. La puerta E2E es **flaky** (un arnés distinto por corrida); no era
 > regresión. Conviene estabilizarla antes de confiar en un fallo aislado.
+
+## 29. Estabilización de la puerta E2E: dos causas raíz, no una (2026-09-19)
+
+La sección 28 dejó anotado que la puerta E2E era flaky («un arnés distinto por corrida»). Se
+cerró esa deuda midiendo el mecanismo, no la tasa de fallos. Aparecieron **dos** causas
+independientes.
+
+### Causa 1 — el backend falso vivía dentro de la banda de puertos CDP
+
+`run.cjs` levantaba el backend falso en **9820**, dentro de la banda aleatoria de los arneses
+(9300-9989). Siete arneses sortean un puerto que puede ser 9820 —incluido `bulkcheck.cjs`, que
+ni siquiera usa el backend falso—. Al darse la colisión:
+
+1. El Chrome del arnés no puede escuchar en 9820 (ocupado) y muere.
+2. `PUT /json/new` llega al **backend falso**, que responde `{"success":true}`.
+3. `target.webSocketDebuggerUrl` es `undefined` → `new WebSocket(undefined)` →
+   `TypeError: Invalid URL`, a los ~0.1 s.
+
+Probabilidad de choque por corrida: **8.4 %**. El modo ya estaba en el baseline (`e2e-r2.log`:
+`scannercheck.cjs (0.1s)` con el mismo error), así que no era regresión de ningún corte.
+
+El mecanismo se probó de forma determinista: contra el backend falso, `/json/version` y
+`/json/new` devuelven `{"success":true}` y `new WebSocket(undefined)` lanza exactamente
+`TypeError: Invalid URL`.
+
+**Corte:** `FAKE_BACKEND_PORT` a **9100**, fuera de la banda, con `E2E_FAKE_PORT` como escape;
+guarda que aborta con causa explícita si el puerto está ocupado; y los defaults standalone de
+los 9 arneses alineados a 9100.
+
+### Causa 2 — perfiles de Chrome sucios por `user-data-dir` derivado del puerto
+
+Cada arnés deriva `--user-data-dir` del puerto CDP aleatorio (`<prefijo>-<puerto>`) y **nunca
+borra el perfil**. Al repetirse un puerto (problema del cumpleaños), Chrome reabre un perfil con
+`appsheet_clone_*` de una corrida anterior. Los arneses que exigen arranque limpio
+(`demoentrycheck`) o un dataset recién sembrado (`detailcheck`) fallan entonces de forma
+intermitente.
+
+La intermitencia tiene una explicación precisa: el flush asíncrono de LevelDB compite con el
+`SIGKILL` del cierre. Probado de forma determinista con un perfil compartido entre dos corridas:
+
+- Escritura + `SIGKILL` → la marca **no** sobrevive (`null`).
+- Escritura + `Browser.close` (cierre ordenado) → la marca **sí** sobrevive.
+- Sembrado `appsheet_clone_scriptUrl` + `Browser.close` → el siguiente arranque en ese perfil
+  **salta el onboarding** (`onboarding:false`), la firma exacta de `demoentrycheck`.
+
+**Corte:** `run.cjs` crea un `TMPDIR` por corrida con `fs.mkdtempSync` y lo pasa en `env` a los
+27 arneses (todos derivan su perfil de `os.tmpdir()`, así que heredan el aislamiento sin tocar
+ninguno), y lo borra best-effort en `killAll`.
+
+### Validación por mutación
+
+Con las **precondiciones sembradas** (60 perfiles con `scriptUrl` persistido en el rango
+9420-9479 de `demoentrycheck`):
+
+| Condición | Fallos |
+|---|---|
+| Control (sin aislamiento) | **4/6** |
+| Tratamiento (`TMPDIR` fresco) | **0/10** |
+
+Fisher exacto **p = 0.0082**. La primera mutación (revertir el aislamiento tras purgar los
+perfiles) dio 0/20 y **no reprodujo**: sin la precondición sucia el control no puede fallar. Ese
+resultado obligó a sembrar la precondición para que la prueba fuera discriminante.
+
+### Puerta
+
+`tsc` 0 · `eslint` 0 errores (16 warnings preexistentes, idénticos con y sin el corte) · **320
+pruebas** unitarias · **27/27 arneses E2E en 4 corridas consecutivas con `E2E_RETRIES=0`** ·
+build 0. Sin dependencias nuevas (solo `os` de la stdlib de Node).
+
+Antes del corte, `E2E_RETRIES=0` no pasaba una corrida limpia; ahora pasa cuatro seguidas. El
+reintento único se conserva como red de seguridad, pero ya no es lo que sostiene el verde.
+

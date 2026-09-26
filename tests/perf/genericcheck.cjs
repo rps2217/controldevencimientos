@@ -26,7 +26,7 @@ const path = require('path');
 const port = 9700 + Math.floor(Math.random() * 60);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const URL_APP = process.argv[2];
-const FAKE_PORT = Number(process.argv[3] || 9800);
+const FAKE_PORT = Number(process.argv[3] || 9100);
 
 function req(method, p) {
   return new Promise((res, rej) => {

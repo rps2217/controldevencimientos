@@ -24,7 +24,7 @@ const path = require('path');
 
 // Convencion del runner: argv[2] = BASE de la app (no se usa: este arnes no abre
 // navegador, usa el codigo real de sheets.ts desde Node), argv[3] = puerto del backend.
-const FAKE_PORT = Number(process.argv[3] || 9861);
+const FAKE_PORT = Number(process.argv[3] || 9100);
 const READ_DELAY_MS = Number(process.argv[4] || 800);
 const TERMINAL = path.join(__dirname, 'campaign-sync-terminal.ts');
 const PROBE = path.join(__dirname, 'script-capability-probe.ts');

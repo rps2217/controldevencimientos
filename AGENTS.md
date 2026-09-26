@@ -412,7 +412,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
 | `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
-| `npm run test:e2e` | Arranca el build de producción y corre los 24 arneses de integridad (`tests/perf/run.cjs`). |
+| `npm run test:e2e` | Arranca el build de producción y corre los 27 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -439,8 +439,20 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 
 ### Arneses de medición (`tests/perf/`, requieren Chromium y un build servido)
 
+> **Aislamiento obligatorio (invariante de la puerta E2E).** `run.cjs` asigna un `TMPDIR` fresco
+> por corrida y lo pasa en `env` a todos los arneses. Cada arnés deriva su `--user-data-dir` de
+> `os.tmpdir()`, así que hereda el aislamiento sin cambios propios. No lo quites: sin él, un
+> puerto CDP repetido reabre un perfil con `appsheet_clone_*` de una corrida previa y los
+> arneses de arranque limpio fallan de forma intermitente (probado: 4/6 fallos, p=0.0082).
+>
+> **Puertos.** La banda CDP de los arneses es **9300-9989**; cualquier servidor auxiliar
+> (p. ej. el backend falso, hoy en **9100**) debe quedar **fuera** de ella. Un auxiliar dentro
+> de la banda le roba el puerto a un arnés, y este muere con `TypeError: Invalid URL` a los
+> ~0.1 s (el auxiliar responde `{"success":true}` a `/json/new`, así que
+> `webSocketDebuggerUrl` es `undefined`). Ver ROADMAP §29.
+
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 24 arneses que cubren integridad de
+`npm run test:e2e` arranca el preview y corre los 27 arneses que cubren integridad de
 datos y navegación; devuelve código distinto de cero si alguno falla. El binario de Chrome
 se toma de `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`,
 etc.).

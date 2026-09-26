@@ -13,6 +13,7 @@
 const { spawn, spawnSync } = require('child_process');
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -50,7 +51,10 @@ const HARNESSES = [
 // Arneses que necesitan el backend falso (hojas no canonicas): el runner lo levanta
 // y le pasa el puerto como segundo argumento.
 const NEED_FAKE_BACKEND = new Set(['genericcheck.cjs', 'bodegacheck.cjs', 'capabilitycheck.cjs', 'genericpersonalitycheck.cjs', 'catalogpersonalitycheck.cjs', 'titlecheck.cjs', 'writecheck.cjs', 'racecheck.cjs', 'rowidentity.cjs']);
-const FAKE_BACKEND_PORT = Number(process.env.E2E_FAKE_PORT || 9820);
+// Fuera de la banda de puertos CDP de los arneses (9300-9989): un backend falso dentro
+// de ese rango puede caerle a un arnés que sortea ese puerto, y entonces su Chrome no
+// escucha, `/json/new` lo responde el backend falso y el arnés muere con `Invalid URL`.
+const FAKE_BACKEND_PORT = Number(process.env.E2E_FAKE_PORT || 9100);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function findChrome() {
@@ -91,8 +95,20 @@ function get(url) {
 
   let exited = false;
   preview.on('exit', () => { exited = true; });
+
+  // Cada arnés deriva su `--user-data-dir` del puerto CDP aleatorio, y los perfiles
+  // nunca se borraban: al repetirse un puerto, Chrome reusaba un perfil con
+  // `appsheet_clone_*` de una corrida anterior. Eso rompía justo los arneses que exigen
+  // un arranque limpio (demoentrycheck) o un dataset recién sembrado (detailcheck), de
+  // forma intermitente. Aislar TMPDIR por arnés le da un perfil nuevo sin tocar los 27
+  // arneses: todos ya heredan `env: process.env`.
+  const profileTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-profile-'));
+
   const killAll = code => {
     try { preview.kill('SIGKILL'); } catch (e) {}
+    // Chrome puede seguir escribiendo en el perfil recién creado: el borrado es
+    // best-effort y nunca debe cambiar el código de salida de la puerta.
+    try { fs.rmSync(profileTmp, { recursive: true, force: true }); } catch (e) {}
     process.exit(code);
   };
 
@@ -113,19 +129,26 @@ function get(url) {
   const fakeBackend = spawn(process.execPath, [path.join(__dirname, 'fake-backend.cjs'), String(FAKE_BACKEND_PORT)],
     { cwd: ROOT, stdio: ['ignore', 'ignore', 'ignore'] });
   // Espera a que el backend falso acepte conexiones antes de correr los arneses.
+  let fakeUp = false;
   for (let i = 0; i < 40; i++) {
-    try { await get(`http://127.0.0.1:${FAKE_BACKEND_PORT}/`); break; } catch (e) { await sleep(250); }
+    try { await get(`http://127.0.0.1:${FAKE_BACKEND_PORT}/`); fakeUp = true; break; } catch (e) { await sleep(250); }
   }
-  // Un arnés puede fallar por contención de recursos (Chrome de corridas previas todavía
-  // soltando procesos), no por una regresión: se vio `filas: 0` justo tras encadenar
-  // arneses, y pasaba aislado. Un único reintento evita el falso rojo sin tapar un fallo
-  // real, que vuelve a fallar. E2E_RETRIES=0 desactiva el reintento.
+  // Si el puerto estaba ocupado, el backend falso no escucha y los arneses que lo
+  // necesitan fallan de forma críptica. Mejor abortar aquí con la causa explícita.
+  if (!fakeUp) {
+    console.error(`El backend falso no respondio en http://127.0.0.1:${FAKE_BACKEND_PORT}/ (¿puerto ocupado?)`);
+    try { fakeBackend.kill('SIGKILL'); } catch (e) {}
+    killAll(1);
+  }
+  // Un arnés puede fallar de forma intermitente por un perfil de Chrome sucio (ver
+  // abajo): un único reintento evita el falso rojo sin tapar un fallo real, que vuelve a
+  // fallar. E2E_RETRIES=0 desactiva el reintento.
   const maxRetries = process.env.E2E_RETRIES === undefined ? 1 : Number(process.env.E2E_RETRIES);
   const runHarness = h => {
     const args = [path.join(__dirname, h), BASE];
     if (NEED_FAKE_BACKEND.has(h)) args.push(String(FAKE_BACKEND_PORT));
     return spawnSync(process.execPath, args,
-      { cwd: ROOT, stdio: 'inherit', timeout: 180000, env: process.env });
+      { cwd: ROOT, stdio: 'inherit', timeout: 180000, env: { ...process.env, TMPDIR: profileTmp } });
   };
 
   for (const h of HARNESSES) {

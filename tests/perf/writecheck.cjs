@@ -18,7 +18,7 @@ const { spawn } = require('child_process');
 const http = require('http');
 const os = require('os');
 const port = 9300 + Math.floor(Math.random() * 90);
-const FAKE_PORT = Number(process.argv[3] || 9800);
+const FAKE_PORT = Number(process.argv[3] || 9100);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function httpReq(method, urlPath) {
