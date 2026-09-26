@@ -10,9 +10,10 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "lint:eslint": "eslint src",
-    "test": "tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts",
+    "test": "tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts && tsx tests/perf/rowidentity-template.ts",
     "test:components": "tsx tests/components.test.tsx",
     "test:e2e": "node tests/perf/run.cjs",
+    "test:count-scale": "tsx tests/perf/count-scale.ts",
     "verify": "tsc --noEmit && eslint src tests && npm test",
     "verify:all": "npm run verify && npm run build && npm run test:e2e"
   },

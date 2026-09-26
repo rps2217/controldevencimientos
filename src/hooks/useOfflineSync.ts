@@ -350,7 +350,8 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
             if (targetRowIndex && targetRowIndex > 1) {
               await updateRow(mutation.sheetTitle, targetRowIndex, Array.isArray(mutation.values) ? mutation.values : [], {
                 entityKey: entityKey,
-                keyValue: entityKey
+                keyValue: entityKey,
+                entityKeyCol: mutation.keyColumn || mutation.entityKeyCol,
               });
               // Invalidate cached sheet so next mutation fetches updated state
               freshSheetsCache.delete(mutation.sheetTitle);
@@ -410,7 +411,11 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
             }
 
             if (targetRowIndex && targetRowIndex > 1) {
-              await deleteRow(mutation.sheetId || 0, targetRowIndex, mutation.sheetTitle);
+              await deleteRow(mutation.sheetId || 0, targetRowIndex, mutation.sheetTitle, {
+                entityKey: mutation.keyValue || mutation.entityKey,
+                keyValue: mutation.keyValue || mutation.entityKey,
+                entityKeyCol: mutation.keyColumn || mutation.entityKeyCol,
+              });
               // Invalidate cached sheet
               freshSheetsCache.delete(mutation.sheetTitle);
               freshIndexesCache.delete(mutation.sheetTitle);

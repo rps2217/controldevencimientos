@@ -153,6 +153,13 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
     4. Identificador sintético con prefijo de hoja y fila de respaldo.
 - **Re-resolución Dinámica en Cola Offline (`matchRowIndexByIdentity`)**:
   - Al vaciar mutaciones (`update` o `delete`) en `useOfflineSync.ts`, el sistema re-localiza dinámicamente el `rowIndex` exacto en los datos frescos de Google Sheets mediante la clave de entidad o coincidencia de `CU_VC` / `SKU`+`YYYY`+`MM`, previniendo sobreescrituras o eliminaciones accidentales de filas contiguas.
+- **Invariante: la identidad manda sobre el índice obsoleto (servidor)**:
+  - El `rowIndex` lo calcula el cliente sobre una lectura previa. Si la hoja se movió entretanto (otra terminal borró una fila, alguien insertó/ordenó en Sheets), escribir por posición corrompe la fila **vecina** sin dar error: `updateRow` sobreescribe datos ajenos y `deleteRow` los destruye.
+  - Por eso el template de Apps Script (`src/lib/sheets.ts`) **re-localiza por clave antes de escribir**, no solo cuando el índice es inválido. El cliente envía `entityKey` + `entityKeyCol`.
+  - Al buscar la clave se usa **solo la columna de la clave** (`entityKeyCol`). Escanear toda la fila es peligroso con SKU numéricos: un código corto (`"100"`) coincide con una celda de `CANTIDAD` de otra fila y la escritura iría al registro equivocado. Sin columna conocida se exige coincidencia **única** en toda la fila; una ambigüedad conserva el índice en vez de reubicar mal.
+  - Clasificación de claves en el servidor: **de celda** (se reubica), **compuesta** (`SKU::FECHA`, se verifica el contenido antes de borrar) y **sintética** (`_ROW_`, deriva del propio índice: no aporta información, se usa el índice).
+  - Congelado por `tests/perf/rowidentity-template.ts`, que ejecuta el **template real** con stubs de Apps Script (no un mock) y cubre los 9 casos, incluidos los falsos positivos numéricos. `tests/perf/rowidentity.cjs` cubre el ida y vuelta HTTP contra el backend falso.
+
 
 ### I. Módulo de Conteo Masivo de Existencias y Cuadratura Virtualizada (`src/utils/stockCountUtils.ts` & `StockCountTerminal.tsx`)
 - **Virtualización de Cuadratura**: La tabla de reconciliación y cuadratura física vs. teórica utiliza `@tanstack/react-virtual` (`useVirtualizer`), permitiendo auditar cientos o miles de SKUs sin degradación de memoria ni lag en el scroll.

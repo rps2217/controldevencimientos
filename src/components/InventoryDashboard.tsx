@@ -904,7 +904,11 @@ export const InventoryDashboard: React.FC = () => {
       } else {
         const ident = resolveItemIdentity(item, headers, activeSheet.title);
         try {
-          await deleteRow(activeSheet.sheetId, item._rowIndex as number, activeSheet.title);
+          await deleteRow(activeSheet.sheetId, item._rowIndex as number, activeSheet.title, {
+            entityKey: ident.keyValue,
+            keyValue: ident.keyValue,
+            entityKeyCol: ident.keyColumn || undefined,
+          });
           showToast('Registro eliminado de Google Sheets', 'success', 'Eliminación Completada');
         } catch (delErr) {
           console.warn('Error al eliminar en la nube, agregando a cola offline:', delErr);

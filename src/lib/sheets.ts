@@ -280,6 +280,9 @@ export async function updateRow(
   const parsedRowIndex = parseSheetRowIndex(rowIndex);
 
   const entityKey = extraKeys?.entityKey || extraKeys?.keyValue;
+  // Columna de la clave (si el resolutor la conoce): permite al servidor buscar en
+  // esa columna y no en toda la fila, evitando falsos positivos con SKU numericos.
+  const entityKeyCol = extraKeys?.entityKeyCol || extraKeys?.keyColumn;
 
   if (parsedRowIndex < 1 && !entityKey) {
     throw new Error(`Índice de fila inválido (${rowIndex}) para actualizar en "${sheetName}". Se requiere un número de fila válido o una clave de entidad.`);
@@ -296,16 +299,24 @@ export async function updateRow(
     targetRow: safeRowIndex,
     entityKey: entityKey || undefined,
     keyValue: entityKey || undefined,
+    entityKeyCol: entityKeyCol || undefined,
     values, 
     spreadsheetId: SPREADSHEET_ID 
   });
 }
 
-export async function deleteRow(sheetId: number, rowIndex: number | null | undefined, sheetName?: string) {
+export async function deleteRow(
+  sheetId: number,
+  rowIndex: number | null | undefined,
+  sheetName?: string,
+  extraKeys?: { entityKey?: string; keyValue?: string; entityKeyCol?: string; keyColumn?: string }
+) {
   clearSheetsCache(sheetName);
   const parsedRowIndex = parseSheetRowIndex(rowIndex);
+  const entityKey = extraKeys?.entityKey || extraKeys?.keyValue;
+  const entityKeyCol = extraKeys?.entityKeyCol || extraKeys?.keyColumn;
 
-  if (parsedRowIndex < 1) {
+  if (parsedRowIndex < 1 && !entityKey) {
     throw new Error(`Índice de fila inválido (${rowIndex}) para eliminar en "${sheetName || sheetId}".`);
   }
 
@@ -316,6 +327,9 @@ export async function deleteRow(sheetId: number, rowIndex: number | null | undef
     row: parsedRowIndex,
     rowNumber: parsedRowIndex,
     targetRow: parsedRowIndex,
+    entityKey: entityKey || undefined,
+    keyValue: entityKey || undefined,
+    entityKeyCol: entityKeyCol || undefined,
     sheetName, 
     spreadsheetId: SPREADSHEET_ID 
   });
@@ -990,6 +1004,40 @@ function doPost(e) {
       lock.waitLock(15000);
     }
 
+    // Helper: localiza la fila que contiene una clave de entidad (CU_VC/SKU/ID).
+    // Devuelve el numero de fila (1-based) o -1.
+    //
+    // Si se conoce la columna de la clave se busca SOLO ahi. Escanear toda la fila
+    // es peligroso con SKU numericos: un codigo corto (p. ej. "100") puede coincidir
+    // con una celda de CANTIDAD o STOCK de otra fila y la escritura iria a la fila
+    // equivocada. Sin columna conocida se exige coincidencia unica en toda la fila,
+    // de modo que una ambiguedad no reubique nada.
+    function findRowByKey(sheet, searchKey, keyColumnName) {
+      if (!sheet || !searchKey) return -1;
+      var data = sheet.getDataRange().getValues();
+      if (!data || data.length < 2) return -1;
+
+      var colIdx = -1;
+      if (keyColumnName) {
+        var wanted = String(keyColumnName).trim().toUpperCase();
+        for (var h = 0; h < data[0].length; h++) {
+          if (String(data[0][h]).trim().toUpperCase() === wanted) { colIdx = h; break; }
+        }
+      }
+
+      var encontradas = [];
+      for (var r = 1; r < data.length; r++) {
+        if (colIdx >= 0) {
+          if (String(data[r][colIdx]).trim().toUpperCase() === searchKey) encontradas.push(r + 1);
+        } else {
+          for (var c = 0; c < data[r].length; c++) {
+            if (String(data[r][c]).trim().toUpperCase() === searchKey) { encontradas.push(r + 1); break; }
+          }
+        }
+      }
+      return encontradas.length === 1 ? encontradas[0] : -1;
+    }
+
     // Helper: Extrae datos en memoria limpia usando getValues() nativo (3x más veloz que getDisplayValues)
     function getCleanSheetValues(sheet) {
       if (!sheet) return [];
@@ -1165,22 +1213,18 @@ function doPost(e) {
       var rawRow = payload.rowIndex !== undefined && payload.rowIndex !== null ? payload.rowIndex : (payload.row !== undefined && payload.row !== null ? payload.row : (payload.rowNumber || payload.targetRow));
       var targetRow = parseInt(rawRow, 10);
       
-      // Auto-recuperación si rowIndex es null o inválido: buscar por clave de entidad/CU_VC/SKU
-      if (isNaN(targetRow) || targetRow < 1) {
-        var searchKey = String(payload.entityKey || payload.keyValue || '').trim().toUpperCase();
-        if (searchKey) {
-          var allData = sheet.getDataRange().getValues();
-          if (allData && allData.length > 1) {
-            for (var r = 1; r < allData.length; r++) {
-              for (var c = 0; c < allData[r].length; c++) {
-                if (String(allData[r][c]).trim().toUpperCase() === searchKey) {
-                  targetRow = r + 1;
-                  break;
-                }
-              }
-              if (!isNaN(targetRow) && targetRow > 1) break;
-            }
-          }
+      // La clave de entidad manda sobre el indice cuando es verificable en la hoja.
+      // El indice lo calculo el cliente sobre una lectura previa: si la hoja se movio
+      // entretanto (otra terminal elimino una fila, o alguien inserto/ordeno en Sheets)
+      // escribe sobre el vecino sin dar error. Si la clave esta en celdas (CU_VC, SKU,
+      // ID), se localiza y se corrige el indice obsoleto. Las claves compuestas
+      // (SKU::FECHA, SKU+YYYY+MM) no existen como celda unica, asi que ahi se conserva
+      // el indice que ya resolvio el cliente.
+      var searchKey = String(payload.entityKey || payload.keyValue || '').trim().toUpperCase();
+      if (searchKey) {
+        var locatedRow = findRowByKey(sheet, searchKey, payload.entityKeyCol || payload.keyColumn);
+        if (locatedRow > 1) {
+          targetRow = locatedRow;
         }
       }
 
@@ -1227,6 +1271,35 @@ function doPost(e) {
       }
 
       if (!validIndexes.length) return responseJson({ error: 'No se especificaron filas válidas para eliminar' });
+
+      // En el borrado individual la identidad tambien manda: si el indice quedo
+      // obsoleto, borrarlo elimina el registro VECINO (perdida silenciosa, no error).
+      // Tres casos: clave de celda (se reubica), clave compuesta (se verifica el
+      // contenido antes de destruir) y clave sintetica (deriva del propio indice,
+      // no aporta informacion nueva: se usa el indice tal cual).
+      if (action === 'deleteRow') {
+        var delKey = String(payload.entityKey || payload.keyValue || '').trim().toUpperCase();
+        var delRow = validIndexes[0];
+        var esCompuesta = delKey.indexOf('::') !== -1;
+        var esSintetica = delKey.indexOf('_ROW_') !== -1;
+        if (delKey && !esCompuesta && !esSintetica) {
+          var locatedDel = findRowByKey(sheet, delKey, payload.entityKeyCol || payload.keyColumn);
+          if (locatedDel > 1) {
+            validIndexes = [locatedDel];
+          } else {
+            return responseJson({ error: 'No se elimino la fila: la clave indicada no existe en la hoja (indice posiblemente obsoleto).' });
+          }
+        } else if (esCompuesta) {
+          // Solo se borra si la fila destino realmente contiene la clave compuesta.
+          var rowVals = sheet.getRange(delRow, 1, 1, sheet.getLastColumn()).getValues()[0];
+          var rowText = rowVals.map(function(v) { return String(v).trim().toUpperCase(); });
+          var partes = delKey.split('::').filter(function(p) { return p.length > 0; });
+          var coincide = partes.length > 0 && partes.every(function(p) { return rowText.indexOf(p) !== -1; });
+          if (!coincide) {
+            return responseJson({ error: 'No se elimino la fila: el contenido no corresponde a la clave indicada (indice posiblemente obsoleto).' });
+          }
+        }
+      }
 
       var sortedIndexes = validIndexes.slice().sort(function(a, b) { return b - a; });
       for (var j = 0; j < sortedIndexes.length; j++) {

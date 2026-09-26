@@ -120,19 +120,61 @@ function handler(req, res) {
     // vuelta online (append/update/delete y su relectura) quedaba sin cubrir.
     // La fila 1 es el encabezado, por eso `_rowIndex` 2 es `filas[1]`.
     const filas = () => (HOJAS[payload.sheetName] || (HOJAS[payload.sheetName] = []));
+    // Localiza la fila que contiene la clave (misma semantica que findRowByKey del
+    // template de Apps Script): busca solo en la columna de la clave si se conoce, y
+    // exige coincidencia unica para no reubicar por una celda ajena. Devuelve fila
+    // 1-based o -1.
+    const findRowByKey = (rows, key, keyColumnName) => {
+      let colIdx = -1;
+      if (keyColumnName && rows[0]) {
+        const wanted = String(keyColumnName).trim().toUpperCase();
+        colIdx = rows[0].findIndex(h => String(h).trim().toUpperCase() === wanted);
+      }
+      const encontradas = [];
+      for (let r = 1; r < rows.length; r++) {
+        if (colIdx >= 0) {
+          if (String(rows[r][colIdx]).trim().toUpperCase() === key) encontradas.push(r + 1);
+        } else {
+          for (const cell of (rows[r] || [])) {
+            if (String(cell).trim().toUpperCase() === key) { encontradas.push(r + 1); break; }
+          }
+        }
+      }
+      return encontradas.length === 1 ? encontradas[0] : -1;
+    };
+    // Reemplaza el contenido completo de una hoja (sembrado determinista de arneses).
+    if (action === 'setSheetData') {
+      HOJAS[payload.sheetName] = (payload.values || []).map(r => (r || []).map(String));
+      return res.end(JSON.stringify({ success: true }));
+    }
     if (action === 'appendRow') {
       filas().push((payload.values || []).map(String));
       return res.end(JSON.stringify({ success: true }));
     }
     if (action === 'updateRow') {
       const f = filas();
-      const idx = Number(payload.rowIndex);
+      let idx = Number(payload.rowIndex);
+      // Misma semantica que el template: la clave verificable en celdas manda
+      // sobre un indice que pudo quedar obsoleto.
+      const key = String(payload.entityKey || payload.keyValue || '').trim().toUpperCase();
+      if (key && key.indexOf('::') === -1 && key.indexOf('_ROW_') === -1) {
+        const found = findRowByKey(f, key, payload.entityKeyCol || payload.keyColumn);
+        if (found > 1) idx = found;
+      }
       if (idx >= 1 && idx <= f.length) f[idx - 1] = (payload.values || []).map(String);
       return res.end(JSON.stringify({ success: true }));
     }
     if (action === 'deleteRow' || action === 'deleteRows') {
       const f = filas();
-      const idxs = action === 'deleteRows' ? (payload.rowIndexes || []) : [payload.rowIndex];
+      let idxs = action === 'deleteRows' ? (payload.rowIndexes || []) : [payload.rowIndex];
+      if (action === 'deleteRow') {
+        const key = String(payload.entityKey || payload.keyValue || '').trim().toUpperCase();
+        if (key && key.indexOf('::') === -1 && key.indexOf('_ROW_') === -1) {
+          const found = findRowByKey(f, key, payload.entityKeyCol || payload.keyColumn);
+          if (found > 1) idxs = [found];
+          else return res.end(JSON.stringify({ error: 'clave no encontrada (indice posiblemente obsoleto)' }));
+        }
+      }
       // Descendente: borrar de arriba hacia abajo desplazaria los indices restantes.
       idxs.map(Number).filter(n => Number.isFinite(n) && n >= 1 && n <= f.length)
         .sort((a, b) => b - a)

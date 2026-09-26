@@ -214,7 +214,11 @@ export const useInventoryBulkActions = ({
             const itemToDelete = originalItems.find(i => i._rowIndex === rowIndex);
             const ident = itemToDelete ? resolveItemIdentity(itemToDelete, headers, activeSheet.title) : null;
             try {
-              await deleteRow(activeSheet.sheetId, rowIndex, activeSheet.title);
+              await deleteRow(activeSheet.sheetId, rowIndex, activeSheet.title, {
+                entityKey: ident?.keyValue,
+                keyValue: ident?.keyValue,
+                entityKeyCol: ident?.keyColumn || undefined,
+              });
             } catch (err) {
               console.warn(`Error al eliminar fila ${rowIndex} en la nube, agregando a cola offline`, err);
               await enqueueMutation({
