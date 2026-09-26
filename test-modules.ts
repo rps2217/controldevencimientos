@@ -135,6 +135,7 @@ import {
   filterAuditRows
 } from './src/utils/campaignAggregation';
 import { InventoryCampaign, StockCountSession, CampaignSnapshotItem, StockCountEntry, StockCountReconciliationItem, InventoryItem, SheetConfig } from './src/types';
+import { mergeCloudConfigs, redactSecretsForCloudSheet } from './src/utils/dashboardConfigUtils';
 import { createMimeMessage, escapeHtml } from './src/lib/gmailService';
 
 
@@ -1610,6 +1611,76 @@ console.log('\n--- 23. Sinonimos manuales: acentos y no-desborde (Ponytail) ---'
   // El exacto sigue ganando.
   assert(findColumnBySemantic(['COD'], 'sku', { sku: ['COD'] }) === 'COD',
     'alias: la coincidencia exacta del sinonimo se conserva');
+}
+
+console.log('\n--- 24. Seguridad: la apiKey no viaja a la hoja compartida (Ponytail) ---');
+{
+  const configConClave: SheetConfig = {
+    main: 'VENCIMIENTOS',
+    updatedAt: '2026-09-26T00:00:00.000Z',
+    backendMirror: {
+      enabled: true,
+      endpointUrl: 'https://espejo.ejemplo.cl',
+      apiKey: 'clave-secreta-123',
+      syncMode: 'dual_write',
+      conflictStrategy: 'last_write_wins'
+    }
+  };
+
+  // 1. El chokepoint: la config que se persiste en la hoja no lleva el secreto.
+  const redactada = redactSecretsForCloudSheet(configConClave);
+  assert(redactada.backendMirror?.apiKey === undefined,
+    'redaccion: la apiKey no se incluye en la config de la hoja');
+  assert(!JSON.stringify(redactada).includes('clave-secreta-123'),
+    'redaccion: el secreto no aparece en el JSON serializado');
+  // Lo demas del espejo sobrevive: no se pierde configuracion util.
+  assert(redactada.backendMirror?.endpointUrl === 'https://espejo.ejemplo.cl'
+    && redactada.backendMirror?.enabled === true
+    && redactada.backendMirror?.syncMode === 'dual_write',
+    'redaccion: el resto de la config del espejo se conserva');
+  assert(configConClave.backendMirror?.apiKey === 'clave-secreta-123',
+    'redaccion: la config original no se muta (la clave local sigue viva)');
+
+  // Sin secreto no hay copia nueva: se devuelve la misma referencia.
+  const sinClave: SheetConfig = { main: 'FRC' };
+  assert(redactSecretsForCloudSheet(sinClave) === sinClave,
+    'redaccion: sin apiKey no se crea una copia innecesaria');
+
+  // 2. El merge: la nube (sin clave) no debe borrar la clave local en silencio.
+  const local: SheetConfig = {
+    main: 'VENCIMIENTOS',
+    updatedAt: '2026-09-26T00:00:00.000Z',
+    backendMirror: {
+      enabled: true,
+      endpointUrl: 'https://espejo.ejemplo.cl',
+      apiKey: 'clave-secreta-123',
+      syncMode: 'dual_write',
+      conflictStrategy: 'last_write_wins'
+    }
+  };
+  const remotoMasNuevo: SheetConfig = {
+    main: 'VENCIMIENTOS',
+    updatedAt: '2026-09-27T00:00:00.000Z',
+    backendMirror: {
+      enabled: true,
+      endpointUrl: 'https://espejo.ejemplo.cl',
+      syncMode: 'mirror_first',
+      conflictStrategy: 'last_write_wins'
+    }
+  };
+  const fusion = mergeCloudConfigs(local, remotoMasNuevo);
+  assert(fusion.backendMirror?.apiKey === 'clave-secreta-123',
+    'merge: la clave local sobrevive a un remoto mas nuevo sin clave');
+  assert(fusion.backendMirror?.syncMode === 'mirror_first',
+    'merge: el remoto mas nuevo sigue mandando en el resto del espejo');
+
+  // Si el remoto trae su propia clave (Script Properties si la conserva), esa manda.
+  const remotoConClave: SheetConfig = {
+    ...remotoMasNuevo,
+    backendMirror: { ...remotoMasNuevo.backendMirror!, apiKey: 'clave-remota-999' }
+  };
+  assert(mergeCloudConfigs(local, remotoConClave).backendMirror?.apiKey === 'clave-remota-999',
+    'merge: una clave remota explicita tiene prioridad sobre la local');
 }
 
 console.log(`\n========================================`);

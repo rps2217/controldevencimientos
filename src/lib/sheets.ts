@@ -4,6 +4,7 @@ import { consolidateAuditRows, dedupeAuditRows } from '../utils/auditConsolidati
 import { fetchWithTimeout } from './http';
 
 import { STORAGE_KEYS } from '../utils/appStorage';
+import { redactSecretsForCloudSheet } from '../utils/dashboardConfigUtils';
 export const SPREADSHEET_ID = '1a4jGo-7pduH4fue73F_67sQYJS0LJqI7hiXYpyWVA8o';
 
 /** Valor de una celda tal como lo devuelve Google Sheets. */
@@ -502,7 +503,11 @@ export async function loadCloudConfig(configSheetName = '_CONFIG_APP'): Promise<
 }
 
 export async function saveCloudConfig(config: SheetConfig, configSheetName = '_CONFIG_APP') {
+  // La pestaña `_CONFIG_APP` la lee cualquiera con acceso a la hoja, así que su
+  // JSON va sin secretos. Script Properties (paso 1) es privado y conserva la
+  // config íntegra: por eso se serializan por separado.
   const jsonStr = JSON.stringify(config, null, 2);
+  const sheetJsonStr = JSON.stringify(redactSecretsForCloudSheet(config), null, 2);
   const nowIso = new Date().toISOString();
 
   // 1. Guardar en Script Properties si está disponible
@@ -522,9 +527,9 @@ export async function saveCloudConfig(config: SheetConfig, configSheetName = '_C
   
   if (!rows || rows.length === 0) {
     await appendRow(configSheetName, ['CLAVE', 'VALOR_JSON', 'ULTIMA_ACTUALIZACION']);
-    await appendRow(configSheetName, ['APP_CONFIG', jsonStr, nowIso]);
+    await appendRow(configSheetName, ['APP_CONFIG', sheetJsonStr, nowIso]);
   } else if (rows.length === 1) {
-    await appendRow(configSheetName, ['APP_CONFIG', jsonStr, nowIso]);
+    await appendRow(configSheetName, ['APP_CONFIG', sheetJsonStr, nowIso]);
   } else {
     // Buscar la fila exacta de APP_CONFIG
     let targetRow = 2;
@@ -534,7 +539,7 @@ export async function saveCloudConfig(config: SheetConfig, configSheetName = '_C
         break;
       }
     }
-    await updateRow(configSheetName, targetRow, ['APP_CONFIG', jsonStr, nowIso], { entityKey: 'APP_CONFIG' });
+    await updateRow(configSheetName, targetRow, ['APP_CONFIG', sheetJsonStr, nowIso], { entityKey: 'APP_CONFIG' });
   }
 }
 

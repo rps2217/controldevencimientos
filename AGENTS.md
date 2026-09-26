@@ -346,6 +346,7 @@ Para garantizar un código limpio, sin sobreingeniería (*anti-bloat*) y con el 
 - **Prevención de Pérdida de Datos**: Conservar siempre el soporte offline y las colas de sincronización para Google Sheets.
 - **Validación de Datos**: Mantener sanitización, manejo de errores `try/catch` con `AbortController` y parsing seguro de formatos heterogéneos de fechas y números.
 - **Accesibilidad y Rendimiento**: Respetar contraste visual WCAG AA, virtualización de listas grandes (`@tanstack/react-virtual`) y tipado estricto en TypeScript sin `any` injustificados.
+- **Secretos fuera de recursos compartidos**: La pestaña `_CONFIG_APP` la lee cualquiera con acceso a la hoja, así que **nunca** debe contener credenciales. `saveCloudConfig` redacta `backendMirror.apiKey` con `redactSecretsForCloudSheet` antes de escribirla; Script Properties (privado) sí conserva la config íntegra, por eso se serializan por separado. `mergeCloudConfigs` repone la clave local cuando gana un remoto que no la trae: sin eso, la redacción la borraría en silencio en cada revalidación. Congelado en `test-modules.ts` §24.
 
 ---
 

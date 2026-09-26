@@ -3069,3 +3069,69 @@ arnés es discriminante.
 ### Puerta
 
 `tsc` 0 · **293 pruebas** unitarias · **24/24 arneses E2E** · build 0. Sin dependencias nuevas.
+
+---
+
+## 28. Auditoría Ponytail (2026-09-26) — el «Punto 4» no existía y la `apiKey` viajaba en claro
+
+### Hallazgo de trazabilidad: el Punto 4 era un artefacto del resumen de contexto
+
+El tracker arrastraba un «Punto 4 — pendiente» que **nunca se definió**. Rastreando los eventos de la
+conversación, la recomendación original del 26-09 tenía tres puntos accionables (1: aviso de script
+sin guardado atómico; 2: medir el conteo; 3: hueco de concurrencia) y un cuarto bloque que era **la
+lista de exclusiones** («lo que deliberadamente no hice: chunking, UI, dependencias»). El resumen
+automático de contexto convirtió esa sección en una tarea pendiente y renumeró la lista.
+
+Conclusión: **no había nada que ejecutar**. Ejecutar un «Punto 4» inventado habría sido el trabajo
+especulativo que la escalera de Ponytail prohíbe. Se cerró como aclaración, no como corte.
+
+### Auditoría estructural: los 8 invariantes y su puerta
+
+| Invariante | Puerta permanente | Estado |
+|---|---|---|
+| Identidad de datos | `rowidentity.cjs` + `rowidentity-template.ts` (9 casos) | ✅ |
+| Concurrencia | `racecheck.cjs` (6 casos, CAS por versión) | ✅ |
+| Offline/PWA | `offlinecheck.cjs` + `countcheck.cjs` (flush `pagehide`) | ✅ |
+| Contrato cliente↔script | `script-capability-probe.ts` | ✅ |
+| Tipado | `tsc --noEmit` en `verify.yml` | ✅ |
+| Seguridad | `test-modules.ts` §24 (este corte) | ✅ tras el corte |
+| Rendimiento | `count-scale.ts` / `count-render-cost.cjs` | ⚠️ medición manual, fuera de CI |
+| Dependencias | — | ⚠️ disciplina, sin puerta automática |
+
+### El defecto de seguridad, medido
+
+La `apiKey` del backend espejo viajaba **en claro** a la pestaña `_CONFIG_APP`, que lee cualquiera
+con acceso a la hoja. Dos rutas: el botón «Opción 1» de `useCloudConfigSync`, y —más grave— el
+**fallback silencioso** de `InventoryDashboard.saveConfig`: si `saveScriptPropertiesConfig` falla (y
+con un script anterior *siempre* falla, porque no conoce `saveAppProperties`), cae a
+`saveCloudConfig` y escribe el JSON completo, credencial incluida.
+
+Verificado antes de tocar nada: el resto de los sinks de inyección **sí** estaban cubiertos
+(`barcodeGenerator` escapa con `escapeXml`, `gmailService` con `escapeHtml`, `introText`/`footerText`
+también); no hay token en logs ni en URLs.
+
+### El corte (un chokepoint, no seis parches)
+
+1. **`redactSecretsForCloudSheet(config)`** (`dashboardConfigUtils.ts`): devuelve la config sin
+   `backendMirror.apiKey`, sin mutar el original y sin crear copia si no hay secreto.
+2. **`saveCloudConfig`**: único punto que escribe la hoja. Serializa **por separado** — la hoja
+   recibe el JSON redactado; Script Properties (privado) conserva la config íntegra.
+3. **`mergeCloudConfigs`**: repone la clave local cuando gana un remoto que no la trae. Sin esto, la
+   redacción la borraría en silencio en la siguiente revalidación (la nube *siempre* llega sin
+   clave, así que el borrado sería sistemático).
+
+### Validación por mutación
+
+Revertida la redacción y la preservación del merge: **3 pruebas caen** —«la apiKey no se incluye»,
+«el secreto no aparece en el JSON serializado» y «la clave local sobrevive a un remoto más nuevo»—.
+Restaurado el corte: 8/8 OK. Las pruebas son discriminantes, no decorativas.
+
+### Puerta
+
+`tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **320 pruebas** unitarias · **27/27
+arneses E2E** · build 0. Sin dependencias nuevas.
+
+> **Nota de método:** la primera corrida E2E falló `importcheck.cjs`. Antes de atribuirlo al corte se
+> corrió el baseline con `git stash`: también falló, pero **otro** arnés (`bodegacheck.cjs`), y una
+> segunda corrida dio 27/27. La puerta E2E es **flaky** (un arnés distinto por corrida); no era
+> regresión. Conviene estabilizarla antes de confiar en un fallo aislado.

@@ -53,7 +53,7 @@ export function mergeCloudConfigs(local: SheetConfig, remote: SheetConfig): Shee
     ...(primary.tableBulkActions || {})
   };
 
-  return {
+  const merged: SheetConfig = {
     ...secondary,
     ...primary,
     slices: Array.from(sliceMap.values()),
@@ -61,6 +61,26 @@ export function mergeCloudConfigs(local: SheetConfig, remote: SheetConfig): Shee
     tableBulkActions: mergedBulk,
     updatedAt: new Date(Math.max(localTime, remoteTime, Date.now())).toISOString()
   };
+
+  // La nube guarda la config sin `apiKey` (se redacta al escribirla en la hoja
+  // compartida). Si el remoto gana el merge, hay que conservar la clave local:
+  // de lo contrario se perderia en silencio y el espejo dejaria de autenticarse.
+  const apiKeyLocal = local.backendMirror?.apiKey;
+  if (apiKeyLocal && merged.backendMirror && !merged.backendMirror.apiKey) {
+    merged.backendMirror = { ...merged.backendMirror, apiKey: apiKeyLocal };
+  }
+  return merged;
+}
+
+/**
+ * Devuelve la config sin secretos, apta para persistirse en la hoja compartida
+ * `_CONFIG_APP`. La `apiKey` del backend espejo se queda en localStorage y en
+ * Script Properties (privados); en la hoja la leeria cualquiera con acceso.
+ */
+export function redactSecretsForCloudSheet(config: SheetConfig): SheetConfig {
+  if (!config.backendMirror?.apiKey) return config;
+  const { apiKey: _redactada, ...mirrorSinClave } = config.backendMirror;
+  return { ...config, backendMirror: mirrorSinClave };
 }
 
 export interface ModuleViewState {
