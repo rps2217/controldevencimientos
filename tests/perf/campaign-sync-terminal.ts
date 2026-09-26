@@ -62,9 +62,7 @@ const campaign = {
   ajustesVentaManual: {},
 };
 
-const { syncCampaignsWithCloud } = await import(
-  '/workspace/project/controldevencimientos/src/lib/sheets.ts'
-);
+const { syncCampaignsWithCloud } = await import('../../src/lib/sheets.ts');
 
 // Espera activa hasta el instante coordinado: ambos procesos disparan su
 // load->save en el mismo milisegundo, garantizando el solapamiento.

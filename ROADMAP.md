@@ -3207,3 +3207,94 @@ build 0. Sin dependencias nuevas (solo `os` de la stdlib de Node).
 Antes del corte, `E2E_RETRIES=0` no pasaba una corrida limpia; ahora pasa cuatro seguidas. El
 reintento único se conserva como red de seguridad, pero ya no es lo que sostiene el verde.
 
+
+## 30. Auditoría Ponytail (2026-09-19) — el CI llevaba 6 commits en rojo por rutas absolutas
+
+Al cerrar la estabilización de §29 se fue a confirmar el CI y la pestaña de Actions llevaba
+**seis commits en rojo** (`dae1bbb` en adelante), incluido el `edd3a41` recién empujado. Ninguno
+de los resúmenes previos lo mencionaba porque nadie había mirado el CI: la medición local daba
+verde y se asumió que el CI también.
+
+### Hallazgo 1 — rutas absolutas a una máquina concreta, commiteadas
+
+`tsc` fallaba en CI con un solo error:
+
+```
+tests/perf/campaign-sync-terminal.ts#L66: Cannot find module
+'/workspace/project/controldevencimientos/src/lib/sheets.ts'
+```
+
+Esa ruta es el workspace de desarrollo de este entorno. En el runner el repo vive en
+`/home/runner/work/...`, así que el módulo no existe. El mismo patrón estaba en
+`tests/perf/racecheck.cjs` (dos `cwd:` de `spawn`), que además **no había fallado todavía**
+porque el arnés lanza `tsx` con una ruta relativa y el `cwd` sólo se usa como base de proceso.
+
+Lo engañoso: el bug es **invisible al correr en la máquina que lo introdujo**. Un clon limpio en
+`/tmp` hacía `npm run verify` con exit 0 porque el import absoluto seguía resolviendo contra el
+workspace real, no contra el clon. Sólo se vio leyendo el log del runner.
+
+**Corte:** las tres rutas a relativas (`../../src/lib/sheets.ts` y `path.join(__dirname,'..','..')`).
+Ninguna dependencia nueva.
+
+### Hallazgo 2 — el serial de Excel se corría un día en zonas UTC-negativas
+
+Al probar el arreglo en varias `TZ` apareció un segundo bug, ajeno al CI: la prueba del serial
+`45321` fallaba en `America/Santiago` y `Asia/Tokyo`, y pasaba en `UTC`.
+
+```
+new Date(ms)            -> 2024-01-30T00:00:00.000Z   (instante UTC, correcto)
+.setHours(0, 0, 0, 0)   -> medianoche LOCAL, que en Chile (UTC-3) es el 29
+```
+
+Toda fecha importada desde Excel/Sheets se leía **un día antes** en Chile, que es la zona
+objetivo de la aplicación. Se corrigió con `serialToLocalDate`, que extrae los componentes UTC y
+reconstruye con el constructor local — el mismo criterio que ya usaban las ramas ISO y latina
+del parser. Se corrigió también la prueba, que comparaba con `toISOString()` y por eso era
+ciega al problema.
+
+### Validación por mutación
+
+Revertido el helper a `new Date(ms).setHours(0,0,0,0)`:
+
+| Zona | Resultado |
+|---|---|
+| `America/Santiago` | **falla** (`obtenido: 2024-01-29`) |
+| `UTC` | pasa |
+
+La mutación es discriminante en la zona del usuario e **invisible en UTC**: exactamente por qué
+llevaba sin detectarse. Con el corte, el parser da `2024-01-30` en `UTC`, `America/Santiago`,
+`Asia/Tokyo`, `Pacific/Kiritimati` (UTC+14) y `America/New_York`.
+
+### Hallazgo 3 — `document.body` es null en ~20 % de las evaluaciones tras navegar
+
+Con las dos causas anteriores cerradas, `demoentrycheck.cjs` seguía fallando dentro del runner
+pero pasaba 20/20 en aislado. Medido con una sonda de target nuevo por iteración (como hacen los
+arneses): `document.body === null` en **8/40 = 20 %** de las evaluaciones inmediatas tras
+`Page.navigate`. El sondeo del arnés no tenía guarda, así que la excepción mataba el proceso —el
+`Cannot read properties of null (reading 'innerText')` a los 0.5 s del reporte original.
+
+Al blindar el sondeo apareció un segundo modo, visible sólo bajo la carga del runner: **el texto
+del onboarding se pinta antes que el botón de demostración**. El sondeo esperaba sólo el texto,
+así que la búsqueda del botón (`detail: null`) corría en la ventana en que aún no existía. Eso
+explicaba los 30.7 s del fallo: el bucle de 120 intentos se agotaba entero.
+
+**Corte:** el sondeo espera a la UI **completa** (`onboarding && botón`) con `catch(() => false)`
+durante la espera, dejando que las aserciones reales sigan lanzando.
+
+### Puerta
+
+`tsc` 0 · `eslint` 0 errores (16 warnings preexistentes) · **320 pruebas** unitarias · pruebas
+verdes en **5 zonas horarias** · build 0 · **27/27 arneses E2E con `E2E_RETRIES=0`**. Sin
+dependencias nuevas.
+
+`demoentrycheck` pasó de 30.7 s (fallo) a **1.7 s** en verde: el corte ataca la causa, no el
+síntoma.
+
+> **Deuda que queda abierta (honesta):** hay ~30 lecturas de `document.body` repartidas en 14
+> arneses y **19 arneses definen su propio `ev2`**, sin helper compartido. Los tres `catch` de
+> sondeo se aplicaron sólo a `demoentrycheck`, que es el que se midió. Los demás conservan la
+> misma carrera latente: no se tocaron porque **no hay síntoma medido** en ellos, y extender el
+> corte a ciegas contradice la escalera. Si alguno falla de forma intermitente, el primer
+> sospechoso es esa lectura sin guarda.
+
+

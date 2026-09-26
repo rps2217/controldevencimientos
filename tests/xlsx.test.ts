@@ -53,9 +53,13 @@ async function main() {
   const dates = await parseExcelBuffer(fixture('date_serial.xlsx'));
   const serialValue = dates.rows[0]['Fecha Vencimiento'];
   const resolved = parseAnyDate(serialValue);
+  // Se comparan componentes LOCALES, no `toISOString()`: el parser devuelve
+  // medianoche local y en zonas con offset positivo (p. ej. Tokio) el ISO UTC
+  // caeria en el dia anterior. Mismo criterio que el caso de fecha nativa.
+  const resolvedIso = resolved && `${resolved.getFullYear()}-${String(resolved.getMonth() + 1).padStart(2, '0')}-${String(resolved.getDate()).padStart(2, '0')}`;
   assert(
-    resolved !== null && resolved.toISOString().slice(0, 10) === '2024-01-30',
-    `parseExcelBuffer + parseAnyDate: resuelven el serial 45321 a 2024-01-30 (obtenido: ${resolved && resolved.toISOString().slice(0, 10)})`
+    resolvedIso === '2024-01-30',
+    `parseExcelBuffer + parseAnyDate: resuelven el serial 45321 a 2024-01-30 (obtenido: ${resolvedIso})`
   );
 
   // Fecha nativa: con `raw: true` la celda llega como Date y debe normalizarse a

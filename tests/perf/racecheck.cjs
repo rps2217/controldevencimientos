@@ -69,7 +69,7 @@ async function leerNube() {
 function correrTerminal(sessionId, entryId, label, startAt = 0) {
   return new Promise(resolve => {
     const p = spawn('npx', ['tsx', TERMINAL, String(FAKE_PORT), sessionId, entryId, label, String(startAt)], {
-      cwd: '/workspace/project/controldevencimientos',
+      cwd: path.join(__dirname, '..', '..'),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '', err = '';
@@ -86,7 +86,7 @@ function correrTerminal(sessionId, entryId, label, startAt = 0) {
 function correrSondaCapacidades() {
   return new Promise(resolve => {
     const p = spawn('npx', ['tsx', PROBE, String(FAKE_PORT)], {
-      cwd: '/workspace/project/controldevencimientos',
+      cwd: path.join(__dirname, '..', '..'),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '', err = '';

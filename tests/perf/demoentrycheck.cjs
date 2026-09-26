@@ -71,7 +71,16 @@ function req(method, p) {
   const EN_DASHBOARD = `!!document.querySelector('[title="Abrir Panel Lateral de Control, Densidad y Vistas"]')`;
 
   await send('Page.navigate', { url: URL_APP });
-  for (let i = 0; i < 120; i++) { if (await ev2(EN_ONBOARDING)) break; await sleep(250); }
+  // Se espera a que la UI este COMPLETA, no solo al texto del onboarding:
+  //   - `document.body` es null en ~20% de las evaluaciones inmediatas tras
+  //     navegar (el documento previo ya se destruyo y el nuevo aun no existe);
+  //     sin el catch la excepcion mata el arnes.
+  //   - el texto del onboarding aparece antes que el boton de demostracion, asi
+  //     que sondear solo por el texto dejaba la busqueda del boton corriendo en
+  //     la ventana en que aun no existe (fallo intermitente bajo carga).
+  // Las comprobaciones reales de abajo siguen lanzando si algo va mal.
+  const LISTO = `(${EN_ONBOARDING}) && !!(${URL_DEMO})`;
+  for (let i = 0; i < 120; i++) { if (await ev2(LISTO).catch(() => false)) break; await sleep(250); }
 
   check('sin backend, el arranque limpio muestra el onboarding', await ev2(EN_ONBOARDING));
   check('el dashboard NO se muestra antes de elegir', !(await ev2(EN_DASHBOARD)));

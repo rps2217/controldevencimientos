@@ -450,6 +450,24 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 > de la banda le roba el puerto a un arnés, y este muere con `TypeError: Invalid URL` a los
 > ~0.1 s (el auxiliar responde `{"success":true}` a `/json/new`, así que
 > `webSocketDebuggerUrl` es `undefined`). Ver ROADMAP §29.
+>
+> **Rutas relativas (invariante de portabilidad).** Ningún arnés ni prueba puede referirse a una
+> ruta absoluta del entorno de desarrollo (`/workspace/project/...`, `/home/runner/...`). Usa
+> `path.join(__dirname, '..', '..')` o un import relativo. El bug es **invisible en la máquina
+> que lo introduce** —un clon en otra ruta sigue resolviendo el import absoluto contra el
+> workspace real y `verify` da verde— pero revienta el CI, que corre en `/home/runner/work/...`.
+> Ver ROADMAP §30.
+>
+> **Sondeo con guarda.** `document.body` es `null` en ~20 % de las evaluaciones inmediatas tras
+> `Page.navigate` (medido: 8/40). Un sondeo de arranque debe envolver la evaluación en
+> `.catch(() => false)` y esperar a la UI **completa** (texto y botón), no sólo al primer texto
+> que aparezca: la excepción, sin guarda, mata el arnés. Ver ROADMAP §30.
+>
+> **Fechas y zona horaria.** El serial de Excel se convierte con `serialToLocalDate`
+> (`pureCalculations.ts`), nunca con `new Date(ms).setHours(0,0,0,0)`: ese instante es UTC y en
+> zonas de offset negativo (Chile, UTC-3) retrocede al día anterior. Las pruebas de fechas deben
+> comparar componentes **locales**, no `toISOString()`. Un fallo aquí es invisible en UTC, así que
+> al tocar fechas conviene correr `TZ=America/Santiago npm test`. Ver ROADMAP §30.
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
 `npm run test:e2e` arranca el preview y corre los 27 arneses que cubren integridad de

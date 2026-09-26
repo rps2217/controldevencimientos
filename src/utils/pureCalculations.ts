@@ -41,6 +41,21 @@ export function getCategoryFromEventValue(rawVal: unknown): EventCategory | null
 }
 
 /**
+ * Convierte el epoch-ms de un serial de Excel/Sheets a medianoche LOCAL.
+ *
+ * No sirve `new Date(ms).setHours(0,0,0,0)`: el instante es UTC, y en zonas con
+ * offset negativo (p. ej. Chile, UTC-3) `setHours(0)` lo retrocede al día anterior.
+ * Se extraen los componentes UTC y se reconstruye con el constructor local, que es
+ * el mismo criterio que usan las ramas ISO/latina de `parseAnyDate`.
+ */
+function serialToLocalDate(ms: number): Date | null {
+  const u = new Date(ms);
+  if (isNaN(u.getTime())) return null;
+  const d = new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), 0, 0, 0, 0);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
  * Universal Date Parser supporting:
  * - Google Sheets / Excel serial numbers (e.g. 45321)
  * - ISO format: YYYY-MM-DD, YYYY/MM/DD, YYYY-MM-DDTHH:mm:ss
@@ -62,11 +77,8 @@ export function parseAnyDate(dateVal: unknown): Date | null {
   if (typeof dateVal === 'number' && !isNaN(dateVal) && dateVal > 20000 && dateVal < 70000) {
     // 25569 = Days between 1899-12-30 and 1970-01-01 (Unix epoch)
     const ms = Math.round((dateVal - 25569) * 86400 * 1000);
-    const d = new Date(ms);
-    if (!isNaN(d.getTime())) {
-      d.setHours(0, 0, 0, 0);
-      return d;
-    }
+    const d = serialToLocalDate(ms);
+    if (d) return d;
   }
 
   const str = String(dateVal).trim();
@@ -77,11 +89,8 @@ export function parseAnyDate(dateVal: unknown): Date | null {
     const num = parseFloat(str);
     if (num > 20000 && num < 70000) {
       const ms = Math.round((num - 25569) * 86400 * 1000);
-      const d = new Date(ms);
-      if (!isNaN(d.getTime())) {
-        d.setHours(0, 0, 0, 0);
-        return d;
-      }
+      const d = serialToLocalDate(ms);
+      if (d) return d;
     }
   }
 
