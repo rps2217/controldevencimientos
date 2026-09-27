@@ -11,6 +11,7 @@ import { parseLocaleNumber, getEndOfMonthDateForYm, formatDisplayDate } from './
 import { findMasterProduct, getMasterProductSummary } from './referenceResolver';
 import { exportToExcel } from './exportUtils';
 import { STORAGE_KEYS, readStorage, objectArraySchema } from './appStorage';
+import { toAuditSheetStatus } from './auditConsolidation';
 
 // El ciclo de campañas (snapshot ERP, matriz de cuadratura, reportes y su
 // persistencia) vive en `campaignUtils.ts`. Este módulo cubre las sesiones de
@@ -518,7 +519,7 @@ export function buildAuditRowsFromSession(
       STOCK_FISICO: item.contado,
       DIFERENCIA: item.diferencia,
       VENTA_AJUSTE: item.ajusteMovimiento || 0,
-      ESTADO_AUDITORIA: item.estado,
+      ESTADO_AUDITORIA: toAuditSheetStatus(item.estado),
       UBICACIONES_MUEBLES: session.ubicacion || session.nombre,
       USUARIO_TERMINAL: 'Operario',
       ULTIMA_ACTUALIZACION: nowIso

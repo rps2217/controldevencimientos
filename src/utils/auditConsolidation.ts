@@ -1,4 +1,35 @@
 import type { CellValue, SheetRow, SheetMatrix } from '../lib/sheets';
+import type { StockCountReconciliationItem } from '../types';
+
+/**
+ * Vocabulario canónico de la columna `ESTADO_AUDITORIA` de la pestaña
+ * `_AUDITORIA_INVENTARIO`.
+ *
+ * La hoja es una sola y no registra de qué vía entró cada fila, así que la sesión
+ * individual y la campaña consolidada deben escribir el MISMO valor. Con dos
+ * vocabularios, un SKU cuadrado quedaba `CUADRADO` o `CUADRADO_OK` según el origen y
+ * cualquier filtro o tabla dinámica sobre esa columna se partía en dos.
+ */
+export type AuditSheetStatus =
+  | 'CUADRADO_OK'
+  | 'FALTANTE'
+  | 'SOBRANTE'
+  | 'NUNCA_PISTOLEADO'
+  | 'HALLAZGO_NO_ERP'
+  | 'VALIDADO_CERRADO';
+
+/**
+ * Traduce el estado de cuadratura de una sesión al vocabulario de la hoja. El estado
+ * interno (`CUADRADO`, `NO_CATALOGADO`) es el que ve el operario en la UI de cuadratura
+ * y no se renombra: la traducción vive solo en la frontera de escritura.
+ */
+export function toAuditSheetStatus(
+  estado: StockCountReconciliationItem['estado']
+): AuditSheetStatus {
+  if (estado === 'CUADRADO') return 'CUADRADO_OK';
+  if (estado === 'NO_CATALOGADO') return 'HALLAZGO_NO_ERP';
+  return estado;
+}
 
 /** Construye los valores de una fila de auditoría según el orden de `headerList`. */
 export function buildAuditRowValues(

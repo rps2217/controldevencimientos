@@ -3591,3 +3591,96 @@ corrompería la cuadratura. Lanzar sesiones normales por proveedor es un corte a
 Gate: `tsc` 0 · `eslint` 0 errores (1 warning preexistente) · **401 unitarias** (391 + 10) ·
 **19 de componente** (12 + 7) · build 0 · **27 arneses E2E** en verde.
 
+
+---
+
+## Auditoría Ponytail (2026-09-19) — Fase 5: auditoría integral del módulo de conteo
+
+Encargo: auditar el módulo de conteo completo para **definir y separar sus funciones**. Antes
+de cortar nada se midió, y la medición cambió el plan: **el corte más valioso no era otro
+trozo de JSX, sino el contrato de datos entre las dos vías de guardado.** Eso destapó un bug
+de producción que ninguna prueba cubría.
+
+### Medición del dominio (no por tamaño, por costura)
+
+| Archivo | Líneas | Rol |
+| --- | --- | --- |
+| `StockCountTerminal.tsx` | 2.624 | UI del pistoleo. Monolito ya medido: 43/65 identidades por bloque, corte por móvil/escritorio **descartado** |
+| `CampaignConsolidationDashboard.tsx` | 947 | Matriz de campaña (ya podado −31 % en cortes 3 y 4) |
+| `stockCountUtils.ts` | 829 | Sesiones: reconciliación de una sesión |
+| `campaignUtils.ts` | 808 | Campañas: snapshot ERP, matriz, reportes |
+| `countAggregation.ts` | 196 | Agregación pura de la sesión (corte 2) |
+| `campaignAggregation.ts` | 159 | Agregación pura de la campaña |
+| `auditConsolidation.ts` | 66 | Consolidación de filas de auditoría |
+
+La separación de dominios ya es correcta: **sesiones** (`stockCountUtils`) y **campañas**
+(`campaignUtils`) no comparten una sola función, y la agregación pura vive fuera de los
+componentes. No se encontró mezcla del dominio FRC/vencimientos dentro del conteo.
+
+### Hallazgo 1 (bug real) — `ESTADO_AUDITORIA` con dos vocabularios
+
+La pestaña `_AUDITORIA_INVENTARIO` es **una sola** y no registra de qué vía entró cada fila. Sin
+embargo el estado se escribía en dos vocabularios distintos según el origen:
+
+| Concepto | Vía sesión (`buildAuditRowsFromSession`) | Vía campaña (`buildAuditRowsFromCampaignMatrix`) |
+| --- | --- | --- |
+| Cuadrado | `CUADRADO` | `CUADRADO_OK` |
+| Sin registro en ERP | `NO_CATALOGADO` | `HALLAZGO_NO_ERP` |
+| — | — | `VALIDADO_CERRADO`, `NUNCA_PISTOLEADO` |
+
+Consecuencia operativa: un filtro o tabla dinámica sobre `ESTADO_AUDITORIA` mezclaba dos
+poblaciones para el mismo concepto, y los "hallazgos físicos" de una sesión individual no
+aparecían al filtrar por `HALLAZGO_NO_ERP`. Ninguna prueba lo cubría.
+
+**Corrección elegida (la más barata que cierra el agujero).** El vocabulario canónico y la
+traducción viven en `auditConsolidation.ts` —el módulo que **ya** gobierna el contrato de la
+hoja—: `AuditSheetStatus` + `toAuditSheetStatus()` (`CUADRADO→CUADRADO_OK`,
+`NO_CATALOGADO→HALLAZGO_NO_ERP`). Se traduce **solo en la frontera de escritura**; el estado
+interno (`CUADRADO`, `NO_CATALOGADO`) no se renombra porque es el que ve el operario en la UI de
+cuadratura y lo leen `countAggregation` y las dos tablas de `StockCountReconciliationView`.
+Renombrar el tipo hasta la UI habría sido un "mejor nombre" con onda expansiva por todo el
+dominio; el bug estaba en la escritura, no en el modelo.
+
+La vía de campaña se tipó con el mismo `AuditSheetStatus` y su cadena pasó a ser exhaustiva
+(`...else estadoLabel = 'HALLAZGO_NO_ERP'`), así el compilador obliga a que toda rama caiga en el
+vocabulario. El literal duplicado desaparece: las dos vías de guardado emiten el mismo conjunto.
+
+Verificación: 2 pruebas nuevas + **mutación confirmada** (revertir `toAuditSheetStatus` → el
+arnés cae exactamente en las 2, 401 pasadas/2 falladas) · `tsc` 0 · build 0.
+
+### Hallazgo 2 — `resumenPorUbicacion` es código muerto
+
+`computeCampaignConsolidationMatrix` construye y devuelve `resumenPorUbicacion` (por mueble),
+que **no se renderiza ni se exporta en ningún sitio**. Su único consumidor es una aserción de
+prueba. `campaignAggregation.computeProviderProgress` lo cita en su comentario como "el análogo
+… pero sobre un eje que sí vive en la fila". **No tocado en este corte**: retirarlo implica un
+cambio de tipo y de prueba que conviene hacer cuando se cierre el eje por proveedor, no antes.
+Queda anotado.
+
+### Hallazgo 3 (a corregir) — la escritura a `_AUDITORIA_INVENTARIO` está duplicada
+
+`StockCountTerminal.handleSyncToAuditSheet` y
+`CampaignConsolidationDashboard.handleSaveToDedicatedAuditSheet` repiten el flujo: construir
+filas según la vía, `saveAuditRowsToDedicatedSheet('_AUDITORIA_INVENTARIO', rows)`, beep,
+toast de resultado, `finally` para el flag de guardado. La llamada y el manejo de éxito/error
+son idénticos. Es un buen candidato a un único `saveAuditRows(rows, { onToast })`, pero toca dos
+componentes grandes y debe hacerse con red de pruebas; **fuera del alcance de este corte**.
+
+### Lo que se descartó y por qué (escalera de decisiones)
+
+- **Reescribir `handleSaveToDedicatedAuditSheet` con un builder genérico**: duplicaría la
+  duplicación o crearía una abstracción con dos modos para un solo par de consumidores (YAGNI).
+- **Renombrar `CUADRADO`→`CUADRADO_OK` en todo el dominio**: cierra el síntoma donde no está
+  (la UI de cuadratura) y arrastra `countAggregation`, el tipo y dos vistas. El costo supera al
+  beneficio; la frontera de escritura es el lugar correcto.
+- **Convertir los 14 encabezados de auditoría en un record tipado** que obligue a completarlos:
+  haría fallar el compilador si alguien añade una columna al canon y olvida una vía. Es defensa
+  **para un bug que aún no ocurre**; se deja como opción futura, anotada, sin construir.
+- **Partir `StockCountTerminal.tsx`**: re-medido y **descartado de nuevo** (43 y 65 identidades).
+
+### Gate
+
+`npm run verify` exit 0 · `tsc --noEmit` 0 · `eslint` de los 3 archivos tocados, 0 ·
+**403 unitarias** (401 + 2) · **19 de componente** · **18 de hoja de cálculo** · build de
+producción 0 · 0 dependencias nuevas.
+

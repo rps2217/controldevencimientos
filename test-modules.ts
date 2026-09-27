@@ -128,7 +128,8 @@ import {
   generateCuVc,
   calculateLastDayOfMonthDateString,
   reconcileStockCountSession,
-  buildVencimientosRowFromCount
+  buildVencimientosRowFromCount,
+  buildAuditRowsFromSession
 } from './src/utils/stockCountUtils';
 import {
   groupSkuEntries,
@@ -1015,6 +1016,28 @@ console.log('\n--- 15. Pruebas de computeCampaignConsolidationMatrix (matriz de 
     'las filas de auditoría llevan el ID de campaña y el local');
   assert(auditRows[0].ESTADO_AUDITORIA === 'CUADRADO_OK',
     'un SKU cuadrado se etiqueta CUADRADO_OK en la planilla de auditoría');
+
+  // Vocabulario único de ESTADO_AUDITORIA entre las dos vías de guardado.
+  //
+  // La hoja `_AUDITORIA_INVENTARIO` es una sola y no tiene columna de origen: la sesión
+  // (individual) y la campaña (consolidada) escriben en la MISMA columna. Con dos
+  // vocabularios, un SKU cuadrado quedaba `CUADRADO` o `CUADRADO_OK` según por dónde
+  // entró, y un pendiente `NUNCA_PISTOLEADO` o `NO_CATALOGADO`; cualquier filtro o
+  // tabla dinámica sobre esa columna se parte en dos.
+  const sesionVocab = buildAuditRowsFromSession(
+    makeSession('SKU_A', 100),
+    reconcileStockCountSession(makeSession('SKU_A', 100), [], ['SKU', 'CANTIDAD']),
+    campOk
+  );
+  const vocabCampana = new Set(auditRows.map(r => r.ESTADO_AUDITORIA));
+  const vocabSesion = new Set(sesionVocab.map(r => r.ESTADO_AUDITORIA));
+  const vocabularioCanonico = new Set([
+    'CUADRADO_OK', 'FALTANTE', 'SOBRANTE', 'NUNCA_PISTOLEADO', 'HALLAZGO_NO_ERP', 'VALIDADO_CERRADO'
+  ]);
+  assert([...vocabCampana, ...vocabSesion].every(v => vocabularioCanonico.has(v as string)),
+    `ESTADO_AUDITORIA usa un solo vocabulario: campaña=${[...vocabCampana]} sesión=${[...vocabSesion]}`);
+  assert([...vocabSesion].every(v => v !== 'NO_CATALOGADO'),
+    'la vía de sesión no emite NO_CATALOGADO (el canon de la hoja es HALLAZGO_NO_ERP)');
 
   // --- 2da vuelta: REEMPLAZA, no suma (inventario general con stock en movimiento) ---
   //

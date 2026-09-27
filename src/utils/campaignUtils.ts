@@ -23,6 +23,7 @@ import { findColumnBySemantic } from './columnAliases';
 import { parseLocaleNumber, rowToObject } from './pureCalculations';
 import { exportToExcel } from './exportUtils';
 import { STORAGE_KEYS, readStorage, objectArraySchema } from './appStorage';
+import type { AuditSheetStatus } from './auditConsolidation';
 
 // ==========================================
 // CAMPAÑA DE INVENTARIO CÍCLICO MULTISESIÓN
@@ -777,12 +778,14 @@ export function buildAuditRowsFromCampaignMatrix(
   const dateStr = new Date().toLocaleDateString('es-CL');
 
   return allRows.map(r => {
-    let estadoLabel: string = r.estadoGlobal;
+    // Cada rama cubre un estadoGlobal; `DISCREPANCIA` se abre en faltante/sobrante.
+    // El tipo de retorno obliga a que todas queden cubiertas por el vocabulario.
+    let estadoLabel: AuditSheetStatus;
     if (r.esCerrado) estadoLabel = 'VALIDADO_CERRADO';
     else if (r.estadoGlobal === 'VALIDADO_OK') estadoLabel = 'CUADRADO_OK';
     else if (r.estadoGlobal === 'DISCREPANCIA') estadoLabel = r.diferenciaNeta < 0 ? 'FALTANTE' : 'SOBRANTE';
     else if (r.estadoGlobal === 'NUNCA_PISTOLEADO') estadoLabel = 'NUNCA_PISTOLEADO';
-    else if (r.estadoGlobal === 'HALLAZGO') estadoLabel = 'HALLAZGO_NO_ERP';
+    else estadoLabel = 'HALLAZGO_NO_ERP';
 
     const ubicacionesStr = r.sesionesDondeAparece && r.sesionesDondeAparece.length > 0
       ? r.sesionesDondeAparece.map(s => `${s.ubicacion || s.nombreSesion} (${s.cantidad} u.)`).join('; ')
