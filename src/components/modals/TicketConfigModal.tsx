@@ -421,33 +421,53 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">
-                    Ancho de Papel
-                  </label>
-                  <div className="flex rounded-xl bg-slate-200 dark:bg-slate-700 p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setLocalGeneral(prev => ({ ...prev, paperWidth: '80mm' }))}
-                      className={`flex-1 py-1 text-xs font-bold rounded-lg transition-all ${
-                        localGeneral.paperWidth === '80mm'
-                          ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      80mm (Estándar)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLocalGeneral(prev => ({ ...prev, paperWidth: '58mm' }))}
-                      className={`flex-1 py-1 text-xs font-bold rounded-lg transition-all ${
-                        localGeneral.paperWidth === '58mm'
-                          ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      58mm (Compacto)
-                    </button>
+                  {/* Un solo control de papel: el sustrato puede ser un ticket continuo
+                      (80/58 mm) o un rollo troquelado. Estaban separados y el operario
+                      debía cruzar dos campos; ahora el ancho y el rollo son una decisión
+                      única. Elegir 80/58 mm limpia el rollo: son excluyentes. */}
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                      Ancho de Papel
+                    </label>
+                    {calidadRollo && (
+                      <span className={`text-[10px] font-semibold ${
+                        calidadRollo === 'optimo' ? 'text-emerald-600 dark:text-emerald-400'
+                          : calidadRollo === 'ok' ? 'text-blue-600 dark:text-blue-400'
+                            : calidadRollo === 'justo' ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-red-600 dark:text-red-400'
+                      }`}>
+                        {FIT_QUALITY_LABEL[calidadRollo]}
+                      </span>
+                    )}
                   </div>
+                  <select
+                    value={localGeneral.labelRollId || localGeneral.paperWidth || '80mm'}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setLocalGeneral(prev => (v === '80mm' || v === '58mm')
+                        ? { ...prev, paperWidth: v as '80mm' | '58mm', labelRollId: undefined }
+                        : { ...prev, labelRollId: v });
+                    }}
+                    className="w-full px-3 py-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  >
+                    <option value="80mm">80 mm (Estándar)</option>
+                    <option value="58mm">58 mm (Compacto)</option>
+                    <optgroup label="Rollo de etiquetas (troquelado)">
+                      {ROLLOS.map(rollo => {
+                        const calidad = fitQuality(evaluateFit(skuDeMuestra, rollo));
+                        return (
+                          <option key={rollo.id} value={rollo.id}>
+                            {rollo.nombre} · {FIT_QUALITY_LABEL[calidad]}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  </select>
+                  <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
+                    {localGeneral.labelRollId
+                      ? <>Al imprimir etiquetas el código se gira 90° para usar el largo del rollo.{calidadRollo === 'justo' && ' En este rollo queda al límite: se lee con dificultad si la etiqueta se roza.'}{calidadRollo === 'no-cabe' && ' Este rollo no permite imprimir el código.'}</>
+                      : 'El ticket se ajusta al alto del contenido, sin desperdiciar papel.'}
+                  </p>
                 </div>
 
                 <div>
@@ -517,43 +537,6 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
                       </button>
                     ))}
                   </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
-                      Rollo de Etiquetas
-                    </label>
-                    {calidadRollo && (
-                      <span className={`text-[10px] font-semibold ${
-                        calidadRollo === 'optimo' ? 'text-emerald-600 dark:text-emerald-400'
-                          : calidadRollo === 'ok' ? 'text-blue-600 dark:text-blue-400'
-                            : calidadRollo === 'justo' ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-red-600 dark:text-red-400'
-                      }`}>
-                        {FIT_QUALITY_LABEL[calidadRollo]}
-                      </span>
-                    )}
-                  </div>
-                  <select
-                    value={localGeneral.labelRollId || ''}
-                    onChange={(e) => setLocalGeneral(prev => ({ ...prev, labelRollId: e.target.value || undefined }))}
-                    className="w-full px-3 py-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  >
-                    <option value="">Rollo continuo (ticket)</option>
-                    {ROLLOS.map(rollo => {
-                      const calidad = fitQuality(evaluateFit(skuDeMuestra, rollo));
-                      return (
-                        <option key={rollo.id} value={rollo.id}>
-                          {rollo.nombre} · {FIT_QUALITY_LABEL[calidad]}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
-                    {localGeneral.labelRollId
-                      ? <>Se imprime rotado 90° para que el código use el largo de la etiqueta.{calidadRollo === 'justo' && ' En este rollo queda al límite: se lee con dificultad si la etiqueta se roza.'}{calidadRollo === 'no-cabe' && ' Este rollo no permite imprimir el código.'}</>
-                      : 'El ticket se ajusta al alto del contenido, sin desperdiciar papel.'}
-                  </p>
                 </div>
 
               </div>
@@ -653,7 +636,7 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
               <div className="flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-indigo-500" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                  Vista Previa Térmica ({localGeneral.paperWidth || '80mm'})
+                  Vista Previa Térmica ({rolloElegido ? rolloElegido.nombre : (localGeneral.paperWidth || '80mm')})
                 </span>
               </div>
               <span className="text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold px-2 py-0.5 rounded-full">

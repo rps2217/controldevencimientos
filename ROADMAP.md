@@ -3910,3 +3910,67 @@ campos que el local no define.
   flush en `pagehide`; los `saveStockCountSessionsToStorage` explícitos en handlers duplican esa
   persistencia. Inofensivo hoy, pero requiere mutación antes de tocarlo.
 - **Sin E2E del flujo "Contar"** completo: campaña → botón → sesión con `skuScope` → conteo → guardado.
+
+## Auditoría Ponytail (2026-09-19) — Fase 9: aviso de alcance acotado y sustrato de impresión unificado
+
+Dos cortes independientes, ambos de UX con verificación por mutación.
+
+### Cierre del pendiente: pistoleo fuera de alcance sin aviso
+
+`skuScope` se aplica solo en la conciliación (`theoreticalMap`, pendientes). Una lectura de un SKU
+ajeno se guardaba en `conteos` pero quedaba excluida de matriz, auditoría y VENCIMIENTOS: el
+operario recibía un toast de éxito y su trabajo se perdía en silencio. Aplica a **ambos caminos**,
+`handleCameraScanCode` y `handleSkuScannedOrEntered`, porque ambos pasan por `commitCountEntry`.
+
+**El aviso:** el helper `fueraDeAlcance(sku)` (junto a `commitCountEntry`, ~`:620`) espeja la
+condición de la conciliación —compara `skuScope` no vacío por SKU, sin `key` ni `CU_VC`— y el
+terminal emite «Fuera del alcance de esta sesión: `<SKU>` (+n). No entrará en la conciliación.»
+por **delante** del aviso de «no catalogado», por ser el motivo más específico. La lectura se
+conserva; no se descarta ni se corrompe nada.
+
+**El arnés y su primera trampa.** `tests/perf/scopeguardcheck.cjs` (registrado en `run.cjs`).
+La versión inicial tenía una aserción **vacía**: probaba que el SKU ajeno «no recibe aviso verde»,
+pero el SKU ajeno de prueba no estaba en el catálogo demo, así que el flujo emitía «no catalogado»
+y la aserción pasaba por el motivo equivocado —habría pasado igual con la guarda rota—. Se añadió
+un **tercer caso discriminante**: un SKU ajeno **que sí está en `SAMPLE_PRODUCTS`**, que sin la
+guarda saldría «Registrado» en verde. Mutación confirmada: forzando `fueraDeAlcance` a `false`,
+caen los dos pasos del caso ajeno (`RESULTADO: FALLO`, exit 1).
+
+### Sustrato de impresión unificado (petición del usuario)
+
+«Ancho de Papel» y «Rollo de Etiquetas» eran dos campos que el operario debía cruzar mentalmente.
+Ahora hay **un solo `select`** «Ancho de Papel» en Ajustes Generales del Ticket:
+
+- `80mm` — Estándar, **preseleccionado por defecto** (ya era el default de
+  `getDefaultTicketGeneralSettings`), y `58mm` — Compacto, sin cambios de comportamiento.
+- `optgroup` «Rollo de etiquetas (troquelado)» con los `ROLLOS` de `labelMediaProfile.ts` y su
+  badge de encaje (`FIT_QUALITY_LABEL`).
+
+**Excluyencia (invariante del control):** elegir 80/58 mm limpia `labelRollId`; elegir un rollo lo
+fija. Se mantienen los dos campos del modelo (`paperWidth`, `labelRollId`) porque `executeThermalPrint`
+distingue ambos caminos —rollo troquelado de tamaño fijo vs. ticket continuo con altura medida—;
+lo que se unificó es la **decisión de UI**, no el modelo. La vista previa muestra el nombre del rollo
+cuando hay uno activo.
+
+**Prueba de componente** `testSelectorPapelUnificado` (6 aserciones): default 80 mm, conserva 80/58,
+ofrece todos los rollos, elegir rollo persiste `labelRollId`, volver a un ancho de ticket limpia el
+rollo, y un rollo guardado se muestra preseleccionado al reabrir. **Mutación confirmada**: quitando
+el limpiado de `labelRollId` cae la aserción de excluyencia (27/1).
+
+### Gate
+
+`npm run verify` exit 0 · `tsc --noEmit` 0 · `eslint` 0 errores (10 warnings preexistentes) ·
+**420 unitarias** · **28 de componente** · **18 de hoja de cálculo** · `build` de producción 0 ·
+**E2E: 29 arneses OK** · 0 dependencias nuevas.
+
+### Pendientes que quedan (reconfirmados, medidos)
+
+- **Escritura a `_AUDITORIA_INVENTARIO` duplicada** entre `StockCountTerminal.tsx:1030-1062` y
+  `CampaignConsolidationDashboard.tsx:436-458`. Mismo esqueleto salvo el builder.
+- **`resumenPorUbicacion`**: sin consumidor de UI; retirarlo exige preservar la regla de la 2da
+  vuelta que la prueba protege.
+- **Escrituras de sesión redundantes**: el terminal persiste por `useEffect` (debounce 300 ms) más
+  flush en `pagehide`; los `saveStockCountSessionsToStorage` explícitos en handlers duplican esa
+  persistencia. Inofensivo hoy, pero requiere mutación antes de tocarlo.
+- **Sin E2E del flujo "Contar"** completo: campaña → botón → sesión con `skuScope` → conteo → guardado.
+

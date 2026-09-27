@@ -16,7 +16,9 @@ import { ViewConfigControlDrawer } from '../src/components/drawers/ViewConfigCon
 import { CampaignMatrixTable } from '../src/components/campaign/CampaignMatrixTable';
 import { CampaignProviderProgress } from '../src/components/campaign/CampaignProviderProgress';
 import { useTableGrouping } from '../src/hooks/useTableGrouping';
-import type { SheetConfig, CampaignAuditRow, CampaignConsolidationMatrix } from '../src/types';
+import { TicketConfigModal } from '../src/components/modals/TicketConfigModal';
+import { ROLLOS } from '../src/utils/labelMediaProfile';
+import type { SheetConfig, CampaignAuditRow, CampaignConsolidationMatrix, ViewTicketSettings } from '../src/types';
 
 let passed = 0;
 let failed = 0;
@@ -385,6 +387,60 @@ async function testProviderPanelLanzaConteo() {
 
 
 
+async function testSelectorPapelUnificado() {
+  console.log('\n--- 9. Ancho de Papel agrupa ticket continuo y rollo troquelado ---');
+
+  const config: ViewTicketSettings = {
+    columns: { SKU: { show: true, size: 12, bold: true } },
+    general: { title: 'T', paperWidth: '80mm', orientation: 'portrait' }
+  };
+  let guardado: ViewTicketSettings | null = null;
+  const props = {
+    isOpen: true,
+    onClose: () => {},
+    headers: ['SKU'],
+    activeView: 'main',
+    config,
+    onSave: (_v: string, c: unknown) => { guardado = c as ViewTicketSettings; },
+    sampleItems: [] as never[],
+  };
+
+  const view = await mount(<TicketConfigModal {...props} />);
+  assert(view.selectValue() === '80mm',
+    'sin rollo cargado el control arranca en 80 mm (predeterminado)', view.selectValue());
+
+  const opciones = Array.from(view.container.querySelectorAll('select option'))
+    .map(o => (o as HTMLOptionElement).value);
+  assert(opciones.includes('80mm') && opciones.includes('58mm'),
+    'el control conserva las opciones de ticket 80/58 mm', opciones.slice(0, 4));
+  assert(ROLLOS.every(r => opciones.includes(r.id)),
+    'y ofrece los rollos troquelados en el mismo control', opciones.length);
+
+  // Elegir un rollo debe guardar labelRollId, no paperWidth.
+  await view.chooseSelect('12x40');
+  const guardarBtn = Array.from(view.container.querySelectorAll('button'))
+    .find(b => (b.textContent || '').includes('Guardar Configuración'));
+  await view.run(() => { (guardarBtn as HTMLButtonElement).click(); });
+  assert(guardado!.general!.labelRollId === '12x40',
+    'elegir un rollo persiste labelRollId', guardado!.general);
+
+  // Volver a 80 mm debe limpiar el rollo: son excluyentes.
+  await view.chooseSelect('58mm');
+  await view.run(() => { (guardarBtn as HTMLButtonElement).click(); });
+  assert(guardado!.general!.paperWidth === '58mm' && guardado!.general!.labelRollId === undefined,
+    'volver a un ancho de ticket limpia el rollo (excluyentes)', guardado!.general);
+
+  await view.unmount();
+
+  // Con un rollo persistido, el control debe venir preseleccionado en ese rollo.
+  const conRollo = await mount(
+    <TicketConfigModal {...props} config={{ ...config, general: { ...config.general, labelRollId: '12x30' } }} />
+  );
+  assert(conRollo.selectValue() === '12x30',
+    'un rollo guardado se muestra preseleccionado al reabrir', conRollo.selectValue());
+  await conRollo.unmount();
+}
+
 async function main() {
   console.log('========================================');
   console.log(' PRUEBAS DE COMPONENTE (Fase 0)');
@@ -398,6 +454,7 @@ async function main() {
   await testIconoCoherenteConEstado();
   await testProviderPanelFiltra();
   await testProviderPanelLanzaConteo();
+  await testSelectorPapelUnificado();
 
   teardownDom();
 

@@ -200,6 +200,7 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
 - **`InventoryDashboard.tsx`**: Tabla interactiva con filtros avanzados, búsqueda rápida, tarjetas de resumen KPI y botones de acción rápida.
 - **`ItemDetailDrawer.tsx`**: Drawer lateral que agrupa toda la trazabilidad de un SKU (historial de vencimientos, lotes y eventos relacionados).
 - **`PmReportModal.tsx`**: Genera reportes listos para copiar al portapapeles o exportar para jefaturas de producto/operaciones.
+- **Impresión térmica (`TicketConfigModal.tsx` + `TicketPrintView.tsx` + `ticketUtils.ts`)**: el sustrato se elige en **un solo control** «Ancho de Papel» (`select`) en Ajustes Generales del Ticket: 80 mm (Estándar, preseleccionado), 58 mm (Compacto) y los rollos troquelados de `ROLLOS` (`labelMediaProfile.ts`) en un `optgroup`. Son **excluyentes**: elegir 80/58 mm limpia `labelRollId`; elegir un rollo lo fija. En modo etiqueta manda el rollo (tamaño fijo), no `paperWidth`; `executeThermalPrint` recibe `rollSizeMm` y no mide la altura del contenido, porque la etiqueta es troquelada. En modo ticket continuo la altura se calcula y se respeta `cutMarginMm`. El badge de encaje (`fitQuality`/`FIT_QUALITY_LABEL`) evalúa el código real contra el rollo elegido. La prueba de componente `testSelectorPapelUnificado` fija las tres propiedades (default 80 mm, excluyencia, preselección al reabrir).
 
 ### M. Sistema de Campañas de Inventario Cíclico y Matriz de Consolidación (Farmacia en Movimiento)
 - **Propósito**: Auditorías de inventario completas en farmacias con stock en constante movimiento (atención al público simultánea), dividiendo el trabajo en múltiples días y sesiones por mueble/pasillo.
@@ -446,7 +447,7 @@ sin el arreglo, `ok:false` y el arnés sale `exit 1`).
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
 | `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
-| `npm run test:e2e` | Arranca el build de producción y corre los 28 arneses de integridad (`tests/perf/run.cjs`). |
+| `npm run test:e2e` | Arranca el build de producción y corre los 29 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -504,7 +505,7 @@ sin el arreglo, `ok:false` y el arnés sale `exit 1`).
 > al tocar fechas conviene correr `TZ=America/Santiago npm test`. Ver ROADMAP §30.
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 28 arneses que cubren integridad de
+`npm run test:e2e` arranca el preview y corre los 29 arneses que cubren integridad de
 datos y navegación; devuelve código distinto de cero si alguno falla. El binario de Chrome
 se toma de `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`,
 etc.).
@@ -526,6 +527,7 @@ falso que levanta el propio runner.
 | `sidebarcheck.cjs` | sí | El sidebar resuelve datos del contexto y props solo de comportamiento (colapso y drawer móvil). |
 | `scannercheck.cjs` | sí | Ciclo de vida del lector de cámara con dispositivo falso: arranque real, cierre sin fugas y reapertura. |
 | `countcheck.cjs` | sí | El debounce de 300 ms no pierde la última lectura al descargar la página. |
+| `scopeguardcheck.cjs` | sí | En una sesión acotada, un SKU fuera de `skuScope` se guarda pero avisa «Fuera del alcance» en vez de un éxito verde. Discriminante: el caso ajeno usa un SKU **catalogado**, para no confundirse con «no catalogado» (mutación verificada). |
 | `blindcheck.cjs` | sí | En BLIND no se filtra el stock del ERP a la pantalla (par discriminante con DOCUMENT). |
 | `campaigncheck.cjs` | sí | Matriz de consolidación de campaña: clasificación de los 4 estados, filtros, búsqueda acumulada y ajuste de venta persistido (12 verificaciones). |
 | `printcheck.cjs` | sí | Vista de impresión: el ticket solo monta con un registro pendiente (5 aserciones). |
@@ -639,27 +641,42 @@ PR. Node 22. Sin secrets. El job `e2e` usa el Google Chrome preinstalado del run
    (invariante §6.5); su cierre a unión produjo ~15 errores en cascada y se revirtió. No
    reabrir sin un síntoma real. Detalle y barrido por archivo en `ROADMAP.md`.
 
-### Estado vigente del módulo de conteo (Fase 8, commit `dd70a67`)
+### Estado vigente (Fase 8 + corte de ticket)
 
 El gate hoy: `tsc` 0 · `eslint` 0 errores (10 warnings preexistentes) · **420 unitarias** ·
-**22 de componente** · **18 de hoja de cálculo** · `build` 0 · **E2E: 28 arneses OK** · 0
+**28 de componente** · **18 de hoja de cálculo** · `build` 0 · **E2E: 29 arneses OK** · 0
 dependencias nuevas. Las secciones «Auditoría Ponytail» en `ROADMAP.md` son la fuente; esta
 lista es el resumen accionable.
 
+**Resuelto en este corte:**
+
+1. **Pistoleo fuera de alcance sin aviso** — cerrado. El helper `fueraDeAlcance` en
+   `StockCountTerminal.tsx` (~`:620`) espeja la condición que ya aplica la conciliación y el
+   terminal avisa «Fuera del alcance de esta sesión: `<SKU>` (+n). No entrará en la conciliación.»
+   antes del aviso de «no catalogado», por ser el motivo más específico. La lectura se conserva
+   en `conteos` (no se pierde el trabajo), pero el operario ya sabe que no suma. Arnés E2E
+   `tests/perf/scopeguardcheck.cjs` con caso discriminante: prueba con un SKU ajeno **que sí
+   está catalogado**, para que el aviso no se pueda confundir con el de «no catalogado».
+   Mutación confirmada: forzando el helper a `false`, caen los dos pasos del caso ajeno.
+2. **Dos selectores de papel confusos en el ticket** — cerrado. «Ancho de Papel» y «Rollo de
+   Etiquetas» eran dos campos que el operario debía cruzar. Ahora un único `select` «Ancho de
+   Papel» agrupa 80 mm (Estándar, **preseleccionado por defecto**), 58 mm (Compacto) y, en un
+   `optgroup`, los rollos troquelados de `ROLLOS`. Son excluyentes: elegir 80/58 mm limpia
+   `labelRollId`; elegir un rollo fija `labelRollId`. La vista previa y el badge de encaje
+   siguen el medio elegido. Prueba de componente `testSelectorPapelUnificado` (6 aserciones),
+   mutación confirmada quitando el limpiado.
+
 Pendientes medidos, sin ejecutar, por orden de valor operativo:
 
-1. **Pistoleo fuera de alcance sin aviso** — `handleCameraScanCode` (`StockCountTerminal.tsx:703`)
-   no consulta `skuScope`. La conciliación descarta la lectura, pero el operario pistoliza y no
-   ve nada. Es la única que afecta al usuario hoy y no roza ninguna invariante de datos.
-2. **Escritura duplicada a `_AUDITORIA_INVENTARIO`** — `StockCountTerminal.tsx:1030-1062` y
+1. **Escritura duplicada a `_AUDITORIA_INVENTARIO`** — `StockCountTerminal.tsx:1030-1062` y
    `CampaignConsolidationDashboard.tsx:436-458` repiten el mismo esqueleto salvo el builder.
-3. **`resumenPorUbicacion` sin consumidor de UI** — **no** es código muerto: `test-modules.ts:1113`
+2. **`resumenPorUbicacion` sin consumidor de UI** — **no** es código muerto: `test-modules.ts:1113`
    lo usa (la 2da vuelta no debe inventar un mueble fantasma). Retirarlo exige decidir qué pasa
    con esa regla de negocio.
-4. **Persistencia de sesión redundante** — el terminal persiste por `useEffect` (debounce 300 ms)
+3. **Persistencia de sesión redundante** — el terminal persiste por `useEffect` (debounce 300 ms)
    más flush en `pagehide`; los `saveStockCountSessionsToStorage` explícitos en handlers duplican
    esa persistencia. Inofensivo hoy; requiere mutación antes de tocarlo.
-5. **Sin E2E del flujo "Contar" completo** — campaña → botón → sesión con `skuScope` → conteo →
+4. **Sin E2E del flujo "Contar" completo** — campaña → botón → sesión con `skuScope` → conteo →
    guardado.
 
 Estado muerto ya retirado en la Fase 8 (para no re-añadirlo): `StockCountSession.auditor` y

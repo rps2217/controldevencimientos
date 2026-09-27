@@ -32,6 +32,7 @@ const HARNESSES = [
   'sidebarcheck.cjs',
   'scannercheck.cjs',
   'countcheck.cjs',
+  'scopeguardcheck.cjs',
   'blindcheck.cjs',
   'campaigncheck.cjs',
   'printcheck.cjs',

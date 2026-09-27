@@ -612,6 +612,18 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     }
   };
 
+  /**
+   * Una sesión puede nacer acotada a los SKUs de un proveedor (`skuScope`). La conciliación
+   * recorta a ese conjunto, así que una lectura ajena no llega a la matriz ni a VENCIMIENTOS.
+   * Espeja esa misma condición para poder avisarlo al operario en el momento del pistoleo.
+   */
+  const fueraDeAlcance = (sku: string): boolean => {
+    const scope = currentSession?.skuScope;
+    if (!scope || scope.length === 0) return false;
+    const clean = sku.trim();
+    return !scope.some(s => String(s).trim() === clean);
+  };
+
   // Record a physical count entry with full business logic and validation
   const commitCountEntry = (sku: string, mmVal?: string, yyyyVal?: string, isOmitted: boolean = false) => {
     if (!currentSession) return;
@@ -672,8 +684,17 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     setTempYyyy('');
     setIsSearchDropdownOpen(false);
 
-    // Dynamic beep and toast confirmation
-    if (!summary) {
+    // Dynamic beep and toast confirmation. El orden de las ramas importa: "fuera de alcance"
+    // va primero porque es el motivo más específico: un SKU ajeno al proveedor puede no estar
+    // en el catálogo maestro y, si se evaluara después, se reportaría como "no catalogado".
+    if (fueraDeAlcance(cleanSku)) {
+      // Sesión acotada a un proveedor y lectura ajena: la conciliación la omite, así que un
+      // "Registrado" en verde haría creer que el esfuerzo sirvió. Se guarda igual (puede ser
+      // un hallazgo legítimo), pero se avisa para que el operario no cuente mercadería ajena.
+      playBeep('skip');
+      triggerVisualFlash('WARNING');
+      showToast(`Fuera del alcance de esta sesión: ${cleanSku} (+${qty}). No entrará en la conciliación.`, 'warning');
+    } else if (!summary) {
       // SKU fuera del catálogo maestro: la lectura se guarda (puede ser un hallazgo legítimo),
       // pero se avisa con tono neutro para que el operario note un posible dígito mal leído.
       playBeep('skip');
