@@ -3391,8 +3391,17 @@ característica «perfil de impresión»: un preset con (ancho mm, alto mm, gap 
    comerciales P12/P15, rotación fija a 90°, y selector «Rollo de Etiquetas» en el modal de
    ticket (con opción de rollo continuo para no cambiar la impresión actual). Al elegir el
    rollo, la impresión pasa a tamaño fijo de etiqueta en vez de medir el contenido.
-2. **Rasterizador canvas** — de barcode a `RawImageData` 1 bit al tamaño exacto del rollo.
-   Testeable sin impresora: verificar dimensiones y que el bitmap no salga en blanco.
+2. **Rasterizador canvas** — ✅ **hecho, sin canvas**. `src/utils/labelRasterizer.ts` pinta el
+   Code128 directamente sobre el búfer RGBA con aritmética entera: son barras verticales de
+   grosor constante, así que no hace falta dibujar nada. Eso lo deja **verificable sin navegador
+   y sin impresora**, que es la única prueba posible hoy.
+   - Salida `{ width, height, data }` (`Uint8ClampedArray` RGBA), la forma de `RawImageData`.
+   - Lienzo = tamaño exacto del rollo (12×40 → 96×320 puntos), barras centradas.
+   - Ancho de módulo **truncado a entero**: un módulo de 2,79 puntos obligaría a alternar barras
+     de 2 y 3 puntos, y esa irregularidad es lo que penalizan los lectores.
+   - Devuelve `null` si no cabe, en vez de recortar el código.
+   - **Límite conocido:** no rasteriza el texto legible bajo el código; eso exigiría un motor de
+     fuentes o un canvas. El paso del lector es lo que aquí se garantiza.
 3. **Transporte BLE** — `requestPrinters()` + `print()` tras un gesto del usuario. **No testeable
    sin hardware**; es lo último.
 4. **UI** — el selector de perfil ya vive en el modal de ticket; falta el botón «Imprimir

@@ -48,6 +48,11 @@ import {
 } from './src/utils/labelMediaProfile';
 import { generateBarcodeSvgString } from './src/utils/barcodeGenerator';
 import {
+  labelSizeDots,
+  moduleWidthDots,
+  rasterizeBarcode
+} from './src/utils/labelRasterizer';
+import {
   buildAuditRowValues,
   consolidateAuditRows,
   dedupeAuditRows
@@ -1806,6 +1811,90 @@ console.log('\n--- Perfiles de medios para etiquetas térmicas (ROADMAP §31) --
   // El color de fondo debe sobrevivir a la rotacion (la etiqueta es blanca).
   assert(svgRotado.includes('background:#ffffff'),
     'barcode: el SVG rotado conserva el fondo de la etiqueta');
+
+  // --- Paso 2: rasterizador a RGBA (sin canvas ni DOM) ---
+
+  const r40raster = findRoll('12x40')!;
+  const tamano = labelSizeDots(r40raster);
+  assert(tamano.width === 96 && tamano.height === 320,
+    'raster: 12x40 mm son 96x320 puntos a 203 dpi', `${tamano.width}x${tamano.height}`);
+  assert(labelSizeDots(findRoll('15x50')!).width === 120,
+    'raster: 15 mm de ancho son 120 puntos');
+
+  // El ancho de modulo debe ser entero: el cabezal no imprime medios puntos.
+  const anchoModulo40 = moduleWidthDots(sku, r40raster, 90);
+  assert(Number.isInteger(anchoModulo40) && anchoModulo40 === Math.floor(320 / 143),
+    'raster: el ancho de modulo se trunca a entero', anchoModulo40);
+  assert(moduleWidthDots(sku, findRoll('12x22')!, 0) === 0,
+    'raster: sin rotar en 12x22 el ancho de modulo es 0 (no cabe)');
+
+  const img = rasterizeBarcode(sku, r40raster, 90);
+  assert(!!img, 'raster: el SKU se rasteriza en 12x40 rotado');
+  assert(img!.data.length === img!.width * img!.height * 4,
+    'raster: el buffer tiene 4 bytes por pixel', img!.data.length);
+
+  // Debe haber tinta y fondo: un bitmap todo blanco es una etiqueta vacia y un
+  // bitmap todo negro es una mancha. Ninguno de los dos sirve.
+  let pixelesNegros = 0;
+  for (let i = 0; i < img!.data.length; i += 4) {
+    if (img!.data[i] === 0) pixelesNegros++;
+  }
+  assert(pixelesNegros > 0, 'raster: el bitmap contiene barras impresas', pixelesNegros);
+  assert(pixelesNegros < img!.width * img!.height,
+    'raster: el bitmap no es una mancha de tinta');
+
+  // Es 1 bit util: cada pixel es negro puro o blanco puro, sin grises.
+  let hayGris = false;
+  for (let i = 0; i < img!.data.length; i += 4) {
+    const canal = img!.data[i];
+    if (canal !== 0 && canal !== 255) { hayGris = true; break; }
+  }
+  assert(!hayGris, 'raster: la salida es 1 bit (sin tonos intermedios)');
+
+  // Rotado: las barras son filas completas, así que el eje de lectura es vertical.
+  // Debe haber al menos una fila totalmente negra (una barra que cruza el ancho).
+  const ancho40 = img!.width;
+  let filasConBarraCompleta = 0;
+  for (let fila = 0; fila < img!.height; fila++) {
+    const base = fila * ancho40 * 4;
+    let todaNegra = true;
+    for (let x = 0; x < ancho40; x++) {
+      if (img!.data[base + x * 4] !== 0) { todaNegra = false; break; }
+    }
+    if (todaNegra) filasConBarraCompleta++;
+  }
+  assert(filasConBarraCompleta > 0,
+    'raster: rotado 90 las barras cruzan el ancho completo (filas negras)', filasConBarraCompleta);
+
+  // Sin rotar, un código CORTO usa columnas: los ejes se invierten. Un SKU real no
+  // cabe horizontal ni en 15 mm (120 puntos < 143 módulos), así que aquí se usa
+  // "1234" (77 módulos) para poder ejercitar la rama horizontal.
+  assert(moduleWidthDots('1234', findRoll('15x50')!, 0) === 1,
+    'raster: un codigo corto si cabe horizontal en 15 mm con modulo de 1 punto');
+  const imgAncho = rasterizeBarcode('1234', findRoll('15x50')!, 0);
+  assert(!!imgAncho, 'raster: un codigo corto se rasteriza sin rotar en 15x50');
+  // En horizontal ninguna fila es una barra completa: las barras son columnas.
+  let filasCompletasHorizontal = 0;
+  for (let fila = 0; fila < imgAncho!.height; fila++) {
+    const base = fila * imgAncho!.width * 4;
+    let todaNegra = true;
+    for (let x = 0; x < imgAncho!.width; x++) {
+      if (imgAncho!.data[base + x * 4] !== 0) { todaNegra = false; break; }
+    }
+    if (todaNegra) filasCompletasHorizontal++;
+  }
+  assert(filasCompletasHorizontal === 0,
+    'raster: sin rotar ninguna fila es una barra horizontal completa', filasCompletasHorizontal);
+
+  // Y confirma el hallazgo del ROADMAP: un SKU real NO cabe horizontal en ninguno
+  // de los rollos estrechos (el mas ancho, 15 mm = 120 puntos, no llega a 143).
+  assert(ROLLOS.every(r => rasterizeBarcode(sku, r, 0) === null),
+    'raster: un SKU real no cabe horizontal en ningun rollo P12/P15 (justifica la rotacion)');
+
+  // Texto vacio o codigo que no cabe: null explicito, sin etiqueta a medias.
+  assert(rasterizeBarcode('', r40raster, 90) === null, 'raster: texto vacio devuelve null');
+  assert(rasterizeBarcode(sku, findRoll('12x22')!, 0) === null,
+    'raster: un codigo que no cabe devuelve null en vez de recortarse');
 }
 
 console.log(`\n========================================`);
