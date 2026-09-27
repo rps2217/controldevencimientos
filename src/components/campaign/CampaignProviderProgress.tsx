@@ -34,7 +34,7 @@ export const CampaignProviderProgress: React.FC<CampaignProviderProgressProps> =
 }) => {
   if (providers.length === 0) return null;
 
-  const conPendientes = providers.filter(p => p.pendientes > 0).length;
+  const conPendientes = providers.filter(p => p.porContar > 0).length;
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
@@ -52,7 +52,7 @@ export const CampaignProviderProgress: React.FC<CampaignProviderProgressProps> =
       <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
         {providers.map(p => {
           const activo = selectedProvider === p.proveedor;
-          const completo = p.pendientes === 0;
+          const completo = p.porContar === 0;
           return (
             <div
               key={p.proveedor}
@@ -75,7 +75,7 @@ export const CampaignProviderProgress: React.FC<CampaignProviderProgressProps> =
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-600 dark:text-amber-400 shrink-0">
                         <AlertTriangle className="w-3 h-3" />
-                        {formatLocaleNumber(p.pendientes)} por contar
+                        {formatLocaleNumber(p.porContar)} por contar
                       </span>
                     )}
                   </div>
@@ -105,7 +105,7 @@ export const CampaignProviderProgress: React.FC<CampaignProviderProgressProps> =
               {onStartCount && !completo && (
                 <button
                   type="button"
-                  title={`Iniciar conteo de ${p.proveedor} (${p.pendientes} SKUs por contar)`}
+                  title={`Iniciar conteo de ${p.proveedor} (${p.porContar} SKUs por contar)`}
                   onClick={() => onStartCount(p.proveedor)}
                   className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer"
                 >

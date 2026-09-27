@@ -3756,3 +3756,68 @@ que vuelve determinista la hoja y permite exigir el conteo exacto de filas.
 **413 unitarias** · **22 de componente** · **18 de hoja de cálculo** · `build` de producción 0 ·
 **E2E: 28 arneses OK** · 0 dependencias nuevas.
 
+
+
+---
+
+## Auditoría Ponytail (2026-09-19) — Fase 7: semántica de "pendiente" (carga de conteo vs cobertura de auditoría)
+
+Incoherencia real entre lo que promete el panel de proveedor y lo que muestra el operario al
+abrir el conteo. El número `pendientes` servía a dos preguntas distintas a la vez.
+
+### El desajuste medido
+
+- `getProviderPendingSkus` devolvía **todos** los `nuncaPistoleados` del proveedor, sin mirar stock.
+- El badge del panel y el orden contaban esos mismos SKUs.
+- Pero el checklist del terminal (`getPendingItems`, `countAggregation.ts`) filtra `teorico > 0`.
+- El snapshot del ERP incluye SKUs con stock 0 (no se filtran al importar), así que la brecha es
+  real: el panel podía ofrecer "12 por contar" y el operario ver 9 en la lista.
+
+El comentario de `getProviderPendingSkus` ya decía "con stock"; el código no lo hacía. Un
+`pendiente` con stock 0 no está en la góndola: es carga de conteo nula, pero sigue siendo
+cobertura de auditoría pendiente.
+
+### El corte — separar los dos ejes
+
+Se deja de compartir un único número y se nombran los ejes:
+
+- **Carga de conteo** (`ProviderProgress.porContar`, reemplaza a `pendientes`): SKUs del proveedor
+  con stock y cero lecturas. Es lo que se debe **recorrer**, y ahora coincide exactamente con el
+  checklist del terminal.
+- **Cobertura de auditoría** (`CampaignConsolidationMatrix.porcentajeCobertura`,
+  `nuncaPistoleadosCount`): sigue contando **todos** los SKUs sin lecturas, incluidos los de stock
+  0. "¿Qué falta auditar?" no es "¿qué falta recorrer?".
+
+Un único predicado documenta la frontera: `esPorContar(row) = row.stockTeorico > 0`. Se usa el
+stock del snapshot —no el efectivo con ajuste de ventas— porque el terminal tampoco conoce ese
+ajuste, así el panel y el checklist miden lo mismo. `totalSkus` del panel pasa a ser el universo
+**contable** (teórico con stock + hallazgos); un SKU sin stock ya no diluye su cobertura.
+
+`getProviderPendingSkus` aplica el mismo predicado, de modo que el botón "Contar" ofrece
+exactamente lo que el operario verá al abrir la sesión.
+
+### Pruebas
+
+- Par discriminante en `computeProviderProgress`: se agrega un SKU `C0` con stock 0 al proveedor
+  "Lab Centro" y se afirma que `totalSkus === 1` y `porContar === 1` (sin el filtro serían 2 y 2).
+- `getProviderPendingSkus` excluye `C0`: sin el filtro, el botón prometería 2 SKUs y el terminal
+  mostraría 1.
+- **Mutación confirmada**: quitar `esPorContar(r)` del filtro de `getProviderPendingSkus` hace caer
+  las dos aserciones de pendientes (413 PASADAS, 2 FALLADAS); al restaurar, 415/0.
+
+### Gate
+
+`npm run verify` exit 0 · `tsc --noEmit` 0 · `eslint` 0 errores (10 warnings preexistentes) ·
+**415 unitarias** · **22 de componente** · **18 de hoja de cálculo** · `build` de producción 0 ·
+**E2E: 28 arneses OK** · 0 dependencias nuevas.
+
+### Pendientes que quedan (medidos, no ejecutados)
+
+- Escritura a `_AUDITORIA_INVENTARIO` duplicada entre `StockCountTerminal.tsx` y
+  `CampaignConsolidationDashboard.tsx` (Hallazgo 3): candidato a un único
+  `saveAuditRows(rows, { onToast })`. Toca dos componentes grandes; requiere red antes.
+- `resumenPorUbicacion`: código muerto (tipo + cómputo + fixtures), sin consumidor.
+- El pistoleo fuera de alcance (`skuScope`) no avisa en vivo: la conciliación lo descarta, pero el
+  terminal no lo advierte al operario.
+- Sin E2E del flujo completo "Contar": campaña → botón → sesión con `skuScope` → conteo → guardado.
+- `skuScope` no se prueba al cruzar la nube (fusión en `lib/sheets.ts`).

@@ -46,16 +46,33 @@ export function getAuditProviders(rows: CampaignAuditRow[]): string[] {
 
 export interface ProviderProgress {
   proveedor: string;
-  totalSkus: number;        // SKUs del proveedor en la auditoría (teóricos + hallazgos)
+  totalSkus: number;        // SKUs del proveedor en el universo CONTABLE (teórico con stock + hallazgos)
   contados: number;         // SKUs con al menos una lectura física
   cuadrados: number;
   discrepancias: number;
-  pendientes: number;       // En el snapshot, con stock, y cero lecturas (NUNCA_PISTOLEADO)
+  porContar: number;        // Carga de conteo: SKUs con stock y cero lecturas (coincide con el checklist)
   hallazgos: number;
   cobertura: number;        // contados / totalSkus, en %
   totalTeorico: number;     // unidades esperadas (teórico efectivo)
   totalFisico: number;      // unidades contadas
 }
+
+/**
+ * Un SKU del snapshot está realmente POR CONTAR si tiene stock y no fue leído.
+ *
+ * El universo teórico incluye SKUs con stock 0 (el ERP los lista y la matriz los marca
+ * NUNCA_PISTOLEADO), pero esos no son carga de conteo: no están en la góndola y el
+ * checklist del terminal los omite (`getPendingItems` filtra `teorico > 0`). Si el
+ * avance por proveedor los contara como pendientes, el panel ofrecería "contar 12" y
+ * el operario vería 9 en la lista. Se usa el stock del snapshot (no el efectivo con
+ * ajuste de ventas) porque el terminal tampoco conoce ese ajuste: así el panel y el
+ * checklist miden lo mismo.
+ *
+ * Esto separa dos ejes que antes compartían un número: la CARGA DE CONTEO (este panel)
+ * y la COBERTURA DE AUDITORÍA (KPI de campaña, que sí incluye los SKUs sin stock por
+ * auditar). Son preguntas distintas: "¿qué falta recorrer?" vs "¿qué falta auditar?".
+ */
+const esPorContar = (row: CampaignAuditRow): boolean => row.stockTeorico > 0;
 
 /**
  * Avance de la auditoría agrupado por proveedor.
@@ -78,7 +95,7 @@ export function computeProviderProgress(matrix: CampaignConsolidationMatrix | nu
     if (!p) {
       p = {
         proveedor: key, totalSkus: 0, contados: 0, cuadrados: 0, discrepancias: 0,
-        pendientes: 0, hallazgos: 0, cobertura: 0, totalTeorico: 0, totalFisico: 0
+        porContar: 0, hallazgos: 0, cobertura: 0, totalTeorico: 0, totalFisico: 0
       };
       acc.set(key, p);
     }
@@ -96,8 +113,11 @@ export function computeProviderProgress(matrix: CampaignConsolidationMatrix | nu
     p.totalTeorico += row.stockTeoricoEfectivo; p.totalFisico += row.stockFisicoTotal;
   }
   for (const row of matrix.nuncaPistoleados) {
+    // Solo los SKUs con stock entran al universo contable y a la carga de conteo.
+    // Uno sin stock no está en la góndola: no se recorre ni diluye la cobertura.
+    if (!esPorContar(row)) continue;
     const p = bucket(row.proveedor);
-    p.totalSkus++; p.pendientes++;
+    p.totalSkus++; p.porContar++;
     p.totalTeorico += row.stockTeoricoEfectivo;
   }
   for (const row of matrix.hallazgos) {
@@ -110,14 +130,15 @@ export function computeProviderProgress(matrix: CampaignConsolidationMatrix | nu
   for (const p of list) {
     p.cobertura = p.totalSkus > 0 ? Math.round((p.contados / p.totalSkus) * 100) : 0;
   }
-  // Lo que falta primero: ordenar por pendientes desc y luego por nombre.
-  return list.sort((a, b) => b.pendientes - a.pendientes || a.proveedor.localeCompare(b.proveedor));
+  // Lo que falta primero: ordenar por carga de conteo desc y luego por nombre.
+  return list.sort((a, b) => b.porContar - a.porContar || a.proveedor.localeCompare(b.proveedor));
 }
 
 /**
- * SKUs pendientes de un proveedor: los que están en el snapshot del ERP con stock y
- * aún no tienen ninguna lectura física. Son exactamente los que debe recorrer una
- * sesión de conteo nueva acotada a ese proveedor.
+ * SKUs que debe recorrer una sesión de conteo nueva acotada a un proveedor: los del
+ * snapshot con stock y aún sin ninguna lectura física. Es la misma definición que usa
+ * el badge del panel y el filtro del checklist del terminal (`teorico > 0`), para que
+ * el botón "Contar" ofrezca exactamente lo que el operario verá al abrir la sesión.
  *
  * Vacío si el proveedor ya está completo o no existe (`''` para "sin proveedor").
  */
@@ -128,7 +149,7 @@ export function getProviderPendingSkus(
   if (!matrix) return [];
   const key = proveedor.trim() || 'Sin Proveedor';
   return matrix.nuncaPistoleados
-    .filter(r => (r.proveedor.trim() || 'Sin Proveedor') === key)
+    .filter(r => (r.proveedor.trim() || 'Sin Proveedor') === key && esPorContar(r))
     .map(r => r.sku);
 }
 

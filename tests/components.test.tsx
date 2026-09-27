@@ -303,9 +303,9 @@ async function testProviderPanelFiltra() {
 
   const providers = [
     { proveedor: 'Lab Norte', totalSkus: 2, contados: 2, cuadrados: 1, discrepancias: 1,
-      pendientes: 0, hallazgos: 0, cobertura: 100, totalTeorico: 150, totalFisico: 140 },
+      porContar: 0, hallazgos: 0, cobertura: 100, totalTeorico: 150, totalFisico: 140 },
     { proveedor: 'Lab Centro', totalSkus: 1, contados: 0, cuadrados: 0, discrepancias: 0,
-      pendientes: 1, hallazgos: 0, cobertura: 0, totalTeorico: 30, totalFisico: 0 }
+      porContar: 1, hallazgos: 0, cobertura: 0, totalTeorico: 30, totalFisico: 0 }
   ];
 
   let elegido = '';
@@ -338,9 +338,9 @@ async function testProviderPanelLanzaConteo() {
 
   const providers = [
     { proveedor: 'Lab Norte', totalSkus: 2, contados: 2, cuadrados: 2, discrepancias: 0,
-      pendientes: 0, hallazgos: 0, cobertura: 100, totalTeorico: 150, totalFisico: 150 },
+      porContar: 0, hallazgos: 0, cobertura: 100, totalTeorico: 150, totalFisico: 150 },
     { proveedor: 'Lab Centro', totalSkus: 1, contados: 0, cuadrados: 0, discrepancias: 0,
-      pendientes: 4, hallazgos: 0, cobertura: 0, totalTeorico: 30, totalFisico: 0 }
+      porContar: 4, hallazgos: 0, cobertura: 0, totalTeorico: 30, totalFisico: 0 }
   ];
 
   let lanzado = '';

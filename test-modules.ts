@@ -1776,7 +1776,11 @@ console.log('\n--- 20. Pruebas de derivacion y filtrado de campanas (campaignAgg
       A1: snapshotItem('A1', 100, { proveedor: 'Lab Norte' }),
       A2: snapshotItem('A2', 50, { proveedor: 'Lab Norte' }),
       B1: snapshotItem('B1', 80, { proveedor: 'Lab Sur' }),
-      C1: snapshotItem('C1', 30, { proveedor: 'Lab Centro' })
+      C1: snapshotItem('C1', 30, { proveedor: 'Lab Centro' }),
+      // SKU sin stock: el ERP lo lista y queda NUNCA_PISTOLEADO, pero no está en la
+      // gondola. No debe engrosar la carga de conteo ni la cobertura del panel, que es
+      // justo lo que el checklist del terminal omite (`getPendingItems`: teorico > 0).
+      C0: snapshotItem('C0', 0, { proveedor: 'Lab Centro' })
     }
   });
   const provMatriz = computeCampaignConsolidationMatrix(provCamp, [
@@ -1791,18 +1795,23 @@ console.log('\n--- 20. Pruebas de derivacion y filtrado de campanas (campaignAgg
     'avance por proveedor: agrupa todos los proveedores presentes');
 
   const norte = avance.find(p => p.proveedor === 'Lab Norte')!;
-  assert(norte.totalSkus === 2 && norte.contados === 2 && norte.pendientes === 0,
-    'avance por proveedor: suma los SKUs de cada proveedor y no deja pendientes');
+  assert(norte.totalSkus === 2 && norte.contados === 2 && norte.porContar === 0,
+    'avance por proveedor: suma los SKUs de cada proveedor y no deja carga de conteo');
   assert(norte.cuadrados === 1 && norte.discrepancias === 1,
     'avance por proveedor: separa cuadrados de descuadres');
   assert(norte.cobertura === 100,
     'avance por proveedor: con todo contado la cobertura es 100%, aunque haya descuadres');
 
   const centro = avance.find(p => p.proveedor === 'Lab Centro')!;
-  assert(centro.pendientes === 1 && centro.contados === 0 && centro.cobertura === 0,
-    'avance por proveedor: un proveedor sin lecturas queda 0% y con pendiente');
+  assert(centro.porContar === 1 && centro.contados === 0 && centro.cobertura === 0,
+    'avance por proveedor: un proveedor sin lecturas queda 0% y con carga de conteo');
   assert(centro.totalTeorico === 30 && centro.totalFisico === 0,
-    'avance por proveedor: el teorico pendiente cuenta en unidades, no solo en SKUs');
+    'avance por proveedor: el teorico por contar cuenta en unidades, no solo en SKUs');
+  // El SKU con stock 0 (C0) no debe inflar la carga de conteo ni la cobertura: si se
+  // contara, `centro.totalSkus` seria 2 y `centro.porContar` tambien 2, y el panel
+  // ofreceria contar un SKU que el checklist del terminal nunca muestra.
+  assert(centro.totalSkus === 1 && centro.porContar === 1,
+    'avance por proveedor: un SKU sin stock no es carga de conteo ni diluye la cobertura');
 
   // El orden pone primero lo que falta por contar.
   assert(avance[0].proveedor === 'Lab Centro',
@@ -1830,6 +1839,11 @@ console.log('\n--- 20. Pruebas de derivacion y filtrado de campanas (campaignAgg
   const pendientesCentro = getProviderPendingSkus(provMatriz, 'Lab Centro');
   assert(pendientesCentro.length === 1 && pendientesCentro[0] === 'C1',
     'pendientes de proveedor: devuelve solo los SKUs sin lecturas');
+  // El SKU sin stock (C0) no se ofrece para contar: no esta en la gondola. Este es el
+  // par discriminante contra el desajuste panel/checklist: sin el filtro `esPorContar`,
+  // el boton "Contar" prometeria 2 SKUs y el terminal mostraria 1.
+  assert(!pendientesCentro.includes('C0'),
+    'pendientes de proveedor: excluye los SKUs sin stock (coincide con el checklist)');
   assert(getProviderPendingSkus(provMatriz, 'Lab Norte').length === 0,
     'pendientes de proveedor: un proveedor ya contado no tiene pendientes');
   assert(getProviderPendingSkus(provMatriz, 'Inexistente').length === 0,
