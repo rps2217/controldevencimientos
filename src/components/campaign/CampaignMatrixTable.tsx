@@ -141,7 +141,6 @@ export const CampaignMatrixTable: React.FC<CampaignMatrixTableProps> = ({
               </tr>
             ) : (
               displayedRows.map((row) => {
-                const isSquare = row.diferenciaNeta === 0;
                 const isNeverScanned = row.estadoGlobal === 'NUNCA_PISTOLEADO';
                 const isHallazgo = row.estadoGlobal === 'HALLAZGO';
 
@@ -154,7 +153,7 @@ export const CampaignMatrixTable: React.FC<CampaignMatrixTableProps> = ({
                   >
                     {/* Estado Badge */}
                     <td className="py-2.5 px-4 text-center">
-                      {row.esCerrado || isSquare ? (
+                      {row.estadoGlobal === 'VALIDADO_OK' ? (
                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400" title="Validado / Cuadrado">
                           <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                         </span>

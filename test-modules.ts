@@ -149,7 +149,8 @@ import {
   resolveActiveCampaign,
   collectAllAuditRows,
   getAuditProviders,
-  filterAuditRows
+  filterAuditRows,
+  computeProviderProgress
 } from './src/utils/campaignAggregation';
 import { InventoryCampaign, StockCountSession, CampaignSnapshotItem, StockCountEntry, StockCountReconciliationItem, InventoryItem, SheetConfig } from './src/types';
 import { mergeCloudConfigs, redactSecretsForCloudSheet } from './src/utils/dashboardConfigUtils';
@@ -1707,6 +1708,62 @@ console.log('\n--- 20. Pruebas de derivacion y filtrado de campanas (campaignAgg
   // (Cuidado: quitar el trim de la guarda NO cambia nada, porque q se recorta igual.)
   assert(filterAuditRows(matriz, 'DISCREPANCIA', 'ALL', ' SKU_DIF ').length === 1,
     'filtro de matriz: recorta espacios alrededor del termino de busqueda');
+
+  // --- computeProviderProgress ---
+  // Avance por proveedor: el operario va por laboratorio, no por mueble.
+  assert(computeProviderProgress(null).length === 0,
+    'avance por proveedor: sin matriz devuelve lista vacia');
+
+  const provCamp = makeCampaign({
+    snapshotTeoricoActual: {
+      A1: snapshotItem('A1', 100, { proveedor: 'Lab Norte' }),
+      A2: snapshotItem('A2', 50, { proveedor: 'Lab Norte' }),
+      B1: snapshotItem('B1', 80, { proveedor: 'Lab Sur' }),
+      C1: snapshotItem('C1', 30, { proveedor: 'Lab Centro' })
+    }
+  });
+  const provMatriz = computeCampaignConsolidationMatrix(provCamp, [
+    makeSession('A1', 100),   // Norte: cuadrado
+    makeSession('A2', 40),    // Norte: discrepancia (-10)
+    makeSession('B1', 80)     // Sur: cuadrado
+    // C1 nunca pistoleado
+  ]);
+  const avance = computeProviderProgress(provMatriz);
+
+  assert(avance.length === 3,
+    'avance por proveedor: agrupa todos los proveedores presentes');
+
+  const norte = avance.find(p => p.proveedor === 'Lab Norte')!;
+  assert(norte.totalSkus === 2 && norte.contados === 2 && norte.pendientes === 0,
+    'avance por proveedor: suma los SKUs de cada proveedor y no deja pendientes');
+  assert(norte.cuadrados === 1 && norte.discrepancias === 1,
+    'avance por proveedor: separa cuadrados de descuadres');
+  assert(norte.cobertura === 100,
+    'avance por proveedor: con todo contado la cobertura es 100%, aunque haya descuadres');
+
+  const centro = avance.find(p => p.proveedor === 'Lab Centro')!;
+  assert(centro.pendientes === 1 && centro.contados === 0 && centro.cobertura === 0,
+    'avance por proveedor: un proveedor sin lecturas queda 0% y con pendiente');
+  assert(centro.totalTeorico === 30 && centro.totalFisico === 0,
+    'avance por proveedor: el teorico pendiente cuenta en unidades, no solo en SKUs');
+
+  // El orden pone primero lo que falta por contar.
+  assert(avance[0].proveedor === 'Lab Centro',
+    'avance por proveedor: ordena primero el que tiene pendientes');
+
+  // Cobertura por SKUs, no por unidades: Sur tiene 1 SKU contado de 1 (100%),
+  // aunque las unidades sean 80; si midiera unidades el resultado seria otro.
+  const sur = avance.find(p => p.proveedor === 'Lab Sur')!;
+  assert(sur.cobertura === 100 && sur.totalFisico === 80,
+    'avance por proveedor: la cobertura mide SKUs cubiertos, no unidades contadas');
+
+  // Hallazgo sin proveedor cae al bucket explicito, no se pierde.
+  const hallazgoCamp = makeCampaign({ snapshotTeoricoActual: {} });
+  const hallazgoMatriz = computeCampaignConsolidationMatrix(hallazgoCamp, [makeSession('X1', 5)]);
+  const avanceHallazgo = computeProviderProgress(hallazgoMatriz);
+  assert(avanceHallazgo.length === 1 && avanceHallazgo[0].proveedor === 'Sin Proveedor'
+    && avanceHallazgo[0].hallazgos === 1,
+    'avance por proveedor: un hallazgo sin proveedor cae a "Sin Proveedor" y no se pierde');
 
   // createMetricsAccumulator: ruta compartida por el worker y el fallback sincronico.
   {

@@ -3550,3 +3550,44 @@ medición: **confirmar la semántica de las columnas del ERP con el cliente ante
 Gate: `tsc` 0 · `eslint` 0 errores · **391 unitarias** (377 + 14 nuevas) · **12 de componente**
 (10 + 2) · build 0 · **27 arneses E2E** en verde.
 
+## Auditoría Ponytail — icono coherente con el estado y avance por proveedor (2026-09-19)
+
+### Hallazgo 4 — El icono verde contradecía al KPI rojo
+
+`CampaignMatrixTable.tsx` decidía el icono con `row.esCerrado || isSquare`, con
+`isSquare = diferenciaNeta === 0`, **antes** de mirar `estadoGlobal`. Un SKU del ERP con
+`stockTeorico = 0` que nadie pistolea tiene `diferenciaNeta = 0 − 0 = 0`: el KPI lo cuenta como
+`NUNCA_PISTOLEADO` (rojo) mientras la fila muestra el check **VERDE** "Validado / Cuadrado", para
+el mismo SKU. Es alcanzable siempre que el ERP exporte una fila con stock 0. El semáforo es justo
+lo que el operario usa para decidir qué le falta, así que la contradicción tiene costo operativo.
+
+**Corrección (opción a, elegida sobre "sacar los SKUs en cero del universo").** El icono sigue a
+`estadoGlobal`: el check verde sólo con `VALIDADO_OK`; el resto cae a su propio icono. Se eliminó
+`isSquare`, que quedó huérfano. Va con 2 pruebas de componente y mutación confirmada (volver a
+`diferenciaNeta` tumba ambas).
+
+### Característica — Avance por proveedor (recorrer la tienda por laboratorio, no por mueble)
+
+El filtro por proveedor ya existía en la matriz, pero **no había avance por proveedor**: el único
+resumen de progreso era `resumenPorUbicacion` (por mueble) y ni siquiera se renderizaba. De la
+escalera de decisiones salió reutilizar, no reconstruir:
+
+- **`computeProviderProgress(matrix)`** (pura, en `campaignAggregation.ts`): agrupa por
+  `CampaignAuditRow.proveedor` y devuelve, por proveedor, SKUs totales/contados/cuadrados/
+  descuadres/pendientes/hallazgos, cobertura y unidades. Ordena por pendientes.
+- **`CampaignProviderProgress.tsx`**: barra de cobertura por proveedor sobre la tabla; tocar uno
+  fija `selectedProvider`, la **misma** fuente de verdad que el desplegable (sin estado paralelo).
+- **Integración** en la pestaña MATRIX del dashboard.
+
+`cobertura` cuenta SKUs, no unidades —la mutación a unidades hace caer la prueba—. Sin proveedor
+caen a "Sin Proveedor", no desaparecen.
+
+**Corte deliberado: el panel filtra, no lanza conteos.** `onStartTargetedRecount` crea sesiones
+con `esSegundaVuelta: true`, y una vuelta **reemplaza** el físico. Un conteo nuevo por proveedor
+debe **sumar**. Cablear el botón del panel a ese launcher marcaría un conteo nuevo como reconteo y
+corrompería la cuadratura. Lanzar sesiones normales por proveedor es un corte aparte que toca
+`StockCountTerminal` y el launcher.
+
+Gate: `tsc` 0 · `eslint` 0 errores (1 warning preexistente) · **401 unitarias** (391 + 10) ·
+**19 de componente** (12 + 7) · build 0 · **27 arneses E2E** en verde.
+

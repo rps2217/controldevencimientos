@@ -5,11 +5,12 @@ import { computeCampaignConsolidationMatrix, importPharmacySnapshotToCampaign, m
 import { saveStockCountSessionsToStorage, playBeep } from '../../utils/stockCountUtils';
 import { syncCampaignsWithCloud, saveAuditRowsToDedicatedSheet } from '../../lib/sheets';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
-import { resolveActiveCampaign, collectAllAuditRows, getAuditProviders, filterAuditRows } from '../../utils/campaignAggregation';
+import { resolveActiveCampaign, collectAllAuditRows, getAuditProviders, filterAuditRows, computeProviderProgress } from '../../utils/campaignAggregation';
 import { parseDelimitedText, detectDelimiter } from '../../utils/universalImporter';
 import { CampaignQuickScanModal } from '../modals/CampaignQuickScanModal';
 import { CampaignMatrixTable } from '../campaign/CampaignMatrixTable';
 import { CampaignKpiSemaphore } from '../campaign/CampaignKpiSemaphore';
+import { CampaignProviderProgress } from '../campaign/CampaignProviderProgress';
 import { getErrorMessage } from '../../utils/pureCalculations';
 
 import { STORAGE_KEYS } from '../../utils/appStorage';
@@ -142,6 +143,11 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
   const providerList = useMemo(() => {
     return getAuditProviders(allAuditRows);
   }, [allAuditRows]);
+
+  // Avance por proveedor (cuánto falta contar de cada laboratorio)
+  const providerProgress = useMemo(() => {
+    return computeProviderProgress(matrix);
+  }, [matrix]);
 
   // Filtered rows for the matrix table
   const displayedRows = useMemo(() => {
@@ -737,7 +743,13 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
       
       {/* TAB A: MATRIX OF CONSOLIDATION */}
       {activeTab === 'MATRIX' && (
-        <CampaignMatrixTable
+        <div className="flex flex-col gap-4">
+          <CampaignProviderProgress
+            providers={providerProgress}
+            selectedProvider={selectedProvider}
+            onSelectProvider={(p) => setSelectedProvider(selectedProvider === p ? 'ALL' : p)}
+          />
+          <CampaignMatrixTable
           matrix={matrix}
           displayedRows={displayedRows}
           providerList={providerList}
@@ -752,7 +764,8 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
           onLaunchTargetedRecount={handleLaunchTargetedRecount}
           onToggleCloseSku={handleToggleCloseSku}
           onUpdateSalesAdjustment={handleUpdateSalesAdjustment}
-        />
+          />
+        </div>
       )}
 
       {/* TAB B: SNAPSHOT UPLOADER */}

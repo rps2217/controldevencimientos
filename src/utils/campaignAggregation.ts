@@ -44,6 +44,77 @@ export function getAuditProviders(rows: CampaignAuditRow[]): string[] {
   return Array.from(set).sort();
 }
 
+export interface ProviderProgress {
+  proveedor: string;
+  totalSkus: number;        // SKUs del proveedor en la auditoría (teóricos + hallazgos)
+  contados: number;         // SKUs con al menos una lectura física
+  cuadrados: number;
+  discrepancias: number;
+  pendientes: number;       // En el snapshot, con stock, y cero lecturas (NUNCA_PISTOLEADO)
+  hallazgos: number;
+  cobertura: number;        // contados / totalSkus, en %
+  totalTeorico: number;     // unidades esperadas (teórico efectivo)
+  totalFisico: number;      // unidades contadas
+}
+
+/**
+ * Avance de la auditoría agrupado por proveedor.
+ *
+ * El operario recorre la tienda por proveedor (un laboratorio a la vez), no por
+ * mueble, así que necesita saber cuánto le falta de cada uno sin abrir la tabla.
+ * Es el análogo de `resumenPorUbicacion`, pero sobre un eje que sí vive en la fila
+ * (`CampaignAuditRow.proveedor`) y que la UI ya usa para filtrar.
+ *
+ * `cobertura` cuenta SKUs, no unidades: 80 unidades de 1 SKU no son el 80 % de una
+ * góndola de 10 SKUs. Nunca divide por cero.
+ */
+export function computeProviderProgress(matrix: CampaignConsolidationMatrix | null): ProviderProgress[] {
+  if (!matrix) return [];
+
+  const acc = new Map<string, ProviderProgress>();
+  const bucket = (proveedor: string): ProviderProgress => {
+    const key = proveedor.trim() || 'Sin Proveedor';
+    let p = acc.get(key);
+    if (!p) {
+      p = {
+        proveedor: key, totalSkus: 0, contados: 0, cuadrados: 0, discrepancias: 0,
+        pendientes: 0, hallazgos: 0, cobertura: 0, totalTeorico: 0, totalFisico: 0
+      };
+      acc.set(key, p);
+    }
+    return p;
+  };
+
+  for (const row of matrix.cuadrados) {
+    const p = bucket(row.proveedor);
+    p.totalSkus++; p.contados++; p.cuadrados++;
+    p.totalTeorico += row.stockTeoricoEfectivo; p.totalFisico += row.stockFisicoTotal;
+  }
+  for (const row of matrix.discrepancias) {
+    const p = bucket(row.proveedor);
+    p.totalSkus++; p.contados++; p.discrepancias++;
+    p.totalTeorico += row.stockTeoricoEfectivo; p.totalFisico += row.stockFisicoTotal;
+  }
+  for (const row of matrix.nuncaPistoleados) {
+    const p = bucket(row.proveedor);
+    p.totalSkus++; p.pendientes++;
+    p.totalTeorico += row.stockTeoricoEfectivo;
+  }
+  for (const row of matrix.hallazgos) {
+    const p = bucket(row.proveedor);
+    p.totalSkus++; p.contados++; p.hallazgos++;
+    p.totalFisico += row.stockFisicoTotal;
+  }
+
+  const list = Array.from(acc.values());
+  for (const p of list) {
+    p.cobertura = p.totalSkus > 0 ? Math.round((p.contados / p.totalSkus) * 100) : 0;
+  }
+  // Lo que falta primero: ordenar por pendientes desc y luego por nombre.
+  return list.sort((a, b) => b.pendientes - a.pendientes || a.proveedor.localeCompare(b.proveedor));
+}
+
+
 /**
  * Filas visibles de la matriz según estado, proveedor y búsqueda.
  *

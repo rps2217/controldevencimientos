@@ -14,6 +14,7 @@ import { DashboardProvider } from '../src/context/DashboardContext';
 import { RightDrawerProvider } from '../src/context/RightDrawerContext';
 import { ViewConfigControlDrawer } from '../src/components/drawers/ViewConfigControlDrawer';
 import { CampaignMatrixTable } from '../src/components/campaign/CampaignMatrixTable';
+import { CampaignProviderProgress } from '../src/components/campaign/CampaignProviderProgress';
 import { useTableGrouping } from '../src/hooks/useTableGrouping';
 import type { SheetConfig, CampaignAuditRow, CampaignConsolidationMatrix } from '../src/types';
 
@@ -239,6 +240,100 @@ async function testPostCorteBadgeRenders() {
   await sinMarca.unmount();
 }
 
+async function testIconoCoherenteConEstado() {
+  console.log('\n--- 6. El icono de fila sigue a estadoGlobal, no a diferenciaNeta ---');
+
+  // Un SKU del ERP con stock 0 y cero lecturas tiene diferenciaNeta 0, pero NO está
+  // validado: es NUNCA_PISTOLEADO. El icono verde "Validado / Cuadrado" contradecía
+  // al KPI rojo para el mismo SKU.
+  const rowNunca: CampaignAuditRow = {
+    sku: 'SKU-CERO',
+    descripcion: 'Sin stock',
+    proveedor: '',
+    stockTeorico: 0,
+    stockFisicoTotal: 0,
+    ventaRegistrada: 0,
+    ajusteManualVenta: 0,
+    stockTeoricoEfectivo: 0,
+    diferenciaNeta: 0,
+    estadoGlobal: 'NUNCA_PISTOLEADO',
+    conteoPosteriorAlCorte: false,
+    esCerrado: false,
+    sesionesDondeAparece: []
+  };
+
+  const matrix = {
+    campaignId: 'c1', nombreCampana: 'Inv', fechaCalculo: '2026-09-19T00:00:00.000Z',
+    corte: { fechaCorte: null, skusConLecturaPosterior: [], skusPendientesDeConteo: [] },
+    totalSkusTeoricos: 1, totalSkusFisicosAuditados: 0, porcentajeCobertura: 0,
+    cuadradosCount: 0, discrepanciasCount: 0, nuncaPistoleadosCount: 1, hallazgosCount: 0,
+    totalFisicoContado: 0, totalTeoricoEsperado: 0, diferenciaNetaTotal: 0,
+    cuadrados: [], discrepancias: [], nuncaPistoleados: [rowNunca], hallazgos: [],
+    resumenPorUbicacion: []
+  } as unknown as CampaignConsolidationMatrix;
+
+  const props = {
+    matrix,
+    displayedRows: [rowNunca],
+    providerList: [],
+    matrixFilter: 'ALL' as const,
+    searchTerm: '',
+    selectedProvider: '',
+    onMatrixFilterChange: () => {},
+    onSearchTermChange: () => {},
+    onSelectedProviderChange: () => {},
+    onQuickScan: () => {},
+    onExportDiscrepancies: () => {},
+    onLaunchTargetedRecount: () => {},
+    onToggleCloseSku: () => {},
+    onUpdateSalesAdjustment: () => {}
+  };
+
+  const view = await mount(<CampaignMatrixTable {...props} />);
+  const html = view.container.innerHTML;
+  assert(!html.includes('Validado / Cuadrado'),
+    'un SKU NUNCA_PISTOLEADO con diferencia 0 NO muestra el check verde de validado');
+  assert(html.includes('Nunca Pistoleado'),
+    'muestra el icono rojo de nunca pistoleado, coherente con el KPI');
+  await view.unmount();
+}
+
+async function testProviderPanelFiltra() {
+  console.log('\n--- 7. El panel por proveedor se pinta y filtra la matriz ---');
+
+  const providers = [
+    { proveedor: 'Lab Norte', totalSkus: 2, contados: 2, cuadrados: 1, discrepancias: 1,
+      pendientes: 0, hallazgos: 0, cobertura: 100, totalTeorico: 150, totalFisico: 140 },
+    { proveedor: 'Lab Centro', totalSkus: 1, contados: 0, cuadrados: 0, discrepancias: 0,
+      pendientes: 1, hallazgos: 0, cobertura: 0, totalTeorico: 30, totalFisico: 0 }
+  ];
+
+  let elegido = '';
+  const view = await mount(
+    <CampaignProviderProgress
+      providers={providers}
+      selectedProvider="ALL"
+      onSelectProvider={(p) => { elegido = p; }}
+    />
+  );
+  const texto = view.text();
+  assert(texto.includes('Lab Norte') && texto.includes('Lab Centro'),
+    'el panel lista los proveedores de la campana', texto.slice(0, 100));
+  assert(texto.includes('100%') && texto.includes('0%'),
+    'el panel muestra la cobertura de cada proveedor');
+  assert(texto.includes('1 por contar'),
+    'el panel destaca cuanto falta por contar, no solo el porcentaje');
+
+  const botones = view.container.querySelectorAll('button');
+  assert(botones.length === 2, 'hay un boton por proveedor');
+  (botones[1] as HTMLButtonElement).click();
+  await view.run(() => {});
+  assert(elegido === 'Lab Centro',
+    'tocar un proveedor lo selecciona para filtrar la matriz (no es un panel decorativo)');
+  await view.unmount();
+}
+
+
 
 async function main() {
   console.log('========================================');
@@ -250,6 +345,8 @@ async function main() {
   await testDrawerClosedRendersNothing();
   await testGroupingRestoredWhenConfigArrivesLate();
   await testPostCorteBadgeRenders();
+  await testIconoCoherenteConEstado();
+  await testProviderPanelFiltra();
 
   teardownDom();
 
