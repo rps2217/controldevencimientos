@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Database, Server, Zap, Shield, RefreshCw, CheckCircle2, 
   AlertTriangle, ArrowRightLeft, Activity, Terminal, Key, Globe
 } from 'lucide-react';
 import { SheetConfig, BackendMirrorConfig, InventoryItem } from '../../types';
 import { backendMirrorService, MirrorTestResult, MirrorLogEntry } from '../../services/backendMirrorService';
+import { isMirrorRetryable, MIRROR_MAX_ATTEMPTS } from '../../utils/mirrorSyncPolicy';
+import type { MirrorRetryEntry } from '../../utils/mirrorRetryQueue';
 import { getErrorMessage } from '../../utils/pureCalculations';
 
 interface BackendMirrorPanelProps {
@@ -38,6 +40,14 @@ export const BackendMirrorPanel: React.FC<BackendMirrorPanelProps> = ({
   const [isSyncingNow, setIsSyncingNow] = useState<boolean>(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [logs, setLogs] = useState<MirrorLogEntry[]>(backendMirrorService.getLogs());
+  const [pendientes, setPendientes] = useState<MirrorRetryEntry[]>(backendMirrorService.getPendingRetries());
+  const [isDraining, setIsDraining] = useState<boolean>(false);
+
+  // El buzón se lee del almacenamiento, no es reactivo: al abrir el panel y tras
+  // cada operación se refresca para que un fallo persistente no quede invisible.
+  const refrescarPendientes = () => setPendientes(backendMirrorService.getPendingRetries());
+
+  useEffect(() => { refrescarPendientes(); }, []);
 
   const updateConfig = (patch: Partial<BackendMirrorConfig>) => {
     const updated: BackendMirrorConfig = { ...currentConfig, ...patch };
@@ -91,6 +101,30 @@ export const BackendMirrorPanel: React.FC<BackendMirrorPanelProps> = ({
       setSyncStatusMsg(`Error: ${getErrorMessage(err)}`);
     } finally {
       setIsSyncingNow(false);
+    }
+  };
+
+  const handleDrainRetries = async () => {
+    if (!currentConfig.enabled || !currentConfig.endpointUrl) {
+      alert('Debes habilitar el espejo e ingresar una URL de endpoint válida.');
+      return;
+    }
+    setIsDraining(true);
+    setSyncStatusMsg(null);
+    try {
+      const replicados = await backendMirrorService.drainRetries(currentConfig);
+      const restantes = backendMirrorService.getPendingRetries();
+      setSyncStatusMsg(
+        replicados > 0
+          ? `Reintento completado: ${replicados} pendiente(s) replicado(s). Quedan ${restantes.length}.`
+          : `No se pudo replicar ningún pendiente. Quedan ${restantes.length} en el buzón.`
+      );
+      setLogs(backendMirrorService.getLogs());
+      refrescarPendientes();
+    } catch (err: unknown) {
+      setSyncStatusMsg(`Error: ${getErrorMessage(err)}`);
+    } finally {
+      setIsDraining(false);
     }
   };
 
@@ -243,6 +277,39 @@ export const BackendMirrorPanel: React.FC<BackendMirrorPanelProps> = ({
             Dispositivo Local: <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono text-[10px]">{backendMirrorService.getDeviceId()}</code>
           </span>
         </div>
+
+        {/* PENDING RETRY MAILBOX */}
+        {pendientes.length > 0 && (
+          <div
+            role="status"
+            className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs space-y-2"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2 font-medium text-amber-800 dark:text-amber-300">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                {pendientes.length} cambio(s) sin replicar al espejo todavía.
+              </span>
+              <button
+                type="button"
+                onClick={handleDrainRetries}
+                disabled={isDraining}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[11px] flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+              >
+                <RefreshCw className={`w-3 h-3 ${isDraining ? 'animate-spin' : ''}`} /> Reintentar ahora
+              </button>
+            </div>
+            <ul className="space-y-0.5 text-amber-800/90 dark:text-amber-300/90 font-mono text-[10px]">
+              {pendientes.slice(-5).map(p => (
+                <li key={p.mutationId} className="break-all">
+                  {isMirrorRetryable(p.attempts)
+                    ? `[${p.attempts} intento(s)] `
+                    : `[AGOTADO tras ${MIRROR_MAX_ATTEMPTS} intentos] `}
+                  {p.mutation.type} en {p.mutation.sheetTitle}: {p.lastError || 'sin detalle'}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* TEST RESULT BADGE */}
         {testResult && (

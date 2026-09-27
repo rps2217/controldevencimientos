@@ -4005,3 +4005,70 @@ tumba el proceso de pruebas.
   persistencia. Inofensivo hoy, pero requiere mutación antes de tocarlo.
 - **Sin E2E del flujo "Contar"** completo: campaña → botón → sesión con `skuScope` → conteo → guardado.
 
+
+---
+
+## Auditoría Ponytail (2026-09-27) — Fase 10: los modos del Espejo de Backend existían sólo en la UI
+
+### El pendiente que no estaba en ninguna lista
+
+Las listas de pendientes heredadas (Fases 7–9) eran todas de bajo retorno: duplicación cosmética y
+estado muerto. Al medir el árbol apareció un defecto de otra clase — el mismo género que el bug del
+código de barras recién corregido: **una capacidad que la UI ofrece y el código no ejecuta**.
+
+`syncMode` se declara en `types.ts`, se ofrece en un `<select>` en `BackendMirrorPanel.tsx` y el
+`AGENTS.md` §J lo documentaba como la capacidad central del módulo (*"Espejo Primero para latencia
+sub-150ms"*). **No se leía en ninguna parte de `src/`**. Los tres modos replicaban exactamente igual.
+
+### Hallazgo 1 — El modo se elegía, no se cumplía
+
+`planMirrorDispatch` (`src/utils/mirrorSyncPolicy.ts`) fija ahora la decisión por modo. El invariante
+caro es `mirror_first`: debe **esperar** al espejo antes de continuar. Si se adelanta Sheets, deja de
+ser mirror-first y la latencia prometida no existe. `backup_only` deja de escribir en cada mutación
+(antes replicaba igual que las otras dos).
+
+### Hallazgo 2 — El `.catch()` del fire-and-forget no podía dispararse nunca
+
+Defecto de clase, no de detalle: `backendMirrorService.mirrorMutation` **no lanza**, resuelve
+`{ success: false }`. El código hacía `mirrorMutation(...).catch(...)`, así que un espejo caído no
+entraba jamás por esa rama. Se registraba un warning y **la mutación no se reintentaba nunca**: el
+espejo divergía en silencio justo cuando el usuario lo había activado por concurrencia.
+
+Se cierra con `replicate` → buzón de reintento persistido (`src/utils/mirrorRetryQueue.ts`), backoff
+exponencial acotado y drenado periódico. Y con `autoSyncIntervalSec`, que hasta ahora se guardaba y
+**no lo leía nadie**.
+
+### Pruebas (25 aserciones nuevas, §25–§27 de `test-modules.ts`)
+
+- **§25 Política por modo**: los tres modos, el modo ausente que no debe apagar la replicación, el
+  backoff (primera espera = base, no el doble; techo; intentos agotados) y el acotado del intervalo.
+- **§26 Buzón**: encolado con contador, **dedupe por `mutationId`** (duplicar replicaría dos veces el
+  mismo cambio), tope de cola que descarta lo más antiguo, respeto del backoff, dato corrupto inocuo.
+- **§27 Ruta real del servicio**: se stubea `fetch` (el límite de red), no el servicio. Confirma que
+  un fallo queda persistido, que el drenado no martillea un servidor caído, y que al recuperarse el
+  pendiente sale del buzón.
+
+**Mutación confirmada en 5 puntos**: quitar el `awaitBeforeSheets` de `mirror_first` (1 fallo);
+indexar el backoff desde 1 (3 fallos); hacer que el buzón duplique (1 fallo); ignorar el backoff en
+el drenado; y —la más importante— **revertir `replicate` al comportamiento original** (2 fallos:
+"el fallo queda persistido" y "el drenado respeta el backoff"), que es exactamente el bug.
+
+### UI
+
+El buzón es inútil si nadie lo ve: `BackendMirrorPanel.tsx` muestra los pendientes (con intentos y
+último error), marca los **agotados** en vez de descartarlos en silencio, y ofrece "Reintentar ahora".
+
+### Gate
+
+`npm run verify` exit 0 · `tsc --noEmit` 0 · `eslint` 0 errores (10 warnings preexistentes) ·
+**445 unitarias** · **30 de componente** · **18 de hoja de cálculo** · `build` de producción 0 ·
+**E2E: 29 arneses OK** · 0 dependencias nuevas.
+
+### Lo que no se tocó (escalera de decisiones)
+
+- **`conflictStrategy`**: se envía en el payload, pero negociarlo corresponde al servidor espejo, que
+  es de terceros. No se inventa un cliente de conflictos que no puede cumplirse solo de este lado.
+- **`syncSheetToMirror`** (volcado masivo manual): funciona y no entra en el defecto de las
+  mutaciones. No se refactoriza sin motivo.
+- El E2E del flujo "Contar" (pendiente heredado) **no se abordó aquí** para no mezclar dominios.
+

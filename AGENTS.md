@@ -185,7 +185,9 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
 - **Espejo de Backend REST (`src/services/backendMirrorService.ts` & `BackendMirrorPanel.tsx`)**:
   - Resuelve las limitaciones de latencia (~2.500ms en Google Apps Script) y la falta de bloqueos de concurrencia a nivel de fila durante conteos masivos en farmacia.
   - Soporte para un backend espejo secundario vía endpoint REST personalizado.
-  - Estrategias de sincronización: **Escritura Dual (Dual-Write)** en paralelo con Google Sheets, **Espejo Primero (Mirror-First)** para latencia sub-150ms con volcado asíncrono, o **Solo Respaldo (Backup-Only)**.
+  - Estrategias de sincronización: **Escritura Dual (Dual-Write)** en paralelo con Google Sheets, **Espejo Primero (Mirror-First)** para latencia sub-150ms, o **Solo Respaldo (Backup-Only)**.
+  - La semántica de los modos vive en `src/utils/mirrorSyncPolicy.ts` (`planMirrorDispatch`): `mirror_first` **espera** al espejo antes de continuar, `dual_write` replica en paralelo, `backup_only` no escribe automáticamente. `useOfflineSync` es el único que decide cuándo despachar.
+  - Fallos del espejo **no se pierden**: `replicate` (`backendMirrorService.ts`) persiste el pendiente en el buzón de reintento (`src/utils/mirrorRetryQueue.ts`) y el drenado usa backoff exponencial (`autoSyncIntervalSec`, antes sin consumidor). Los pendientes son visibles y reintentables desde `BackendMirrorPanel.tsx`. Nota: `mirrorMutation` **no lanza**, devuelve `{ success: false }`; un `.catch()` sobre ella nunca se dispara.
   - Telemetría en tiempo real, test de latencia de red, identificador único de terminal/dispositivo (`deviceId`) y resolución de conflictos por timestamp atómico (`last_write_wins`).
 
 ### K. Consolidación Inteligente por CU_VC (Control sin Lotes)

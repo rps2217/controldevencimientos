@@ -15,7 +15,26 @@ import {
   getItemResolutionStatus
 } from './src/utils/dateCalculations';
 import { createMetricsAccumulator } from './src/utils/pureCalculations';
+import { backendMirrorService } from './src/services/backendMirrorService';
 import { getDefaultTicketTitle } from './src/utils/ticketUtils';
+import {
+  planMirrorDispatch,
+  mirrorRetryDelayMs,
+  isMirrorRetryable,
+  clampMirrorIntervalSec,
+  MIRROR_RETRY_BASE_MS,
+  MIRROR_RETRY_MAX_MS,
+  MIRROR_MAX_ATTEMPTS
+} from './src/utils/mirrorSyncPolicy';
+import {
+  enqueueMirrorRetry,
+  removeMirrorRetry,
+  selectMirrorReady,
+  readMirrorRetryQueue,
+  writeMirrorRetryQueue,
+  MIRROR_RETRY_QUEUE_KEY,
+  MIRROR_RETRY_QUEUE_MAX
+} from './src/utils/mirrorRetryQueue';
 
 import {
   findColumnBySemantic,
@@ -2329,6 +2348,169 @@ console.log('\n--- Perfiles de medios para etiquetas térmicas (ROADMAP §31) --
     'fusión: un campo opcional de campaña en undefined no borra el valor remoto',
     mergeCampana.mergedCampaigns[0].notasCierre);
 
+}
+
+console.log('\n--- 25. Política de modos del Espejo de Backend (syncMode) ---');
+{
+  // El defecto: `syncMode` se elegía en la UI y no se leía. Los tres modos
+  // replicaban igual. Estas aserciones fijan la decisión de cada uno.
+  const dual = planMirrorDispatch('dual_write');
+  assert(dual.mirror === true && dual.awaitBeforeSheets === false,
+    'espejo: dual_write replica en paralelo sin bloquear', dual);
+
+  // El invariante caro: mirror_first DEBE esperar. Si se adelanta Sheets, deja de
+  // ser mirror-first y la latencia sub-150ms prometida no existe.
+  const first = planMirrorDispatch('mirror_first');
+  assert(first.mirror === true && first.awaitBeforeSheets === true,
+    'espejo: mirror_first espera al espejo antes de Sheets', first);
+
+  const backup = planMirrorDispatch('backup_only');
+  assert(backup.mirror === false && backup.awaitBeforeSheets === false,
+    'espejo: backup_only no escribe en el espejo (es pasivo)', backup);
+
+  // Config vieja o corrupta no debe dejar la mutación sin replicar en silencio.
+  const indefinido = planMirrorDispatch(undefined);
+  assert(indefinido.mirror === true,
+    'espejo: un modo ausente cae a dual_write (replica, no se apaga)', indefinido);
+
+  // Backoff: la PRIMERA espera es la base, no el doble. Si se indexara desde 1,
+  // se perdería casi la mitad del margen de reintentos.
+  assert(mirrorRetryDelayMs(1) === MIRROR_RETRY_BASE_MS,
+    'espejo: el primer reintento espera la base', mirrorRetryDelayMs(1));
+  assert(mirrorRetryDelayMs(3) === MIRROR_RETRY_BASE_MS * 4,
+    'espejo: el backoff duplica por intento', mirrorRetryDelayMs(3));
+  assert(mirrorRetryDelayMs(50) === MIRROR_RETRY_MAX_MS,
+    'espejo: el backoff tiene techo (no crece sin límite)', mirrorRetryDelayMs(50));
+  assert(mirrorRetryDelayMs(0) === MIRROR_RETRY_BASE_MS,
+    'espejo: un contador en 0 no produce espera negativa', mirrorRetryDelayMs(0));
+
+  assert(isMirrorRetryable(MIRROR_MAX_ATTEMPTS - 1) === true
+    && isMirrorRetryable(MIRROR_MAX_ATTEMPTS) === false,
+    'espejo: se deja de reintentar al agotar los intentos');
+
+  // El intervalo muerto: autoSyncIntervalSec no lo leía nadie. Su acotado evita
+  // que un valor ausente o absurdo apague el drenado.
+  assert(clampMirrorIntervalSec(undefined) === 60, 'espejo: intervalo ausente cae a 60s');
+  assert(clampMirrorIntervalSec(0) === 15, 'espejo: intervalo 0 se acota al mínimo');
+  assert(clampMirrorIntervalSec(99999) === 3600, 'espejo: intervalo absurdo se acota al máximo');
+  assert(clampMirrorIntervalSec(30) === 30, 'espejo: un intervalo razonable se respeta');
+}
+
+console.log('\n--- 26. Buzón de reintento del espejo (sin pérdida silenciosa) ---');
+{
+  const store = new Map<string, string>();
+  const previo = (globalThis as any).localStorage;
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+    setItem: (k: string, v: string) => { store.set(k, String(v)); },
+    removeItem: (k: string) => { store.delete(k); },
+  };
+
+  const mut = (id: string): OfflineMutation => ({
+    id, type: 'update', sheetTitle: 'VENCIMIENTOS', createdAt: '2026-09-19T10:00:00Z',
+    status: 'pending', attempts: 0,
+  });
+
+  // El fallo del espejo antes se perdía: no lanza, devuelve {success:false}, así
+  // que el .catch() del fire-and-forget nunca se disparaba.
+  let cola = enqueueMirrorRetry([], mut('m1'), 'HTTP 503', '2026-09-19T10:00:00Z');
+  assert(cola.length === 1 && cola[0].attempts === 1,
+    'buzón: un fallo del espejo queda encolado con su intento', cola);
+
+  // Reintentar la misma mutación no debe duplicar la entrada: duplicar
+  // replicaría dos veces el mismo cambio al volver el espejo.
+  cola = enqueueMirrorRetry(cola, mut('m1'), 'HTTP 503', '2026-09-19T10:05:00Z');
+  assert(cola.length === 1 && cola[0].attempts === 2,
+    'buzón: reintentar la misma mutación incrementa, no duplica', cola);
+
+  cola = removeMirrorRetry(cola, 'm1');
+  assert(cola.length === 0, 'buzón: al replicar con éxito se retira el pendiente');
+
+  // El tope protege cuota y memoria: el buzón es recuperación, no archivo.
+  let grande: ReturnType<typeof enqueueMirrorRetry> = [];
+  for (let i = 0; i < MIRROR_RETRY_QUEUE_MAX + 25; i++) {
+    grande = enqueueMirrorRetry(grande, mut(`m${i}`), 'HTTP 503', '2026-09-19T10:00:00Z');
+  }
+  assert(grande.length === MIRROR_RETRY_QUEUE_MAX,
+    'buzón: la cola se acota al máximo', grande.length);
+  assert(grande[grande.length - 1].mutationId === `m${MIRROR_RETRY_QUEUE_MAX + 24}`,
+    'buzón: el tope descarta los más antiguos, conserva los recientes');
+
+  // Backoff: un pendiente recién fallado NO debe reintentarse en el acto.
+  const nuevo = enqueueMirrorRetry([], mut('m9'), 'HTTP 503', new Date().toISOString());
+  assert(selectMirrorReady(nuevo, Date.now()).length === 0,
+    'buzón: un fallo reciente respeta la espera del backoff');
+  assert(selectMirrorReady(nuevo, Date.now() + MIRROR_RETRY_BASE_MS + 1).length === 1,
+    'buzón: pasado el backoff el pendiente entra al drenado');
+
+  // Agotados los intentos deja de reintentarse solo (queda visible en el panel).
+  const agotado = enqueueMirrorRetry([], mut('m10'), 'HTTP 503', '2026-09-19T10:00:00Z');
+  agotado[0].attempts = MIRROR_MAX_ATTEMPTS;
+  assert(selectMirrorReady(agotado, Date.now() + 10_000_000).length === 0,
+    'buzón: agotados los intentos no se reintenta automáticamente');
+
+  // Persistencia tolerante: la cola sobrevive el ciclo de escritura/lectura y un
+  // dato corrupto no revienta (se descarta y se sigue).
+  writeMirrorRetryQueue(cola.length ? cola : enqueueMirrorRetry([], mut('m7'), 'x', '2026-09-19T10:00:00Z'));
+  assert(readMirrorRetryQueue().length === 1, 'buzón: sobrevive el ciclo persistir/leer');
+  store.set(MIRROR_RETRY_QUEUE_KEY, '{no-es-json');
+  assert(readMirrorRetryQueue().length === 0, 'buzón: un dato corrupto no revienta el arranque');
+
+  (globalThis as any).localStorage = previo;
+}
+
+console.log('\n--- 27. Servicio del espejo: fallo persistido y drenado (ruta real) ---');
+{
+  const store = new Map<string, string>();
+  const previoLs = (globalThis as any).localStorage;
+  const previoFetch = (globalThis as any).fetch;
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+    setItem: (k: string, v: string) => { store.set(k, String(v)); },
+    removeItem: (k: string) => { store.delete(k); },
+  };
+
+  const config = {
+    enabled: true, endpointUrl: 'https://espejo.ejemplo.cl/rest',
+    syncMode: 'dual_write' as const, conflictStrategy: 'last_write_wins' as const,
+  };
+  const mut: OfflineMutation = {
+    id: 'mut-1', type: 'update', sheetTitle: 'VENCIMIENTOS',
+    createdAt: '2026-09-19T10:00:00Z', status: 'pending', attempts: 0,
+  };
+
+  // Se stubea `fetch` (el límite de red), no el servicio: la ruta de decisión que
+  // se prueba es código de producción real.
+  (globalThis as any).fetch = async () => ({ ok: false, status: 503, statusText: 'Service Unavailable' });
+
+  const fallo = await backendMirrorService.replicate(config, mut);
+  assert(fallo.success === false, 'espejo: un POST fallido se reporta como fallo');
+  assert(backendMirrorService.getPendingRetries().length === 1,
+    'espejo: el fallo queda persistido (antes se perdía en un console.warn)');
+
+  // El backoff impide que el drenado inmediato lo reintente: sin esto, un
+  // servidor caído recibiría una andanada en cada tick.
+  const recien = await backendMirrorService.drainRetries(config);
+  assert(recien === 0 && backendMirrorService.getPendingRetries().length === 1,
+    'espejo: el drenado respeta el backoff y no reintenta un fallo reciente');
+
+  // Con el espejo ya en pie, el pendiente se replica y sale del buzón.
+  (globalThis as any).fetch = async () => ({ ok: true, status: 200, statusText: 'OK' });
+  const reposicionado = readMirrorRetryQueue();
+  reposicionado[0].lastAttemptAt = new Date(Date.now() - 60_000).toISOString();
+  writeMirrorRetryQueue(reposicionado);
+
+  const drenado = await backendMirrorService.drainRetries(config);
+  assert(drenado === 1 && backendMirrorService.getPendingRetries().length === 0,
+    'espejo: al recuperarse el servidor el pendiente se replica y sale del buzón');
+
+  // Sin espejo habilitado no se replica nada, aunque haya pendientes.
+  await backendMirrorService.replicate(config, { ...mut, id: 'mut-2' });
+  const apagado = await backendMirrorService.drainRetries({ ...config, enabled: false });
+  assert(apagado === 0, 'espejo: deshabilitado no drena pendientes');
+
+  (globalThis as any).fetch = previoFetch;
+  (globalThis as any).localStorage = previoLs;
 }
 
 console.log(`\n========================================`);

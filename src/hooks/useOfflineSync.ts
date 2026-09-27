@@ -5,6 +5,7 @@ import type { SheetMatrix } from '../lib/sheets';
 import { matchRowIndexByIdentity, buildRowIdentityIndex } from '../utils/entityIdentityResolver';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { backendMirrorService } from '../services/backendMirrorService';
+import { planMirrorDispatch, clampMirrorIntervalSec } from '../utils/mirrorSyncPolicy';
 import { getErrorMessage } from '../utils/pureCalculations';
 import { isFailedMutation, sortQueueFifo } from '../utils/offlineQueueUtils';
 import type { SheetConfig } from '../types';
@@ -181,6 +182,44 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
     }
   }, []);
 
+  /** Config y plan de despacho vigentes, o `null` si el espejo está apagado. */
+  const readMirrorPlan = useCallback(() => {
+    try {
+      const parsed = readStorage<SheetConfig>(STORAGE_KEYS.SHEET_CONFIG, sheetConfigShapeSchema, {});
+      const config = parsed?.backendMirror;
+      if (!config?.enabled) return null;
+      return { config, plan: planMirrorDispatch(config.syncMode) };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  /**
+   * Replica al espejo y, si falla, lo encola para reintento (delegado al
+   * servicio: así el panel y el hook comparten una sola ruta).
+   *
+   * El defecto anterior era doble: el modo no se leía, y el `.catch()` del
+   * fire-and-forget nunca se disparaba porque `mirrorMutation` no lanza, sino que
+   * devuelve `{ success: false }`. Un espejo caído quedaba divergiendo en
+   * silencio.
+   */
+  const mirrorWithRetry = useCallback(async (
+    config: NonNullable<SheetConfig['backendMirror']>,
+    mutation: OfflineMutation
+  ) => {
+    const res = await backendMirrorService.replicate(config, mutation);
+    if (!res.success) {
+      console.warn('[OfflineSync] No se pudo replicar al espejo; queda en el buzón de reintento:', res.error);
+    }
+  }, []);
+
+  /** Drena el buzón del espejo respetando el backoff de cada pendiente. */
+  const drainMirrorRetries = useCallback(async () => {
+    const vigente = readMirrorPlan();
+    if (!vigente) return;
+    await backendMirrorService.drainRetries(vigente.config);
+  }, [readMirrorPlan]);
+
   // Enqueue a mutation to IndexedDB, state, and Audit Log
   const enqueueMutation = useCallback(
     async (mutation: {
@@ -214,27 +253,24 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
         }
       });
 
-      // Real-time mirror replication if enabled
-      try {
-        const parsed = readStorage<SheetConfig>(
-          STORAGE_KEYS.SHEET_CONFIG,
-          sheetConfigShapeSchema,
-          {}
-        );
-        if (parsed?.backendMirror?.enabled) {
-          backendMirrorService.mirrorMutation(parsed.backendMirror, created).catch(mErr => {
-            console.warn('[OfflineSync] Immediate mirror replication warning:', mErr);
-          });
+      // Despacho al espejo según el modo configurado.
+      const vigente = readMirrorPlan();
+      if (vigente?.plan.mirror) {
+        if (vigente.plan.awaitBeforeSheets) {
+          // mirror_first: se espera el espejo. Es lo que compra la latencia
+          // sub-150 ms; adelantar la escritura a Sheets lo volvería un dual_write.
+          await mirrorWithRetry(vigente.config, created);
+        } else {
+          // dual_write: en paralelo, sin bloquear la operación del operario.
+          void mirrorWithRetry(vigente.config, created);
         }
-      } catch (e) {
-        // Non-blocking mirror operation
       }
 
       await refreshQueue();
       await refreshAuditLog();
       return created;
     },
-    [refreshQueue, refreshAuditLog]
+    [refreshQueue, refreshAuditLog, readMirrorPlan, mirrorWithRetry]
   );
 
   // Synchronize the queue of mutations with Google Sheets in FIFO order
@@ -573,6 +609,23 @@ export function useOfflineSync(onSyncSuccess?: (successCount?: number) => Promis
       clearInterval(intervalId);
     };
   }, [refreshQueue, refreshAuditLog]);
+
+  const drainMirrorRetriesRef = useRef(drainMirrorRetries);
+  drainMirrorRetriesRef.current = drainMirrorRetries;
+
+  /**
+   * Drenado periódico del buzón del espejo. Se usa `autoSyncIntervalSec`, que
+   * hasta ahora se guardaba en la configuración y no leía nadie. Corre en su
+   * propio temporizador a propósito: el de salud (60 s fijos) regula la conexión
+   * con Apps Script, no el espejo, y mezclarlos ataría dos ritmos distintos.
+   */
+  useEffect(() => {
+    const intervalo = clampMirrorIntervalSec(readMirrorPlan()?.config.autoSyncIntervalSec);
+    const id = setInterval(() => {
+      if (navigator.onLine) drainMirrorRetriesRef.current();
+    }, intervalo * 1000);
+    return () => clearInterval(id);
+  }, [readMirrorPlan]);
 
   return {
     offlineQueue,

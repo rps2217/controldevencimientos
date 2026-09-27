@@ -11,6 +11,14 @@ import { BackendMirrorConfig, InventoryItem } from '../types';
 import { OfflineMutation } from '../db/indexedDbService';
 import { getErrorMessage } from '../utils/pureCalculations';
 import { fetchWithTimeout } from '../lib/http';
+import {
+  enqueueMirrorRetry,
+  readMirrorRetryQueue,
+  removeMirrorRetry,
+  selectMirrorReady,
+  writeMirrorRetryQueue,
+  type MirrorRetryEntry
+} from '../utils/mirrorRetryQueue';
 
 export interface MirrorTestResult {
   success: boolean;
@@ -136,6 +144,49 @@ class BackendMirrorService {
         message
       };
     }
+  }
+
+  /**
+   * Replica una mutación y, si falla, la encola para reintento.
+   *
+   * El defecto anterior: `mirrorMutation` no lanza, devuelve `{ success: false }`,
+   * así que el `.catch()` del fire-and-forget del llamante nunca se disparaba y el
+   * fallo se perdía en un `console.warn`. Aquí el fallo se persiste.
+   */
+  public async replicate(
+    config: BackendMirrorConfig,
+    mutation: OfflineMutation
+  ): Promise<{ success: boolean; error?: string }> {
+    const res = await this.mirrorMutation(config, mutation);
+    if (res.success) {
+      writeMirrorRetryQueue(removeMirrorRetry(readMirrorRetryQueue(), mutation.id));
+      return res;
+    }
+    writeMirrorRetryQueue(
+      enqueueMirrorRetry(readMirrorRetryQueue(), mutation, res.error || 'Fallo de replicación al espejo', new Date().toISOString())
+    );
+    return res;
+  }
+
+  /** Pendientes en espera de reintento (incluye los que agotaron intentos). */
+  public getPendingRetries(): MirrorRetryEntry[] {
+    return readMirrorRetryQueue();
+  }
+
+  /**
+   * Drena el buzón: reintenta lo que ya cumplió su backoff y aún tiene intentos.
+   * Los agotados se conservan a la vista en el panel en vez de descartarse solos.
+   */
+  public async drainRetries(config: BackendMirrorConfig): Promise<number> {
+    if (!config.enabled || !config.endpointUrl) return 0;
+
+    const pendientes = selectMirrorReady(readMirrorRetryQueue(), Date.now());
+    let replicados = 0;
+    for (const entry of pendientes) {
+      const res = await this.replicate(config, entry.mutation);
+      if (res.success) replicados++;
+    }
+    return replicados;
   }
 
   /**
