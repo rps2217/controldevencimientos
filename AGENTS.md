@@ -231,7 +231,7 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
 
 
 ### N. Modularización del Conteo por Dominio (Fase 5)
-- **`src/utils/stockCountUtils.ts`**: solo el **ciclo de sesión** de conteo —`reconcileStockCountSession`, `buildVencimientosRowFromCount`, `generateCuVc`, la persistencia de sesiones y la exportación a Excel—.
+- **`src/utils/stockCountUtils.ts`**: solo el **ciclo de sesión** de conteo —`reconcileStockCountSession`, `buildVencimientosRowFromCount`, `generateCuVc`, la persistencia de sesiones y la exportación a Excel—, más `mergeCampaignsAndSessions`, el **motor de fusión multi-dispositivo** (local ↔ nube). Su regla no negociable: `sinIndefinidos(obj)` antes de cada spread, porque `{...remoto, ...local}` copiaría un campo local en `undefined` y borraría el valor que la nube sí tiene (ver §7). El alcance acotado `skuScope` es el caso que lo motivó.
 - **`src/utils/campaignUtils.ts`**: el **ciclo de campaña** completo (13 exports, ~680 líneas): `importPharmacySnapshotToCampaign`, `computeCampaignConsolidationMatrix`, la separación de aguas, reportes, actas y su persistencia. Se separó porque tenía **cero acoplamiento** con el resto y **cero consumidores internos**.
 - **`src/utils/campaignAggregation.ts`**: la **agregación de la vista de consolidación de campaña**, sin React. Cuatro funciones que antes eran `useMemo` dentro de `CampaignConsolidationDashboard.tsx`:
   - `resolveActiveCampaign` — elige la campaña activa por id y, si no la encuentra, cae a la primera. La vista no debe quedarse en blanco con un id huérfano.
@@ -379,13 +379,15 @@ Para garantizar un código limpio, sin sobreingeniería (*anti-bloat*) y con el 
 ## 7. Estado Operativo y Continuidad
 
 Esta sección es memoria para el próximo agente. El **plan vigente es `ROADMAP.md`**
-(fases 0–6) y manda sobre `PLAN_CONTINUIDAD.md`, que describe una auditoría Ponytail
+(fases 0–8) y manda sobre `PLAN_CONTINUIDAD.md`, que describe una auditoría Ponytail
 anterior ya absorbida. Antes de escribir código, leer `ROADMAP.md`; la escalera de
 Ponytail (§5) sigue siendo obligatoria.
 
-> **Retomar el trabajo**: la sección **«Punto de arranque»** al final de `ROADMAP.md` tiene
-> el estado exacto (rama, último commit, gate), lo hecho y el siguiente corte medido.
-> Es lo primero que hay que leer. Esta sección §7 queda para comandos y trampas.
+> **Retomar el trabajo**: leer «Punto de arranque» en `ROADMAP.md` (estado y método) y,
+> para el módulo de conteo, **«Estado vigente del módulo de conteo»** al final de esta
+> sección §7 (gate y pendientes accionables). El «Punto de arranque» quedó anotado en una
+> jornada anterior y su tabla de commit/pruebas está desfasada; las auditorías finales de
+> `ROADMAP.md` mandan sobre él.
 
 ### Dirección de producto: cañería vs. producto (contexto para decidir)
 
@@ -419,13 +421,32 @@ Plantilla del patrón que funcionó: `src/utils/countAggregation.ts` — funcion
 `test-modules.ts`. Y **verificar cada prueba nueva por mutación**: en el corte 2, una prueba
 pasaba en vacío porque el fixture no distinguía los dos criterios de agrupación posibles.
 
+### Fusión multi-dispositivo: `undefined` no es "sin valor" (aprendido en la Fase 8)
+
+`mergeCampaignsAndSessions` (`src/utils/stockCountUtils.ts`) consolida local y nube con
+`{...remoto, ...local}`. Un spread copia **todas** las claves del local, incluidas las que valen
+`undefined`. Una sesión normal se crea con `skuScope: config.skuScope` (campo opcional), así que
+la clave existe y vale `undefined`: al fusionar, borraba el alcance que la nube sí tenía.
+
+El patrón es de **clase**, no de un campo: `StockCountSession` tiene 11 opcionales y
+`InventoryCampaign` varios, y la fusión de campañas ya parcheaba `nombre`/`local` campo a campo.
+La regla vigente es `sinIndefinidos(obj)` antes del spread, en sesiones y campañas: con valor
+local, el local sigue ganando; solo deja ganar al remoto en los campos que el local no define.
+
+Alcanzabilidad (no inflarla): `skuScope` se fija solo al crear y nunca se muta, así que un
+dispositivo no puede perderlo por sí solo; es fragilidad latente ante un cliente viejo, no bug
+activo. Dejó un aprendizaje de método: **una prueba de frontera debe recorrer la ruta del
+defecto**. La primera versión del caso en `racecheck.cjs` daba `ok:true` porque el helper siempre
+definía `skuScope`; se rehízo con un modo `SIN_SCOPE` que sí reproduce el fallo (mutación E2E:
+sin el arreglo, `ok:false` y el arnés sale `exit 1`).
+
 ### Comandos
 
 | Comando | Qué hace |
 |---|---|
 | `npm run verify` | `tsc --noEmit && eslint src tests && npm test`. Gate estático + unitario. |
 | `npm run verify:all` | `verify` + `build` + `test:e2e`. Gate completo antes de dar algo por cerrado. |
-| `npm run test:e2e` | Arranca el build de producción y corre los 27 arneses de integridad (`tests/perf/run.cjs`). |
+| `npm run test:e2e` | Arranca el build de producción y corre los 28 arneses de integridad (`tests/perf/run.cjs`). |
 | `npm test` | `tsx test-modules.ts && tsx tests/components.test.tsx && tsx tests/xlsx.test.ts`. |
 | `npm run dev` | Vite. En este entorno el puerto 3000 suele estar ocupado: usar `--port 3001`. |
 | `npm run build` | Build de producción. |
@@ -483,7 +504,7 @@ pasaba en vacío porque el fixture no distinguía los dos criterios de agrupaci�
 > al tocar fechas conviene correr `TZ=America/Santiago npm test`. Ver ROADMAP §30.
 
 Son pruebas de comportamiento, no solo de milisegundos. **Puerta unificada**:
-`npm run test:e2e` arranca el preview y corre los 27 arneses que cubren integridad de
+`npm run test:e2e` arranca el preview y corre los 28 arneses que cubren integridad de
 datos y navegación; devuelve código distinto de cero si alguno falla. El binario de Chrome
 se toma de `CHROME_BIN` o de las rutas habituales (`/usr/bin/chromium`, `google-chrome`,
 etc.).
@@ -617,3 +638,31 @@ PR. Node 22. Sin secrets. El job `e2e` usa el Google Chrome preinstalado del run
    de índice de `SheetRecord` (`types.ts`), deliberada por la heterogeneidad de columnas
    (invariante §6.5); su cierre a unión produjo ~15 errores en cascada y se revirtió. No
    reabrir sin un síntoma real. Detalle y barrido por archivo en `ROADMAP.md`.
+
+### Estado vigente del módulo de conteo (Fase 8, commit `dd70a67`)
+
+El gate hoy: `tsc` 0 · `eslint` 0 errores (10 warnings preexistentes) · **420 unitarias** ·
+**22 de componente** · **18 de hoja de cálculo** · `build` 0 · **E2E: 28 arneses OK** · 0
+dependencias nuevas. Las secciones «Auditoría Ponytail» en `ROADMAP.md` son la fuente; esta
+lista es el resumen accionable.
+
+Pendientes medidos, sin ejecutar, por orden de valor operativo:
+
+1. **Pistoleo fuera de alcance sin aviso** — `handleCameraScanCode` (`StockCountTerminal.tsx:703`)
+   no consulta `skuScope`. La conciliación descarta la lectura, pero el operario pistoliza y no
+   ve nada. Es la única que afecta al usuario hoy y no roza ninguna invariante de datos.
+2. **Escritura duplicada a `_AUDITORIA_INVENTARIO`** — `StockCountTerminal.tsx:1030-1062` y
+   `CampaignConsolidationDashboard.tsx:436-458` repiten el mismo esqueleto salvo el builder.
+3. **`resumenPorUbicacion` sin consumidor de UI** — **no** es código muerto: `test-modules.ts:1113`
+   lo usa (la 2da vuelta no debe inventar un mueble fantasma). Retirarlo exige decidir qué pasa
+   con esa regla de negocio.
+4. **Persistencia de sesión redundante** — el terminal persiste por `useEffect` (debounce 300 ms)
+   más flush en `pagehide`; los `saveStockCountSessionsToStorage` explícitos en handlers duplican
+   esa persistencia. Inofensivo hoy; requiere mutación antes de tocarlo.
+5. **Sin E2E del flujo "Contar" completo** — campaña → botón → sesión con `skuScope` → conteo →
+   guardado.
+
+Estado muerto ya retirado en la Fase 8 (para no re-añadirlo): `StockCountSession.auditor` y
+`CampaignConsolidationMatrix.totalSkusFisicosAuditados` (con su variable interna
+`totalSkusAuditados`). `diferenciaNetaTotal` **se conserva**: una prueba lo usa como invariante.
+
