@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Scan, Download, RotateCcw, Package, Check, HelpCircle, Plus, AlertTriangle, MapPin } from 'lucide-react';
+import { Search, Scan, Download, RotateCcw, Package, Check, HelpCircle, Plus, AlertTriangle, MapPin, Clock } from 'lucide-react';
 import { CampaignAuditRow, CampaignConsolidationMatrix } from '../../types';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 
@@ -176,6 +176,15 @@ export const CampaignMatrixTable: React.FC<CampaignMatrixTableProps> = ({
                     {/* SKU */}
                     <td className="py-2.5 px-4 font-mono font-bold text-slate-800 dark:text-slate-200">
                       {row.sku}
+                      {row.conteoPosteriorAlCorte && (
+                        <span
+                          className="ml-2 inline-flex items-center gap-1 rounded-full bg-sky-100 dark:bg-sky-950/60 px-1.5 py-0.5 text-[10px] font-bold text-sky-700 dark:text-sky-300 align-middle"
+                          title={`Contado después del corte del ${matrix?.corte.fechaCorte ? new Date(matrix.corte.fechaCorte).toLocaleString('es-CL') : 'snapshot'}. Su diferencia puede ser venta o reposición del turno, no una pérdida: verifica los movimientos antes de perseguirla.`}
+                        >
+                          <Clock className="w-3 h-3" />
+                          POST-CORTE
+                        </span>
+                      )}
                     </td>
 
                     {/* Descripción & Proveedor */}

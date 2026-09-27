@@ -419,6 +419,12 @@ export interface CampaignAuditRow {
   stockTeoricoEfectivo: number;                     // stockTeorico - ajusteManualVenta (o + ajuste)
   diferenciaNeta: number;                           // stockFisicoTotal - stockTeoricoEfectivo
   estadoGlobal: CampaignItemAuditStatus;            // 🟢 VALIDADO_OK | 🟡 DISCREPANCIA | 🔴 NUNCA_PISTOLEADO | 🔵 HALLAZGO
+  /**
+   * El SKU tiene lecturas posteriores al corte del snapshot, así que su diferencia
+   * puede ser venta/reposición del turno y no una pérdida. El operario debe cruzarla
+   * con los movimientos antes de tratarla como faltante.
+   */
+  conteoPosteriorAlCorte: boolean;
   esCerrado: boolean;
   fechaCierre?: string;
   sesionesDondeAparece: Array<{
@@ -434,6 +440,8 @@ export interface CampaignConsolidationMatrix {
   campaignId: string;
   nombreCampana: string;
   fechaCalculo: string;
+  /** Corte documental: el instante del snapshot y los conteos posteriores a él. */
+  corte: CampaignCutoff;
   totalSkusTeoricos: number;
   totalSkusFisicosAuditados: number;
   porcentajeCobertura: number;                      // % de SKUs teóricos que ya tienen al menos 1 lectura física o están validados
@@ -454,4 +462,22 @@ export interface CampaignConsolidationMatrix {
     skusContados: number;
     totalUnidades: number;
   }>;
+}
+
+/**
+ * Corte documental de la campaña.
+ *
+ * La matriz compara el físico contra el stock del snapshot, que está congelado en un
+ * instante (`fechaCarga`). Todo conteo posterior a ese instante mide mercadería que
+ * pudo venderse o reponerse desde el corte, así que su diferencia no es atribuible a
+ * una pérdida: es movimiento. Estos SKUs se marcan para que el operario los revise
+ * contra los movimientos de su turno en vez de perseguir un faltante que no existe.
+ */
+export interface CampaignCutoff {
+  /** Instante del último snapshot del ERP (`fechaCarga`); null si aún no se cargó. */
+  fechaCorte: string | null;
+  /** SKUs con al menos una lectura posterior al corte. */
+  skusConLecturaPosterior: string[];
+  /** SKUs teóricos con stock que aún no tienen ninguna lectura, posteriores o no. */
+  skusPendientesDeConteo: string[];
 }

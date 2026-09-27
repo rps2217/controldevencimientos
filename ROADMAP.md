@@ -3501,3 +3501,52 @@ habría listado un mueble inexistente.
 Gate: `tsc` 0 · `eslint` 0 errores (1 warning preexistente en `StockCountTerminal`) ·
 **377 unitarias** (367 + 10 nuevas) · build 0 · **27 arneses E2E** en verde.
 
+
+## Auditoría Ponytail — 2da vuelta y corte documental (2026-09-19)
+
+### Hallazgo 2 — El agrupamiento por bandera perdía conteos posteriores a la vuelta
+
+Al re-auditar el motor con la pregunta "¿un SKU repartido en hasta 4 muebles se pierde?", la
+medición dio que **el caso global no era el problema**: la 2da vuelta se lanza barriendo la
+tienda completa, así que **reemplazar** el físico es correcto. Pero la sonda encontró otro
+defecto real, y distinto:
+
+`computeCampaignConsolidationMatrix` procesaba **todas las sesiones normales primero y luego
+todas las 2das vueltas**, ordenando por *bandera* e ignorando la cronología. Con
+`A=30 (10/09) → vuelta=50 (11/09) → B=20 (12/09)`, el conteo de Mueble B —posterior a la
+vuelta— se aplicaba *antes* que ella, y la vuelta lo borraba: el físico quedaba en 50 en vez
+de 70, y la matriz inventaba un faltante de 20 unidades que **no existían**. Un mueble o una
+bodega contada después de la vuelta desaparecía del acta.
+
+**Corrección.** Se ordenan las sesiones **cronológicamente** (`fechaInicio`, desempate por
+`id`) y dentro del mismo recorrido: normal → suma, vuelta → reemplaza. La vuelta corrige sólo
+lo contado **antes** de ella; nunca puede borrar lo que vino después. El desempate por `id`
+existe para que el resultado no dependa del orden del arreglo —localStorage y la fusión
+multi-dispositivo no garantizan orden— y sea reproducible.
+
+**Verificación por mutación.** 4 pruebas nuevas (sección 15) y la mutación "agrupar por
+bandera" hace caer exactamente la prueba del conteo posterior (`70 → 50`).
+
+### Hallazgo 3 — El corte del snapshot no era explícito
+
+Un inventario con stock en movimiento se compara contra un stock congelado en un instante.
+Todo conteo posterior a ese instante mide mercadería que pudo venderse o reponerse, así que su
+diferencia **no es atribuible a una pérdida**. El proyecto ya guardaba `fechaCarga` en el
+snapshot, pero nadie la usaba.
+
+**Corrección.** `CampaignConsolidationMatrix.corte` expone `fechaCorte`,
+`skusConLecturaPosterior` y `skusPendientesDeConteo`; la fila afectada lleva
+`conteoPosteriorAlCorte` y la tabla pinta el badge **POST-CORTE** con la fecha del corte en el
+tooltip. Sin fecha utilizable no se marca nada: una marca masiva sería peor que no marcar.
+
+**Límite deliberado y declarado.** La derivación **automática** del teórico efectivo desde
+`Inv. Inicial | Egreso | Ingreso | Venta` **no** se implementó. No se pudo confirmar la
+identidad contable: el fixture del ERP es inconsistente (una fila cuadra con
+`Stock = Inv.Inicial − Egreso + Ingreso`; otra sólo si además se resta `Venta`). Adivinarla
+habría producido doble conteo —justo lo que el motor evita—. El corte se entrega como marca
+para revisión humana (más el `ajustesVentaManual` ya existente). Queda como el corte con su
+medición: **confirmar la semántica de las columnas del ERP con el cliente antes de automatizar.**
+
+Gate: `tsc` 0 · `eslint` 0 errores · **391 unitarias** (377 + 14 nuevas) · **12 de componente**
+(10 + 2) · build 0 · **27 arneses E2E** en verde.
+

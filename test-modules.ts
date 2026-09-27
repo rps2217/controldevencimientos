@@ -1089,6 +1089,117 @@ console.log('\n--- 15. Pruebas de computeCampaignConsolidationMatrix (matriz de 
     'la 2da vuelta se atribuye al mueble de su conteo, no crea un mueble fantasma',
     mRecountFix.resumenPorUbicacion.map(u => u.ubicacion).join(', '));
 
+  // --- Orden cronológico: la vuelta corrige lo ANTERIOR, no lo posterior ---
+  //
+  // Las sesiones se agregan en orden de fecha, no agrupadas por bandera. Un conteo
+  // normal posterior a una vuelta es una ubicación nueva (o stock que llegó después)
+  // y debe SUMAR: la vuelta sólo reemplaza lo contado antes de ella. Agrupar por
+  // bandera perdía esas unidades, y el operario veía un faltante que no existía.
+  const normalEn = (id: string, cantidad: number, fecha: string) =>
+    makeSession('SKU_A', cantidad, { id, fechaInicio: fecha });
+
+  const normalAntes = normalEn('a', 30, '2026-09-10T00:00:00.000Z');
+  const vueltaMedio = segundaVuelta('SKU_A', 50, { id: 'v', fechaInicio: '2026-09-11T00:00:00.000Z' });
+  const normalDespues = normalEn('b', 20, '2026-09-12T00:00:00.000Z');
+
+  const mCrono = computeCampaignConsolidationMatrix(campOk, [normalAntes, vueltaMedio, normalDespues]);
+  const rCrono = [...mCrono.cuadrados, ...mCrono.discrepancias][0];
+  assert(rCrono.stockFisicoTotal === 70,
+    'un conteo normal POSTERIOR a la 2da vuelta suma sus unidades (50 + 20 = 70)',
+    rCrono.stockFisicoTotal);
+
+  // El mismo caso sin el conteo posterior: la vuelta reemplaza lo anterior.
+  const mSoloVuelta = computeCampaignConsolidationMatrix(campOk, [normalAntes, vueltaMedio]);
+  const rSoloVuelta = [...mSoloVuelta.cuadrados, ...mSoloVuelta.discrepancias][0];
+  assert(rSoloVuelta.stockFisicoTotal === 50,
+    'la 2da vuelta reemplaza el conteo normal anterior (50, no 80)',
+    rSoloVuelta.stockFisicoTotal);
+
+  // Un conteo normal anterior a la vuelta SÍ queda reemplazado.
+  const mNormalAntes = computeCampaignConsolidationMatrix(campOk, [normalEn('a', 30, '2026-09-10T00:00:00.000Z'), vueltaMedio]);
+  const rNormalAntes = [...mNormalAntes.cuadrados, ...mNormalAntes.discrepancias][0];
+  assert(rNormalAntes.stockFisicoTotal === 50,
+    'un conteo normal anterior a la vuelta queda corregido por ella',
+    rNormalAntes.stockFisicoTotal);
+
+  // El resultado no depende del orden de entrada: las sesiones pueden cargarse en
+  // cualquier orden desde localStorage o desde la fusión multi-dispositivo.
+  const mOrdenInverso = computeCampaignConsolidationMatrix(campOk, [normalDespues, vueltaMedio, normalAntes]);
+  assert(mOrdenInverso.totalFisicoContado === mCrono.totalFisicoContado,
+    'el resultado no depende del orden del arreglo de sesiones (orden cronológico estable)',
+    `${mCrono.totalFisicoContado} vs ${mOrdenInverso.totalFisicoContado}`);
+
+  // --- Corte documental: separa el movimiento del faltante real ---
+  //
+  // El snapshot congela el stock en un instante (`fechaCarga`). Un conteo posterior
+  // mide mercadería que pudo venderse desde el corte, así que su diferencia no es
+  // atribuible a una pérdida. La matriz lo expone para no perseguir faltantes falsos.
+  const campCorte = makeCampaign({
+    snapshotTeoricoActual: {
+      SKU_A: snapshotItem('SKU_A', 100),
+      SKU_B: snapshotItem('SKU_B', 50)
+    },
+    historialSnapshots: [{
+      id: 'snap-1',
+      nombreArchivo: 'snapshot_erp.xlsx',
+      fechaCarga: '2026-09-10T09:00:00.000Z',
+      totalSkus: 2,
+      totalStockTeorico: 150,
+      totalVentasRegistradas: 0
+    }]
+  });
+
+  const mCorte = computeCampaignConsolidationMatrix(campCorte, [
+    makeSession('SKU_A', 90, { fechaInicio: '2026-09-10T12:00:00.000Z', conteos: [{ id: 'c1', sku: 'SKU_A', descripcion: 'A', cantidad: 90, timestamp: '2026-09-10T12:00:00.000Z' }] })
+  ]);
+  assert(mCorte.corte.fechaCorte === '2026-09-10T09:00:00.000Z',
+    'el corte usa la fecha del último snapshot del ERP (historialSnapshots)',
+    mCorte.corte.fechaCorte);
+  assert(mCorte.corte.skusConLecturaPosterior.includes('SKU_A'),
+    'un SKU contado DESPUÉS del corte se marca como susceptible a movimiento');
+  assert(!mCorte.corte.skusConLecturaPosterior.includes('SKU_B'),
+    'un SKU sin lecturas no se marca como conteo posterior');
+  assert(mCorte.corte.skusPendientesDeConteo.includes('SKU_B') &&
+    !mCorte.corte.skusPendientesDeConteo.includes('SKU_A'),
+    'los SKUs teóricos con stock y sin lecturas quedan pendientes de conteo');
+
+  // Un conteo ANTERIOR al corte no es movimiento: mide contra el stock congelado.
+  const mCorteAntes = computeCampaignConsolidationMatrix(campCorte, [
+    makeSession('SKU_A', 90, { fechaInicio: '2026-09-10T06:00:00.000Z', conteos: [{ id: 'c1', sku: 'SKU_A', descripcion: 'A', cantidad: 90, timestamp: '2026-09-10T06:00:00.000Z' }] })
+  ]);
+  assert(!mCorteAntes.corte.skusConLecturaPosterior.includes('SKU_A'),
+    'un conteo anterior al corte NO se marca como movimiento posterior');
+
+  // Sin historial de snapshots, el corte cae a la fecha del propio ítem teórico: no se
+  // pierde la capacidad de detectar movimiento por no haber subido un archivo nuevo.
+  const campSinSnap = makeCampaign({ snapshotTeoricoActual: { SKU_A: snapshotItem('SKU_A', 100) } });
+  const mSinCorte = computeCampaignConsolidationMatrix(campSinSnap, [makeSession('SKU_A', 100)]);
+  assert(mSinCorte.corte.fechaCorte === '2026-09-01T00:00:00.000Z',
+    'sin historial, el corte cae a la fecha del ítem teórico',
+    mSinCorte.corte.fechaCorte);
+  assert(mSinCorte.corte.skusConLecturaPosterior.includes('SKU_A'),
+    'el fallback al ítem teórico sigue detectando un conteo posterior al corte');
+
+  // Sin ninguna fecha utilizable no hay corte: las listas quedan vacías en vez de marcar
+  // todo como movimiento (una marca masiva sería peor que no marcar nada).
+  const campSinFecha = makeCampaign({
+    snapshotTeoricoActual: { SKU_A: { ...snapshotItem('SKU_A', 100), fechaCarga: '' } }
+  });
+  const mSinFecha = computeCampaignConsolidationMatrix(campSinFecha, [makeSession('SKU_A', 100)]);
+  assert(mSinFecha.corte.fechaCorte === null && mSinFecha.corte.skusConLecturaPosterior.length === 0,
+    'sin fecha de corte utilizable no se marca ningún conteo como posterior');
+
+  // La marca llega a la FILA, que es lo que la UI pinta con el badge POST-CORTE.
+  const filaPostCorte = [...mCorte.cuadrados, ...mCorte.discrepancias].find(r => r.sku === 'SKU_A');
+  assert(filaPostCorte?.conteoPosteriorAlCorte === true,
+    'la fila del SKU contado después del corte lleva conteoPosteriorAlCorte');
+  const filaPreCorte = [...mCorteAntes.cuadrados, ...mCorteAntes.discrepancias].find(r => r.sku === 'SKU_A');
+  assert(filaPreCorte?.conteoPosteriorAlCorte === false,
+    'la fila de un conteo anterior al corte NO lleva la marca');
+
+
+
+
   // --- Totales del encabezado coherentes con las filas ---
   //
   // El encabezado debe usar el teórico EFECTIVO (con ajuste de ventas del turno). Si

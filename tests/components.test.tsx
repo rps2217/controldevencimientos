@@ -13,8 +13,9 @@ import { mount, makeContext, teardownDom } from './harness';
 import { DashboardProvider } from '../src/context/DashboardContext';
 import { RightDrawerProvider } from '../src/context/RightDrawerContext';
 import { ViewConfigControlDrawer } from '../src/components/drawers/ViewConfigControlDrawer';
+import { CampaignMatrixTable } from '../src/components/campaign/CampaignMatrixTable';
 import { useTableGrouping } from '../src/hooks/useTableGrouping';
-import type { SheetConfig } from '../src/types';
+import type { SheetConfig, CampaignAuditRow, CampaignConsolidationMatrix } from '../src/types';
 
 let passed = 0;
 let failed = 0;
@@ -179,6 +180,65 @@ async function testGroupingRestoredWhenConfigArrivesLate() {
 
   await view.unmount();
 }
+async function testPostCorteBadgeRenders() {
+  console.log('\n--- 5. El badge POST-CORTE se pinta sólo en las filas marcadas ---');
+
+  const rowBase: CampaignAuditRow = {
+    sku: 'SKU-A',
+    descripcion: 'Producto A',
+    proveedor: 'Proveedor',
+    stockTeorico: 100,
+    stockFisicoTotal: 100,
+    ventaRegistrada: 0,
+    ajusteManualVenta: 0,
+    stockTeoricoEfectivo: 100,
+    diferenciaNeta: 0,
+    estadoGlobal: 'VALIDADO_OK',
+    conteoPosteriorAlCorte: true,
+    esCerrado: false,
+    sesionesDondeAparece: []
+  };
+
+  const matrix = {
+    campaignId: 'c1', nombreCampana: 'Inv', fechaCalculo: '2026-09-19T00:00:00.000Z',
+    corte: { fechaCorte: '2026-09-10T09:00:00.000Z', skusConLecturaPosterior: ['SKU-A'], skusPendientesDeConteo: [] },
+    totalSkusTeoricos: 1, totalSkusFisicosAuditados: 1, porcentajeCobertura: 100,
+    cuadradosCount: 1, discrepanciasCount: 0, nuncaPistoleadosCount: 0, hallazgosCount: 0,
+    totalFisicoContado: 100, totalTeoricoEsperado: 100, diferenciaNetaTotal: 0,
+    cuadrados: [rowBase], discrepancias: [], nuncaPistoleados: [], hallazgos: [],
+    resumenPorUbicacion: []
+  } as unknown as CampaignConsolidationMatrix;
+
+  const props = {
+    matrix,
+    displayedRows: [rowBase],
+    providerList: [],
+    matrixFilter: 'ALL' as const,
+    searchTerm: '',
+    selectedProvider: '',
+    onMatrixFilterChange: () => {},
+    onSearchTermChange: () => {},
+    onSelectedProviderChange: () => {},
+    onQuickScan: () => {},
+    onExportDiscrepancies: () => {},
+    onLaunchTargetedRecount: () => {},
+    onToggleCloseSku: () => {},
+    onUpdateSalesAdjustment: () => {}
+  };
+
+  const conMarca = await mount(<CampaignMatrixTable {...props} />);
+  assert(conMarca.text().includes('POST-CORTE'),
+    'la fila marcada muestra el badge POST-CORTE en la tabla real', conMarca.text().slice(0, 120));
+  await conMarca.unmount();
+
+  const sinMarca = await mount(
+    <CampaignMatrixTable {...props} displayedRows={[{ ...rowBase, conteoPosteriorAlCorte: false }]} />
+  );
+  assert(!sinMarca.text().includes('POST-CORTE'),
+    'una fila sin la marca no muestra el badge (badge vivo, no decorativo)');
+  await sinMarca.unmount();
+}
+
 
 async function main() {
   console.log('========================================');
@@ -189,6 +249,7 @@ async function main() {
   await testGroupingDirectionToggle();
   await testDrawerClosedRendersNothing();
   await testGroupingRestoredWhenConfigArrivesLate();
+  await testPostCorteBadgeRenders();
 
   teardownDom();
 

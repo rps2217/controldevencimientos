@@ -269,10 +269,16 @@ export function computeCampaignConsolidationMatrix(
   //
   //   - Conteo normal: mira mercadería que ningún otro conteo miró, así que se SUMA
   //     entre sesiones (mueble A 50 + mueble B 30 = 80 unidades del mismo SKU).
-  //   - 2da vuelta: vuelve a mirar la MISMA mercadería que el conteo que corrige, así
+  //   - 2da vuelta: vuelve a mirar la MISMA mercadería contada ANTES que ella, así
   //     que su cantidad REEMPLAZA la del SKU en vez de sumarse. Si el primer conteo
-  //     dijo 98 y la vuelta confirma 98, el físico es 98 y no 196. Los SKUs que la
-  //     vuelta no re-cuenta conservan el valor del conteo normal.
+  //     dijo 98 y la vuelta confirma 98, el físico es 98 y no 196. La vuelta es el
+  //     conteo vigente de todo lo que barrió, y como se lanza de forma GLOBAL
+  //     (recorre la tienda completa), su total es el total real del SKU.
+  //
+  // Las sesiones se procesan en ORDEN CRONOLÓGICO, no agrupadas por bandera. Un
+  // conteo normal posterior a una vuelta es una ubicación nueva (p.ej. una bodega
+  // contada después) y debe SUMAR: la vuelta sólo corrige lo contado antes de ella,
+  // no puede borrar lo que vino después. Agrupar por bandera perdía esas unidades.
   //
   // Sin esta distinción la 2da vuelta duplicaba el físico y la matriz reportaba un
   // sobrante inexistente (98 + 98 = 196 en vez de 98), corrompiendo la cuadratura.
@@ -327,23 +333,24 @@ export function computeCampaignConsolidationMatrix(
     }
   };
 
-  const conteosNormales = campaignSessions.filter(s => !s.esSegundaVuelta);
-  const segundasVueltas = campaignSessions
-    .filter(s => s.esSegundaVuelta)
-    .sort((a, b) => (a.fechaInicio || '').localeCompare(b.fechaInicio || ''));
+  // Orden cronológico estable: `fechaInicio` y, a igualdad, el id. Sin el desempate
+  // por id, dos sesiones con la misma marca dependen del orden de entrada y el
+  // resultado de la cuadratura dejaría de ser reproducible.
+  const sesionesCronologicas = [...campaignSessions].sort((a, b) => {
+    const fa = a.fechaInicio || '';
+    const fb = b.fechaInicio || '';
+    if (fa !== fb) return fa.localeCompare(fb);
+    return (a.id || '').localeCompare(b.id || '');
+  });
 
-  for (const session of conteosNormales) {
+  for (const session of sesionesCronologicas) {
     for (const [cleanSku, { cantidad, entry }] of totalesDeSesion(session)) {
-      totalesPorSku.set(cleanSku, (totalesPorSku.get(cleanSku) || 0) + cantidad);
-      guardarMaestro(cleanSku, entry);
-      registrarTraza(session, cleanSku, cantidad, entry.timestamp);
-    }
-  }
-
-  for (const session of segundasVueltas) {
-    for (const [cleanSku, { cantidad, entry }] of totalesDeSesion(session)) {
-      // Reemplaza, no suma: la vuelta es el conteo vigente de ese SKU.
-      totalesPorSku.set(cleanSku, cantidad);
+      if (session.esSegundaVuelta) {
+        // Reemplaza lo contado ANTES: la vuelta es el conteo vigente de ese SKU.
+        totalesPorSku.set(cleanSku, cantidad);
+      } else {
+        totalesPorSku.set(cleanSku, (totalesPorSku.get(cleanSku) || 0) + cantidad);
+      }
       guardarMaestro(cleanSku, entry);
       registrarTraza(session, cleanSku, cantidad, entry.timestamp);
     }
@@ -378,7 +385,7 @@ export function computeCampaignConsolidationMatrix(
   // atribuye al mueble de su conteo original (el nombre "Auditoría 2da Vuelta" no
   // identifica un mueble), para que el acta no muestre un mueble fantasma.
   const ubicacionPorSesion = new Map<string, string>();
-  for (const session of conteosNormales) {
+  for (const session of campaignSessions.filter(s => !s.esSegundaVuelta)) {
     ubicacionPorSesion.set(session.id, session.ubicacion?.trim() || session.nombre || 'Sin Ubicación');
   }
 
@@ -420,6 +427,35 @@ export function computeCampaignConsolidationMatrix(
   const theoreticalKeys = Object.keys(theoreticalSnapshot);
 
   const cuadrados: CampaignAuditRow[] = [];
+  // Corte documental: el snapshot congela el stock en `fechaCorte`. Un conteo posterior
+  // mide mercadería que pudo venderse o reponerse desde entonces, así que su diferencia
+  // puede ser movimiento y no pérdida. Se marca para que el operario la cruce con los
+  // movimientos de su turno antes de perseguirla.
+  const fechaCorte = campaign.historialSnapshots?.[0]?.fechaCarga
+    || (theoreticalKeys.length > 0 ? theoreticalSnapshot[theoreticalKeys[0]]?.fechaCarga : '')
+    || null;
+
+  const corteMs = fechaCorte ? Date.parse(fechaCorte) : NaN;
+  const hayCorte = !Number.isNaN(corteMs);
+
+  const skusConLecturaPosterior: string[] = [];
+  const skusPendientesDeConteo: string[] = [];
+  if (hayCorte) {
+    for (const [sku, phys] of physicalMap) {
+      if (phys.sesiones.some(s => {
+        const t = Date.parse(s.timestamp);
+        return !Number.isNaN(t) && t > corteMs;
+      })) {
+        skusConLecturaPosterior.push(sku);
+      }
+    }
+    for (const sku of theoreticalKeys) {
+      const stock = theoreticalSnapshot[sku]?.stockTeorico || 0;
+      if (stock > 0 && !physicalMap.has(sku)) skusPendientesDeConteo.push(sku);
+    }
+  }
+  const setSkusPosteriores = new Set(skusConLecturaPosterior);
+
   const discrepancias: CampaignAuditRow[] = [];
   const nuncaPistoleados: CampaignAuditRow[] = [];
   const hallazgos: CampaignAuditRow[] = [];
@@ -462,6 +498,7 @@ export function computeCampaignConsolidationMatrix(
       stockTeoricoEfectivo: effectiveTeorico,
       diferenciaNeta,
       estadoGlobal: 'DISCREPANCIA',
+      conteoPosteriorAlCorte: setSkusPosteriores.has(sku),
       esCerrado: Boolean(closed),
       fechaCierre: closed?.fechaValidacion,
       sesionesDondeAparece: sesiones
@@ -514,6 +551,7 @@ export function computeCampaignConsolidationMatrix(
       stockTeoricoEfectivo: 0 - manualSalesAdj,
       diferenciaNeta,
       estadoGlobal: 'HALLAZGO',
+      conteoPosteriorAlCorte: setSkusPosteriores.has(sku),
       esCerrado: Boolean(closed),
       fechaCierre: closed?.fechaValidacion,
       sesionesDondeAparece: phys.sesiones
@@ -543,6 +581,11 @@ export function computeCampaignConsolidationMatrix(
     campaignId: campaign.id,
     nombreCampana: campaign.nombre,
     fechaCalculo: now,
+    corte: {
+      fechaCorte: hayCorte ? fechaCorte : null,
+      skusConLecturaPosterior: skusConLecturaPosterior.sort(),
+      skusPendientesDeConteo: skusPendientesDeConteo.sort()
+    },
     totalSkusTeoricos: totalTheorSkus,
     totalSkusFisicosAuditados: totalSkusAuditados,
     porcentajeCobertura: coveragePercent,
