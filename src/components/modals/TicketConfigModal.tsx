@@ -29,6 +29,13 @@ import {
 import { findColumnBySemantic } from '../../utils/columnAliases';
 import { formatDisplayDate } from '../../utils/pureCalculations';
 import { generateBarcodeSvgString } from '../../utils/barcodeGenerator';
+import {
+  ROLLOS,
+  findRoll,
+  evaluateFit,
+  fitQuality,
+  FIT_QUALITY_LABEL
+} from '../../utils/labelMediaProfile';
 
 interface TicketConfigModalProps {
   isOpen: boolean;
@@ -146,11 +153,15 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
       general: localGeneral
     });
 
+    const roll = localGeneral.labelRollId ? findRoll(localGeneral.labelRollId) : undefined;
     executeThermalPrint({
       elementId: 'thermal-ticket-root',
       paperWidth: localGeneral.paperWidth || '80mm',
       orientation: localGeneral.orientation || 'portrait',
-      cutMarginMm: localGeneral.cutMarginMm !== undefined ? Number(localGeneral.cutMarginMm) : 2
+      cutMarginMm: localGeneral.cutMarginMm !== undefined ? Number(localGeneral.cutMarginMm) : 2,
+      // La prueba de impresión también respeta el rollo: si no, el usuario
+      // calibraría con un tamaño que no es el que va a usar.
+      rollSizeMm: roll ? { widthMm: roll.widthMm, heightMm: roll.heightMm } : undefined
     });
   };
 
@@ -169,6 +180,18 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
 
   const primaryHeaders = new Set([skuHeader, descHeader, dateHeader, loteHeader, cantHeader].filter(Boolean));
   const otherConfiguredHeaders = headers.filter(h => !primaryHeaders.has(h) && localColumns[h]?.show);
+
+  // Calidad del rollo elegido, medida contra un SKU real de la muestra: es el
+  // código que de verdad se va a imprimir, no un ejemplo genérico. En rollo
+  // continuo no hay rollo troquelado que evaluar.
+  const skuDeMuestra = (() => {
+    const fromSample = sampleItems
+      .map(it => String(it[skuHeader || ''] || it['CU_VC'] || '').trim())
+      .find(v => v.length > 0);
+    return fromSample || '2000210218569';
+  })();
+  const rolloElegido = localGeneral.labelRollId ? findRoll(localGeneral.labelRollId) : undefined;
+  const calidadRollo = rolloElegido ? fitQuality(evaluateFit(skuDeMuestra, rolloElegido)) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -495,6 +518,44 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
                     ))}
                   </div>
                 </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                      Rollo de Etiquetas
+                    </label>
+                    {calidadRollo && (
+                      <span className={`text-[10px] font-semibold ${
+                        calidadRollo === 'optimo' ? 'text-emerald-600 dark:text-emerald-400'
+                          : calidadRollo === 'ok' ? 'text-blue-600 dark:text-blue-400'
+                            : calidadRollo === 'justo' ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-red-600 dark:text-red-400'
+                      }`}>
+                        {FIT_QUALITY_LABEL[calidadRollo]}
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    value={localGeneral.labelRollId || ''}
+                    onChange={(e) => setLocalGeneral(prev => ({ ...prev, labelRollId: e.target.value || undefined }))}
+                    className="w-full px-3 py-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  >
+                    <option value="">Rollo continuo (ticket)</option>
+                    {ROLLOS.map(rollo => {
+                      const calidad = fitQuality(evaluateFit(skuDeMuestra, rollo));
+                      return (
+                        <option key={rollo.id} value={rollo.id}>
+                          {rollo.nombre} · {FIT_QUALITY_LABEL[calidad]}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
+                    {localGeneral.labelRollId
+                      ? <>Se imprime rotado 90° para que el código use el largo de la etiqueta.{calidadRollo === 'justo' && ' En este rollo queda al límite: se lee con dificultad si la etiqueta se roza.'}{calidadRollo === 'no-cabe' && ' Este rollo no permite imprimir el código.'}</>
+                      : 'El ticket se ajusta al alto del contenido, sin desperdiciar papel.'}
+                  </p>
+                </div>
+
               </div>
 
               <div className="flex flex-wrap gap-4 pt-1">

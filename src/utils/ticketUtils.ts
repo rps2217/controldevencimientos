@@ -219,6 +219,12 @@ export interface ThermalPrintOptions {
   paperWidth?: '80mm' | '58mm';
   orientation?: 'portrait' | 'landscape';
   cutMarginMm?: number;
+  /**
+   * Tamaño exacto del rollo de etiquetas. Tiene prioridad sobre `paperWidth`:
+   * un rollo de 12 mm no es un ticket de 58 mm, y el driver debe recibir la
+   * medida real para no alimentar papel de más.
+   */
+  rollSizeMm?: { widthMm: number; heightMm: number };
   onBeforePrint?: () => void;
   onAfterPrint?: () => void;
 }
@@ -236,6 +242,7 @@ export function executeThermalPrint(options: ThermalPrintOptions = {}): void {
     paperWidth = '80mm',
     orientation = 'portrait',
     cutMarginMm = 2,
+    rollSizeMm,
     onBeforePrint,
     onAfterPrint
   } = options;
@@ -308,6 +315,45 @@ export function executeThermalPrint(options: ThermalPrintOptions = {}): void {
     const effectiveMargin = Math.max(0, cutMarginMm);
     const orientationKeyword = orientation === 'landscape' ? 'landscape' : 'portrait';
     const isLandscape = orientation === 'landscape';
+
+    // Con un rollo de etiquetas la altura NO se mide: la etiqueta es troquelada y
+    // tiene un tamaño fijo. Medir el contenido daría una altura arbitraria y el
+    // driver alimentaría papel de más o cortaría a media etiqueta.
+    if (rollSizeMm) {
+      const { widthMm, heightMm } = rollSizeMm;
+      styleTag.textContent = `
+        @media print {
+          @page {
+            size: ${widthMm}mm ${heightMm}mm ${orientationKeyword};
+            margin: 0mm;
+          }
+          html, body {
+            width: ${widthMm}mm !important;
+            height: ${heightMm}mm !important;
+            max-height: ${heightMm}mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+          }
+          #${elementId} {
+            width: ${widthMm}mm !important;
+            max-width: ${widthMm}mm !important;
+            height: ${heightMm}mm !important;
+            max-height: ${heightMm}mm !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+          }
+        }
+      `;
+      window.print();
+      window.onafterprint = () => {
+        restoreOtherTickets();
+        if (onAfterPrint) onAfterPrint();
+      };
+      return;
+    }
 
     // When landscape, the width becomes the larger dimension or auto
     const sizeRule = calculatedHeightMm > 10

@@ -38,10 +38,15 @@ import {
 import {
   DOTS_PER_MM,
   findRoll,
+  resolveRoll,
   moduleCount,
   evaluateFit,
-  toMediaDescriptor
+  fitQuality,
+  toMediaDescriptor,
+  ROLLOS,
+  DEFAULT_ROLL_ID
 } from './src/utils/labelMediaProfile';
+import { generateBarcodeSvgString } from './src/utils/barcodeGenerator';
 import {
   buildAuditRowValues,
   consolidateAuditRows,
@@ -1748,6 +1753,59 @@ console.log('\n--- Perfiles de medios para etiquetas térmicas (ROADMAP §31) --
   const descriptor = toMediaDescriptor(r22!);
   assert(descriptor.type === 'die-cut' && descriptor.widthMm === 12 && descriptor.heightMm === 22,
     'perfiles: el descriptor de medio conserva las medidas en mm');
+
+  // --- Catalogo completo seleccionable en la UI ---
+
+  // Todos los rollos comerciales de la familia P12/P15 deben estar ofrecidos.
+  const idsEsperados = ['12x22', '12x30', '12x40', '14x30', '14x40', '15x30', '15x50'];
+  assert(idsEsperados.every(id => ROLLOS.some(r => r.id === id)),
+    'perfiles: el catalogo ofrece todos los rollos comerciales P12/P15');
+  assert(ROLLOS.length === idsEsperados.length,
+    'perfiles: no hay rollos duplicados en el catalogo', ROLLOS.length);
+
+  // El default debe existir de verdad: si no, "Rollo continuo" seria el unico
+  // estado alcanzable y el selector quedaria muerto.
+  assert(findRoll(DEFAULT_ROLL_ID) !== undefined,
+    'perfiles: el rollo por defecto existe en el catalogo', DEFAULT_ROLL_ID);
+
+  // resolveRoll siempre devuelve algo: cubre el caso de config vieja o corrupta.
+  assert(resolveRoll(undefined).id === DEFAULT_ROLL_ID,
+    'perfiles: resolveRoll sin id cae al rollo por defecto');
+  assert(resolveRoll('no-existe').id === DEFAULT_ROLL_ID,
+    'perfiles: resolveRoll con id invalido cae al rollo por defecto');
+  assert(resolveRoll('15x50').id === '15x50',
+    'perfiles: resolveRoll respeta un id valido');
+
+  // La calidad debe corresponder a la medicion: 12x40 es comodo y 12x22 es justo.
+  assert(fitQuality(evaluateFit(sku, r40!, 90)) === 'optimo',
+    'perfiles: 12x40 rotado se clasifica como optimo');
+  assert(fitQuality(evaluateFit(sku, r22!, 90)) === 'justo',
+    'perfiles: 12x22 rotado se clasifica como justo (al limite)');
+  assert(fitQuality(evaluateFit(sku, r22!, 0)) === 'no-cabe',
+    'perfiles: 12x22 sin rotar se clasifica como no-cabe');
+
+  // --- Rotacion 90 en el SVG generado: es lo que hace viable la etiqueta ---
+
+  const svgHorizontal = generateBarcodeSvgString(sku, { rotate: 0, width: 2, height: 40, background: '#ffffff' });
+  const svgRotado = generateBarcodeSvgString(sku, { rotate: 90, width: 2, height: 40, background: '#ffffff' });
+  const anchoDe = (svg: string) => Number(svg.match(/width="([\d.]+)"/)?.[1] ?? 0);
+  const altoDe = (svg: string) => Number(svg.match(/height="([\d.]+)"/)?.[1] ?? 0);
+
+  // Rotar intercambia los ejes: el ancho rotado debe ser el alto original y viceversa.
+  assert(Math.abs(anchoDe(svgRotado) - altoDe(svgHorizontal)) < 0.01,
+    'barcode: al rotar 90 el ancho pasa a ser el alto original',
+    `${anchoDe(svgRotado)} vs ${altoDe(svgHorizontal)}`);
+  assert(Math.abs(altoDe(svgRotado) - anchoDe(svgHorizontal)) < 0.01,
+    'barcode: al rotar 90 el alto pasa a ser el ancho original');
+  assert(svgRotado.includes('rotate(90)'),
+    'barcode: el SVG rotado aplica la transformacion de rotacion');
+  assert(!svgHorizontal.includes('rotate(90)'),
+    'barcode: sin rotar el SVG no lleva transformacion (no cambia el ticket actual)');
+  assert(svgRotado.includes('<rect') && svgRotado.includes('</svg>'),
+    'barcode: el SVG rotado sigue siendo valido y conserva las barras');
+  // El color de fondo debe sobrevivir a la rotacion (la etiqueta es blanca).
+  assert(svgRotado.includes('background:#ffffff'),
+    'barcode: el SVG rotado conserva el fondo de la etiqueta');
 }
 
 console.log(`\n========================================`);

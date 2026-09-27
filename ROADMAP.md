@@ -3387,13 +3387,26 @@ característica «perfil de impresión»: un preset con (ancho mm, alto mm, gap 
 
 ### Plan por etapas (cuando llegue la impresora)
 
-1. **Perfil / preset de medios** — enum de rollos con sus medidas en mm y su rotación. Puro TS,
-   testeable sin hardware (la matemática de arriba lo es).
+1. **Perfil / preset de medios** — ✅ **hecho**. Catálogo `ROLLOS` con las 7 medidas
+   comerciales P12/P15, rotación fija a 90°, y selector «Rollo de Etiquetas» en el modal de
+   ticket (con opción de rollo continuo para no cambiar la impresión actual). Al elegir el
+   rollo, la impresión pasa a tamaño fijo de etiqueta en vez de medir el contenido.
 2. **Rasterizador canvas** — de barcode a `RawImageData` 1 bit al tamaño exacto del rollo.
    Testeable sin impresora: verificar dimensiones y que el bitmap no salga en blanco.
 3. **Transporte BLE** — `requestPrinters()` + `print()` tras un gesto del usuario. **No testeable
    sin hardware**; es lo último.
-4. **UI** — botón «Imprimir etiqueta» por fila / en lote, con selección de perfil.
+4. **UI** — el selector de perfil ya vive en el modal de ticket; falta el botón «Imprimir
+   etiqueta» por fila que dispare directo al transporte BLE.
+
+### Rotación 90°: medida y verificada
+
+El código se gira en `generateBarcodeSvgString` (opción `rotate: 90`), no con CSS: la rotación
+es geometría del código, no presentación. La prueba fija que los ejes se intercambian y que el
+ticket continuo (sin rollo) no cambia.
+
+> ⚠️ **Pendiente de validación física.** Las medidas están verificadas por aritmética, pero
+> ningún resultado está probado contra la P15 real. La rotación y el tamaño de página hay que
+> confirmarlos con la impresora en mano antes de dar la función por cerrada.
 
 Los pasos 1 y 2 **sí se pueden construir y probar antes de tener la impresora**; el 3 se deja
 contra la llegada del hardware para no escribir código especulativo que nadie pueda verificar.

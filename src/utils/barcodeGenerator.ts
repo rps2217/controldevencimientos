@@ -33,6 +33,12 @@ export interface BarcodeOptions {
   quietZone?: number;   // Left/Right margin in modules (default: 10)
   color?: string;       // Bar color (default: '#000000')
   background?: string;  // Background color (default: 'transparent')
+  /**
+   * Rota 90° el código para que su eje de lectura (el ancho, que suma muchos
+   * módulos) use la dimensión larga de la etiqueta. En un rollo de 12 mm el
+   * código horizontal no cabe; rotado sí. Ver ROADMAP §31.
+   */
+  rotate?: 0 | 90;
   className?: string;
 }
 
@@ -127,7 +133,8 @@ export function generateBarcodeSvgString(
     fontSize = 11,
     quietZone = 8,
     color = "#000000",
-    background = "transparent"
+    background = "transparent",
+    rotate = 0
   } = options;
 
   const rawText = String(text || '').trim();
@@ -185,5 +192,15 @@ export function generateBarcodeSvgString(
     ? `<text x="${(svgWidth / 2).toFixed(2)}" y="${(height + fontSize + 1).toFixed(2)}" font-family="monospace" font-size="${fontSize}" font-weight="bold" text-anchor="middle" fill="${color}">${escapeXml(rawText)}</text>`
     : "";
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth.toFixed(2)} ${svgHeight.toFixed(2)}" width="${svgWidth.toFixed(2)}" height="${svgHeight.toFixed(2)}" style="max-width:100%;height:auto;background:${background};display:block;margin:0 auto;">${rects}${textElement}</svg>`;
+  // Rotación 90° en sentido horario, envolviendo el código en un <g> y
+  // declarando el viewBox ya girado para que el SVG ocupe el hueco correcto.
+  const content = `${rects}${textElement}`;
+  const isRotated = rotate === 90;
+  const body = isRotated
+    ? `<g transform="translate(${svgHeight.toFixed(2)} 0) rotate(90)">${content}</g>`
+    : content;
+  const viewBoxW = isRotated ? svgHeight : svgWidth;
+  const viewBoxH = isRotated ? svgWidth : svgHeight;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewBoxW.toFixed(2)} ${viewBoxH.toFixed(2)}" width="${viewBoxW.toFixed(2)}" height="${viewBoxH.toFixed(2)}" style="max-width:100%;height:auto;background:${background};display:block;margin:0 auto;">${body}</svg>`;
 }

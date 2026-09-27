@@ -40,15 +40,21 @@ export interface LabelMedia {
  * Rollos comerciales reales de la familia P12/P15. El 12×22 no está en el
  * catálogo del driver `@thermal-label/marklife`, por eso se declara aquí: la
  * impresora no reporta qué medios tiene cargados.
+ *
+ * Ordenados de menor a mayor: el operario elige el que tiene cargado.
  */
 export const ROLLOS: LabelMedia[] = [
   { id: '12x22', nombre: '12 × 22 mm', widthMm: 12, heightMm: 22, gapMm: 2, rotacion: 90 },
   { id: '12x30', nombre: '12 × 30 mm', widthMm: 12, heightMm: 30, gapMm: 2, rotacion: 90 },
   { id: '12x40', nombre: '12 × 40 mm', widthMm: 12, heightMm: 40, gapMm: 2, rotacion: 90 },
+  { id: '14x30', nombre: '14 × 30 mm', widthMm: 14, heightMm: 30, gapMm: 2, rotacion: 90 },
   { id: '14x40', nombre: '14 × 40 mm', widthMm: 14, heightMm: 40, gapMm: 2, rotacion: 90 },
   { id: '15x30', nombre: '15 × 30 mm', widthMm: 15, heightMm: 30, gapMm: 2, rotacion: 90 },
   { id: '15x50', nombre: '15 × 50 mm', widthMm: 15, heightMm: 50, gapMm: 2, rotacion: 90 },
 ];
+
+/** Rollo por defecto al elegir una etiqueta troquelada: el menor con margen cómodo. */
+export const DEFAULT_ROLL_ID = '12x40';
 
 /** Módulos que ocupa un texto en Code128, incluidas las dos zonas de silencio. */
 export function moduleCount(texto: string): number {
@@ -88,6 +94,33 @@ export function evaluateFit(
 export function findRoll(id: string): LabelMedia | undefined {
   return ROLLOS.find(r => r.id === id);
 }
+
+/** Resuelve un rollo por id, cayendo al por defecto si no existe o no se indicó. */
+export function resolveRoll(id?: string): LabelMedia {
+  return findRoll(id || '') || findRoll(DEFAULT_ROLL_ID)!;
+}
+
+export type FitQuality = 'optimo' | 'ok' | 'justo' | 'no-cabe';
+
+/**
+ * Traduce el resultado numérico a una etiqueta legible para el selector.
+ * Los cortes (2,0 y 1,5 dots/módulo) salen del ROADMAP §31, medidos con el
+ * generador real: por debajo de 1,5 el código es frágil al roce.
+ */
+export function fitQuality(fit: FitResult): FitQuality {
+  if (!fit.cabe) return 'no-cabe';
+  if (fit.dotsPerModule >= 2) return 'optimo';
+  if (fit.dotsPerModule >= 1.5) return 'ok';
+  return 'justo';
+}
+
+/** Texto corto y operativo para la UI, con el motivo del aviso. */
+export const FIT_QUALITY_LABEL: Record<FitQuality, string> = {
+  optimo: 'Óptimo',
+  ok: 'Bueno',
+  justo: 'Al límite (se lee con dificultad)',
+  'no-cabe': 'No cabe',
+};
 
 /**
  * Descriptor de medio en la forma que espera `@thermal-label/marklife-web`.

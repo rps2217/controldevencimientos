@@ -189,6 +189,12 @@ export interface TicketGeneralSettings {
   barcodeHeightMm?: number;
   showBarcodeTextInReport?: boolean;
   cutMarginMm?: number; // Margen de corte final (0mm = corte al ras / ahorro máximo, 2mm = recomendado, 5mm = holgado)
+  /**
+   * Rollo cargado en la impresora de etiquetas (id de `ROLLOS` en
+   * `labelMediaProfile.ts`). Define el tamaño real del papel; la impresora no lo
+   * reporta, así que el operario debe declararlo.
+   */
+  labelRollId?: string;
 }
 
 export interface ViewTicketSettings {

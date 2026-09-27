@@ -3,6 +3,7 @@ import { InventoryItem, ViewTicketConfig, TicketColumnConfig } from '../../types
 import { findColumnBySemantic } from '../../utils/columnAliases';
 import { normalizeTicketConfig } from '../../utils/ticketUtils';
 import { generateBarcodeSvgString } from '../../utils/barcodeGenerator';
+import { findRoll } from '../../utils/labelMediaProfile';
 import { formatDisplayDate } from '../../utils/pureCalculations';
 
 interface TicketPrintViewProps {
@@ -54,6 +55,11 @@ export const TicketPrintView: React.FC<TicketPrintViewProps> = ({
   const is58mm = general.paperWidth === '58mm';
   const barcodeWidth = is58mm ? 1.3 : 1.6;
   const barcodeHeight = isBarcodeMode ? 44 : 36;
+
+  // Con un rollo troquelado el código se gira 90°: en 12-15 mm de ancho no cabe
+  // horizontal. Sin rollo (ticket continuo) se mantiene horizontal.
+  const labelRoll = general.labelRollId ? findRoll(general.labelRollId) : undefined;
+  const isLabelRoll = isBarcodeMode && !!labelRoll;
 
   return (
     <div 
@@ -107,7 +113,8 @@ export const TicketPrintView: React.FC<TicketPrintViewProps> = ({
             fontSize: 11,
             quietZone: 6,
             color: '#000000',
-            background: '#ffffff'
+            background: '#ffffff',
+            rotate: isLabelRoll ? 90 : 0
           }) : null;
 
           if (isBarcodeMode) {
