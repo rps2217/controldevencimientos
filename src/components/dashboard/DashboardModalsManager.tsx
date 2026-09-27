@@ -1,6 +1,5 @@
 import React, { lazy, Suspense } from 'react';
 import { InventoryItem, SheetConfig, EventCategory, GlobalTicketConfig, ViewTicketConfig, TableSlice, SheetRecord, SheetProperties, SpreadsheetMetadata, SortConfig, SliceFilterConfig } from '../../types';
-import { ItemDetailDrawer } from '../drawers/ItemDetailDrawer';
 import { PmReportModal } from '../modals/PmReportModal';
 import { ScriptCodeModal } from '../modals/ScriptCodeModal';
 import { ItemFormModal } from '../modals/ItemFormModal';
@@ -29,12 +28,8 @@ import { ManageableColumn } from '../../hooks/useColumnManager';
 const StockCountTerminal = lazy(() => import('../views/StockCountTerminal').then(m => ({ default: m.StockCountTerminal })));
 
 export interface DashboardModalsManagerProps {
-  // Master-Detail Drawer
-  selectedProduct: InventoryItem | null;
-  setSelectedProduct: (p: InventoryItem | null) => void;
   handleOpenModal: (item?: InventoryItem, prefillSku?: string, initialCategory?: EventCategory) => void;
   handleDelete: (item: InventoryItem) => Promise<void>;
-  handlePrintTicket: (items: InventoryItem[], mode: 'standard' | 'barcode') => void;
   allMainItems: InventoryItem[];
   policies: SheetRecord[];
   products: SheetRecord[];
@@ -187,11 +182,8 @@ export interface DashboardModalsManagerProps {
 export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProps>> = (props) => {
   const context = useDashboard();
   const {
-    selectedProduct,
-    setSelectedProduct,
     handleOpenModal,
     handleDelete,
-    handlePrintTicket,
     allMainItems,
     policies,
     products,
@@ -293,25 +285,6 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
 
   return (
     <>
-      {/* 1. MASTER-DETAIL PRODUCT DRAWER */}
-      <ItemDetailDrawer
-        product={selectedProduct}
-        onClose={() => setSelectedProduct(null)}
-        onEdit={(prod) => {
-          setSelectedProduct(null);
-          handleOpenModal(prod);
-        }}
-        onDeleteRow={handleDelete}
-        onPrintBarcode={(prod) => handlePrintTicket([prod], 'barcode')}
-        onNewEventForProduct={(sku, category) => {
-          handleOpenModal(undefined, sku, category);
-        }}
-        allMainItems={allMainItems}
-        policies={policies}
-        products={products}
-        customAliases={sheetConfig.customAliases}
-      />
-
       {/* 2. PM DRAINAGE REPORT MODAL */}
       <PmReportModal
         isOpen={isPmReportOpen}

@@ -159,8 +159,8 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
      * En móvil no hay ancho para dividir, así que conserva el patrón anterior:
      * overlay con backdrop y foco atrapado.
      */
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 lg:static lg:inset-auto lg:z-auto lg:bg-transparent lg:backdrop-blur-none lg:w-[28rem] xl:w-[32rem] 2xl:w-[36rem] lg:shrink-0 lg:border-l lg:border-slate-200 lg:dark:border-slate-800">
-      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 h-full shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 lg:max-w-none lg:shadow-none lg:border-l-0">
+    <div className="fixed inset-0 top-[65px] z-30 flex justify-end bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 lg:static lg:inset-auto lg:top-auto lg:z-auto lg:bg-transparent lg:backdrop-blur-none lg:w-[28rem] xl:w-[32rem] 2xl:w-[36rem] lg:shrink-0 lg:h-full">
+      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 h-full shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 lg:max-w-none lg:shadow-sm lg:rounded-3xl lg:border border-slate-200 dark:border-slate-800">
         
         {/* Header */}
         <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/90">

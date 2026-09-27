@@ -119,7 +119,7 @@ export const DashboardTopNav: React.FC = () => {
   const viewMeta = getViewMeta();
 
   return (
-    <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 z-30 sticky top-0 shrink-0 px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2.5 sm:gap-3 shadow-2xs">
+    <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 z-40 sticky top-0 shrink-0 px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2.5 sm:gap-3 shadow-2xs">
       
       {/* LEFT: Mobile trigger & View Identity Context */}
       <div className="flex items-center gap-2 shrink-0">

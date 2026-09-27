@@ -48,6 +48,7 @@ import { ZenModeOverlay } from './dashboard/ZenModeOverlay';
 import { DashboardMobileDrawer } from './dashboard/DashboardMobileDrawer';
 import { DashboardMobileFABs } from './dashboard/DashboardMobileFABs';
 import { DashboardTableContainer } from './dashboard/DashboardTableContainer';
+import { ItemDetailDrawer } from './drawers/ItemDetailDrawer';
 import { ViewConfigControlDrawer } from './drawers/ViewConfigControlDrawer';
 import { usePrecomputedColumns } from '../hooks/usePrecomputedColumns';
 import { TicketPrintView } from './views/TicketPrintView';
@@ -1246,7 +1247,7 @@ export const InventoryDashboard: React.FC = () => {
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-auto p-2 md:p-6">
+        <div className="flex-1 overflow-hidden p-2 md:p-6 min-h-0 flex flex-col">
           {error && (
             <div className="mb-6 rounded-xl bg-red-50 p-4 border border-red-100">
               <div className="flex items-center">
@@ -1295,7 +1296,28 @@ export const InventoryDashboard: React.FC = () => {
               </div>
             </div>
           ) : (
-            <DashboardTableContainer />
+            <div className="flex-1 flex gap-3 lg:gap-4 min-h-0 overflow-hidden relative h-full">
+              <div className="flex-1 min-w-0 h-full">
+                <DashboardTableContainer />
+              </div>
+              <ItemDetailDrawer
+                product={selectedProduct}
+                onClose={() => setSelectedProduct(null)}
+                onEdit={(prod) => {
+                  setSelectedProduct(null);
+                  handleOpenModal(prod);
+                }}
+                onDeleteRow={handleDelete}
+                onPrintBarcode={(prod) => handlePrintTicket([prod], 'barcode')}
+                onNewEventForProduct={(sku, category) => {
+                  handleOpenModal(undefined, sku, category);
+                }}
+                allMainItems={allMainItems}
+                policies={policies}
+                products={products}
+                customAliases={sheetConfig.customAliases}
+              />
+            </div>
           )}
 
           {/* FLOATING ACTION BAR (BULK ACTIONS) */}
