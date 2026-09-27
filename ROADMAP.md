@@ -3474,7 +3474,7 @@ y el efecto es que el resumen ejecutivo deja de contradecir al detalle que el op
 
 ### Verificación por mutación (el arnés no es decorativo)
 
-9 pruebas nuevas en la sección 15. Se comprobó que **discriminan** rompiendo el código a
+10 pruebas nuevas en la sección 15. Se comprobó que **discriminan** rompiendo el código a
 propósito, no sólo que pasan:
 
 | Mutación aplicada | Pruebas que caen |
