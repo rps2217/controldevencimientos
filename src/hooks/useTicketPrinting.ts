@@ -6,7 +6,7 @@ import {
   saveTicketConfigToStorage,
   executeThermalPrint
 } from '../utils/ticketUtils';
-import { resolveRoll } from '../utils/labelMediaProfile';
+import { findRoll } from '../utils/labelMediaProfile';
 
 /**
  * Estado y acciones del ticket térmico (impresión y su configuración por vista).
@@ -73,14 +73,12 @@ export function useTicketPrinting(params: {
     const orientation = generalSettings.orientation || 'portrait';
     const cutMarginMm = generalSettings.cutMarginMm !== undefined ? Number(generalSettings.cutMarginMm) : 2;
 
-    // En modo etiqueta manda el rollo declarado, no el ancho de ticket: la
-    // etiqueta es troquelada y tiene medida fija.
-    const rollSizeMm = mode === 'barcode'
-      ? (() => {
-          const roll = resolveRoll(generalSettings.labelRollId);
-          return { widthMm: roll.widthMm, heightMm: roll.heightMm };
-        })()
-      : undefined;
+    // El rollo troquelado solo manda si el operario declaró uno. Sin esa
+    // condición, `resolveRoll` caía al rollo por defecto y una etiqueta impresa
+    // con 80/58 mm configurados salía en 12×40 mm: el formato de la etiqueta
+    // terminaba decidiéndolo el código, no la Configuración de Ticket Térmico.
+    const roll = mode === 'barcode' ? findRoll(generalSettings.labelRollId || '') : undefined;
+    const rollSizeMm = roll ? { widthMm: roll.widthMm, heightMm: roll.heightMm } : undefined;
 
     executeThermalPrint({
       elementId: 'thermal-ticket-root',

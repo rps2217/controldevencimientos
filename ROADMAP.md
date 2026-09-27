@@ -3957,10 +3957,41 @@ ofrece todos los rollos, elegir rollo persiste `labelRollId`, volver a un ancho 
 rollo, y un rollo guardado se muestra preseleccionado al reabrir. **Mutación confirmada**: quitando
 el limpiado de `labelRollId` cae la aserción de excluyencia (27/1).
 
+### Bug reportado: imprimir etiquetas ignoraba el ancho configurado
+
+`ItemDetailDrawer` → «Imprimir código de barras» → `handlePrintTicket([item], 'barcode')`. El hook
+resolvía el rollo así:
+
+```ts
+const roll = resolveRoll(generalSettings.labelRollId);   // el bug
+```
+
+`resolveRoll` cae a `DEFAULT_ROLL_ID` (`12x40`) cuando el id falta o no está catalogado. Con 80/58 mm
+configurados y sin rollo declarado —el caso normal del botón del drawer— el hook devolvía `rollSizeMm`
+igual, `executeThermalPrint` entraba a su rama de etiqueta y fijaba `@page size: 12mm 40mm`. El formato
+terminaba decidiéndolo el código, no la Configuración de Ticket Térmico.
+
+**Por qué el selector unificado no lo cubría**: el fix de UI unificó la elección, pero el hook seguía
+teniendo un camino donde "no declaré rollo" se traducía en "rollo 12×40". La excluyencia del modal
+(funciona) y la resolución del hook (no funcionaba) eran dos reglas distintas.
+
+**El arreglo:** `findRoll(labelRollId || '')` y solo se pasa `rollSizeMm` si hay rollo. Sin rollo manda
+`paperWidth`. Se retiraron `resolveRoll` y `DEFAULT_ROLL_ID`: tras el arreglo quedaban sin consumidor
+en `src/` y `resolveRoll` **es** el fallback silencioso que causó el defecto, así que dejarlo invita a
+reintroducirlo. Sus tres aserciones en `test-modules.ts` se retiraron (417 unitarias, −3).
+
+**Prueba de regresión** `testImpresionEtiquetaRespetaConfig`: monta el hook, dispara `handlePrintTicket`
+en modo `barcode` y lee el `@page size` realmente inyectado en `#thermal-print-dynamic-page-style`.
+Dos casos: sin rollo (debe decir `80mm`, no `12mm 40mm`) y con `labelRollId: '12x30'` (debe decir
+`12mm 30mm`). **Mutación confirmada**: restaurando el fallback a 12×40 cae el primer caso (29/1).
+Nota de arnés: la prueba debe esperar ~4,2 s antes de desmontar, porque `executeThermalPrint` programa
+un respaldo de limpieza a 4 s que, si dispara tras `teardownDom`, referencia un `window` inexistente y
+tumba el proceso de pruebas.
+
 ### Gate
 
 `npm run verify` exit 0 · `tsc --noEmit` 0 · `eslint` 0 errores (10 warnings preexistentes) ·
-**420 unitarias** · **28 de componente** · **18 de hoja de cálculo** · `build` de producción 0 ·
+**417 unitarias** · **30 de componente** · **18 de hoja de cálculo** · `build` de producción 0 ·
 **E2E: 29 arneses OK** · 0 dependencias nuevas.
 
 ### Pendientes que quedan (reconfirmados, medidos)

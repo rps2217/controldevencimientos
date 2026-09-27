@@ -53,9 +53,6 @@ export const ROLLOS: LabelMedia[] = [
   { id: '15x50', nombre: '15 × 50 mm', widthMm: 15, heightMm: 50, gapMm: 2, rotacion: 90 },
 ];
 
-/** Rollo por defecto al elegir una etiqueta troquelada: el menor con margen cómodo. */
-export const DEFAULT_ROLL_ID = '12x40';
-
 /** Módulos que ocupa un texto en Code128, incluidas las dos zonas de silencio. */
 export function moduleCount(texto: string): number {
   return codesToBinaryString(encodeCode128(texto)).length + QUIET_ZONE_MODULES * 2;
@@ -93,11 +90,6 @@ export function evaluateFit(
 /** Resuelve un perfil por su id. Devuelve `undefined` si el rollo no está catalogado. */
 export function findRoll(id: string): LabelMedia | undefined {
   return ROLLOS.find(r => r.id === id);
-}
-
-/** Resuelve un rollo por id, cayendo al por defecto si no existe o no se indicó. */
-export function resolveRoll(id?: string): LabelMedia {
-  return findRoll(id || '') || findRoll(DEFAULT_ROLL_ID)!;
 }
 
 export type FitQuality = 'optimo' | 'ok' | 'justo' | 'no-cabe';

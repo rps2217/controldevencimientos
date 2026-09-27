@@ -200,7 +200,7 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
 - **`InventoryDashboard.tsx`**: Tabla interactiva con filtros avanzados, búsqueda rápida, tarjetas de resumen KPI y botones de acción rápida.
 - **`ItemDetailDrawer.tsx`**: Drawer lateral que agrupa toda la trazabilidad de un SKU (historial de vencimientos, lotes y eventos relacionados).
 - **`PmReportModal.tsx`**: Genera reportes listos para copiar al portapapeles o exportar para jefaturas de producto/operaciones.
-- **Impresión térmica (`TicketConfigModal.tsx` + `TicketPrintView.tsx` + `ticketUtils.ts`)**: el sustrato se elige en **un solo control** «Ancho de Papel» (`select`) en Ajustes Generales del Ticket: 80 mm (Estándar, preseleccionado), 58 mm (Compacto) y los rollos troquelados de `ROLLOS` (`labelMediaProfile.ts`) en un `optgroup`. Son **excluyentes**: elegir 80/58 mm limpia `labelRollId`; elegir un rollo lo fija. En modo etiqueta manda el rollo (tamaño fijo), no `paperWidth`; `executeThermalPrint` recibe `rollSizeMm` y no mide la altura del contenido, porque la etiqueta es troquelada. En modo ticket continuo la altura se calcula y se respeta `cutMarginMm`. El badge de encaje (`fitQuality`/`FIT_QUALITY_LABEL`) evalúa el código real contra el rollo elegido. La prueba de componente `testSelectorPapelUnificado` fija las tres propiedades (default 80 mm, excluyencia, preselección al reabrir).
+- **Impresión térmica (`TicketConfigModal.tsx` + `TicketPrintView.tsx` + `ticketUtils.ts` + `useTicketPrinting.ts`)**: el sustrato se elige en **un solo control** «Ancho de Papel» (`select`) en Ajustes Generales del Ticket: 80 mm (Estándar, preseleccionado), 58 mm (Compacto) y los rollos troquelados de `ROLLOS` (`labelMediaProfile.ts`) en un `optgroup`. Son **excluyentes**: elegir 80/58 mm limpia `labelRollId`; elegir un rollo lo fija. **El rollo manda solo si está declarado** (`findRoll(labelRollId)`, nunca un fallback al rollo por defecto): con 80/58 mm configurados, imprimir etiquetas usa ese ancho. Sin esa condición la etiqueta salía siempre en 12×40 mm, ignorando la Configuración de Ticket Térmico. Con rollo, `executeThermalPrint` recibe `rollSizeMm` y no mide la altura del contenido, porque la etiqueta es troquelada; sin rollo, en ticket continuo, la altura se calcula y se respeta `cutMarginMm`. El badge de encaje (`fitQuality`/`FIT_QUALITY_LABEL`) evalúa el código real contra el rollo elegido. Pruebas: `testSelectorPapelUnificado` (selector) y `testImpresionEtiquetaRespetaConfig` (el `@page size` impreso sigue la config, con y sin rollo).
 
 ### M. Sistema de Campañas de Inventario Cíclico y Matriz de Consolidación (Farmacia en Movimiento)
 - **Propósito**: Auditorías de inventario completas en farmacias con stock en constante movimiento (atención al público simultánea), dividiendo el trabajo en múltiples días y sesiones por mueble/pasillo.
@@ -643,8 +643,8 @@ PR. Node 22. Sin secrets. El job `e2e` usa el Google Chrome preinstalado del run
 
 ### Estado vigente (Fase 8 + corte de ticket)
 
-El gate hoy: `tsc` 0 · `eslint` 0 errores (10 warnings preexistentes) · **420 unitarias** ·
-**28 de componente** · **18 de hoja de cálculo** · `build` 0 · **E2E: 29 arneses OK** · 0
+El gate hoy: `tsc` 0 · `eslint` 0 errores (10 warnings preexistentes) · **417 unitarias** ·
+**30 de componente** · **18 de hoja de cálculo** · `build` 0 · **E2E: 29 arneses OK** · 0
 dependencias nuevas. Las secciones «Auditoría Ponytail» en `ROADMAP.md` son la fuente; esta
 lista es el resumen accionable.
 
@@ -665,6 +665,15 @@ lista es el resumen accionable.
    `labelRollId`; elegir un rollo fija `labelRollId`. La vista previa y el badge de encaje
    siguen el medio elegido. Prueba de componente `testSelectorPapelUnificado` (6 aserciones),
    mutación confirmada quitando el limpiado.
+3. **Imprimir código de barras ignoraba el ancho configurado** — cerrado. El botón de etiquetas
+   del modal de detalle (`ItemDetailDrawer` → `handlePrintTicket([item], 'barcode')`) pasaba por
+   `resolveRoll(labelRollId)`, que **cae al rollo por defecto 12×40 mm cuando no hay rollo
+   declarado**. Resultado: con 80/58 mm configurados, la etiqueta salía siempre en 12×40 mm.
+   El hook ahora resuelve el rollo con `findRoll` y solo lo aplica si existe; sin rollo manda
+   `paperWidth`. Se retiraron `resolveRoll` y `DEFAULT_ROLL_ID` (sin consumidores tras el fix)
+   para que el fallback silencioso no pueda reintroducirse. Prueba de componente
+   `testImpresionEtiquetaRespetaConfig` inspecciona el `@page size` realmente inyectado, con y
+   sin rollo; mutación confirmada restaurando el fallback.
 
 Pendientes medidos, sin ejecutar, por orden de valor operativo:
 

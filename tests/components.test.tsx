@@ -17,8 +17,10 @@ import { CampaignMatrixTable } from '../src/components/campaign/CampaignMatrixTa
 import { CampaignProviderProgress } from '../src/components/campaign/CampaignProviderProgress';
 import { useTableGrouping } from '../src/hooks/useTableGrouping';
 import { TicketConfigModal } from '../src/components/modals/TicketConfigModal';
+import { useTicketPrinting } from '../src/hooks/useTicketPrinting';
+import { STORAGE_KEYS } from '../src/utils/appStorage';
 import { ROLLOS } from '../src/utils/labelMediaProfile';
-import type { SheetConfig, CampaignAuditRow, CampaignConsolidationMatrix, ViewTicketSettings } from '../src/types';
+import type { SheetConfig, CampaignAuditRow, CampaignConsolidationMatrix, ViewTicketSettings, InventoryItem } from '../src/types';
 
 let passed = 0;
 let failed = 0;
@@ -441,6 +443,61 @@ async function testSelectorPapelUnificado() {
   await conRollo.unmount();
 }
 
+async function testImpresionEtiquetaRespetaConfig() {
+  console.log('\n--- 10. Imprimir código de barras respeta el formato configurado ---');
+
+  const general = { paperWidth: '80mm' as const, orientation: 'portrait' as const };
+  const config = { main: { columns: {}, general } };
+
+  const imprimir = { fn: null as null | ((items: InventoryItem[], mode: 'standard' | 'barcode') => void) };
+  function Probe() {
+    const { handlePrintTicket } = useTicketPrinting({
+      sheetConfig: {} as SheetConfig,
+      setSheetConfig: () => {},
+      saveConfig: () => {},
+      activeView: 'main',
+      showToast: () => '',
+      closeTicketConfig: () => {},
+    });
+    imprimir.fn = handlePrintTicket;
+    return <div />;
+  }
+
+  const item = { _rowIndex: 1, SKU: '2000210218569', DESCRIPCION: 'Producto' };
+  const leerPageSize = () =>
+    (document.getElementById('thermal-print-dynamic-page-style')?.textContent || '')
+      .match(/size:\s*([^;]+);/)?.[1]?.trim() || '';
+
+  // Sin rollo declarado: el caso del botón del drawer. Los 80 mm configurados deben mandar.
+  localStorage.setItem(STORAGE_KEYS.TICKET_CONFIG, JSON.stringify(config));
+  window.print = () => {};
+  const view = await mount(<Probe />);
+  await view.run(async () => { imprimir.fn!([item], 'barcode'); await new Promise(r => setTimeout(r, 200)); });
+  const sizeSinRollo = leerPageSize();
+  assert(sizeSinRollo.includes('80mm') && !/\d2mm\s+40mm/.test(sizeSinRollo),
+    'imprimir etiqueta sin rollo declarado usa los 80 mm configurados, no el rollo por defecto',
+    sizeSinRollo);
+
+  // Con rollo declarado, manda el rollo troquelado.
+  const conRollo = { main: { columns: {}, general: { ...general, labelRollId: '12x30' } } };
+  localStorage.setItem(STORAGE_KEYS.TICKET_CONFIG, JSON.stringify(conRollo));
+  const view2 = await mount(<Probe />);
+  await view2.run(async () => { imprimir.fn!([item], 'barcode'); await new Promise(r => setTimeout(r, 200)); });
+  const sizeConRollo = leerPageSize();
+  assert(sizeConRollo.includes('12mm') && sizeConRollo.includes('30mm'),
+    'con rollo declarado la etiqueta se imprime en la medida del rollo', sizeConRollo);
+
+  await view.unmount();
+  await view2.unmount();
+  localStorage.removeItem(STORAGE_KEYS.TICKET_CONFIG);
+
+  // `executeThermalPrint` programa un respaldo de limpieza a 4 s por si el
+  // navegador no emite `afterprint` (jsdom no lo hace). Hay que dejarlo correr
+  // antes de desmontar el DOM: si el temporizador dispara tras `teardownDom`,
+  // referencia un `window` ya borrado y tumba el proceso de pruebas.
+  await new Promise(r => setTimeout(r, 4200));
+}
+
 async function main() {
   console.log('========================================');
   console.log(' PRUEBAS DE COMPONENTE (Fase 0)');
@@ -455,6 +512,7 @@ async function main() {
   await testProviderPanelFiltra();
   await testProviderPanelLanzaConteo();
   await testSelectorPapelUnificado();
+  await testImpresionEtiquetaRespetaConfig();
 
   teardownDom();
 

@@ -38,13 +38,11 @@ import {
 import {
   DOTS_PER_MM,
   findRoll,
-  resolveRoll,
   moduleCount,
   evaluateFit,
   fitQuality,
   toMediaDescriptor,
-  ROLLOS,
-  DEFAULT_ROLL_ID
+  ROLLOS
 } from './src/utils/labelMediaProfile';
 import { generateBarcodeSvgString } from './src/utils/barcodeGenerator';
 import {
@@ -2139,18 +2137,10 @@ console.log('\n--- Perfiles de medios para etiquetas térmicas (ROADMAP §31) --
   assert(ROLLOS.length === idsEsperados.length,
     'perfiles: no hay rollos duplicados en el catalogo', ROLLOS.length);
 
-  // El default debe existir de verdad: si no, "Rollo continuo" seria el unico
+  // El catalogo debe ofrecer rollos: si no, "Rollo continuo" seria el unico
   // estado alcanzable y el selector quedaria muerto.
-  assert(findRoll(DEFAULT_ROLL_ID) !== undefined,
-    'perfiles: el rollo por defecto existe en el catalogo', DEFAULT_ROLL_ID);
-
-  // resolveRoll siempre devuelve algo: cubre el caso de config vieja o corrupta.
-  assert(resolveRoll(undefined).id === DEFAULT_ROLL_ID,
-    'perfiles: resolveRoll sin id cae al rollo por defecto');
-  assert(resolveRoll('no-existe').id === DEFAULT_ROLL_ID,
-    'perfiles: resolveRoll con id invalido cae al rollo por defecto');
-  assert(resolveRoll('15x50').id === '15x50',
-    'perfiles: resolveRoll respeta un id valido');
+  assert(ROLLOS.length > 0 && findRoll(ROLLOS[0].id) !== undefined,
+    'perfiles: el catalogo ofrece rollos seleccionables');
 
   // La calidad debe corresponder a la medicion: 12x40 es comodo y 12x22 es justo.
   assert(fitQuality(evaluateFit(sku, r40!, 90)) === 'optimo',
