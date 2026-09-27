@@ -471,7 +471,7 @@ export const InventoryDashboard: React.FC = () => {
     setSearchTerm('');
     setActiveQuickChip(null);
     clearHookFilters();
-  }, [clearHookFilters]);
+  }, [clearHookFilters, setSearchTerm, setActiveQuickChip]);
 
   // AppSheet Pattern: Slices / Vistas Personalizadas
   const {
@@ -639,8 +639,14 @@ export const InventoryDashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    fetchData(sheetConfig, activeView, false);
+    // Se recarga por `activeView` a propósito, no por `fetchData`/`sheetConfig`:
+    // `fetchData` rellena títulos de hoja faltantes llamando a `setSheetConfig`, así
+    // que listarlo como dependencia re-dispararía este efecto tras cada carga (bucle
+    // de fetch). El ref se lee al ejecutar, que es el patrón que ya usa el resto del
+    // dashboard para los callbacks diferidos.
+    fetchDataRef.current?.(sheetConfig, activeView, false);
     setSelectedRowIds([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView]);
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -958,19 +964,19 @@ export const InventoryDashboard: React.FC = () => {
 
   const handlePmRadarFilterClick = useCallback((targetFilter: string, isMulti: boolean) => {
     setPmRadarFilter(prev => handleFilterToggle(prev, targetFilter, isMulti));
-  }, []);
+  }, [setPmRadarFilter]);
 
   const handleEventResolutionFilterClick = useCallback((status: 'pending' | 'completed', isMulti: boolean) => {
     setEventResolutionFilter(prev => handleFilterToggle(prev, status, isMulti));
-  }, []);
+  }, [setEventResolutionFilter]);
 
   const handleEventFilterClick = useCallback((eventCat: EventCategory, isMulti: boolean) => {
     setEventFilter(prev => handleFilterToggle(prev, eventCat, isMulti));
-  }, []);
+  }, [setEventFilter]);
 
   const handleFrcBodFilterClick = useCallback((bodVal: string, isMulti: boolean) => {
     setFrcBodFilter(prev => handleFilterToggle(prev, bodVal, isMulti));
-  }, []);
+  }, [setFrcBodFilter]);
 
   if (loading && !metadata) {
     return <SkeletonLoader />;
