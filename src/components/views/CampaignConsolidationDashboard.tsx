@@ -5,7 +5,7 @@ import { computeCampaignConsolidationMatrix, importPharmacySnapshotToCampaign, m
 import { saveStockCountSessionsToStorage, playBeep } from '../../utils/stockCountUtils';
 import { syncCampaignsWithCloud, saveAuditRowsToDedicatedSheet } from '../../lib/sheets';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
-import { resolveActiveCampaign, collectAllAuditRows, getAuditProviders, filterAuditRows, computeProviderProgress } from '../../utils/campaignAggregation';
+import { resolveActiveCampaign, collectAllAuditRows, getAuditProviders, filterAuditRows, computeProviderProgress, getProviderPendingSkus } from '../../utils/campaignAggregation';
 import { parseDelimitedText, detectDelimiter } from '../../utils/universalImporter';
 import { CampaignQuickScanModal } from '../modals/CampaignQuickScanModal';
 import { CampaignMatrixTable } from '../campaign/CampaignMatrixTable';
@@ -21,6 +21,8 @@ interface CampaignConsolidationDashboardProps {
   onUpdateCampaigns: (campaigns: InventoryCampaign[]) => void;
   onSelectCampaign: (id: string) => void;
   onStartTargetedRecount: (sessionName: string, skus: string[]) => void;
+  /** Conteo NUEVO acotado a los SKUs pendientes de un proveedor (suma, no reemplaza). */
+  onStartProviderCount: (proveedor: string, skus: string[]) => void;
   showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info', title?: string) => void;
   onSwitchToTerminal: (sku?: string) => void;
   onUpdateSessions?: (sessions: StockCountSession[]) => void;
@@ -34,13 +36,14 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
   onUpdateCampaigns,
   onSelectCampaign,
   onStartTargetedRecount,
+  onStartProviderCount,
   showToast,
   onSwitchToTerminal,
   onUpdateSessions,
   onNavigateToSessionList
 }) => {
-  // Active tab inside Campaign view: 'MATRIX' | 'SNAPSHOT_UPLOAD' | 'CAMPAIGN_SETTINGS'
-  const [activeTab, setActiveTab] = useState<'MATRIX' | 'SNAPSHOT_UPLOAD' | 'CAMPAIGN_SETTINGS'>('MATRIX');
+  // Active tab inside Campaign view: 'MATRIX' | 'SNAPSHOT_UPLOAD'
+  const [activeTab, setActiveTab] = useState<'MATRIX' | 'SNAPSHOT_UPLOAD'>('MATRIX');
   
   // Status filter for Matrix: 'ALL' | 'CUADRADO' | 'DISCREPANCIA' | 'NUNCA_PISTOLEADO' | 'HALLAZGO'
   const [matrixFilter, setMatrixFilter] = useState<'ALL' | 'VALIDADO_OK' | 'DISCREPANCIA' | 'NUNCA_PISTOLEADO' | 'HALLAZGO'>('ALL');
@@ -374,6 +377,17 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
     const skus = matrix.discrepancias.map(r => r.sku);
     const sessionName = `2da Vuelta - Discrepancias (${skus.length} SKUs)`;
     onStartTargetedRecount(sessionName, skus);
+  };
+
+  // Conteo NUEVO por proveedor: toma sus SKUs pendientes (nunca pistoleados) y abre una
+  // sesión normal acotada a ellos. Distinto del reconteo: aquí las lecturas SUMAN.
+  const handleLaunchProviderCount = (proveedor: string) => {
+    const skus = getProviderPendingSkus(matrix, proveedor);
+    if (skus.length === 0) {
+      showToast(`${proveedor} no tiene SKUs pendientes por contar.`, 'info');
+      return;
+    }
+    onStartProviderCount(proveedor, skus);
   };
 
   // ☁️ SINCRONIZACIÓN Y CONSOLIDACIÓN ATÓMICA DE DISPOSITIVOS (GOOGLE SHEETS)
@@ -748,6 +762,7 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
             providers={providerProgress}
             selectedProvider={selectedProvider}
             onSelectProvider={(p) => setSelectedProvider(selectedProvider === p ? 'ALL' : p)}
+            onStartCount={handleLaunchProviderCount}
           />
           <CampaignMatrixTable
           matrix={matrix}

@@ -3684,3 +3684,75 @@ componentes grandes y debe hacerse con red de pruebas; **fuera del alcance de es
 **403 unitarias** (401 + 2) · **19 de componente** · **18 de hoja de cálculo** · build de
 producción 0 · 0 dependencias nuevas.
 
+
+---
+
+## Auditoría Ponytail (2026-09-19) — Fase 6: cierre del eje por proveedor y prueba de la frontera HTTP
+
+Cierre del corte que la Fase 5 dejó abierto (lanzar conteos por proveedor) y de la deuda de
+pruebas del Hallazgo 1. La medición volvió a mover el plan: **el valor no estaba en más UI, sino
+en probar la frontera que ninguna prueba unitaria alcanza.**
+
+### Característica — lanzar un conteo nuevo acotado a un proveedor
+
+El panel de avance por proveedor ya filtraba la matriz, pero no permitía **arrancar** el conteo
+de un laboratorio. No se cableó el botón a `onStartTargetedRecount` a propósito: ese camino crea
+sesiones `esSegundaVuelta: true`, y una 2da vuelta **reemplaza** el físico del SKU. Un conteo de
+proveedor es mercadería que **aún no se contó**, así que debe **sumar**.
+
+- **`getProviderPendingSkus(matrix, proveedor)`** (`campaignAggregation.ts`): SKUs del snapshot
+  ERP con stock y cero lecturas (los `nuncaPistoleados` del proveedor). Fuente única del alcance.
+- **`StockCountSession.skuScope?`** (`types.ts`): acota el universo teórico y el checklist de la
+  sesión a un conjunto de SKUs. Ausente = toda la hoja, así que no toca datos ya guardados.
+- **`handleStartProviderCount`** (`StockCountTerminal.tsx`): abre una sesión **normal**
+  (`DOCUMENT`) con `skuScope` y la asocia a la campaña activa.
+- **`handleLaunchProviderCount`** (`CampaignConsolidationDashboard.tsx`) → panel con botón
+  "Contar" por proveedor, visible **solo si hay pendientes**.
+
+`getProviderPendingSkus` se usa igual en el arnés E2E, para que el alcance que se cuenta en la UI
+y el que se verifica en la hoja sean el mismo cálculo (una sola fuente de verdad).
+
+### Hallazgo de cierre — la vía de sesión emite FALTANTE/SOBRANTE, y es correcto
+
+Al medir con el arnés E2E se observó que la vía de sesión escribe `FALTANTE`/`SOBRANTE` y que la
+matriz de campaña los rotula `DISCREPANCIA`. **No es un segundo vocabulario**: `FALTANTE` y
+`SOBRANTE` son dos valores del canon de `AuditSheetStatus` (`auditConsolidation.ts`) que la vista
+de campaña agrupa bajo la etiqueta de UI `DISCREPANCIA`. La sospecha de bug era un supuesto
+equivocado del conjunto de prueba, no un defecto del producto. Corregido el supuesto.
+
+### Prueba de la frontera HTTP (`tests/perf/auditcheck.cjs`)
+
+Este arnés cubre lo que ninguna prueba unitaria alcanza: el **payload real** que sale por HTTP
+hacia `_AUDITORIA_INVENTARIO` al pulsar el botón de guardado, con el backend falso real. Verifica
+encabezados canónicos, ausencia del vocabulario viejo (`CUADRADO`/`NO_CATALOGADO`) y que un
+segundo guardado **consolida** (no duplica).
+
+- **Mutación confirmada**: reintroducir `CUADRADO` en el builder de campaña hace caer las dos
+  aserciones de vocabulario (FALLO), y el arnés vuelve a OK al restaurar. El arnés discrimina.
+- **La vía de sesión NO se repite aquí.** Su traducción (`CUADRADO→CUADRADO_OK`,
+  `NO_CATALOGADO→HALLAZGO_NO_ERP`) ya está fijada a nivel unitario, y navegar a cuadratura ataría
+  el arnés al fixture de hoja activa sin cubrir código nuevo. Duplicar cobertura es ruido, no red.
+
+### Aislamiento del backend falso (por qué el arnés levanta el suyo)
+
+`auditcheck.cjs` **no** usa el backend falso compartido del runner. Al medir, la hoja aparecía
+con 5 filas en vez de 4: `racecheck.cjs` deja campanas y sesiones sembradas, y esta app
+**consolida todas las sesiones de una campaña**, así que el arnés veía SKUs ajenos. En solitario
+daba 4/4; tras el runner, 5/5. La causa no era el producto sino el estado compartido. El arnés
+levanta su propio backend en un puerto fuera de la banda CDP del runner y lo mata al terminar, lo
+que vuelve determinista la hoja y permite exigir el conteo exacto de filas.
+
+### Limpieza (escalera de decisiones)
+
+- **`CAMPAIGN_SETTINGS` retirado** de `CampaignConsolidationDashboard`: valor del tipo `activeTab`
+  que nunca se asignaba ni se renderizaba. Borrarlo no toca ningún camino vivo.
+- **`resumenPorUbicacion` sigue anotado, no tocado**: eliminar un campo construido pero nunca
+  renderizado exige cambiar el tipo, el cómputo y una prueba, y no hay consumidor que lo pida.
+  Se hará si aparece un eje real de muebles; hoy es YAGNI al revés.
+
+### Gate
+
+`npm run verify` exit 0 · `tsc --noEmit` 0 · `eslint` 0 errores (10 warnings preexistentes) ·
+**413 unitarias** · **22 de componente** · **18 de hoja de cálculo** · `build` de producción 0 ·
+**E2E: 28 arneses OK** · 0 dependencias nuevas.
+

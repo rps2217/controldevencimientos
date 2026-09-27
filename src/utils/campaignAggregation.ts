@@ -114,6 +114,24 @@ export function computeProviderProgress(matrix: CampaignConsolidationMatrix | nu
   return list.sort((a, b) => b.pendientes - a.pendientes || a.proveedor.localeCompare(b.proveedor));
 }
 
+/**
+ * SKUs pendientes de un proveedor: los que están en el snapshot del ERP con stock y
+ * aún no tienen ninguna lectura física. Son exactamente los que debe recorrer una
+ * sesión de conteo nueva acotada a ese proveedor.
+ *
+ * Vacío si el proveedor ya está completo o no existe (`''` para "sin proveedor").
+ */
+export function getProviderPendingSkus(
+  matrix: CampaignConsolidationMatrix | null,
+  proveedor: string
+): string[] {
+  if (!matrix) return [];
+  const key = proveedor.trim() || 'Sin Proveedor';
+  return matrix.nuncaPistoleados
+    .filter(r => (r.proveedor.trim() || 'Sin Proveedor') === key)
+    .map(r => r.sku);
+}
+
 
 /**
  * Filas visibles de la matriz según estado, proveedor y búsqueda.

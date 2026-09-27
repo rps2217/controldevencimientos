@@ -320,6 +320,11 @@ export interface StockCountSession {
   // `esSegundaVuelta` sólo cambia cómo se agrega esta sesión en la matriz de campaña
   // (reemplaza en vez de sumar), así que no toca la forma de los datos ya guardados.
   esSegundaVuelta?: boolean;
+  /**
+   * SKUs que esta sesión cubre. Acota el universo teórico y el checklist de pendientes
+   * a ese conjunto (p. ej. el conteo de un proveedor). Ausente = toda la hoja.
+   */
+  skuScope?: string[];
   deviceId?: string;               // Identificador único del dispositivo / terminal auditor
   auditor?: string;                // Nombre o firma del operario
   lastUpdated?: string;            // Timestamp de última mutación (ISO)

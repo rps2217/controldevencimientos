@@ -294,6 +294,19 @@ export function reconcileStockCountSession(
   const reconciliationResults: StockCountReconciliationItem[] = [];
   const processedKeys = new Set<string>();
 
+  // Alcance por proveedor: una sesión puede nacer acotada a los SKUs de un laboratorio.
+  // Se recorta el universo teórico (y el checklist de pendientes) a ese conjunto para
+  // que el operario recorra solo lo suyo. Sin `skuScope` no se toca nada.
+  const scopeSet = session.skuScope && session.skuScope.length > 0
+    ? new Set(session.skuScope.map(s => String(s).trim()).filter(Boolean))
+    : null;
+  if (scopeSet) {
+    for (const key of Array.from(theoreticalMap.keys())) {
+      const theor = theoreticalMap.get(key)!;
+      if (!scopeSet.has(theor.sku) && !scopeSet.has(key)) theoreticalMap.delete(key);
+    }
+  }
+
   // A. Process all items that have theoretical presence in sheet
   for (const [key, theor] of theoreticalMap.entries()) {
     processedKeys.add(key);
@@ -362,6 +375,9 @@ export function reconcileStockCountSession(
   // B. Process items counted physically that were NOT in the theoretical sheet
   for (const [key, physical] of physicalTotals.entries()) {
     if (processedKeys.has(key)) continue;
+    // En una sesión acotada, una lectura fuera del alcance es un SKU ajeno al
+    // proveedor: no debe aparecer como hallazgo ni inflar su conteo.
+    if (scopeSet && !scopeSet.has(physical.sku) && !scopeSet.has(key)) continue;
 
     let finalDesc = physical.descripcion;
     let finalRut = physical.rutProveedor;

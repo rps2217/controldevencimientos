@@ -151,7 +151,8 @@ import {
   collectAllAuditRows,
   getAuditProviders,
   filterAuditRows,
-  computeProviderProgress
+  computeProviderProgress,
+  getProviderPendingSkus
 } from './src/utils/campaignAggregation';
 import { InventoryCampaign, StockCountSession, CampaignSnapshotItem, StockCountEntry, StockCountReconciliationItem, InventoryItem, SheetConfig } from './src/types';
 import { mergeCloudConfigs, redactSecretsForCloudSheet } from './src/utils/dashboardConfigUtils';
@@ -1381,6 +1382,39 @@ console.log('\n--- 18. Pruebas de cuadratura y sincronizacion con VENCIMIENTOS -
   assert(hallazgo[0]?.estado === 'NO_CATALOGADO' && hallazgo[0]?.teorico === 0,
     'un SKU pistoleado ausente de la hoja se clasifica NO_CATALOGADO (hallazgo fisico)');
 
+  // --- Alcance por proveedor: una sesion acotada solo ve los SKUs de su laboratorio ---
+
+  // Control positivo: sin skuScope la sesion ve todo el universo teorico, asi que los
+  // dos SKUs aparecen. Es el par discriminante del alcance: mismo dato, misma sesion,
+  // unica diferencia es el skuScope.
+  const sinAlcance = reconcileStockCountSession(
+    session({ conteos: [] }),
+    [sheetRow('SKU_A', '100'), sheetRow('SKU_B', '50')], HEADERS);
+  assert(sinAlcance.length === 2,
+    'sin skuScope la sesion ve todo el universo teorico de la hoja (control positivo del alcance)');
+
+  const conAlcance = reconcileStockCountSession(
+    session({ skuScope: ['SKU_B'], conteos: [] }),
+    [sheetRow('SKU_A', '100'), sheetRow('SKU_B', '50')], HEADERS);
+  assert(conAlcance.length === 1 && conAlcance[0]?.sku === 'SKU_B',
+    'skuScope acota el checklist de pendientes a los SKUs del proveedor');
+  assert(conAlcance[0]?.teorico === 50,
+    'skuScope conserva el teorico del SKU dentro del alcance (no lo vacia)');
+
+  // Una lectura fisica fuera del alcance no debe colarse en la cuadratura acotada.
+  const alcanceConLecturaAjena = reconcileStockCountSession(
+    session({ skuScope: ['SKU_B'], conteos: [entry('SKU_A', 100), entry('SKU_B', 50)] }),
+    [sheetRow('SKU_A', '100'), sheetRow('SKU_B', '50')], HEADERS);
+  assert(alcanceConLecturaAjena.every(r => r.sku === 'SKU_B'),
+    'skuScope no deja entrar lecturas de SKUs fuera del alcance del proveedor');
+
+  // Un skuScope vacio equivale a no acotar: no debe vaciar la sesion por accidente.
+  const alcanceVacio = reconcileStockCountSession(
+    session({ skuScope: [], conteos: [] }),
+    [sheetRow('SKU_A', '100')], HEADERS);
+  assert(alcanceVacio.length === 1,
+    'skuScope vacio no acota nada (no vacia la sesion por accidente)');
+
   // --- Consolidacion por CU_VC: la unidad de vencimiento es SKU + MM/YYYY ---
 
   const dosLecturasMismoCuVc = reconcileStockCountSession(
@@ -1787,6 +1821,34 @@ console.log('\n--- 20. Pruebas de derivacion y filtrado de campanas (campaignAgg
   assert(avanceHallazgo.length === 1 && avanceHallazgo[0].proveedor === 'Sin Proveedor'
     && avanceHallazgo[0].hallazgos === 1,
     'avance por proveedor: un hallazgo sin proveedor cae a "Sin Proveedor" y no se pierde');
+
+  // --- getProviderPendingSkus: que SKUs debe recorrer el conteo de un proveedor ---
+  assert(getProviderPendingSkus(null, 'Lab Norte').length === 0,
+    'pendientes de proveedor: sin matriz no hay nada que contar');
+
+  // Solo los nunca pistoleados del proveedor, no los ya contados ni los de otros.
+  const pendientesCentro = getProviderPendingSkus(provMatriz, 'Lab Centro');
+  assert(pendientesCentro.length === 1 && pendientesCentro[0] === 'C1',
+    'pendientes de proveedor: devuelve solo los SKUs sin lecturas');
+  assert(getProviderPendingSkus(provMatriz, 'Lab Norte').length === 0,
+    'pendientes de proveedor: un proveedor ya contado no tiene pendientes');
+  assert(getProviderPendingSkus(provMatriz, 'Inexistente').length === 0,
+    'pendientes de proveedor: un proveedor ausente no inventa SKUs');
+
+  // El conteo de proveedor debe SUMAR a la matriz, no reemplazar como la 2da vuelta.
+  // El par discriminante compara las dos marcas con las mismas lecturas: si el conteo
+  // por proveedor se marcara esSegundaVuelta, el fisico se reemplazaria y el resultado
+  // seria distinto (aqui no hay vuelta previa que reemplazar, asi que ademas se prueba
+  // que la marca ausente no rompe la suma).
+  const sumaCamp = makeCampaign({
+    snapshotTeoricoActual: { P1: snapshotItem('P1', 100, { proveedor: 'Lab Centro' }) }
+  });
+  const matrizSuma = computeCampaignConsolidationMatrix(sumaCamp, [
+    makeSession('P1', 30)   // conteo por proveedor: suma fisico nuevo sobre teorico 100
+  ]);
+  const filaSuma = matrizSuma.cuadrados.concat(matrizSuma.discrepancias)[0];
+  assert(filaSuma?.stockFisicoTotal === 30 && filaSuma?.stockTeoricoEfectivo === 100,
+    'conteo por proveedor: el fisico nuevo se suma sobre el teorico (no reemplaza la fila)');
 
   // createMetricsAccumulator: ruta compartida por el worker y el fallback sincronico.
   {

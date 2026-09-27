@@ -333,6 +333,56 @@ async function testProviderPanelFiltra() {
   await view.unmount();
 }
 
+async function testProviderPanelLanzaConteo() {
+  console.log('\n--- 8. El panel por proveedor lanza un conteo acotado ---');
+
+  const providers = [
+    { proveedor: 'Lab Norte', totalSkus: 2, contados: 2, cuadrados: 2, discrepancias: 0,
+      pendientes: 0, hallazgos: 0, cobertura: 100, totalTeorico: 150, totalFisico: 150 },
+    { proveedor: 'Lab Centro', totalSkus: 1, contados: 0, cuadrados: 0, discrepancias: 0,
+      pendientes: 4, hallazgos: 0, cobertura: 0, totalTeorico: 30, totalFisico: 0 }
+  ];
+
+  let lanzado = '';
+  const view = await mount(
+    <CampaignProviderProgress
+      providers={providers}
+      selectedProvider="ALL"
+      onSelectProvider={() => {}}
+      onStartCount={(p) => { lanzado = p; }}
+    />
+  );
+
+  // Solo el proveedor con pendientes ofrece arrancar el conteo: uno ya completo no
+  // debe mostrar un boton que iniciaria una sesion vacia.
+  const botones = Array.from(view.container.querySelectorAll('button'));
+  const botonesContar = botones.filter(b => (b.textContent || '').includes('Contar'));
+  assert(botonesContar.length === 1,
+    'solo el proveedor con pendientes ofrece lanzar el conteo', String(botones.length));
+
+  (botonesContar[0] as HTMLButtonElement).click();
+  await view.run(() => {});
+  assert(lanzado === 'Lab Centro',
+    'el boton Contar entrega el proveedor exacto para acotar la sesion');
+
+  // El boton de contar no debe seleccionar al proveedor: son acciones distintas.
+  await view.unmount();
+
+  // Sin `onStartCount` el panel no inventa el boton (YAGNI: no siempre se puede lanzar).
+  const sinLanzador = await mount(
+    <CampaignProviderProgress
+      providers={providers}
+      selectedProvider="ALL"
+      onSelectProvider={() => {}}
+    />
+  );
+  const sinContar = Array.from(sinLanzador.container.querySelectorAll('button'))
+    .filter(b => (b.textContent || '').includes('Contar'));
+  assert(sinContar.length === 0,
+    'sin handler de conteo el panel no muestra el boton Contar');
+  await sinLanzador.unmount();
+}
+
 
 
 async function main() {
@@ -347,6 +397,7 @@ async function main() {
   await testPostCorteBadgeRenders();
   await testIconoCoherenteConEstado();
   await testProviderPanelFiltra();
+  await testProviderPanelLanzaConteo();
 
   teardownDom();
 

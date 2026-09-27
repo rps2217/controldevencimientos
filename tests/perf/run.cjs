@@ -47,10 +47,14 @@ const HARNESSES = [
   'domaincheck.cjs',
   'racecheck.cjs',
   'rowidentity.cjs',
+  'auditcheck.cjs',
 ];
 // Arneses que necesitan el backend falso (hojas no canonicas): el runner lo levanta
 // y le pasa el puerto como segundo argumento.
 const NEED_FAKE_BACKEND = new Set(['genericcheck.cjs', 'bodegacheck.cjs', 'capabilitycheck.cjs', 'genericpersonalitycheck.cjs', 'catalogpersonalitycheck.cjs', 'titlecheck.cjs', 'writecheck.cjs', 'racecheck.cjs', 'rowidentity.cjs']);
+// auditcheck.cjs levanta SU PROPIO backend falso: el compartido del runner acumula el
+// estado de otros arneses (racecheck siembra campanas/sesiones) y esta app consolida
+// todas las sesiones de una campana, lo que contamina la hoja de auditoria.
 // Fuera de la banda de puertos CDP de los arneses (9300-9989): un backend falso dentro
 // de ese rango puede caerle a un arnés que sortea ese puerto, y entonces su Chrome no
 // escucha, `/json/new` lo responde el backend falso y el arnés muere con `Invalid URL`.

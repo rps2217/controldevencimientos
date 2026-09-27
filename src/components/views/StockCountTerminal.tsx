@@ -243,6 +243,64 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     showToast(`Sesión de 2da vuelta iniciada para ${targetSkus.length} SKUs`, 'success');
   };
 
+  /**
+   * Lanza un conteo NUEVO acotado a los SKUs pendientes de un proveedor.
+   *
+   * No reutiliza `handleStartTargetedRecount`: ese marca la sesión como 2da vuelta
+   * (`esSegundaVuelta: true`), y la matriz REEMPLAZA el físico de una 2da vuelta en vez
+   * de sumarlo (la vuelta re-cuenta mercadería ya contada). Un conteo de proveedor es
+   * mercadería que aún no se contó, así que debe ir como sesión normal y con `skuScope`
+   * para que el operario solo recorra ese laboratorio.
+   */
+  const handleStartProviderCount = (proveedor: string, skus: string[]) => {
+    if (skus.length === 0) {
+      showToast(`No hay SKUs pendientes de ${proveedor}.`, 'info');
+      return;
+    }
+    const sessionName = `${proveedor} - Conteo (${skus.length} SKUs)`;
+    const newSessionId = generateShortVcId();
+    const newSession: StockCountSession = {
+      id: newSessionId,
+      nombre: sessionName,
+      modo: 'DOCUMENT',
+      requiereVencimiento: false,
+      hojaOrigen: activeSheetTitle || 'main',
+      estado: 'IN_PROGRESS',
+      fechaInicio: new Date().toISOString(),
+      conteos: [],
+      ubicacion: proveedor,
+      notas: `Conteo por proveedor: ${proveedor}`,
+      skuScope: skus,
+      deviceId: getOrCreateDeviceId(),
+      lastUpdated: new Date().toISOString(),
+      sincronizadoNube: false
+    };
+
+    setSessions(prev => {
+      const updated = [newSession, ...prev];
+      saveStockCountSessionsToStorage(updated);
+      return updated;
+    });
+
+    if (activeCampaignIdState) {
+      setCampaigns(prev => {
+        const updated = prev.map(c => {
+          if (c.id === activeCampaignIdState && !c.sessionIds.includes(newSessionId)) {
+            return { ...c, sessionIds: [...c.sessionIds, newSessionId] };
+          }
+          return c;
+        });
+        saveCampaignsToStorage(updated);
+        return updated;
+      });
+    }
+
+    setActiveSessionId(newSessionId);
+    setCountLocation(proveedor);
+    setViewState('COUNTING');
+    showToast(`Conteo iniciado para ${proveedor}: ${skus.length} SKUs pendientes`, 'success', 'Conteo por Proveedor');
+  };
+
   // New session creation form states
 
   // Active counting terminal form states
@@ -482,6 +540,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       conteos: [],
       notas: config.ubicacion ? `Ubicación inicial: ${config.ubicacion}` : undefined,
       rangoAnos: config.rangoAnos,
+      skuScope: config.skuScope,
       deviceId: getOrCreateDeviceId(),
       lastUpdated: new Date().toISOString(),
       sincronizadoNube: false
@@ -1269,6 +1328,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                 onUpdateCampaigns={handleUpdateCampaigns}
                 onSelectCampaign={handleSelectCampaign}
                 onStartTargetedRecount={handleStartTargetedRecount}
+                onStartProviderCount={handleStartProviderCount}
                 showToast={showToast}
                 onUpdateSessions={setSessions}
                 onNavigateToSessionList={() => setViewState('LIST')}

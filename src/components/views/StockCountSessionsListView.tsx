@@ -11,6 +11,12 @@ export interface NewSessionConfig {
   requiereVencimiento: boolean;
   rangoAnos?: { desde: number; hasta: number };
   ubicacion: string;
+  /**
+   * SKUs que esta sesión debe cubrir. Si viene, al abrir la sesión se acota el
+   * checklist de pendientes a ellos (p. ej. los pendientes de un proveedor). Vacío o
+   * ausente = toda la hoja.
+   */
+  skuScope?: string[];
 }
 
 export interface StockCountSessionsListViewProps {
