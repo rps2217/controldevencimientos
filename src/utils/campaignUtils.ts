@@ -16,6 +16,7 @@ import {
   CampaignConsolidationMatrix,
   CampaignAuditRow,
   StockCountSession,
+  StockCountEntry,
   SheetRecord,
 } from '../types';
 import { findColumnBySemantic } from './columnAliases';
@@ -264,8 +265,90 @@ export function computeCampaignConsolidationMatrix(
     campaign.sessionIds.length === 0 || campaign.sessionIds.includes(s.id)
   );
 
-  // 2. Accumulate all physical counts across all sessions
-  // Map: SKU -> { totalContado, sesiones: Array<{ sesionId, nombreSesion, ubicacion, cantidad, timestamp }> }
+  // 2. Acumulación física. Hay dos clases de sesión y se agregan distinto:
+  //
+  //   - Conteo normal: mira mercadería que ningún otro conteo miró, así que se SUMA
+  //     entre sesiones (mueble A 50 + mueble B 30 = 80 unidades del mismo SKU).
+  //   - 2da vuelta: vuelve a mirar la MISMA mercadería que el conteo que corrige, así
+  //     que su cantidad REEMPLAZA la del SKU en vez de sumarse. Si el primer conteo
+  //     dijo 98 y la vuelta confirma 98, el físico es 98 y no 196. Los SKUs que la
+  //     vuelta no re-cuenta conservan el valor del conteo normal.
+  //
+  // Sin esta distinción la 2da vuelta duplicaba el físico y la matriz reportaba un
+  // sobrante inexistente (98 + 98 = 196 en vez de 98), corrompiendo la cuadratura.
+  // Es la operación central de un inventario general con stock en movimiento: la
+  // vuelta existe justo para corregir, no para agregar mercadería.
+  //
+  // La cantidad se acumula en `totalesPorSku` (valor físico final) y en paralelo se
+  // registra la traza de sesiones, que es informativa.
+  const totalesPorSku = new Map<string, number>();
+  const physDescripcion = new Map<string, { descripcion: string; proveedor?: string }>();
+  const physSesiones = new Map<string, Array<{
+    sesionId: string;
+    nombreSesion: string;
+    ubicacion?: string;
+    cantidad: number;
+    timestamp: string;
+  }>>();
+
+  // Cantidad por SKU dentro de una sesión: las lecturas repetidas del mismo SKU se
+  // suman, porque el operario repite la lectura al volver sobre el mismo estante.
+  const totalesDeSesion = (session: StockCountSession) => {
+    const totals = new Map<string, { cantidad: number; entry: StockCountEntry }>();
+    for (const entry of session.conteos) {
+      const cleanSku = String(entry.sku || '').trim();
+      if (!cleanSku) continue;
+      const acc = totals.get(cleanSku);
+      if (acc) acc.cantidad += entry.cantidad;
+      else totals.set(cleanSku, { cantidad: entry.cantidad, entry });
+    }
+    return totals;
+  };
+
+  const registrarTraza = (session: StockCountSession, sku: string, cantidad: number, timestamp: string) => {
+    const traza = physSesiones.get(sku) || [];
+    traza.push({
+      sesionId: session.id,
+      nombreSesion: session.nombre,
+      ubicacion: session.ubicacion,
+      cantidad,
+      timestamp
+    });
+    physSesiones.set(sku, traza);
+  };
+
+  const guardarMaestro = (sku: string, entry: StockCountEntry) => {
+    const actual = physDescripcion.get(sku);
+    if (!actual) {
+      physDescripcion.set(sku, { descripcion: entry.descripcion || '', proveedor: entry.rutProveedor });
+    } else {
+      if (!actual.descripcion && entry.descripcion) actual.descripcion = entry.descripcion;
+      if (!actual.proveedor && entry.rutProveedor) actual.proveedor = entry.rutProveedor;
+    }
+  };
+
+  const conteosNormales = campaignSessions.filter(s => !s.esSegundaVuelta);
+  const segundasVueltas = campaignSessions
+    .filter(s => s.esSegundaVuelta)
+    .sort((a, b) => (a.fechaInicio || '').localeCompare(b.fechaInicio || ''));
+
+  for (const session of conteosNormales) {
+    for (const [cleanSku, { cantidad, entry }] of totalesDeSesion(session)) {
+      totalesPorSku.set(cleanSku, (totalesPorSku.get(cleanSku) || 0) + cantidad);
+      guardarMaestro(cleanSku, entry);
+      registrarTraza(session, cleanSku, cantidad, entry.timestamp);
+    }
+  }
+
+  for (const session of segundasVueltas) {
+    for (const [cleanSku, { cantidad, entry }] of totalesDeSesion(session)) {
+      // Reemplaza, no suma: la vuelta es el conteo vigente de ese SKU.
+      totalesPorSku.set(cleanSku, cantidad);
+      guardarMaestro(cleanSku, entry);
+      registrarTraza(session, cleanSku, cantidad, entry.timestamp);
+    }
+  }
+
   const physicalMap = new Map<string, {
     sku: string;
     descripcion: string;
@@ -280,55 +363,56 @@ export function computeCampaignConsolidationMatrix(
     }>;
   }>();
 
-  // Location summary map
+  for (const [cleanSku, totalContado] of totalesPorSku) {
+    const maestro = physDescripcion.get(cleanSku);
+    physicalMap.set(cleanSku, {
+      sku: cleanSku,
+      descripcion: maestro?.descripcion || '',
+      proveedor: maestro?.proveedor || '',
+      totalContado,
+      sesiones: physSesiones.get(cleanSku) || []
+    });
+  }
+
+  // Resumen por ubicación derivado del conteo VIGENTE de cada SKU: la vuelta se
+  // atribuye al mueble de su conteo original (el nombre "Auditoría 2da Vuelta" no
+  // identifica un mueble), para que el acta no muestre un mueble fantasma.
+  const ubicacionPorSesion = new Map<string, string>();
+  for (const session of conteosNormales) {
+    ubicacionPorSesion.set(session.id, session.ubicacion?.trim() || session.nombre || 'Sin Ubicación');
+  }
+
   const locationSummaryMap = new Map<string, { sesionesCount: number; skus: Set<string>; totalUnidades: number }>();
-
-  for (const session of campaignSessions) {
-    const loc = session.ubicacion?.trim() || session.nombre || 'Sin Ubicación';
-    let locStats = locationSummaryMap.get(loc);
+  const registrarUbicacion = (ubicacion: string, sku: string, cantidad: number) => {
+    let locStats = locationSummaryMap.get(ubicacion);
     if (!locStats) {
-      locStats = { sesionesCount: 1, skus: new Set<string>(), totalUnidades: 0 };
-      locationSummaryMap.set(loc, locStats);
-    } else {
-      locStats.sesionesCount++;
+      locStats = { sesionesCount: 0, skus: new Set<string>(), totalUnidades: 0 };
+      locationSummaryMap.set(ubicacion, locStats);
     }
+    locStats.skus.add(sku);
+    locStats.totalUnidades += cantidad;
+  };
 
-    for (const entry of session.conteos) {
-      const cleanSku = String(entry.sku || '').trim();
-      if (!cleanSku) continue;
+  for (const [cleanSku, { totalContado, sesiones }] of physicalMap) {
+    // Se atribuye al último conteo NORMAL que vio el SKU (la 2da vuelta no identifica
+    // un mueble). Si sólo lo contó una vuelta, se usa su propia ubicación como último
+    // recurso para no perder la fila del resumen.
+    const normalVigente = [...sesiones].reverse().find(s => ubicacionPorSesion.has(s.sesionId));
+    const loc = normalVigente
+      ? ubicacionPorSesion.get(normalVigente.sesionId)!
+      : (sesiones[sesiones.length - 1]?.ubicacion?.trim() || 'Sin Ubicación');
+    registrarUbicacion(loc, cleanSku, totalContado);
+  }
 
-      locStats.skus.add(cleanSku);
-      locStats.totalUnidades += entry.cantidad;
-
-      let phys = physicalMap.get(cleanSku);
-      if (!phys) {
-        phys = {
-          sku: cleanSku,
-          descripcion: entry.descripcion || '',
-          proveedor: entry.rutProveedor || '',
-          totalContado: entry.cantidad,
-          sesiones: [{
-            sesionId: session.id,
-            nombreSesion: session.nombre,
-            ubicacion: session.ubicacion,
-            cantidad: entry.cantidad,
-            timestamp: entry.timestamp
-          }]
-        };
-        physicalMap.set(cleanSku, phys);
-      } else {
-        phys.totalContado += entry.cantidad;
-        if (!phys.descripcion && entry.descripcion) phys.descripcion = entry.descripcion;
-        if (!phys.proveedor && entry.rutProveedor) phys.proveedor = entry.rutProveedor;
-        phys.sesiones.push({
-          sesionId: session.id,
-          nombreSesion: session.nombre,
-          ubicacion: session.ubicacion,
-          cantidad: entry.cantidad,
-          timestamp: entry.timestamp
-        });
-      }
-    }
+  // Sesiones distintas por ubicación (no contribuciones, que son por SKU). Las 2das
+  // vueltas no son un mueble: sus unidades ya se atribuyeron al mueble del conteo que
+  // corrigen, así que contarlas aquí crearía un mueble "Auditoría 2da Vuelta".
+  for (const session of campaignSessions) {
+    if (session.esSegundaVuelta) continue;
+    const loc = ubicacionPorSesion.get(session.id)
+      || session.ubicacion?.trim() || session.nombre || 'Sin Ubicación';
+    const locStats = locationSummaryMap.get(loc);
+    if (locStats) locStats.sesionesCount++;
   }
 
   // 3. Process all theoretical SKUs from current snapshot
@@ -358,7 +442,10 @@ export function computeCampaignConsolidationMatrix(
     const effectiveTeorico = stockTeorico - manualSalesAdj;
     const diferenciaNeta = stockFisico - effectiveTeorico;
 
-    totalTeorico += stockTeorico;
+    // El total espeja el de las filas: se acumula el teórico EFECTIVO (con el ajuste
+    // de ventas del turno), no el del snapshot. Si no, el encabezado diría "faltan
+    // 10" mientras todas las filas dicen "cuadrado".
+    totalTeorico += effectiveTeorico;
     totalFisico += stockFisico;
 
     const sesiones = phys ? phys.sesiones : [];

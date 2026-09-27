@@ -3420,3 +3420,84 @@ ticket continuo (sin rollo) no cambia.
 Los pasos 1 y 2 **sí se pueden construir y probar antes de tener la impresora**; el 3 se deja
 contra la llegada del hardware para no escribir código especulativo que nadie pueda verificar.
 
+
+---
+
+## Auditoría Ponytail (2026-09-19) — conteo para inventario general con stock en movimiento
+
+Objetivo del corte: que el módulo de conteo sirva para un **inventario general de farmacia
+con stock en movimiento**. Se auditó el motor de consolidación antes de tocar nada, y la
+medición encontró dos defectos de cuadratura que las 367 pruebas no veían porque el fixture
+nunca ejercía la combinación que los rompe.
+
+### Hallazgo 1 — La 2da vuelta duplicaba el físico (pérdida de exactitud, no de datos)
+
+`computeCampaignConsolidationMatrix` **sumaba** las lecturas de todas las sesiones de la
+campaña, sin distinguir un conteo nuevo de un reconteo. La 2da vuelta que la propia UI lanza
+(`handleStartTargetedRecount`) re-cuenta los SKUs discrepantes, que son **la misma mercadería**
+del conteo que corrige. Sumarla contaba la misma caja dos veces.
+
+Medido con una sonda antes de tocar código (SKU con 100 teórico, conteo 98, vuelta 98):
+
+| | antes | después |
+| --- | --- | --- |
+| `stockFisicoTotal` | **196** | **98** |
+| `diferenciaNeta` | **+96** (sobrante falso) | **−2** (faltante real) |
+| `estadoGlobal` | DISCREPANCIA por sobrante | DISCREPANCIA por faltante |
+
+El operario veía un sobrante de 96 unidades donde faltaban 2, y la planilla de 2do conteo se
+generaba a partir de ese error. Es el peor modo de falla para un inventario: no rompe, no
+avisa, y entrega un número creíble pero falso.
+
+**Corrección.** Las sesiones se agregan en dos clases: los conteos normales **suman** entre sí
+(muebles distintos son mercadería distinta: 50 + 50 = 100, que ya era el comportamiento
+probado) y las 2das vueltas **reemplazan** la cantidad del SKU que re-cuentan, en orden
+cronológico para que gane la más reciente. Los SKUs que la vuelta no toca conservan su valor.
+
+**Por qué una bandera y no la ubicación.** El reconteo se guarda con
+`ubicacion: 'Auditoría 2da Vuelta'`, que no identifica el mueble de origen, así que agregar por
+ubicación no detectaba el caso (el primer intento de arreglo cayó en eso). Se añadió
+`StockCountSession.esSegundaVuelta`, un campo opcional: **no toca la forma de los datos ya
+guardados** (las sesiones viejas lo leen como `undefined` y se comportan como conteos normales).
+
+### Hallazgo 2 — El encabezado contradecía a las filas cuando había ajuste de ventas
+
+`totalTeoricoEsperado` y `diferenciaNetaTotal` acumulaban el teórico del **snapshot**, mientras
+cada fila usaba el teórico **efectivo** (`stockTeorico − ajusteManualVenta`). Con una venta de
+turno registrada, el detalle decía "cuadrado" y el encabezado "faltan 10".
+
+Medido: SKU-A teórico 100 con ajuste de venta 10 y físico 90 (correcto) + SKU-B teórico 50
+físico 50. `diferenciaNetaTotal` = **−10** con las filas sumando **0**.
+
+**Corrección.** El encabezado acumula el teórico efectivo, igual que las filas. Es una línea,
+y el efecto es que el resumen ejecutivo deja de contradecir al detalle que el operario ve.
+
+### Verificación por mutación (el arnés no es decorativo)
+
+9 pruebas nuevas en la sección 15. Se comprobó que **discriminan** rompiendo el código a
+propósito, no sólo que pasan:
+
+| Mutación aplicada | Pruebas que caen |
+| --- | --- |
+| La 2da vuelta vuelve a **sumar** | 3 (`98→196`, `−2→+96`, reemplazo) |
+| El encabezado usa el teórico del **snapshot** | 3 (`−10 vs 0`, cuadre en cero, `140→150`) |
+
+Una de las pruebas nuevas encontró **un defecto que quedaba vivo** en el primer arreglo: el
+resumen por ubicación creaba un mueble fantasma "Auditoría 2da Vuelta" con las unidades ya
+atribuidas a su mueble real. Se corrigió antes de cerrar; sin la prueba, el acta de cierre
+habría listado un mueble inexistente.
+
+### Qué no se tocó (escalera de decisiones)
+
+- **`esSegundaVuelta` es opcional**, no obligatorio: hacerlo requerido rompería la lectura de
+  las sesiones ya guardadas en `localStorage` y en la nube, que es justo el riesgo que la
+  invariante de prevención de pérdida de datos prohíbe.
+- **No se tocó `reconcileStockCountSession`** (el motor de una sesión): su agregación por
+  `CU_VC` dentro de una sesión es correcta y tiene su propia red (sección 18).
+- **No se creó una abstracción de "identidad física"**: con la bandera explícita el caso queda
+  cubierto en una línea; una capa de identidad para dos clases de sesión habría sido
+  sobreingeniería (escalón 1).
+
+Gate: `tsc` 0 · `eslint` 0 errores (1 warning preexistente en `StockCountTerminal`) ·
+**377 unitarias** (367 + 10 nuevas) · build 0 · **27 arneses E2E** en verde.
+

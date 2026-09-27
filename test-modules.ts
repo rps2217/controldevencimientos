@@ -1014,6 +1014,109 @@ console.log('\n--- 15. Pruebas de computeCampaignConsolidationMatrix (matriz de 
     'las filas de auditoría llevan el ID de campaña y el local');
   assert(auditRows[0].ESTADO_AUDITORIA === 'CUADRADO_OK',
     'un SKU cuadrado se etiqueta CUADRADO_OK en la planilla de auditoría');
+
+  // --- 2da vuelta: REEMPLAZA, no suma (inventario general con stock en movimiento) ---
+  //
+  // Este es el invariante central del inventario general. La 2da vuelta existe para
+  // CORREGIR un conteo, así que re-cuenta la misma mercadería; sumarla inflaba el
+  // físico con unidades contadas dos veces (98 + 98 = 196 en vez de 98) y la matriz
+  // reportaba un sobrante inexistente.
+
+  const segundaVuelta = (sku: string, cantidad: number, overrides: Partial<StockCountSession> = {}) =>
+    makeSession(sku, cantidad, {
+      id: `seg-${sku}`,
+      nombre: '2da Vuelta - Discrepancias',
+      ubicacion: 'Auditoría 2da Vuelta',
+      esSegundaVuelta: true,
+      fechaInicio: '2026-09-11T00:00:00.000Z',
+      ...overrides
+    });
+
+  // La vuelta confirma el mismo valor: el físico no se duplica.
+  const mRecountSame = computeCampaignConsolidationMatrix(campOk, [
+    makeSession('SKU_A', 98),
+    segundaVuelta('SKU_A', 98)
+  ]);
+  assert(mRecountSame.discrepancias[0].stockFisicoTotal === 98,
+    'la 2da vuelta con el mismo valor NO duplica el físico (98, no 196)',
+    mRecountSame.discrepancias[0].stockFisicoTotal);
+  assert(mRecountSame.discrepancias[0].diferenciaNeta === -2,
+    'el faltante real es -2 y no un sobrante falso de +96',
+    mRecountSame.discrepancias[0].diferenciaNeta);
+
+  // La vuelta corrige la física: manda el valor de la vuelta.
+  const mRecountFix = computeCampaignConsolidationMatrix(campOk, [
+    makeSession('SKU_A', 90),
+    segundaVuelta('SKU_A', 100)
+  ]);
+  assert(mRecountFix.cuadradosCount === 1 && mRecountFix.cuadrados[0].stockFisicoTotal === 100,
+    'la 2da vuelta reemplaza el conteo anterior y puede dejar el SKU cuadrado');
+
+  // Gana la vuelta MÁS RECIENTE cuando hay más de una.
+  const mRecountDos = computeCampaignConsolidationMatrix(campOk, [
+    makeSession('SKU_A', 90),
+    segundaVuelta('SKU_A', 95),
+    segundaVuelta('SKU_A', 100, { id: 'seg2', fechaInicio: '2026-09-12T00:00:00.000Z' })
+  ]);
+  assert(mRecountDos.cuadrados[0].stockFisicoTotal === 100,
+    'entre varias 2das vueltas gana la más reciente');
+
+  // Los SKUs que la vuelta NO re-cuenta conservan el conteo normal.
+  const mRecountParcial = computeCampaignConsolidationMatrix(
+    makeCampaign({
+      snapshotTeoricoActual: {
+        SKU_A: snapshotItem('SKU_A', 100),
+        SKU_B: snapshotItem('SKU_B', 50)
+      }
+    }),
+    [makeSession('SKU_A', 100), makeSession('SKU_B', 50), segundaVuelta('SKU_A', 100)]
+  );
+  const bParcial = [...mRecountParcial.cuadrados, ...mRecountParcial.discrepancias].find(r => r.sku === 'SKU_B')!;
+  assert(bParcial && bParcial.stockFisicoTotal === 50,
+    'un SKU que la 2da vuelta no toca conserva su conteo normal',
+    bParcial?.stockFisicoTotal);
+
+  // Dos muebles distintos del mismo SKU SÍ se suman: son mercadería distinta.
+  const mDosMuebles = computeCampaignConsolidationMatrix(campOk, [
+    makeSession('SKU_A', 50),
+    makeSession('SKU_A', 50, { id: 'ses-mueble4', ubicacion: 'Mueble 4' })
+  ]);
+  assert(mDosMuebles.cuadrados[0].stockFisicoTotal === 100,
+    'dos muebles distintos del mismo SKU se suman (50 + 50), no se reemplazan');
+
+  // El resumen por ubicación no debe inventar un mueble "Auditoría 2da Vuelta".
+  assert(!mRecountFix.resumenPorUbicacion.some(u => /2da Vuelta/i.test(u.ubicacion)),
+    'la 2da vuelta se atribuye al mueble de su conteo, no crea un mueble fantasma',
+    mRecountFix.resumenPorUbicacion.map(u => u.ubicacion).join(', '));
+
+  // --- Totales del encabezado coherentes con las filas ---
+  //
+  // El encabezado debe usar el teórico EFECTIVO (con ajuste de ventas del turno). Si
+  // usara el del snapshot, diría "faltan 10" mientras todas las filas dicen "cuadrado".
+
+  const campDosSkus = makeCampaign({
+    snapshotTeoricoActual: {
+      SKU_A: snapshotItem('SKU_A', 100),
+      SKU_B: snapshotItem('SKU_B', 50)
+    },
+    ajustesVentaManual: { SKU_A: 10 }
+  });
+  const mTotales = computeCampaignConsolidationMatrix(campDosSkus, [
+    makeSession('SKU_A', 90),
+    makeSession('SKU_B', 50, { id: 'ses-b' })
+  ]);
+  const sumaDiferencias = [
+    ...mTotales.cuadrados, ...mTotales.discrepancias,
+    ...mTotales.nuncaPistoleados, ...mTotales.hallazgos
+  ].reduce((acc, r) => acc + r.diferenciaNeta, 0);
+  assert(mTotales.diferenciaNetaTotal === sumaDiferencias,
+    'la diferencia neta del encabezado coincide con la suma de las filas',
+    `${mTotales.diferenciaNetaTotal} vs ${sumaDiferencias}`);
+  assert(mTotales.diferenciaNetaTotal === 0,
+    'con el ajuste de venta aplicado, el total del encabezado cuadra en cero');
+  assert(mTotales.totalTeoricoEsperado === 140,
+    'el total teórico del encabezado usa el teórico efectivo (100-10 + 50 = 140)',
+    mTotales.totalTeoricoEsperado);
 }
 
 console.log('\n--- 16. Pruebas de identidad CU_VC y fin de mes (stockCountUtils) ---');

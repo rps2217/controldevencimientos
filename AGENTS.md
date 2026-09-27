@@ -216,6 +216,12 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
   - **Exportación de Planilla de 2do Conteo (.xlsx)**: Genera una planilla limpia con únicamente los SKUs discrepantes para el equipo de revisión.
   - **Exportación de Acta de Cierre Oficial (.xlsx)**: Genera el informe final consolidado con desglose por mueble y auditoría.
   - **Lanzador de 2da Vuelta Directa**: Crea automáticamente una sesión de conteo focalizada en los SKUs descuadrados.
+- **Regla de agregación con stock en movimiento (invariante de cuadratura)**: las sesiones se agregan en dos clases, y de eso depende que el inventario general cuadre.
+  - **Conteo normal**: mira mercadería que ningún otro conteo miró → se **SUMA** entre sesiones (mueble A 50 + mueble B 30 = 80 del mismo SKU).
+  - **2da vuelta** (`StockCountSession.esSegundaVuelta`): re-cuenta la **misma** mercadería que el conteo que corrige → **REEMPLAZA** la cantidad del SKU en vez de sumarla. Si el primer conteo dijo 98 y la vuelta confirma 98, el físico es 98 y no 196. Gana la vuelta más reciente; los SKUs que no re-cuenta conservan su conteo normal.
+  - Sin esta distinción la 2da vuelta **duplicaba el físico** (98 + 98 = 196) y la matriz reportaba un sobrante inexistente (+96) en vez del faltante real (−2). Es el invariante central del inventario general: la vuelta existe para corregir, no para agregar mercadería.
+  - La 2da vuelta se guarda con `ubicacion: 'Auditoría 2da Vuelta'`, que **no identifica un mueble**. Por eso la regla se decide por la bandera `esSegundaVuelta` y no por la ubicación, y sus unidades se atribuyen al mueble del conteo que corrige (si no, el acta mostraría un mueble fantasma).
+- **Totales del encabezado coherentes con las filas**: `totalTeoricoEsperado` acumula el teórico **efectivo** (con el ajuste de ventas del turno), igual que cada fila. Si acumulara el del snapshot, el encabezado diría "faltan 10" mientras todas las filas dicen "cuadrado".
 
 ### N. Modularización del Conteo por Dominio (Fase 5)
 - **`src/utils/stockCountUtils.ts`**: solo el **ciclo de sesión** de conteo —`reconcileStockCountSession`, `buildVencimientosRowFromCount`, `generateCuVc`, la persistencia de sesiones y la exportación a Excel—.

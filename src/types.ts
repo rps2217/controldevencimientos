@@ -317,6 +317,9 @@ export interface StockCountSession {
   rangoAnos?: { desde: number; hasta: number }; // Rango de años de interés para vencimiento
   snapshotTeorico?: Record<string, number>; // Snapshot congelado del teórico al iniciar/guardar sesión
   ajustesMovimiento?: Record<string, number>; // Ajustes de movimientos (ventas/entradas) durante el conteo
+  // `esSegundaVuelta` sólo cambia cómo se agrega esta sesión en la matriz de campaña
+  // (reemplaza en vez de sumar), así que no toca la forma de los datos ya guardados.
+  esSegundaVuelta?: boolean;
   deviceId?: string;               // Identificador único del dispositivo / terminal auditor
   auditor?: string;                // Nombre o firma del operario
   lastUpdated?: string;            // Timestamp de última mutación (ISO)

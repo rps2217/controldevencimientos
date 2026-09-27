@@ -212,6 +212,10 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       modo: 'DOCUMENT',
       requiereVencimiento: false,
       ubicacion: 'Auditoría 2da Vuelta',
+      // Marca la sesión para que la matriz de campaña REEMPLACE el físico del SKU en
+      // vez de sumarlo: la vuelta re-cuenta la misma mercadería que el conteo que
+      // corrige. Ver computeCampaignConsolidationMatrix.
+      esSegundaVuelta: true,
       conteos: []
     };
 
