@@ -66,9 +66,11 @@ async function leerNube() {
 // Corre una terminal en su propio proceso y devuelve su salida.
 // `startAt` es el instante absoluto del sync: coordina ambos procesos para que
 // el solapamiento sea real y no dependa del jitter de arranque de tsx.
-function correrTerminal(sessionId, entryId, label, startAt = 0) {
+function correrTerminal(sessionId, entryId, label, startAt = 0, sinScope = false) {
   return new Promise(resolve => {
-    const p = spawn('npx', ['tsx', TERMINAL, String(FAKE_PORT), sessionId, entryId, label, String(startAt)], {
+    const args = ['tsx', TERMINAL, String(FAKE_PORT), sessionId, entryId, label, String(startAt)];
+    if (sinScope) args.push('SIN_SCOPE');
+    const p = spawn('npx', args, {
       cwd: path.join(__dirname, '..', '..'),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -125,8 +127,27 @@ function idsPersistidos(data) {
 
   // ---------- 1. CONTROL: una terminal sola ----------
   await correrTerminal('SES-A', 'E-A', 'TERMINAL-A');
-  let ids = idsPersistidos(await leerNube());
+  const nubeControl = await leerNube();
+  let ids = idsPersistidos(nubeControl);
   resultados.push({ caso: 'CONTROL (1 terminal sola)', lecturas: [...ids].sort(), ok: ids.has('E-A') });
+
+  // ---------- 1b. CONTRATO: una terminal rezagada no borra el alcance de la nube ----------
+  // El unitario prueba `mergeCampaignsAndSessions`; esto prueba el viaje completo por el
+  // backend real (load -> merge -> save). Una segunda terminal re-sincroniza la MISMA
+  // sesion con la clave `skuScope` presente pero indefinida (asi la crea una sesion
+  // normal), y el alcance que ya vive en la nube debe sobrevivir. Sin el arreglo del
+  // merge, el valor remoto se pierde y el conteo acotado del operario queda sin filtro.
+  await correrTerminal('SES-A', 'E-A2', 'TERMINAL-A-REZAGADA', 0, true);
+  const nubeTrasRezagada = await leerNube();
+  const sesionRezagada = (nubeTrasRezagada.sessions || []).find(s => s.id === 'SES-A');
+  const scopeTrasRezagada = sesionRezagada && sesionRezagada.skuScope;
+  resultados.push({
+    caso: 'CONTRATO (terminal rezagada conserva el skuScope remoto)',
+    ok: Array.isArray(scopeTrasRezagada)
+      && scopeTrasRezagada.length === 2
+      && scopeTrasRezagada.includes('SKU-SCOPE-A'),
+    detalle: scopeTrasRezagada,
+  });
 
   // ---------- 2. CARRERA: dos terminales a la vez ----------
   await post({ action: 'deleteRows', sheetName: '_CONFIG_APP', rowIndexes: [2, 3, 4, 5, 6, 7, 8] });

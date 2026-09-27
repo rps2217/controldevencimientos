@@ -464,7 +464,6 @@ export function computeCampaignConsolidationMatrix(
   const processedSkus = new Set<string>();
   let totalFisico = 0;
   let totalTeorico = 0;
-  let totalSkusAuditados = 0;
 
   for (const sku of theoreticalKeys) {
     processedSkus.add(sku);
@@ -509,9 +508,7 @@ export function computeCampaignConsolidationMatrix(
     if (closed) {
       row.estadoGlobal = 'VALIDADO_OK';
       cuadrados.push(row);
-      totalSkusAuditados++;
     } else if (phys && phys.totalContado > 0) {
-      totalSkusAuditados++;
       if (diferenciaNeta === 0) {
         row.estadoGlobal = 'VALIDADO_OK';
         cuadrados.push(row);
@@ -538,7 +535,6 @@ export function computeCampaignConsolidationMatrix(
     const closed = campaign.itemsValidadosCerrados?.[sku];
 
     totalFisico += stockFisico;
-    totalSkusAuditados++;
 
     const row: CampaignAuditRow = {
       sku,
@@ -588,7 +584,6 @@ export function computeCampaignConsolidationMatrix(
       skusPendientesDeConteo: skusPendientesDeConteo.sort()
     },
     totalSkusTeoricos: totalTheorSkus,
-    totalSkusFisicosAuditados: totalSkusAuditados,
     porcentajeCobertura: coveragePercent,
     cuadradosCount: cuadrados.length,
     discrepanciasCount: discrepancias.length,

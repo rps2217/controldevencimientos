@@ -326,7 +326,6 @@ export interface StockCountSession {
    */
   skuScope?: string[];
   deviceId?: string;               // Identificador único del dispositivo / terminal auditor
-  auditor?: string;                // Nombre o firma del operario
   lastUpdated?: string;            // Timestamp de última mutación (ISO)
   sincronizadoNube?: boolean;      // Indicador si esta versión ya fue respaldada en la nube
 }
@@ -448,7 +447,6 @@ export interface CampaignConsolidationMatrix {
   /** Corte documental: el instante del snapshot y los conteos posteriores a él. */
   corte: CampaignCutoff;
   totalSkusTeoricos: number;
-  totalSkusFisicosAuditados: number;
   porcentajeCobertura: number;                      // % de SKUs teóricos que ya tienen al menos 1 lectura física o están validados
   cuadradosCount: number;
   discrepanciasCount: number;

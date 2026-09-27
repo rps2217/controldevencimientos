@@ -129,7 +129,8 @@ import {
   calculateLastDayOfMonthDateString,
   reconcileStockCountSession,
   buildVencimientosRowFromCount,
-  buildAuditRowsFromSession
+  buildAuditRowsFromSession,
+  mergeCampaignsAndSessions
 } from './src/utils/stockCountUtils';
 import {
   groupSkuEntries,
@@ -2265,6 +2266,79 @@ console.log('\n--- Perfiles de medios para etiquetas térmicas (ROADMAP §31) --
   assert(rasterizeBarcode('', r40raster, 90) === null, 'raster: texto vacio devuelve null');
   assert(rasterizeBarcode(sku, findRoll('12x22')!, 0) === null,
     'raster: un codigo que no cabe devuelve null en vez de recortarse');
+  // --- Fusión multi-dispositivo: el local `undefined` no debe pisar el valor remoto ---
+  //
+  // `{...remoto, ...local}` copia las claves presentes en el local aunque valgan
+  // `undefined`. Una sesión normal se crea con `skuScope: config.skuScope`, así que esa
+  // clave existe y vale `undefined`: al fusionar, borraría el alcance que la nube sí
+  // tiene, y el operario perdería el conteo acotado al sincronizar desde otra terminal.
+  const sesionBase = {
+    id: 'S-SCOPE', nombre: 'Conteo proveedor', modo: 'DOCUMENT' as const,
+    requiereVencimiento: false, hojaOrigen: 'main', estado: 'IN_PROGRESS' as const,
+    fechaInicio: '2026-09-19T00:00:00Z', conteos: [], deviceId: 'devA'
+  };
+  const sesionRemota = { ...sesionBase, skuScope: ['A', 'B'] };
+
+  const mergeConUndefined = mergeCampaignsAndSessions(
+    { campaigns: [], sessions: [{ ...sesionBase, skuScope: undefined }] },
+    { campaigns: [], sessions: [sesionRemota] }
+  );
+  assert(JSON.stringify(mergeConUndefined.mergedSessions[0].skuScope) === '["A","B"]',
+    'fusión: un skuScope local undefined no pisa el alcance que trae la nube',
+    mergeConUndefined.mergedSessions[0].skuScope);
+
+  const mergeSinClave = mergeCampaignsAndSessions(
+    { campaigns: [], sessions: [sesionBase] },
+    { campaigns: [], sessions: [sesionRemota] }
+  );
+  assert(JSON.stringify(mergeSinClave.mergedSessions[0].skuScope) === '["A","B"]',
+    'fusión: si el local omite la clave, el alcance remoto se conserva',
+    mergeSinClave.mergedSessions[0].skuScope);
+
+  const mergeConValor = mergeCampaignsAndSessions(
+    { campaigns: [], sessions: [{ ...sesionBase, skuScope: ['Z'] }] },
+    { campaigns: [], sessions: [sesionRemota] }
+  );
+  assert(JSON.stringify(mergeConValor.mergedSessions[0].skuScope) === '["Z"]',
+    'fusión: un skuScope local con valor sigue teniendo prioridad sobre el remoto',
+    mergeConValor.mergedSessions[0].skuScope);
+
+  // El arreglo no debe romper la unión idempotente de lecturas (la razón de ser del merge).
+  const mergeConteos = mergeCampaignsAndSessions(
+    {
+      campaigns: [],
+      sessions: [{ ...sesionBase, conteos: [{ id: 'e1', sku: 'A', descripcion: 'A', cantidad: 5, timestamp: '2026-09-19T01:00:00Z' }] }]
+    },
+    {
+      campaigns: [],
+      sessions: [{
+        ...sesionRemota,
+        conteos: [
+          { id: 'e1', sku: 'A', descripcion: 'A', cantidad: 5, timestamp: '2026-09-19T01:00:00Z' },
+          { id: 'e2', sku: 'B', descripcion: 'B', cantidad: 3, timestamp: '2026-09-19T02:00:00Z' }
+        ]
+      }]
+    }
+  );
+  assert(mergeConteos.mergedSessions[0].conteos.length === 2,
+    'fusión: las lecturas se unen sin duplicar la entrada compartida',
+    mergeConteos.mergedSessions[0].conteos.length);
+
+  // Mismo defecto de clase en campañas: un campo opcional local undefined no debe borrar el remoto.
+  const campanaBase = {
+    id: 'C-SCOPE', nombre: 'Inventario', fechaInicio: '2026-09-19T00:00:00Z',
+    fechaActualizacion: '2026-09-19T00:00:00Z', estado: 'ACTIVA' as const,
+    snapshotTeoricoActual: {}, historialSnapshots: [], sessionIds: [],
+    itemsValidadosCerrados: {}, ajustesVentaManual: {}
+  };
+  const mergeCampana = mergeCampaignsAndSessions(
+    { campaigns: [{ ...campanaBase, notasCierre: undefined }], sessions: [] },
+    { campaigns: [{ ...campanaBase, notasCierre: 'Cierre acordado con jefatura' }], sessions: [] }
+  );
+  assert(mergeCampana.mergedCampaigns[0].notasCierre === 'Cierre acordado con jefatura',
+    'fusión: un campo opcional de campaña en undefined no borra el valor remoto',
+    mergeCampana.mergedCampaigns[0].notasCierre);
+
 }
 
 console.log(`\n========================================`);

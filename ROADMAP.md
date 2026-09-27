@@ -3821,3 +3821,92 @@ exactamente lo que el operario verá al abrir la sesión.
   terminal no lo advierte al operario.
 - Sin E2E del flujo completo "Contar": campaña → botón → sesión con `skuScope` → conteo → guardado.
 - `skuScope` no se prueba al cruzar la nube (fusión en `lib/sheets.ts`).
+
+
+---
+
+## Auditoría Ponytail (2026-09-19) — Fase 8: limpieza de estado muerto y contrato de fusión multi-dispositivo
+
+Re-auditoría del módulo de conteo. La medición corrigió una afirmación de la Fase 7 y encontró
+un defecto de **clase** en el motor de fusión, no una instancia suelta.
+
+### Corrección a la Fase 7
+
+`resumenPorUbicacion` no es "código muerto sin consumidor": **sí tiene prueba**
+(`test-modules.ts:1113`, la 2da vuelta no debe inventar un mueble fantasma). Lo correcto es que
+**ningún componente lo renderiza ni lo exporta**. La distinción importa: retirarlo obliga a decidir
+qué pasa con la regla de negocio que la prueba protege, no solo a borrar un campo. Sigue pendiente,
+ahora mejor caracterizado.
+
+### Auditoría A — estado muerto real
+
+- **`StockCountSession.auditor`** (`types.ts`): cero usos en `src/`, tests y `test-modules.ts`.
+  Nunca se setea ni se lee. Eliminado.
+- **`CampaignConsolidationMatrix.totalSkusFisicosAuditados`**: solo se asignaba; su variable interna
+  `totalSkusAuditados` existía únicamente para alimentarlo (`campaignUtils.ts`). Eliminado campo,
+  variable e incrementos. La cobertura (`porcentajeCobertura`) se calcula con `nuncaPistoleados`,
+  así que no cambia.
+- **`diferenciaNetaTotal` se conserva**: a diferencia de los anteriores, una prueba lo usa como
+  invariante del encabezado (`test-modules.ts:1248`, la suma por fila coincide). No es estado muerto.
+- Fixtures de `components.test.tsx` limpiadas del campo retirado (usaban `as unknown as`, por eso
+  el compilador no las señalaba; se limpiaron para que reflejen el tipo real).
+
+### Auditoría D — el defecto de clase en la fusión
+
+La fusión multi-dispositivo aplica `{...remoto, ...local}`. Un campo opcional **presente en el local
+con valor `undefined`** pisa el valor que la nube sí tiene. `getProviderPendingSkus` no era el
+problema: el problema era el spread.
+
+Se reprodujo empíricamente con un sondeo de los tres modos:
+
+| Caso | Local | Resultado |
+|---|---|---|
+| 1 | valor `['A','B']` | sobrevive |
+| 2 | sin la clave | sobrevive |
+| 3 | clave en `undefined` | **se pierde** |
+
+El caso 3 es el de una **sesión normal**: `handleCreateSession` la crea con `skuScope: config.skuScope`
+y `NewSessionConfig.skuScope` es opcional, así que la clave existe y vale `undefined`.
+
+**Alcanzabilidad (honestidad):** `skuScope` solo se fija al crear la sesión y nunca se muta, así que
+un dispositivo no puede pasar de "con alcance" a "sin alcance" por sí solo. El escenario exige que la
+*misma* sesión sea scoped en remoto y esté en local sin alcance — lo que en operación normal solo
+ocurre por colisión de IDs (8 hex, improbable). Es **fragilidad latente**, no un bug activo. Se
+arregla por ser de clase (11 campos opcionales en `StockCountSession`, y la fusión de campañas ya
+parcheaba `nombre`/`local` campo a campo, señal de que el equipo lo reconoce) y por ser barato.
+
+**El arreglo:** `sinIndefinidos(obj)` descarta las claves `undefined` antes del spread, en sesiones y
+en campañas. Cuando el local trae valor, sigue teniendo prioridad; solo deja ganar al remoto en los
+campos que el local no define.
+
+### Pruebas
+
+- **5 unitarias** de fusión: `skuScope` local indefinido no pisa el remoto; local sin la clave lo
+  conserva; local con valor sigue ganando; la unión idempotente de lecturas no se rompe; mismo
+  defecto de clase en un campo opcional de campaña.
+- **Mutación unitaria confirmada**: revirtiendo el helper caen las 2 aserciones del bug (418/2); al
+  restaurar, 420/0.
+- **Arnés E2E `racecheck.cjs`**: la primera versión de esta prueba **no discriminaba** — el helper
+  siempre definía `skuScope`, así que nunca recorría la ruta del bug (un `ok: true` indistinguible de
+  no probar nada). Se rehizo como prueba de **contrato de frontera**: una terminal rezagada
+  re-sincroniza la misma sesión con la clave en `undefined` (modo `SIN_SCOPE`), y el alcance remoto
+  debe sobrevivir. **Mutación E2E confirmada**: sin el helper, `ok: false` y el arnés falla (exit 1).
+
+### Gate
+
+`npm run verify` exit 0 · `tsc --noEmit` 0 · `eslint` 0 errores (10 warnings preexistentes) ·
+**420 unitarias** · **22 de componente** · **18 de hoja de cálculo** · `build` de producción 0 ·
+**E2E: 28 arneses OK** · 0 dependencias nuevas.
+
+### Pendientes que quedan (reconfirmados, medidos)
+
+- **Escritura a `_AUDITORIA_INVENTARIO` duplicada** entre `StockCountTerminal.tsx:1030-1062` y
+  `CampaignConsolidationDashboard.tsx:436-458` (Hallazgo 3). Mismo esqueleto salvo el builder.
+- **`resumenPorUbicacion`**: sin consumidor de UI; retirarlo exige preservar la regla de la 2da
+  vuelta que la prueba protege.
+- **Pistoleo fuera de alcance sin aviso**: `handleCameraScanCode` (`:703`) no consulta `skuScope`;
+  la conciliación lo descarta, pero el operario no lo sabe.
+- **Escrituras de sesión redundantes**: el terminal persiste por `useEffect` (debounce 300 ms) más
+  flush en `pagehide`; los `saveStockCountSessionsToStorage` explícitos en handlers duplican esa
+  persistencia. Inofensivo hoy, pero requiere mutación antes de tocarlo.
+- **Sin E2E del flujo "Contar"** completo: campaña → botón → sesión con `skuScope` → conteo → guardado.

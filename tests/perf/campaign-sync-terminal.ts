@@ -18,6 +18,12 @@ const LABEL = process.argv[5];
 // de `tsx` (1-2 s, con jitter) descoordina las terminales y dejan de solaparse: el
 // arnes pasaria en verde aunque el backend no protegiera nada.
 const START_AT = Number(process.argv[6] || 0);
+// `SIN_SCOPE` simula una terminal rezagada que re-sincroniza la MISMA sesion con la
+// clave `skuScope` presente pero indefinida (asi la crea una sesion normal:
+// `skuScope: config.skuScope`). Prueba el contrato del merge en la frontera HTTP: el
+// valor que ya vive en la nube no debe perderse. No es alcanzable por el flujo normal
+// (la clave solo se fija al crear y nunca se muta), sino defensa ante un cliente viejo.
+const SIN_SCOPE = process.argv[7] === 'SIN_SCOPE';
 
 const store: Record<string, string> = {
   appsheet_clone_scriptUrl: `http://127.0.0.1:${FAKE_PORT}/exec`,
@@ -46,6 +52,10 @@ const session = {
   estado: 'IN_PROGRESS' as const,
   fechaInicio: now,
   conteos: [{ id: ENTRY_ID, sku: LABEL, descripcion: `Lectura ${LABEL}`, cantidad: 1, timestamp: now }],
+  // Alcance de conteo acotado a proveedor: debe sobrevivir al viaje por la nube
+  // (save -> load -> merge). Si el merge lo perdiera, el terminal perderia el filtro.
+  // En modo SIN_SCOPE la clave existe pero vale indefinido, como en una sesion normal.
+  skuScope: SIN_SCOPE ? undefined : ['SKU-SCOPE-A', 'SKU-SCOPE-B'],
   deviceId: LABEL,
 };
 

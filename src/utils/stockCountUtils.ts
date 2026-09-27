@@ -646,6 +646,18 @@ export function getOrCreateDeviceId(): string {
   }
 }
 /**
+ * Copia una entidad descartando las claves con valor `undefined`.
+ *
+ * La fusión multi-dispositivo aplica `{...remoto, ...local}`. Una clave presente en el
+ * local con valor `undefined` (p. ej. `skuScope: config.skuScope` al crear una sesión
+ * normal, sin alcance) pisaría el valor que la nube sí tiene, y el operario perdería el
+ * alcance de su conteo al sincronizar. Descartar los `undefined` del lado local deja
+ * ganar al remoto solo en esos campos: cuando el local trae valor, sigue prefiriéndose.
+ */
+const sinIndefinidos = <T extends object>(obj: T): T =>
+  Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+
+/**
  * Motor de Fusión y Consolidación Multi-dispositivo (Merge Engine)
  * Fusiona sin pérdida de datos las campañas y sesiones de conteo locales con las remotas de Google Sheets
  */
@@ -706,7 +718,7 @@ export function mergeCampaignsAndSessions(
       
       sessionMap.set(lSess.id, {
         ...remote,
-        ...lSess,
+        ...sinIndefinidos(lSess),
         estado,
         conteos: combinedConteos,
         lastUpdated: new Date().toISOString(),
@@ -778,7 +790,7 @@ export function mergeCampaignsAndSessions(
 
       campaignMap.set(lCamp.id, {
         ...remote,
-        ...lCamp,
+        ...sinIndefinidos(lCamp),
         nombre,
         local,
         sessionIds: allSessionIds,

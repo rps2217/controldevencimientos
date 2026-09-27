@@ -203,7 +203,7 @@ async function testPostCorteBadgeRenders() {
   const matrix = {
     campaignId: 'c1', nombreCampana: 'Inv', fechaCalculo: '2026-09-19T00:00:00.000Z',
     corte: { fechaCorte: '2026-09-10T09:00:00.000Z', skusConLecturaPosterior: ['SKU-A'], skusPendientesDeConteo: [] },
-    totalSkusTeoricos: 1, totalSkusFisicosAuditados: 1, porcentajeCobertura: 100,
+    totalSkusTeoricos: 1, porcentajeCobertura: 100,
     cuadradosCount: 1, discrepanciasCount: 0, nuncaPistoleadosCount: 0, hallazgosCount: 0,
     totalFisicoContado: 100, totalTeoricoEsperado: 100, diferenciaNetaTotal: 0,
     cuadrados: [rowBase], discrepancias: [], nuncaPistoleados: [], hallazgos: [],
@@ -265,7 +265,7 @@ async function testIconoCoherenteConEstado() {
   const matrix = {
     campaignId: 'c1', nombreCampana: 'Inv', fechaCalculo: '2026-09-19T00:00:00.000Z',
     corte: { fechaCorte: null, skusConLecturaPosterior: [], skusPendientesDeConteo: [] },
-    totalSkusTeoricos: 1, totalSkusFisicosAuditados: 0, porcentajeCobertura: 0,
+    totalSkusTeoricos: 1, porcentajeCobertura: 0,
     cuadradosCount: 0, discrepanciasCount: 0, nuncaPistoleadosCount: 1, hallazgosCount: 0,
     totalFisicoContado: 0, totalTeoricoEsperado: 0, diferenciaNetaTotal: 0,
     cuadrados: [], discrepancias: [], nuncaPistoleados: [rowNunca], hallazgos: [],
