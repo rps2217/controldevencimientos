@@ -1,15 +1,18 @@
 import React, { useEffect } from 'react';
-import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle } from 'lucide-react';
+import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle, Settings2 } from 'lucide-react';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
+import { ThemeSelector } from './ThemeSelector';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
+import { useUiSettings } from '../../context/UiSettingsContext';
 import { useDebouncedSearch } from '../../hooks/useDebouncedSearch';
 
 export const DashboardTopNav: React.FC = () => {
   const dashboard = useDashboard();
   const modalsActions = useModalsActions();
   const rightDrawer = useRightDrawer();
+  const { onEditBackendUrl } = useUiSettings();
 
   const setIsMobileMenuOpen = modalsActions.setIsMobileMenuOpen;
   const activeView = dashboard.activeView;
@@ -147,10 +150,10 @@ export const DashboardTopNav: React.FC = () => {
         </div>
       </div>
 
-      {/* CENTER: iOS-Inspired Sleek Search Bar */}
+      {/* CENTER: buscador protagonista, en la misma franja que la configuración del entorno */}
       <div className="flex-1 flex justify-center max-w-2xl px-1 sm:px-2">
         {(activeView !== 'schema' || searchableHeaders.length > 0) ? (
-          <div className="relative w-full h-10 flex items-center bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 rounded-2xl transition-all shadow-2xs">
+          <div className="relative w-full h-11 flex items-center bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 rounded-2xl transition-all shadow-2xs">
             <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 ml-3 shrink-0" />
             
             <input
@@ -223,6 +226,17 @@ export const DashboardTopNav: React.FC = () => {
         
         {/* PWA Install Button (Mobile Only) */}
         <PWAInstallButton variant="compact" className="md:hidden" />
+
+        {/* Configuración del entorno: mismo renglón que la búsqueda, no una barra aparte */}
+        <ThemeSelector />
+        <button
+          onClick={onEditBackendUrl}
+          className="hidden md:flex h-10 w-10 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shadow-2xs items-center justify-center cursor-pointer active:scale-95 shrink-0"
+          title="URL de Apps Script · editar la conexión y las credenciales"
+          aria-label="URL de Apps Script: editar la conexión y las credenciales"
+        >
+          <Settings2 className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+        </button>
 
         {/* Special Action: Bulk Import FRC (por capacidad de incidencia) */}
         {canLogEvents && setIsBulkImportOpen && (

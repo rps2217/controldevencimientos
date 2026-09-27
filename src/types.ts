@@ -484,3 +484,11 @@ export interface CampaignCutoff {
   /** SKUs teóricos con stock que aún no tienen ninguna lectura, posteriores o no. */
   skusPendientesDeConteo: string[];
 }
+
+/**
+ * Variantes cromáticas de la aplicación.
+ *
+ * Vive aquí y no en `App.tsx` porque la barra superior del dashboard ofrece el
+ * selector de tema y no debe importar de su componente raíz (acoplamiento invertido).
+ */
+export type ThemeMode = 'light' | 'dark-slate' | 'dark-gray';
