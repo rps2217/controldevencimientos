@@ -269,6 +269,47 @@ function req(method, p) {
   push('el ajuste de venta se persiste en la campana (no se pierde al recargar)',
     ajustePersistido === 5, ajustePersistido);
 
+  // --- 2da vuelta: el terminal debe marcar la sesion como tal ---
+  //
+  // Es el invariante de cuadratura con stock en movimiento: la vuelta re-cuenta la
+  // MISMA mercaderia del conteo que corrige, asi que la matriz la REEMPLAZA en vez
+  // de sumarla. Si el terminal no marcara `esSegundaVuelta`, el fisico se duplicaria
+  // (98 + 98 = 196) y la matriz reportaria un sobrante inexistente. Se comprueba
+  // sobre el flujo real: pulsar el boton y leer lo que quedo guardado.
+  const iniciar2daPasada = () => ev2(`(() => {
+    const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').includes('Iniciar 2da Pasada'));
+    if (!b) return false;
+    b.click();
+    return true;
+  })()`);
+
+  const antesSesiones = await ev2(`(() => {
+    try { return JSON.parse(localStorage.getItem(${JSON.stringify(SESS_KEY)}) || '[]').length; }
+    catch (e) { return -1; }
+  })()`);
+
+  const click2da = await iniciar2daPasada();
+  await sleep(900);
+
+  const sesion2da = await ev2(`(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem(${JSON.stringify(SESS_KEY)}) || '[]');
+      const n = s.find(x => x.esSegundaVuelta === true);
+      return n ? { marcada: true, nombre: n.nombre, ubicacion: n.ubicacion } : { marcada: false };
+    } catch (e) { return { marcada: false, error: String(e) }; }
+  })()`);
+
+  const despuesSesiones = await ev2(`(() => {
+    try { return JSON.parse(localStorage.getItem(${JSON.stringify(SESS_KEY)}) || '[]').length; }
+    catch (e) { return -1; }
+  })()`);
+
+  push('el boton "Iniciar 2da Pasada" existe en la vista de consolidacion', click2da === true);
+  push('la 2da pasada crea una sesion nueva', despuesSesiones === antesSesiones + 1,
+    { antes: antesSesiones, despues: despuesSesiones });
+  push('la sesion de 2da vuelta queda marcada con esSegundaVuelta',
+    sesion2da && sesion2da.marcada === true, sesion2da);
+
   const relevantErrors = consoleErrors.filter(e => !/favicon|Download the React DevTools|deprecat|127\.0\.0\.1:1/i.test(e));
   push('sin errores de consola durante la consolidacion', relevantErrors.length === 0, relevantErrors.slice(0, 3));
 
