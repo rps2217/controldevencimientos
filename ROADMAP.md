@@ -3298,3 +3298,103 @@ síntoma.
 > sospechoso es esa lectura sin guarda.
 
 
+
+---
+
+## 31. Característica propuesta (2026-09-26) — impresión de etiquetas por Web Bluetooth (Marklife P15)
+
+Anotada a pedido del usuario. **No es deuda ni bug: es una característica nueva.** La impresora
+llega en un par de semanas; por ahora sólo se deja el diseño medido y los datos duros, sin código
+de producto, porque la escalera de Ponytail exige un síntoma antes de construir.
+
+### Escenario confirmado
+
+Chrome de **escritorio** → **Web Bluetooth** → Marklife P15, imprimiendo códigos de barras de SKU.
+
+### Lo que ya tiene la aplicación (no hay que construirlo)
+
+- `src/utils/barcodeGenerator.ts` — Code128 puro, sin dependencias, **sin DOM**. Reutilizable tal
+  cual para rasterizar.
+- `src/components/common/Barcode.tsx` — envoltorio SVG sobre ese generador.
+- `src/utils/ticketUtils.ts` — `executeThermalPrint()` ya inyecta `@page { size: …mm }` calculado.
+  Sirve para la ruta OS/USB, **no** para BLE.
+
+### Lo que hay que construir
+
+- **Transporte Web Bluetooth.** Es API **nativa del navegador**: no viola el «cero dependencias».
+- **Rasterizado a 1 bit.** El generador produce SVG/string; la impresora consume `RawImageData`
+  (RGBA de un `<canvas>`). Hay que dibujar el código en canvas del tamaño exacto y pasarlo.
+- **Descriptor de medio.** Ningún chasis reporta qué rollo tiene cargado; `print()` **exige** un
+  descriptor o lanza `MediaNotSpecifiedError`.
+- **Rotación 90°** obligatoria (ver la medición crítica abajo).
+
+### Driver disponible (existe y es MIT)
+
+`@thermal-label/marklife-web` **v0.1.0** en npm (publicado 2026-09-12, ~75 KB sin comprimir,
+autor Mannes Brak, MIT). Sus 3 dependencias son del propio proyecto (`@thermal-label/contracts`,
+`transport`, `marklife-core`). API: `requestPrinters({ transport: 'bluetooth-gatt' })`,
+`printer.print(image, MEDIA.X)`, `printer.close()`.
+
+Soporte declarado: Chrome, Edge, Opera (escritorio y Android). **No Firefox ni Safari.**
+La P15 figura como **✅ verified**, protocolo **L11** (`10 FF` de sesión, raster sin comprimir).
+
+> **Advertencia de juicio:** el paquete tiene 2 semanas de vida y un solo mantenedor. No está
+> auditado. Si se adopta, conviene evaluarlo como riesgo de suministro y fijar versión exacta
+> (sin `^`), igual que se hizo con `xlsx` en su momento.
+
+### Medición crítica — el código de barras NO cabe horizontal en 12 mm
+
+Hecha con el **generador real de la app** (`encodeCode128` + `codesToBinaryString`), no con
+estimaciones. A 203 dpi la P15 imprime **8 puntos/mm**, así que 12 mm = **96 puntos**.
+
+| Código | Módulos (con quiet zone) | Sin rotar en 12 mm | Rotado 90° en 12×22 |
+| --- | --- | --- | --- |
+| SKU 13 dígitos (fixture real `2000210218569`) | 143 | **0,67 dots/mód → NO CABE** | 1,23 dots/mód → **JUSTO** |
+| EAN-13 (`7804671180800`) | 143 | 0,67 → NO CABE | 1,23 → JUSTO |
+| CU_VC 19 dígitos (`2000210218569202712`) | 176 | 0,55 → NO CABE | 1,00 → JUSTO |
+
+No existen medias columnas en el papel: por debajo de 1,0 dots/módulo el código es **físicamente
+imposible**, no «de baja calidad». El umbral horizontal exacto de un rollo de 12 mm son **96
+módulos** (96 puntos / 1 punto por módulo). Conclusión operativa:
+
+- **Horizontal: descartado.** 143 módulos no caben en 96 puntos ni con módulo de 1 punto. De
+  hecho sólo caben horizontal códigos de **2 a 4 caracteres** (`A1`, `123`, `1234`): un SKU de 8
+  dígitos ya ocupa 99 módulos y **no cabe**.
+- **Rotado 90°: es la única forma viable**, porque el largo de avance (22 mm = 176 puntos) pasa a
+  ser el ancho de barras.
+- En 12×22 el SKU de 13 dígitos queda en el **límite** (1,23): legible con lector bueno, frágil
+  si la etiqueta se roza (y la app etiqueta stock de farmacia, que se manipula).
+
+Ancho de módulo resultante al rotar, por rollo:
+
+| Rollo | SKU 13 díg (143 mód.) | CU_VC 19 díg (176 mód.) |
+| --- | --- | --- |
+| 12×22 | 1,23 JUSTO | 1,00 JUSTO (límite) |
+| 12×30 | 1,68 ok | 1,36 JUSTO |
+| **12×40** | **2,24 ÓPTIMO** | 1,82 ok |
+| 14×40 | 2,24 ÓPTIMO | 1,82 ok |
+| 15×30 | 1,68 ok | 1,36 JUSTO |
+| **15×50** | **2,80 ÓPTIMO** | **2,27 ÓPTIMO** |
+
+**Recomendación de compra, medida:** si el objetivo es código de barras legible y resistente,
+**12×22 mm no es el rollo adecuado** — es para texto corto. Para barcode de SKU conviene
+**12×40** (SKU) o **15×50** (si además se imprime el CU_VC de 19 dígitos).
+
+**El catálogo del driver no trae 12×22.** Sus medidas `narrow-tape` son `GAP_12X40`, `GAP_14X40`,
+`GAP_15X30`, `GAP_15X50` y `CONTINUOUS_15MM`. El 12×22 hay que declararlo a mano como descriptor
+propio (`{ widthMm: 12, heightMm: 22, type: 'die-cut' }`), que es justo lo que necesita la
+característica «perfil de impresión»: un preset con (ancho mm, alto mm, gap mm, rotación).
+
+### Plan por etapas (cuando llegue la impresora)
+
+1. **Perfil / preset de medios** — enum de rollos con sus medidas en mm y su rotación. Puro TS,
+   testeable sin hardware (la matemática de arriba lo es).
+2. **Rasterizador canvas** — de barcode a `RawImageData` 1 bit al tamaño exacto del rollo.
+   Testeable sin impresora: verificar dimensiones y que el bitmap no salga en blanco.
+3. **Transporte BLE** — `requestPrinters()` + `print()` tras un gesto del usuario. **No testeable
+   sin hardware**; es lo último.
+4. **UI** — botón «Imprimir etiqueta» por fila / en lote, con selección de perfil.
+
+Los pasos 1 y 2 **sí se pueden construir y probar antes de tener la impresora**; el 3 se deja
+contra la llegada del hardware para no escribir código especulativo que nadie pueda verificar.
+

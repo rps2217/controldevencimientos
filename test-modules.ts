@@ -36,6 +36,13 @@ import {
   pickRearCamera
 } from './src/utils/barcodeScannerConfig';
 import {
+  DOTS_PER_MM,
+  findRoll,
+  moduleCount,
+  evaluateFit,
+  toMediaDescriptor
+} from './src/utils/labelMediaProfile';
+import {
   buildAuditRowValues,
   consolidateAuditRows,
   dedupeAuditRows
@@ -1683,10 +1690,69 @@ console.log('\n--- 24. Seguridad: la apiKey no viaja a la hoja compartida (Ponyt
     'merge: una clave remota explicita tiene prioridad sobre la local');
 }
 
+console.log('\n--- Perfiles de medios para etiquetas térmicas (ROADMAP §31) ---');
+{
+  // La geometría es aritmética entera: 203 dpi = 8 dots/mm. Si alguien cambia
+  // DOTS_PER_MM o el catálogo, estas pruebas fallan y avisan.
+  assert(DOTS_PER_MM === 8, 'perfiles: 203 dpi equivalen a 8 dots/mm');
+
+  const r22 = findRoll('12x22');
+  const r40 = findRoll('12x40');
+  const r50 = findRoll('15x50');
+  assert(!!r22 && !!r40 && !!r50, 'perfiles: los rollos 12x22, 12x40 y 15x50 estan catalogados');
+  assert(findRoll('99x99') === undefined, 'perfiles: un rollo no catalogado devuelve undefined');
+
+  // SKU real del fixture (13 digitos): es el codigo que la app debe imprimir.
+  const sku = '2000210218569';
+  const modulos = moduleCount(sku);
+  assert(modulos === 143, 'perfiles: un SKU de 13 digitos ocupa 143 modulos con quiet zone', modulos);
+
+  // Hallazgo central: horizontal NO cabe en 12 mm (96 dots / 143 mod < 1 dot/mod).
+  const horizontal = evaluateFit(sku, r22!, 0);
+  assert(!horizontal.cabe, 'perfiles: en 12x22 SIN rotar el SKU no cabe (menos de 1 dot/modulo)');
+  assert(horizontal.dotsPerModule < 1, 'perfiles: el modulo horizontal seria sub-punto', horizontal.dotsPerModule);
+
+  // Rotado 90 el largo de avance (22 mm = 176 dots) da 1.23 dots/mod: cabe, pero justo.
+  const rotado22 = evaluateFit(sku, r22!, 90);
+  assert(rotado22.cabe, 'perfiles: en 12x22 ROTADO 90 el SKU si cabe');
+  assert(Math.abs(rotado22.dotsPerModule - 176 / 143) < 0.01,
+    'perfiles: el modulo rotado en 12x22 es 176/143 = 1.23 dots', rotado22.dotsPerModule);
+  assert(rotado22.justo, 'perfiles: en 12x22 el SKU queda en el limite (menos de 1.5 dots/modulo)');
+
+  // 12x40 rotado da 2.24 dots/mod: el margen comodo.
+  const rotado40 = evaluateFit(sku, r40!, 90);
+  assert(rotado40.cabe && !rotado40.justo,
+    'perfiles: en 12x40 el SKU tiene margen comodo (2.24 dots/modulo)', rotado40.dotsPerModule);
+
+  // El CU_VC de 19 digitos es mas largo y por eso exige un rollo mas grande.
+  const cuVc = '2000210218569202712';
+  assert(moduleCount(cuVc) === 176, 'perfiles: el CU_VC de 19 digitos ocupa 176 modulos');
+  const cuVcEn22 = evaluateFit(cuVc, r22!, 90);
+  assert(cuVcEn22.cabe && cuVcEn22.justo,
+    'perfiles: el CU_VC en 12x22 queda exactamente en el limite de 1 dot/modulo', cuVcEn22.dotsPerModule);
+  const cuVcEn50 = evaluateFit(cuVc, r50!, 90);
+  assert(cuVcEn50.cabe && !cuVcEn50.justo,
+    'perfiles: en 15x50 el CU_VC tiene margen comodo', cuVcEn50.dotsPerModule);
+
+  // Un codigo muy corto (2 caracteres = 77 modulos) si cabe horizontal: el limite
+  // es del codigo, no del rollo. El umbral medido son 96 modulos (12 mm = 96 dots).
+  assert(evaluateFit('A1', r22!, 0).cabe,
+    'perfiles: un codigo de 2 caracteres si cabe horizontal en 12x22');
+
+  // Un SKU de 8 digitos ya no cabe horizontal (99 modulos > 96 dots): refuerza que
+  // la rotacion no es una preferencia, es un requisito para SKUs reales.
+  assert(!evaluateFit('12345678', r22!, 0).cabe,
+    'perfiles: un SKU de 8 digitos ya NO cabe horizontal en 12x22');
+
+  // El descriptor evita acoplarse al driver: solo cambia la forma, no los valores.
+  const descriptor = toMediaDescriptor(r22!);
+  assert(descriptor.type === 'die-cut' && descriptor.widthMm === 12 && descriptor.heightMm === 22,
+    'perfiles: el descriptor de medio conserva las medidas en mm');
+}
+
 console.log(`\n========================================`);
 console.log(`RESULTADOS DE PRUEBAS: ${passed} PASADAS, ${failed} FALLADAS`);
 console.log(`========================================\n`);
-
 if (failed > 0) {
   process.exit(1);
 }
