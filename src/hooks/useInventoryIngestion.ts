@@ -139,7 +139,12 @@ export const useInventoryIngestion = ({
         let updatedItemsList = [...items];
         for (const updateOp of reconciliation.rowsToUpdate) {
           const rowValues = headers.map(h => {
-            const val = updateOp.updatedItem[h] !== undefined && updateOp.updatedItem[h] !== null ? String(updateOp.updatedItem[h]) : '';
+            let val = updateOp.updatedItem[h] !== undefined && updateOp.updatedItem[h] !== null ? String(updateOp.updatedItem[h]).trim() : '';
+            if (!val && /^ID_FRC$/i.test(h.trim())) {
+              const generatedId = `FRC-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+              updateOp.updatedItem[h] = generatedId;
+              val = generatedId;
+            }
             const colSchema = sheetConfig.schema?.[activeSheet.title]?.[h];
             if (!val && (colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro/i.test(h))) {
               updateOp.updatedItem[h] = currentFormattedDateTime;
@@ -172,7 +177,11 @@ export const useInventoryIngestion = ({
 
         for (const newRow of reconciliation.rowsToAppend) {
           const rowValues = headers.map(h => {
-            const val = newRow[h] !== undefined && newRow[h] !== null ? String(newRow[h]) : '';
+            let val = newRow[h] !== undefined && newRow[h] !== null ? String(newRow[h]).trim() : '';
+            if (!val && /^ID_FRC$/i.test(h.trim())) {
+              newRow[h] = `FRC-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+              val = newRow[h];
+            }
             const colSchema = sheetConfig.schema?.[activeSheet.title]?.[h];
             if (!val && (colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro/i.test(h))) {
               newRow[h] = currentFormattedDateTime;
@@ -227,7 +236,10 @@ export const useInventoryIngestion = ({
 
         for (const item of mappedData) {
           const rowValues = headers.map(h => {
-            const val = item[h] !== undefined && item[h] !== null ? String(item[h]) : '';
+            let val = item[h] !== undefined && item[h] !== null ? String(item[h]).trim() : '';
+            if (!val && /^ID_FRC$/i.test(h.trim())) {
+              val = `FRC-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+            }
             const colSchema = sheetConfig.schema?.[activeSheet.title]?.[h];
             if (!val && (colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro/i.test(h))) {
               return currentFormattedDateTime;

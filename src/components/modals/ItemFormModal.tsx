@@ -604,6 +604,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                                    colSchema?.behavior === 'auto_id' || 
                                    colSchema?.type === 'calculated' || 
                                    /^ID_VC$/i.test(String(header).trim()) ||
+                                   /^ID_FRC$/i.test(String(header).trim()) ||
                                    /^CU_VC$/i.test(String(header).trim()) ||
                                    /^CU$/i.test(String(header).trim()) ||
                                    /^CODIGO_UNICO$/i.test(String(header).trim()) ||

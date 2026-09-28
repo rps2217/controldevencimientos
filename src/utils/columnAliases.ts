@@ -94,6 +94,7 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^locaci[oó]n$/i
   ],
   id: [
+    /^id_frc$/i,
     /^cu(_|\s)?(vc|calculado)?$/i,
     /^codigo(_|\s)?unico$/i,
     /^clave(_|\s)?unica$/i,

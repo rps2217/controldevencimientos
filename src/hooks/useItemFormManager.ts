@@ -76,6 +76,7 @@ export function useItemFormManager({
       const initialData: Record<string, string> = {};
       
       const idVcCol = headers.find(h => /^ID_VC$/i.test(h.trim()));
+      const idFrcCol = headers.find(h => /^ID_FRC$/i.test(h.trim()));
       const skuCol = headers.find(h => /sku|código|codigo/i.test(h));
       const eventCol = headers.find(h => /tipo.*evento|evento|tipo.*registro|incidencia|categor[ií]a/i.test(h));
       
@@ -92,6 +93,9 @@ export function useItemFormManager({
       
       if (idVcCol) {
         initialData[idVcCol] = `VC-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      }
+      if (idFrcCol) {
+        initialData[idFrcCol] = `FRC-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       }
 
       if (eventCol) {
@@ -133,7 +137,8 @@ export function useItemFormManager({
                                colSchema?.behavior === 'calc_fecha_vc' || 
                                colSchema?.behavior === 'calc_retiro' || 
                                effectiveType === 'calculated' || 
-                               /^ID_VC$/i.test(header.trim());
+                               /^ID_VC$/i.test(header.trim()) ||
+                               /^ID_FRC$/i.test(header.trim());
 
       // If auto calculated, we don't strictly validate user input (it's read-only)
       if (isAutoCalculated) {
