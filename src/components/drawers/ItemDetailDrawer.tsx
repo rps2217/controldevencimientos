@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Package, X, AlertCircle, CheckCircle2, Clock, Plus, Edit2, Eye, EyeOff, 
-  SlidersHorizontal, Link2, Trash2, ChevronDown, Barcode as BarcodeIcon, FileText 
+  SlidersHorizontal, Link2, Trash2, ChevronDown, Barcode as BarcodeIcon, FileText, Copy 
 } from 'lucide-react';
 import { InventoryItem, EventCategory, SheetRecord } from '../../types';
 import { 
@@ -24,6 +24,7 @@ interface ItemDetailDrawerProps {
   product: InventoryItem | null;
   onClose: () => void;
   onEdit: (product: InventoryItem) => void;
+  onCopy?: (product: InventoryItem) => void;
   onDeleteRow?: (product: InventoryItem) => void;
   onPrintBarcode?: (product: InventoryItem) => void;
   onNewEventForProduct: (sku: string, category?: EventCategory) => void;
@@ -37,6 +38,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   product,
   onClose,
   onEdit,
+  onCopy,
   onDeleteRow,
   onPrintBarcode,
   onNewEventForProduct,
@@ -223,6 +225,16 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
       >
         <Edit2 className="w-4 h-4" />
       </button>
+      {onCopy && (
+        <button
+          onClick={() => onCopy(product)}
+          className="p-2 text-blue-700 dark:text-blue-300 bg-blue-600/10 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+          title="Copia esta fila y edítala (crea un nuevo registro prellenando los campos)"
+        >
+          <Copy className="w-4 h-4" />
+          <span className="hidden sm:inline">Copiar y Editar</span>
+        </button>
+      )}
       {onDeleteRow && (
         <button
           onClick={() => {

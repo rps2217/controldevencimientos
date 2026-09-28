@@ -47,6 +47,7 @@ export interface DashboardContextType {
   selectedEventCategory: EventCategory;
   setSelectedEventCategory: (cat: EventCategory) => void;
   handleOpenModal: (item?: InventoryItem, prefillSku?: string, initialCategory?: EventCategory) => void;
+  handleOpenCopyModal: (item: InventoryItem) => void;
   handleCloseModal: () => void;
   handleSelectEventCategory: (cat: EventCategory) => void;
   handleFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
@@ -392,6 +393,7 @@ export const DashboardProvider: React.FC<{
     selectedEventCategory: value.selectedEventCategory,
     setSelectedEventCategory: value.setSelectedEventCategory,
     handleOpenModal: value.handleOpenModal,
+    handleOpenCopyModal: value.handleOpenCopyModal,
     handleCloseModal: value.handleCloseModal,
     handleSelectEventCategory: value.handleSelectEventCategory,
     handleFormChange: value.handleFormChange,

@@ -6,6 +6,7 @@ import { GripVertical, ChevronDown } from 'lucide-react';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { EVENT_CATEGORIES } from '../utils/dateCalculations';
 import { useDashboard } from '../context/DashboardContext';
+import { isActionEnabledForTable, buildBulkActionContext } from '../utils/bulkActionsRegistry';
 
 export const InventoryTable: React.FC = () => {
   const dashboard = useDashboard();
@@ -38,6 +39,7 @@ export const InventoryTable: React.FC = () => {
   const onClickItem = dashboard.onClickItem ?? dashboard.setSelectedProduct;
   const activeDetailRowIndex = dashboard.selectedProduct?._rowIndex ?? null;
   const onDeleteRow = dashboard.onDeleteRow ?? dashboard.handleDelete;
+  const handleOpenCopyModal = dashboard.handleOpenCopyModal;
   const onPmRadarFilterClick = dashboard.onPmRadarFilterClick ?? (() => {});
   const onEventResolutionFilterClick = dashboard.onEventResolutionFilterClick ?? (() => {});
   const onEventFilterClick = dashboard.onEventFilterClick ?? (() => {});
@@ -45,11 +47,17 @@ export const InventoryTable: React.FC = () => {
   const onOpenQuickTraspaso = dashboard.onOpenQuickTraspaso ?? (() => {});
   const onOpenWhatsApp = dashboard.onOpenWhatsApp;
   const onOpenEmail = dashboard.onOpenEmail;
+  const sheetConfig = dashboard.sheetConfig;
+  const isCopyEnabled = isActionEnabledForTable(
+    'copy_edit',
+    dashboard.bulkActionCtx ?? buildBulkActionContext(headers, dashboard.activeView, dashboard.activeView),
+    sheetConfig
+  );
+
   const isWhatsAppEnabled = dashboard.isWhatsAppEnabled ?? false;
   const isEmailEnabled = dashboard.isEmailEnabled ?? false;
   const frcBodFilter = dashboard.frcBodFilter ?? [];
   const setFrcBodFilter = dashboard.setFrcBodFilter ?? (() => {});
-  const sheetConfig = dashboard.sheetConfig;
   const activeSheet = dashboard.activeSheet;
   const draggedCol = dashboard.draggedCol ?? null;
   const setDraggedCol = dashboard.setDraggedCol ?? (() => {});
@@ -495,6 +503,7 @@ export const InventoryTable: React.FC = () => {
                     onSelectRow={onSelectRow}
                     onClickItem={onClickItem}
                     onDeleteRow={onDeleteRow}
+                    onCopyRow={isCopyEnabled ? handleOpenCopyModal : undefined}
                     onPmRadarFilterClick={onPmRadarFilterClick}
                     onEventResolutionFilterClick={onEventResolutionFilterClick}
                     onEventFilterClick={onEventFilterClick}

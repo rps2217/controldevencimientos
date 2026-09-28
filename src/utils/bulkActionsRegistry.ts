@@ -7,6 +7,7 @@ import {
   Flame, 
   Edit2, 
   Trash2,
+  Copy,
   LucideIcon 
 } from 'lucide-react';
 import { SheetConfig, TableCapabilitySetting } from '../types';
@@ -176,6 +177,18 @@ export const ALL_BULK_ACTIONS: BulkActionDefinition[] = [
       }
       return 'Solo aplica a tablas de eventos o incidencias FRC';
     }
+  },
+  {
+    id: 'copy_edit',
+    label: 'Copia esta fila y edítala',
+    shortLabel: 'Copiar y Editar',
+    description: 'Crea un nuevo registro duplicando los valores de esta fila y limpiando el SKU/código único',
+    category: 'operations',
+    icon: Copy,
+    buttonClass: 'text-xs hover:bg-slate-700 px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 bg-blue-600/40 text-blue-200 border border-blue-500/40 hover:bg-blue-600/60',
+    iconClass: 'w-3.5 h-3.5 text-blue-400',
+    defaultEnabled: true,
+    getContextualReason: () => 'Acción de clonar fila y editar sus parámetros para crear un nuevo registro'
   },
   {
     id: 'delete',

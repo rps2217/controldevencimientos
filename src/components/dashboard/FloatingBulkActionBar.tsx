@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Printer, Settings, Barcode, Mail, MessageSquare, Download, Flame, Edit2, Trash2, Sliders, X 
+  Printer, Settings, Barcode, Mail, MessageSquare, Download, Flame, Edit2, Trash2, Sliders, X, Copy 
 } from 'lucide-react';
 import { isActionEnabledForTable, buildBulkActionContext } from '../../utils/bulkActionsRegistry';
 import { resolveActiveVirtualColumns } from '../../utils/virtualColumns';
@@ -29,6 +29,7 @@ export const FloatingBulkActionBar: React.FC = () => {
   const setIsPmReportOpen = modalsActions.setIsPmReportOpen;
   const setIsBulkEditOpen = modalsActions.setIsBulkEditOpen;
   const handleBulkDelete = dashboard.handleBulkDelete;
+  const handleOpenCopyModal = dashboard.handleOpenCopyModal;
   const setIsBulkActionsConfigOpen = modalsActions.setIsBulkActionsConfigOpen;
   const setSelectedRowIds = dashboard.setSelectedRowIds ?? (() => {});
   const bulkActionCtx = dashboard.bulkActionCtx ?? buildBulkActionContext(headers, activeView, activeView);
@@ -117,6 +118,16 @@ export const FloatingBulkActionBar: React.FC = () => {
             className="text-xs hover:bg-slate-700 px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Flame className="w-3.5 h-3.5 text-orange-400" /> Acción PM
+          </button>
+        )}
+
+        {selectedRowIds.length === 1 && handleOpenCopyModal && isActionEnabledForTable('copy_edit', bulkActionCtx, sheetConfig) && (
+          <button 
+            onClick={() => handleOpenCopyModal(selectedItems[0])}
+            className="text-xs hover:bg-slate-700 px-3 py-1.5 rounded-xl font-bold transition-colors flex items-center gap-1.5 bg-blue-600/40 text-blue-200 border border-blue-500/40 shadow-sm cursor-pointer"
+            title="Copia esta fila y edítala (crea un nuevo registro con campos prellenados)"
+          >
+            <Copy className="w-3.5 h-3.5 text-blue-400" /> Copiar y Editar
           </button>
         )}
 

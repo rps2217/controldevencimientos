@@ -112,6 +112,53 @@ export function useItemFormManager({
     setIsModalOpen(true);
   }, [onBeforeOpen, headers, activeSheet, sheetConfig, products, policies, eventFilter]);
 
+  const handleOpenCopyModal = useCallback((item: InventoryItem) => {
+    if (onBeforeOpen) onBeforeOpen();
+    setFormErrors({});
+    
+    // We are creating a NEW record based on copy, so editingItem is null
+    setEditingItem(null);
+    
+    const cat = getEventCategory(item, headers);
+    setSelectedEventCategory(cat);
+    
+    const initialData: Record<string, string> = {};
+    headers.forEach(h => {
+      const colSchema = activeSheet ? sheetConfig.schema?.[activeSheet.title]?.[h] : undefined;
+      const isDateTime = colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro/i.test(h);
+      const isDate = colSchema?.type === 'date' || (/fecha|vencimiento|vence|retiro/i.test(h) && !/time/i.test(h));
+      const raw = item[h] !== undefined && item[h] !== null ? String(item[h]).trim() : '';
+
+      if (isDateTime && raw) {
+        initialData[h] = formatInputDateTime(raw) || raw;
+      } else if (isDate && raw) {
+        initialData[h] = formatInputDate(raw) || raw;
+      } else {
+        initialData[h] = raw;
+      }
+    });
+
+    // Clear primary key, synthetic, or unique identifier fields
+    const keyCol = activeSheet ? Object.keys(sheetConfig.schema?.[activeSheet.title] || {}).find(k => sheetConfig.schema?.[activeSheet.title]?.[k]?.isKey) : undefined;
+    
+    headers.forEach(h => {
+      const isAutoId = h.match(/^ID_VC$/i) || h.match(/^ID_FRC$/i);
+      const isUserUnique = h.match(/sku|código|codigo/i) || h === keyCol;
+      const isCompositeOrRow = h.match(/^CU_VC$/i) || h.match(/^_row/i);
+
+      if (isAutoId) {
+        const prefix = h.match(/VC/i) ? 'VC' : 'FRC';
+        initialData[h] = `${prefix}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      } else if (isUserUnique || isCompositeOrRow) {
+        initialData[h] = '';
+      }
+    });
+
+    const calculatedData = autoCalculateItemFormData(initialData, headers, products, policies, sheetConfig);
+    setFormData(calculatedData);
+    setIsModalOpen(true);
+  }, [onBeforeOpen, headers, activeSheet, sheetConfig, products, policies]);
+
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
     setEditingItem(null);
@@ -326,6 +373,7 @@ export function useItemFormManager({
     selectedEventCategory,
     setSelectedEventCategory,
     handleOpenModal,
+    handleOpenCopyModal,
     handleCloseModal,
     handleSelectEventCategory,
     validateForm,
@@ -333,7 +381,7 @@ export function useItemFormManager({
     handleBatchFormUpdate
   }), [
     isModalOpen, editingItem, formData, formErrors, selectedEventCategory,
-    handleOpenModal, handleCloseModal, handleSelectEventCategory, validateForm,
+    handleOpenModal, handleOpenCopyModal, handleCloseModal, handleSelectEventCategory, validateForm,
     handleFormChange, handleBatchFormUpdate
   ]);
 }

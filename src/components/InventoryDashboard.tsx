@@ -249,6 +249,7 @@ export const InventoryDashboard: React.FC = () => {
     selectedEventCategory,
     setSelectedEventCategory,
     handleOpenModal,
+    handleOpenCopyModal,
     handleCloseModal,
     handleSelectEventCategory,
     validateForm,
@@ -1033,6 +1034,7 @@ export const InventoryDashboard: React.FC = () => {
     selectedEventCategory,
     setSelectedEventCategory,
     handleOpenModal,
+    handleOpenCopyModal,
     handleCloseModal,
     handleSelectEventCategory,
     handleFormChange,
@@ -1323,6 +1325,10 @@ export const InventoryDashboard: React.FC = () => {
                 onEdit={(prod) => {
                   setSelectedProduct(null);
                   handleOpenModal(prod);
+                }}
+                onCopy={(prod) => {
+                  setSelectedProduct(null);
+                  handleOpenCopyModal(prod);
                 }}
                 onDeleteRow={handleDelete}
                 onPrintBarcode={(prod) => handlePrintTicket([prod], 'barcode')}

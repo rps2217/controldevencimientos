@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { 
-  CheckCircle2, Clock3, Edit2, Plus, Trash2, Building2, MessageSquare, Mail 
+  CheckCircle2, Clock3, Edit2, Plus, Trash2, Building2, MessageSquare, Mail, Copy 
 } from 'lucide-react';
 import { InventoryItem, EventCategory } from '../../types';
 import { 
@@ -35,6 +35,7 @@ export interface InventoryTableRowProps {
   onSelectRow: (rowIndex: number, selected: boolean) => void;
   onClickItem: (item: InventoryItem) => void;
   onDeleteRow: (item: InventoryItem) => void;
+  onCopyRow?: (item: InventoryItem) => void;
   onPmRadarFilterClick: (targetFilter: string, isMulti: boolean) => void;
   onEventResolutionFilterClick: (status: 'pending' | 'completed', isMulti: boolean) => void;
   onEventFilterClick: (eventCat: EventCategory, isMulti: boolean) => void;
@@ -64,6 +65,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   onSelectRow,
   onClickItem,
   onDeleteRow,
+  onCopyRow,
   onPmRadarFilterClick,
   onEventResolutionFilterClick,
   onEventFilterClick,
@@ -499,6 +501,15 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
               title="Enviar mensaje de WhatsApp"
             >
               <MessageSquare className="w-4 h-4"/>
+            </button>
+          )}
+          {onCopyRow && (
+            <button 
+              onClick={() => onCopyRow(item)} 
+              className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              title="Copia esta fila y edítala"
+            >
+              <Copy className="w-4 h-4"/>
             </button>
           )}
           <button 
