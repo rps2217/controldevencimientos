@@ -690,7 +690,26 @@ Pendientes medidos, sin ejecutar, por orden de valor operativo:
 4. **Sin E2E del flujo "Contar" completo** — campaña → botón → sesión con `skuScope` → conteo →
    guardado.
 
-Estado muerto ya retirado en la Fase 8 (para no re-añadirlo): `StockCountSession.auditor` y
-`CampaignConsolidationMatrix.totalSkusFisicosAuditados` (con su variable interna
-`totalSkusAuditados`). `diferenciaNetaTotal` **se conserva**: una prueba lo usa como invariante.
+---
+
+## 4. Auditoría Ponytail y Documentación de Mejoras al Módulo de Conteo en Escritorio
+
+### A. Diagnóstico y Criterio Ponytail (Cero Ambigüedades & Cero Ruido)
+- **Principio Ponytail**: Todo elemento de la UI debe tener un propósito operativo real, sin componentes flotantes, stubs ni redundancia visual.
+- **Detección de Capacidades**: El módulo de conteo físico se habilita automáticamente si la hoja contiene columnas reconocibles de `sku` o `fecha_vc` o `id`.
+- **Integridad de Selección**: En la barra lateral (`Sidebar.tsx`) y en la barra superior (`DashboardTopNav.tsx`), el acceso directo al módulo de conteo es unívoco y persistente.
+
+### B. Arquitectura de la Interfaz de Escritorio (Módulo de Conteo)
+1. **Auto-Enfoque Continuo y Atajos de Teclado**:
+   - `useEffect` en `StockCountTerminal.tsx` gestiona el enfoque automático en `skuInputRef` al alternar a la vista `COUNTING`.
+   - `Ctrl + Z` / `Cmd + Z`: Dispara `handleUndoLastEntry` para revertir de inmediato la última lectura sin usar el ratón.
+   - `Escape`: Limpia la entrada del código activo (`handleSkuChange('')`).
+2. **Hero Card de Producto**:
+   - Muestra la coincidencia exacta o de-referenciada desde el catálogo maestro (`masterProducts`).
+   - Muestra el stock teórico ERP recalculado (${\text{Stock ERP}} - {\text{Ventas Post-Corte}}$) y la diferencia neta de cuadratura.
+3. **Pistoleo y Multiplicadores por Empaque**:
+   - Soporte para ráfaga continua (+1) e incrementos directos (`+1`, `+5`, `+10`, `+25`, `+50`) o multiplicadores por formato de empaque de laboratorio (`×10 Blíster`, `×20 Caja`, `×30 Estándar`).
+4. **Tabla Lateral de Lecturas**:
+   - Modos alternables "Agrupado por SKU" y "Cronológico", con controles `+` / `-` in situ y eliminación atómica por fila.
+
 

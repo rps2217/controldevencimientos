@@ -15,12 +15,15 @@ import { RightDrawerProvider } from '../src/context/RightDrawerContext';
 import { ViewConfigControlDrawer } from '../src/components/drawers/ViewConfigControlDrawer';
 import { CampaignMatrixTable } from '../src/components/campaign/CampaignMatrixTable';
 import { CampaignProviderProgress } from '../src/components/campaign/CampaignProviderProgress';
+import { CampaignLocationProgress } from '../src/components/campaign/CampaignLocationProgress';
+import { computeCampaignConsolidationMatrix } from '../src/utils/campaignUtils';
+import { computeProviderProgress, getProviderPendingSkus } from '../src/utils/campaignAggregation';
 import { useTableGrouping } from '../src/hooks/useTableGrouping';
 import { TicketConfigModal } from '../src/components/modals/TicketConfigModal';
 import { useTicketPrinting } from '../src/hooks/useTicketPrinting';
 import { STORAGE_KEYS } from '../src/utils/appStorage';
 import { ROLLOS } from '../src/utils/labelMediaProfile';
-import type { SheetConfig, CampaignAuditRow, CampaignConsolidationMatrix, ViewTicketSettings, InventoryItem } from '../src/types';
+import type { SheetConfig, CampaignAuditRow, CampaignConsolidationMatrix, ViewTicketSettings, InventoryItem, InventoryCampaign, StockCountSession } from '../src/types';
 
 let passed = 0;
 let failed = 0;
@@ -498,6 +501,103 @@ async function testImpresionEtiquetaRespetaConfig() {
   await new Promise(r => setTimeout(r, 4200));
 }
 
+async function testLocationProgressPanel() {
+  console.log('\n--- 11. Barrido Físico por Mueble / Ubicación (resumenPorUbicacion) ---');
+
+  const locations = [
+    { ubicacion: 'Mueble 1 - Analgésicos', sesionesCount: 2, skusContados: 15, totalUnidades: 120 },
+    { ubicacion: 'Góndola Central', sesionesCount: 1, skusContados: 8, totalUnidades: 45 },
+  ];
+
+  let selected = 'ALL';
+  const view = await mount(
+    <CampaignLocationProgress
+      locations={locations}
+      selectedLocation={selected}
+      onSelectLocation={(loc) => { selected = loc; }}
+    />
+  );
+
+  const text = view.container.textContent || '';
+  assert(text.includes('Mueble 1 - Analgésicos'), 'el panel lista el primer mueble');
+  assert(text.includes('Góndola Central'), 'el panel lista el segundo mueble');
+  assert(text.includes('165 unids contadas'), 'muestra el total de unidades contadas');
+  assert(text.includes('2 sesiones'), 'muestra el conteo de sesiones por mueble');
+
+  // Pulsar una ubicación invoca onSelectLocation
+  const btn = view.container.querySelector('button');
+  assert(!!btn, 'cada ubicación tiene un botón seleccionable');
+  btn?.click();
+  assert(selected === 'Mueble 1 - Analgésicos', 'pulsar un mueble lo selecciona para filtrar la matriz', selected);
+
+  await view.unmount();
+}
+
+async function testFullFlowContarCycle() {
+  console.log('\n--- 12. Ciclo Completo Campaña ↔ Terminal ("Contar") ---');
+
+  const camp: InventoryCampaign = {
+    id: 'camp-test-e2e',
+    nombre: 'Campaña Farmacia',
+    local: 'Central',
+    fechaInicio: '2026-09-01T00:00:00.000Z',
+    fechaActualizacion: '2026-09-01T00:00:00.000Z',
+    estado: 'ACTIVA',
+    snapshotTeoricoActual: {
+      'SKU-101': { sku: 'SKU-101', descripcion: 'Paracetamol', proveedor: 'Lab Norte', stockTeorico: 100, fechaCarga: '2026-09-01' },
+      'SKU-102': { sku: 'SKU-102', descripcion: 'Ibuprofeno', proveedor: 'Lab Norte', stockTeorico: 50, fechaCarga: '2026-09-01' },
+      'SKU-201': { sku: 'SKU-201', descripcion: 'Amoxicilina', proveedor: 'Lab Sur', stockTeorico: 30, fechaCarga: '2026-09-01' },
+    },
+    historialSnapshots: [],
+    sessionIds: [],
+    itemsValidadosCerrados: {},
+    ajustesVentaManual: {}
+  };
+
+  // 1. Matriz inicial sin sesiones: Lab Norte tiene 2 pendientes, 0% cobertura
+  const mInitial = computeCampaignConsolidationMatrix(camp, []);
+  const progInitial = computeProviderProgress(mInitial);
+  const labNorteInitial = progInitial.find(p => p.proveedor === 'Lab Norte')!;
+  assert(labNorteInitial.porContar === 2, 'Lab Norte arranca con 2 SKUs por contar', labNorteInitial.porContar);
+  assert(labNorteInitial.cobertura === 0, 'Lab Norte arranca con 0% de cobertura', labNorteInitial.cobertura);
+
+  // 2. Extraer SKUs pendientes para acotar la sesión (skuScope)
+  const pendingSkus = getProviderPendingSkus(mInitial, 'Lab Norte');
+  assert(pendingSkus.length === 2 && pendingSkus.includes('SKU-101') && pendingSkus.includes('SKU-102'),
+    'getProviderPendingSkus extrae exactamente los SKUs pendientes del proveedor', pendingSkus);
+
+  // 3. Crear sesión acotada al proveedor y simular registro físico de SKU-101 (100 u.)
+  const sessionNorte: StockCountSession = {
+    id: 'ses-norte-1',
+    nombre: 'Lab Norte - Conteo (2 SKUs)',
+    modo: 'DOCUMENT',
+    requiereVencimiento: false,
+    hojaOrigen: 'main',
+    estado: 'COMPLETED',
+    fechaInicio: '2026-09-02T10:00:00.000Z',
+    ubicacion: 'Lab Norte',
+    conteos: [
+      { id: 'c1', sku: 'SKU-101', descripcion: 'Paracetamol', cantidad: 100, timestamp: '2026-09-02T10:05:00.000Z' }
+    ],
+    skuScope: pendingSkus,
+    deviceId: 'test'
+  };
+
+  // 4. Re-consolidar matriz de campaña con la nueva sesión
+  const mAfter = computeCampaignConsolidationMatrix(camp, [sessionNorte]);
+  const skuA = [...mAfter.cuadrados, ...mAfter.discrepancias].find(r => r.sku === 'SKU-101')!;
+  assert(skuA.estadoGlobal === 'VALIDADO_OK', 'SKU-101 pasa a estado VALIDADO_OK tras el conteo físico', skuA.estadoGlobal);
+  assert(skuA.stockFisicoTotal === 100, 'SKU-101 registra 100 unidades físicas contadas', skuA.stockFisicoTotal);
+  assert(skuA.diferenciaNeta === 0, 'SKU-101 tiene diferencia neta 0', skuA.diferenciaNeta);
+
+  // 5. Verificar que el progreso del proveedor aumentó a 50% de cobertura y 1 pendiente
+  const progAfter = computeProviderProgress(mAfter);
+  const labNorteAfter = progAfter.find(p => p.proveedor === 'Lab Norte')!;
+  assert(labNorteAfter.cobertura === 50, 'la cobertura de Lab Norte sube a 50%', labNorteAfter.cobertura);
+  assert(labNorteAfter.porContar === 1, 'los pendientes de Lab Norte bajan de 2 a 1', labNorteAfter.porContar);
+  assert(labNorteAfter.contados === 1, 'Lab Norte tiene 1 SKU contado de 2', labNorteAfter.contados);
+}
+
 async function main() {
   console.log('========================================');
   console.log(' PRUEBAS DE COMPONENTE (Fase 0)');
@@ -513,6 +613,8 @@ async function main() {
   await testProviderPanelLanzaConteo();
   await testSelectorPapelUnificado();
   await testImpresionEtiquetaRespetaConfig();
+  await testLocationProgressPanel();
+  await testFullFlowContarCycle();
 
   teardownDom();
 

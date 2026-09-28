@@ -150,7 +150,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
 
   const toggleGroupByDirection = useCallback(() => {
     setGroupByDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-  }, []);
+  }, [setGroupByDirection]);
 
   // Reset collapsed groups when group by column changes
   useEffect(() => {
@@ -168,7 +168,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
       }
       return { column: null, direction: null };
     });
-  }, []);
+  }, [setSortConfig]);
 
   // Virtual columns augmentation (avoid cloning objects when no virtual columns active)
   const augmentedItems = useMemo(() => {
@@ -578,7 +578,16 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     setDynamicMonthFilter([]);
     setDynamicMonthRange(null);
     setSortConfig({ column: null, direction: null });
-  }, []);
+  }, [
+    setEventFilter,
+    setFrcBodFilter,
+    setEventResolutionFilter,
+    setPmRadarFilter,
+    setColumnFilters,
+    setDynamicMonthFilter,
+    setDynamicMonthRange,
+    setSortConfig,
+  ]);
 
   return {
     deferredSearchTerm,

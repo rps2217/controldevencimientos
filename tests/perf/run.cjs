@@ -49,6 +49,7 @@ const HARNESSES = [
   'racecheck.cjs',
   'rowidentity.cjs',
   'auditcheck.cjs',
+  'flowcontarcheck.cjs',
 ];
 // Arneses que necesitan el backend falso (hojas no canonicas): el runner lo levanta
 // y le pasa el puerto como segundo argumento.

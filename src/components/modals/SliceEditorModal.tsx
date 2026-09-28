@@ -217,7 +217,18 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
       setActiveTab('general');
       setErrors({});
     }
-  }, [isOpen, editingSlice?.id, isBuiltIn]);
+  }, [
+    isOpen,
+    editingSlice,
+    isBuiltIn,
+    currentFilters,
+    currentGroupBy,
+    currentGroupByDirection,
+    currentSort,
+    currentVisibleHeaders,
+    headers,
+    tableKey,
+  ]);
 
   // Close on Escape key
   useEffect(() => {

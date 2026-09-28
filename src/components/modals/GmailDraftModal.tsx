@@ -106,7 +106,7 @@ export const GmailDraftModal: React.FC<GmailDraftModalProps> = ({
       }
       setToEmail(detectedEmail);
     }
-  }, [isOpen]);
+  }, [isOpen, availableColumns, selectedItems, activeViewTitle]);
 
   if (!isOpen) return null;
 

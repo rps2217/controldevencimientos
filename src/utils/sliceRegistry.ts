@@ -28,10 +28,8 @@ export function detectTableCapabilities(
 
   const caps = new Set<TableCapability>();
 
-  // El conteo físico necesita identificar el SKU y cuantificar existencias: sin
-  // ambas columnas el terminal no tiene nada que reconciliar (p. ej. una hoja de
-  // Clientes con teléfono y email no debe ofrecerlo).
-  if (has('sku') && has('cantidad')) caps.add('conteo');
+  // El conteo físico necesita identificar el SKU o registro para pistolear.
+  if (has('sku') || has('fecha_vc') || has('id')) caps.add('conteo');
 
   // La precedencia vencimiento > incidencia es deliberada: `getEventCategory` asume
   // VENCIMIENTO por defecto, así que una hoja con fecha de vencimiento se trata como

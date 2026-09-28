@@ -11,6 +11,7 @@ import { CampaignQuickScanModal } from '../modals/CampaignQuickScanModal';
 import { CampaignMatrixTable } from '../campaign/CampaignMatrixTable';
 import { CampaignKpiSemaphore } from '../campaign/CampaignKpiSemaphore';
 import { CampaignProviderProgress } from '../campaign/CampaignProviderProgress';
+import { CampaignLocationProgress } from '../campaign/CampaignLocationProgress';
 import { getErrorMessage } from '../../utils/pureCalculations';
 
 import { STORAGE_KEYS } from '../../utils/appStorage';
@@ -49,6 +50,8 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
   const [matrixFilter, setMatrixFilter] = useState<'ALL' | 'VALIDADO_OK' | 'DISCREPANCIA' | 'NUNCA_PISTOLEADO' | 'HALLAZGO'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<string>('ALL');
+  const [progressView, setProgressView] = useState<'PROVEEDORES' | 'UBICACIONES'>('PROVEEDORES');
+  const [selectedLocation, setSelectedLocation] = useState<string>('ALL');
   
   // New campaign modal / creation form states
   const [isNewCampaignOpen, setIsNewCampaignOpen] = useState(false);
@@ -101,7 +104,11 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
   };
 
   // Auto-sync bidirectional on mount to consolidate fresh counts and ERP snapshots from other devices
+  const hasMountedSyncRef = useRef(false);
   useEffect(() => {
+    if (hasMountedSyncRef.current) return;
+    hasMountedSyncRef.current = true;
+
     syncCampaignsWithCloud({
       campaigns,
       activeCampaignId,
@@ -124,7 +131,7 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
     }).catch((err) => {
       console.warn('[Dashboard AutoSync] Initial sync notice:', err);
     });
-  }, []);
+  }, [campaigns, activeCampaignId, sessions, onUpdateCampaigns, onUpdateSessions, onSelectCampaign]);
 
   // Active campaign entity
   const activeCampaign = useMemo(() => {
@@ -154,8 +161,8 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
 
   // Filtered rows for the matrix table
   const displayedRows = useMemo(() => {
-    return filterAuditRows(matrix, matrixFilter, selectedProvider, searchTerm);
-  }, [matrix, matrixFilter, selectedProvider, searchTerm]);
+    return filterAuditRows(matrix, matrixFilter, selectedProvider, searchTerm, selectedLocation);
+  }, [matrix, matrixFilter, selectedProvider, searchTerm, selectedLocation]);
 
   // Handle creating a new campaign
   const handleCreateCampaign = (e: React.FormEvent) => {
@@ -758,12 +765,73 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
       {/* TAB A: MATRIX OF CONSOLIDATION */}
       {activeTab === 'MATRIX' && (
         <div className="flex flex-col gap-4">
-          <CampaignProviderProgress
-            providers={providerProgress}
-            selectedProvider={selectedProvider}
-            onSelectProvider={(p) => setSelectedProvider(selectedProvider === p ? 'ALL' : p)}
-            onStartCount={handleLaunchProviderCount}
-          />
+          {/* Sub-header de Avance: Toggle entre Proveedores y Muebles/Ubicaciones */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setProgressView('PROVEEDORES')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  progressView === 'PROVEEDORES'
+                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <span>Avance por Proveedor</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                  {providerProgress.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setProgressView('UBICACIONES')}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  progressView === 'UBICACIONES'
+                    ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <span>Barrido por Mueble / Ubicación</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                  {matrix?.resumenPorUbicacion.length ?? 0}
+                </span>
+              </button>
+            </div>
+
+            {/* Active filter badge indicator */}
+            {(selectedProvider !== 'ALL' || selectedLocation !== 'ALL') && (
+              <div className="flex items-center gap-2 text-xs">
+                {selectedProvider !== 'ALL' && (
+                  <span className="inline-flex items-center gap-1 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1 rounded-lg font-bold">
+                    Proveedor: {selectedProvider}
+                    <button type="button" onClick={() => setSelectedProvider('ALL')} className="hover:text-indigo-950 dark:hover:text-white font-black ml-1 cursor-pointer">×</button>
+                  </span>
+                )}
+                {selectedLocation !== 'ALL' && (
+                  <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-lg font-bold">
+                    Mueble: {selectedLocation}
+                    <button type="button" onClick={() => setSelectedLocation('ALL')} className="hover:text-emerald-950 dark:hover:text-white font-black ml-1 cursor-pointer">×</button>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {progressView === 'PROVEEDORES' ? (
+            <CampaignProviderProgress
+              providers={providerProgress}
+              selectedProvider={selectedProvider}
+              onSelectProvider={(p) => setSelectedProvider(selectedProvider === p ? 'ALL' : p)}
+              onStartCount={handleLaunchProviderCount}
+            />
+          ) : (
+            <CampaignLocationProgress
+              locations={matrix?.resumenPorUbicacion ?? []}
+              selectedLocation={selectedLocation}
+              onSelectLocation={(loc) => setSelectedLocation(selectedLocation === loc ? 'ALL' : loc)}
+            />
+          )}
+
           <CampaignMatrixTable
           matrix={matrix}
           displayedRows={displayedRows}

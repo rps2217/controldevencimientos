@@ -40,28 +40,47 @@ export function useModuleViewState({
   const [groupByDirection, setGroupByDirection] = useState<'asc' | 'desc'>(initialModuleState.groupByDirection);
 
   const lastViewRef = useRef<string>(activeView);
+  const moduleStatesRef = useRef(moduleStates);
+  moduleStatesRef.current = moduleStates;
+
+  const currentStateRef = useRef<ModuleViewState>({
+    activeSliceId,
+    searchTerm,
+    activeQuickChip,
+    sortConfig,
+    eventFilter,
+    frcBodFilter,
+    eventResolutionFilter,
+    pmRadarFilter,
+    columnFilters,
+    dynamicMonthFilter,
+    dynamicMonthRange,
+    groupByColumn,
+    groupByDirection,
+  });
+  currentStateRef.current = {
+    activeSliceId,
+    searchTerm,
+    activeQuickChip,
+    sortConfig,
+    eventFilter,
+    frcBodFilter,
+    eventResolutionFilter,
+    pmRadarFilter,
+    columnFilters,
+    dynamicMonthFilter,
+    dynamicMonthRange,
+    groupByColumn,
+    groupByDirection,
+  };
 
   // 1. Tab switch transition: save previous view's state and restore target view's state
   useEffect(() => {
     const prevView = lastViewRef.current;
     if (prevView === activeView) return;
 
-    // Save previous view state
-    const prevViewState: ModuleViewState = {
-      activeSliceId,
-      searchTerm,
-      activeQuickChip,
-      sortConfig,
-      eventFilter,
-      frcBodFilter,
-      eventResolutionFilter,
-      pmRadarFilter,
-      columnFilters,
-      dynamicMonthFilter,
-      dynamicMonthRange,
-      groupByColumn,
-      groupByDirection,
-    };
+    // Save previous view state from ref
+    const prevViewState = currentStateRef.current;
 
     setModuleStates(prev => {
       const updated = {
@@ -77,7 +96,7 @@ export function useModuleViewState({
     });
 
     // Load target view state
-    const targetState = moduleStates[activeView] || DEFAULT_MODULE_STATE;
+    const targetState = moduleStatesRef.current[activeView] || DEFAULT_MODULE_STATE;
 
     // Batch apply target view state
     setActiveSliceId(targetState.activeSliceId ?? null);

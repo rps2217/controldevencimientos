@@ -165,7 +165,8 @@ export function filterAuditRows(
   matrix: CampaignConsolidationMatrix | null,
   filter: CampaignMatrixFilter,
   selectedProvider: string,
-  searchTerm: string
+  searchTerm: string,
+  selectedLocation?: string
 ): CampaignAuditRow[] {
   if (!matrix) return [];
   let list: CampaignAuditRow[] = [];
@@ -183,6 +184,12 @@ export function filterAuditRows(
 
   if (selectedProvider !== 'ALL') {
     list = list.filter(r => r.proveedor === selectedProvider);
+  }
+
+  if (selectedLocation && selectedLocation !== 'ALL') {
+    list = list.filter(r =>
+      r.sesionesDondeAparece && r.sesionesDondeAparece.some(s => (s.ubicacion || s.nombreSesion) === selectedLocation)
+    );
   }
 
   if (searchTerm.trim()) {

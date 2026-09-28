@@ -50,7 +50,7 @@ export function useInventoryData({
   sheetConfig,
   setSheetConfig,
   activeView,
-  showToast,
+  showToast: _showToast,
   setIsOffline,
   setLastCachedAt,
   setHasCloudConfigSheet,
@@ -364,7 +364,19 @@ export function useInventoryData({
       setLoading(false);
       setIsBackgroundSyncing(false);
     }
-  }, [sheetConfig, activeView, showToast, items.length, policies.length, products.length]);
+  }, [
+    sheetConfig,
+    activeView,
+    items.length,
+    policies.length,
+    products.length,
+    setCloudConfigSheetName,
+    setConfigStorageMode,
+    setHasCloudConfigSheet,
+    setIsOffline,
+    setLastCachedAt,
+    setSheetConfig,
+  ]);
 
   return {
     metadata,

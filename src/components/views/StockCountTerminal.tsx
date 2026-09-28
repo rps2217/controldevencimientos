@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { X, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2, Undo2 } from 'lucide-react';
@@ -75,8 +75,12 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     return campaigns.find(c => c.id === activeCampaignIdState) || null;
   }, [campaigns, activeCampaignIdState]);
 
+  // Session list & active session
+  const [sessions, setSessions] = useState<StockCountSession[]>(() => loadStockCountSessionsFromStorage());
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
   // Cloud sync handler (Two-Way Merging between this device and Google Sheets)
-  const handleCloudSync = async (silent: boolean = false) => {
+  const handleCloudSync = useCallback(async (silent: boolean = false) => {
     setIsSyncingCloud(true);
     try {
       const res = await syncCampaignsWithCloud({
@@ -120,7 +124,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     } finally {
       setIsSyncingCloud(false);
     }
-  };
+  }, [campaigns, activeCampaignIdState, sessions, showToast]);
 
   // Respaldar manifiesto de una sesión / mueble específico a la nube
   const handleBackupSessionToCloud = async (sessionToBackup: StockCountSession) => {
@@ -165,14 +169,13 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   };
 
   // Auto-sync on mount to pull any fresh theoretical stock uploaded in the office PC
+  const hasMountedSyncRef = useRef(false);
   useEffect(() => {
+    if (hasMountedSyncRef.current) return;
+    hasMountedSyncRef.current = true;
     handleCloudSync(true);
-  }, []);
+  }, [handleCloudSync]);
 
-  // Session list & active session
-  const [sessions, setSessions] = useState<StockCountSession[]>(() => loadStockCountSessionsFromStorage());
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  
   // Navigation view inside modal: 'CAMPAIGN' | 'LIST' | 'COUNTING' | 'RECONCILIATION'
   const [viewState, setViewState] = useState<'CAMPAIGN' | 'LIST' | 'COUNTING' | 'RECONCILIATION'>(() => {
     const savedCampaigns = loadCampaignsFromStorage();
@@ -351,6 +354,8 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     return {
       inErp: !!itemInErp,
       stockTeorico,
+      ventaAjuste,
+      stockEfectivo,
       totalFisicoCampana,
       diferencia,
       isValidatedInCampaign
@@ -457,7 +462,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     };
   }, []);
 
-  // Focus SKU input whenever switching to counting view
+  // Focus SKU input whenever switching to counting view & attach desktop hotkeys
   useEffect(() => {
     if (viewState === 'COUNTING') {
       setTimeout(() => {
@@ -465,6 +470,26 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       }, 100);
     }
   }, [viewState]);
+
+  // Global Desktop Keyboard Shortcuts (Ctrl+Z to Undo, Esc to Clear SKU)
+  useEffect(() => {
+    if (viewState !== 'COUNTING') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndoLastEntry();
+      } else if (e.key === 'Escape') {
+        if (scannedSku) {
+          e.preventDefault();
+          handleSkuChange('');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewState, scannedSku, handleUndoLastEntry]);
 
   // Current active session
   const currentSession = useMemo(() => {
