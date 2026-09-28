@@ -10,7 +10,7 @@ import { ModalsProvider } from './context/ModalsContext';
 import { UiSettingsProvider } from './context/UiSettingsContext';
 import type { ThemeMode } from './types';
 
-import { STORAGE_KEYS, hasDemoEntry, setDemoEntry } from './utils/appStorage';
+import { STORAGE_KEYS, hasDemoEntry, setDemoEntry, isDemoMode } from './utils/appStorage';
 
 export default function App() {
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -112,6 +112,24 @@ export default function App() {
     setSetupError('');
   };
 
+  const handleActivateDemo = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.SCRIPT_URL);
+      localStorage.removeItem(STORAGE_KEYS.SECURITY_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.SPREADSHEET_ID);
+    } catch (err) {
+      console.warn('LocalStorage error clearing config:', err);
+    }
+    setSetupUrl('');
+    setSecurityToken('');
+    setSpreadsheetId('');
+    setDemoEntry(true);
+    setNeedsSetup(false);
+    setIsChangingUrl(false);
+    setSetupError('');
+    window.location.reload();
+  };
+
   if (needsSetup || isChangingUrl) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-[#F8FAFC] dark:bg-slate-950 px-4 font-sans transition-colors">
@@ -198,7 +216,7 @@ export default function App() {
               </button>
             </div>
 
-            {!isChangingUrl && (
+            {!isChangingUrl ? (
               <div className="pt-1">
                 <div className="flex items-center gap-3 py-2">
                   <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
@@ -216,6 +234,39 @@ export default function App() {
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 text-center">
                   Recorre la aplicación con datos de ejemplo, sin conectar ninguna planilla.
                 </p>
+              </div>
+            ) : (
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-lg">
+                        <Compass className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        Modo Demostración (Offline)
+                      </span>
+                    </div>
+                    {isDemoMode() && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                        Activo
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
+                    {isDemoMode()
+                      ? 'Actualmente estás usando datos locales de ejemplo. Ingresa una URL arriba para conectar tu Google Sheets real, o pulsa abajo para reiniciar los datos de prueba.'
+                      : 'Cambia a datos de ejemplo locales para pruebas, formación o uso sin conexión, sin alterar tu planilla real.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleActivateDemo}
+                    className="mt-1 w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold py-2.5 rounded-xl text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                  >
+                    <Compass className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>{isDemoMode() ? 'Reiniciar Datos de Demostración' : 'Activar Modo Demostración'}</span>
+                  </button>
+                </div>
               </div>
             )}
           </form>

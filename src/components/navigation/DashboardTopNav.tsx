@@ -233,19 +233,6 @@ export const DashboardTopNav: React.FC = () => {
         {/* PWA Install Button (Mobile Only) */}
         <PWAInstallButton variant="compact" className="md:hidden" />
 
-        {/* Demo Mode Action Badge */}
-        {!localStorage.getItem('appsheet_clone_script_url')?.trim() && (
-          <button
-            onClick={onEditBackendUrl}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300 font-bold text-[11px] animate-pulse cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all active:scale-95"
-            title="Estás en Modo Demo con datos locales. Clic para conectar tu Google Sheets real."
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500/30" />
-            <span className="hidden xs:inline">Modo Demo</span>
-            <span className="xs:hidden">Demo</span>
-          </button>
-        )}
-
         {/* Configuración del entorno: mismo renglón que la búsqueda, no una barra aparte */}
         <ThemeSelector />
         <button

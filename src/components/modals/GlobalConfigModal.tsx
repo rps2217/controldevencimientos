@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Settings, X, Database, FileSpreadsheet, Package, FileText, CheckCircle2, Sliders, BookOpen, Plus, Server, Sparkles, ToggleRight } from 'lucide-react';
+import { Settings, X, Database, FileSpreadsheet, Package, FileText, CheckCircle2, Sliders, BookOpen, Plus, Server, Sparkles, ToggleRight, Compass, RotateCcw, Link2 } from 'lucide-react';
 import { SheetConfig, SpreadsheetMetadata } from '../../types';
 import { SEMANTIC_FIELD_OPTIONS } from '../../utils/columnAliases';
 import { TableBulkActionsPanel } from '../settings/TableBulkActionsPanel';
 import { TableCapabilitiesPanel } from '../settings/TableCapabilitiesPanel';
 import { BackendMirrorPanel } from '../settings/BackendMirrorPanel';
 import { AppModulesPanel } from '../settings/AppModulesPanel';
+import { useUiSettings } from '../../context/UiSettingsContext';
+import { isDemoMode, STORAGE_KEYS, setDemoEntry } from '../../utils/appStorage';
 
 interface GlobalConfigModalProps {
   isOpen: boolean;
@@ -18,7 +20,7 @@ interface GlobalConfigModalProps {
   activeView: string;
   activeSheetTitle?: string;
   headers?: string[];
-  initialTab?: 'sheets' | 'dictionary' | 'bulkActions' | 'capabilities' | 'globalModules' | 'backendMirror';
+  initialTab?: 'sheets' | 'dictionary' | 'bulkActions' | 'capabilities' | 'globalModules' | 'backendMirror' | 'environment';
 }
 
 const SEMANTIC_FIELDS = SEMANTIC_FIELD_OPTIONS;
@@ -36,11 +38,41 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
   headers = [],
   initialTab = 'sheets'
 }) => {
-  const [activeTab, setActiveTab] = useState<'sheets' | 'dictionary' | 'bulkActions' | 'capabilities' | 'globalModules' | 'backendMirror'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'sheets' | 'dictionary' | 'bulkActions' | 'capabilities' | 'globalModules' | 'backendMirror' | 'environment'>(initialTab);
   const [selectedField, setSelectedField] = useState<string>('sku');
   const [newAliasInput, setNewAliasInput] = useState<string>('');
+  const { onEditBackendUrl } = useUiSettings();
 
   if (!isOpen) return null;
+
+  const handleActivateDemo = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.SCRIPT_URL);
+      localStorage.removeItem(STORAGE_KEYS.SECURITY_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.SPREADSHEET_ID);
+    } catch (err) {
+      console.warn('LocalStorage error:', err);
+    }
+    setDemoEntry(true);
+    window.location.reload();
+  };
+
+  const handleResetDemoData = () => {
+    try {
+      localStorage.removeItem('app_demo_items_main');
+      localStorage.removeItem('app_demo_items_events');
+      localStorage.removeItem('app_demo_items_products');
+      localStorage.removeItem('app_demo_items_policies');
+    } catch (err) {
+      console.warn('LocalStorage error:', err);
+    }
+    window.location.reload();
+  };
+
+  const handleConnectSheets = () => {
+    onClose();
+    onEditBackendUrl();
+  };
 
   const handleAddAlias = () => {
     if (!newAliasInput.trim()) return;
@@ -94,10 +126,10 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-200 dark:border-slate-800 px-6 bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 px-6 bg-slate-50/50 dark:bg-slate-900/50 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab('sheets')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'sheets'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700'
@@ -108,7 +140,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('dictionary')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'dictionary'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700'
@@ -119,7 +151,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('bulkActions')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'bulkActions'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700'
@@ -130,7 +162,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('capabilities')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'capabilities'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700'
@@ -141,7 +173,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('globalModules')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'globalModules'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700'
@@ -152,7 +184,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('backendMirror')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
               activeTab === 'backendMirror'
                 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
                 : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700'
@@ -160,6 +192,17 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
           >
             <Server className="w-4 h-4" />
             <span>Espejo Backend</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('environment')}
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
+              activeTab === 'environment'
+                ? 'border-amber-600 text-amber-600 dark:text-amber-400'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700'
+            }`}
+          >
+            <Compass className="w-4 h-4" />
+            <span>Entorno & Demo</span>
           </button>
         </div>
 
@@ -358,7 +401,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
               setSheetConfig={setSheetConfig}
               saveConfig={saveConfig}
             />
-          ) : (
+          ) : activeTab === 'backendMirror' ? (
             <BackendMirrorPanel
               sheetConfig={sheetConfig}
               setSheetConfig={setSheetConfig}
@@ -366,6 +409,103 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
               activeSheetTitle={activeSheetTitle}
               headers={headers}
             />
+          ) : (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/60 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <Compass className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  <span className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">
+                    Gestor de Entorno y Datos de Demostración
+                  </span>
+                </div>
+                <p className="text-xs text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
+                  Administra la fuente de datos activa de la aplicación. Puedes alternar libremente entre tu conexión de producción en Google Sheets o el Modo Demostración local para pruebas, auditorías y formación.
+                </p>
+              </div>
+
+              {/* Estado Actual */}
+              <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h4 className="text-xs uppercase font-extrabold tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                      Estado Actual del Sistema
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-extrabold text-slate-900 dark:text-slate-100">
+                        {isDemoMode() ? 'Modo Demostración (Local Offline)' : 'Conectado a Google Apps Script'}
+                      </span>
+                      {isDemoMode() ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                          Demo Activo
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                          En Línea
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleConnectSheets}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    <span>{isDemoMode() ? 'Conectar Google Sheets' : 'Configurar Conexión'}</span>
+                  </button>
+                </div>
+
+                {!isDemoMode() && (
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/60 rounded-xl">
+                    <p className="text-[11px] font-mono text-slate-600 dark:text-slate-400 truncate">
+                      {localStorage.getItem(STORAGE_KEYS.SCRIPT_URL) || 'URL de Apps Script'}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Opciones de Modo Demostración */}
+              <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60 shadow-2xs space-y-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="p-2.5 bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-xl shrink-0">
+                    <Compass className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                      {isDemoMode() ? 'Acciones de Demostración' : 'Cambiar a Modo Demostración'}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-normal">
+                      {isDemoMode()
+                        ? 'Estás operando sobre el conjunto de datos de prueba local. Puedes restablecer los datos de ejemplo iniciales en cualquier momento si realizaste modificaciones de prueba.'
+                        : 'El Modo Demostración te permite explorar la aplicación con datos de logística, vencimientos e incidencias de ejemplo de forma segura, sin realizar escrituras ni depender de tu planilla de Google Sheets.'}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2.5 mt-4">
+                      {isDemoMode() ? (
+                        <button
+                          type="button"
+                          onClick={handleResetDemoData}
+                          className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Restablecer Datos de Prueba Iniciales</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleActivateDemo}
+                          className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                        >
+                          <Compass className="w-3.5 h-3.5" />
+                          <span>Activar Modo Demostración</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
