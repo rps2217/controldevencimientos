@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useMemo } from 'react';
 import { InventoryItem, SheetConfig, SheetProperties, SpreadsheetMetadata, EventCategory, GlobalTicketConfig, ViewTicketConfig, TableSlice, SheetRecord, SliceFilterConfig, SortConfig, TableCapability } from '../types';
 import { OfflineMutation, AuditLogEntry } from '../db/indexedDbService';
 import { ConnectionHealthStatus } from '../hooks/useOfflineSync';
@@ -245,16 +245,256 @@ export interface DashboardContextType {
   toggleGroupByDirection?: () => void;
 }
 
+// Decentralized Granular Contexts for optimal sub-component subscriptions (Fase 4.2)
+const SheetDataContext = createContext<Partial<DashboardContextType> | null>(null);
+const FilterSettingsContext = createContext<Partial<DashboardContextType> | null>(null);
+const OfflineSyncContext = createContext<Partial<DashboardContextType> | null>(null);
+const FormStateContext = createContext<Partial<DashboardContextType> | null>(null);
+
 const DashboardContext = createContext<DashboardContextType | null>(null);
 
 export const DashboardProvider: React.FC<{
   value: DashboardContextType;
   children: React.ReactNode;
 }> = ({ value, children }) => {
+  // 1. Sliced Context for Raw Sheets & Core Data
+  const sheetData = useMemo(() => ({
+    sheetConfig: value.sheetConfig,
+    setSheetConfig: value.setSheetConfig,
+    saveConfig: value.saveConfig,
+    metadata: value.metadata,
+    activeSheet: value.activeSheet,
+    activeView: value.activeView,
+    setActiveView: value.setActiveView,
+    headers: value.headers,
+    visibleHeaders: value.visibleHeaders,
+    products: value.products,
+    policies: value.policies,
+    allMainItems: value.allMainItems,
+    items: value.items,
+    filteredItems: value.filteredItems,
+    fetchData: value.fetchData,
+    loading: value.loading,
+    error: value.error,
+    lastCachedAt: value.lastCachedAt,
+    tableCapabilities: value.tableCapabilities,
+    columnLabelsMap: value.columnLabelsMap,
+  }), [
+    value.sheetConfig, value.metadata, value.activeSheet, value.activeView,
+    value.headers, value.visibleHeaders, value.products, value.policies,
+    value.allMainItems, value.items, value.filteredItems, value.fetchData,
+    value.loading, value.error, value.lastCachedAt, value.tableCapabilities,
+    value.columnLabelsMap
+  ]);
+
+  // 2. Sliced Context for Filters, Search, Chip Selections
+  const filterSettings = useMemo(() => ({
+    searchTerm: value.searchTerm,
+    setSearchTerm: value.setSearchTerm,
+    currentFilters: value.currentFilters,
+    sortConfig: value.sortConfig,
+    groupByColumn: value.groupByColumn,
+    groupByDirection: value.groupByDirection,
+    handleSetGroupByColumn: value.handleSetGroupByColumn,
+    handleSetGroupByDirection: value.handleSetGroupByDirection,
+    activeSliceId: value.activeSliceId,
+    handleSelectSlice: value.handleSelectSlice,
+    currentTableSlices: value.currentTableSlices,
+    sliceCounts: value.sliceCounts,
+    hiddenSliceIds: value.hiddenSliceIds,
+    handleDeleteSlice: value.handleDeleteSlice,
+    handleToggleSliceVisibility: value.handleToggleSliceVisibility,
+    handleSetBulkVisibility: value.handleSetBulkVisibility,
+    handleSaveSlice: value.handleSaveSlice,
+    activeSlice: value.activeSlice,
+    visibleTableSlices: value.visibleTableSlices,
+    customSlices: value.customSlices,
+    isRelationalActive: value.isRelationalActive,
+    searchableHeaders: value.searchableHeaders,
+    hasActiveFilters: value.hasActiveFilters,
+    clearAllFilters: value.clearAllFilters,
+    quickChips: value.quickChips,
+    activeQuickChip: value.activeQuickChip,
+    setActiveQuickChip: value.setActiveQuickChip,
+    eventResolutionFilter: value.eventResolutionFilter,
+    setEventResolutionFilter: value.setEventResolutionFilter,
+    eventResolutionMetrics: value.eventResolutionMetrics,
+    eventFilter: value.eventFilter,
+    setEventFilter: value.setEventFilter,
+    eventMetrics: value.eventMetrics,
+    domainItemsCount: value.domainItemsCount,
+    frcBodValues: value.frcBodValues,
+    frcBodCounts: value.frcBodCounts,
+    frcBodFilter: value.frcBodFilter,
+    setFrcBodFilter: value.setFrcBodFilter,
+    pmRadarFilter: value.pmRadarFilter,
+    setPmRadarFilter: value.setPmRadarFilter,
+    pmMetrics: value.pmMetrics,
+    columnFilters: value.columnFilters,
+    setColumnFilters: value.setColumnFilters,
+    columnOptionsMap: value.columnOptionsMap,
+    frcBodCol: value.frcBodCol,
+  }), [
+    value.searchTerm, value.currentFilters, value.sortConfig, value.groupByColumn,
+    value.groupByDirection, value.handleSetGroupByColumn, value.handleSetGroupByDirection,
+    value.activeSliceId, value.currentTableSlices, value.sliceCounts, value.hiddenSliceIds,
+    value.activeSlice, value.visibleTableSlices, value.customSlices, value.isRelationalActive,
+    value.searchableHeaders, value.hasActiveFilters, value.quickChips, value.activeQuickChip,
+    value.eventResolutionFilter, value.eventResolutionMetrics, value.eventFilter,
+    value.eventMetrics, value.domainItemsCount, value.frcBodValues, value.frcBodCounts,
+    value.frcBodFilter, value.pmRadarFilter, value.pmMetrics, value.columnFilters,
+    value.columnOptionsMap, value.frcBodCol
+  ]);
+
+  // 3. Sliced Context for Offline-First Mutations & Sync Status
+  const offlineSync = useMemo(() => ({
+    offlineQueue: value.offlineQueue,
+    auditLog: value.auditLog,
+    isOffline: value.isOffline,
+    isSyncing: value.isSyncing,
+    latencyMs: value.latencyMs,
+    connectionStatus: value.connectionStatus,
+    lastHealthCheck: value.lastHealthCheck,
+    healthErrorMessage: value.healthErrorMessage,
+    scriptSupportsAtomicSave: value.scriptSupportsAtomicSave,
+    testConnectionHealth: value.testConnectionHealth,
+    syncQueue: value.syncQueue,
+    removeMutation: value.removeMutation,
+    discardMutation: value.discardMutation,
+    discardAllFailedMutations: value.discardAllFailedMutations,
+    retryMutation: value.retryMutation,
+    retryAllFailedMutations: value.retryAllFailedMutations,
+    forkMutationAsAppend: value.forkMutationAsAppend,
+    failedMutations: value.failedMutations,
+    failedCount: value.failedCount,
+    clearQueue: value.clearQueue,
+    clearAuditLog: value.clearAuditLog,
+  }), [
+    value.offlineQueue, value.auditLog, value.isOffline, value.isSyncing,
+    value.latencyMs, value.connectionStatus, value.lastHealthCheck,
+    value.healthErrorMessage, value.scriptSupportsAtomicSave, value.failedCount
+  ]);
+
+  // 4. Sliced Context for Modals, Form inputs and UI Presentation properties
+  const formState = useMemo(() => ({
+    selectedProduct: value.selectedProduct,
+    setSelectedProduct: value.setSelectedProduct,
+    handleDelete: value.handleDelete,
+    handlePrintTicket: value.handlePrintTicket,
+    isModalOpen: value.isModalOpen,
+    setIsModalOpen: value.setIsModalOpen,
+    editingItem: value.editingItem,
+    setEditingItem: value.setEditingItem,
+    formData: value.formData,
+    setFormData: value.setFormData,
+    formErrors: value.formErrors,
+    setFormErrors: value.setFormErrors,
+    selectedEventCategory: value.selectedEventCategory,
+    setSelectedEventCategory: value.setSelectedEventCategory,
+    handleOpenModal: value.handleOpenModal,
+    handleCloseModal: value.handleCloseModal,
+    handleSelectEventCategory: value.handleSelectEventCategory,
+    handleFormChange: value.handleFormChange,
+    handleBatchFormUpdate: value.handleBatchFormUpdate,
+    handleSave: value.handleSave,
+    isSaving: value.isSaving,
+    drainageReportItems: value.drainageReportItems,
+    handleSavePistoleoItem: value.handleSavePistoleoItem,
+    selectedRowIds: value.selectedRowIds,
+    handleApplyBulkEdit: value.handleApplyBulkEdit,
+    allManageableColumns: value.allManageableColumns,
+    toggleVisibility: value.toggleVisibility,
+    moveColumn: value.moveColumn,
+    showAllColumns: value.showAllColumns,
+    resetColumnOrder: value.resetColumnOrder,
+    handleColumnDrop: value.handleColumnDrop,
+    handleSaveQuickTraspaso: value.handleSaveQuickTraspaso,
+    globalTicketConfig: value.globalTicketConfig,
+    handleSaveTicketConfig: value.handleSaveTicketConfig,
+    handleUniversalImportConfirmed: value.handleUniversalImportConfirmed,
+    handleSyncRowsToVencimientos: value.handleSyncRowsToVencimientos,
+    setSelectedRowIds: value.setSelectedRowIds,
+    handleBulkDelete: value.handleBulkDelete,
+    bulkActionCtx: value.bulkActionCtx,
+    isZenMode: value.isZenMode,
+    setIsZenMode: value.setIsZenMode,
+    tableDensity: value.tableDensity,
+    setTableDensity: value.setTableDensity,
+    isSummaryView: value.isSummaryView,
+    handleToggleSummaryView: value.handleToggleSummaryView,
+    areFiltersVisible: value.areFiltersVisible,
+    setAreFiltersVisible: value.setAreFiltersVisible,
+    hasCustomColWidths: value.hasCustomColWidths,
+    handleResetColWidths: value.handleResetColWidths,
+    handleToggleStickyColumns: value.handleToggleStickyColumns,
+    hiddenColumns: value.hiddenColumns,
+    isActionsMenuOpen: value.isActionsMenuOpen,
+    setIsActionsMenuOpen: value.setIsActionsMenuOpen,
+    isSidebarCollapsed: value.isSidebarCollapsed,
+    setIsSidebarCollapsed: value.setIsSidebarCollapsed,
+    otherSheets: value.otherSheets,
+    isMobileMenuOpen: value.isMobileMenuOpen,
+    setIsMobileMenuOpen: value.setIsMobileMenuOpen,
+    showToast: value.showToast,
+    effectiveVisibleHeaders: value.effectiveVisibleHeaders,
+    visibleColumnMeta: value.visibleColumnMeta,
+    tableContainerRef: value.tableContainerRef,
+    getColWidth: value.getColWidth,
+    handleStartResize: value.handleStartResize,
+    handleAutoFitColumn: value.handleAutoFitColumn,
+    resizingCol: value.resizingCol,
+    onSelectRow: value.onSelectRow,
+    onClickItem: value.onClickItem,
+    onDeleteRow: value.onDeleteRow,
+    onPmRadarFilterClick: value.onPmRadarFilterClick,
+    onEventResolutionFilterClick: value.onEventResolutionFilterClick,
+    onEventFilterClick: value.onEventFilterClick,
+    onFrcBodFilterClick: value.onFrcBodFilterClick,
+    onOpenQuickTraspaso: value.onOpenQuickTraspaso,
+    onOpenWhatsApp: value.onOpenWhatsApp,
+    onOpenEmail: value.onOpenEmail,
+    isWhatsAppEnabled: value.isWhatsAppEnabled,
+    isEmailEnabled: value.isEmailEnabled,
+    draggedCol: value.draggedCol,
+    setDraggedCol: value.setDraggedCol,
+    dragOverCol: value.dragOverCol,
+    setDragOverCol: value.setDragOverCol,
+    virtualRows: value.virtualRows,
+    paginatedDisplayRows: value.paginatedDisplayRows,
+    paddingTop: value.paddingTop,
+    paddingBottom: value.paddingBottom,
+    onSelectGroupRows: value.onSelectGroupRows,
+    toggleGroupCollapse: value.toggleGroupCollapse,
+    measureElementRef: value.measureElementRef,
+    handleToggleSort: value.handleToggleSort,
+    expandAllGroups: value.expandAllGroups,
+    collapseAllGroups: value.collapseAllGroups,
+    collapsedGroups: value.collapsedGroups,
+    groupedItems: value.groupedItems,
+    toggleGroupByDirection: value.toggleGroupByDirection,
+  }), [
+    value.selectedProduct, value.isModalOpen, value.editingItem, value.formData,
+    value.formErrors, value.selectedEventCategory, value.isSaving, value.selectedRowIds,
+    value.allManageableColumns, value.globalTicketConfig, value.isZenMode, value.tableDensity,
+    value.isSummaryView, value.areFiltersVisible, value.hasCustomColWidths, value.hiddenColumns,
+    value.isActionsMenuOpen, value.isSidebarCollapsed, value.isMobileMenuOpen,
+    value.effectiveVisibleHeaders, value.visibleColumnMeta, value.resizingCol,
+    value.draggedCol, value.dragOverCol, value.virtualRows, value.paginatedDisplayRows,
+    value.paddingTop, value.paddingBottom, value.collapsedGroups, value.groupedItems
+  ]);
+
   return (
-    <DashboardContext.Provider value={value}>
-      {children}
-    </DashboardContext.Provider>
+    <SheetDataContext.Provider value={sheetData}>
+      <FilterSettingsContext.Provider value={filterSettings}>
+        <OfflineSyncContext.Provider value={offlineSync}>
+          <FormStateContext.Provider value={formState}>
+            <DashboardContext.Provider value={value}>
+              {children}
+            </DashboardContext.Provider>
+          </FormStateContext.Provider>
+        </OfflineSyncContext.Provider>
+      </FilterSettingsContext.Provider>
+    </SheetDataContext.Provider>
   );
 };
 
@@ -262,6 +502,51 @@ export function useDashboard(): DashboardContextType {
   const context = useContext(DashboardContext);
   if (!context) {
     throw new Error('useDashboard must be used within a DashboardProvider');
+  }
+  return context;
+}
+
+/**
+ * Hook to subscribe ONLY to Core Sheet Data & Metadata.
+ * Prevents unnecessary re-renders when filters or offline queues update.
+ */
+export function useSheetData(): Partial<DashboardContextType> {
+  const context = useContext(SheetDataContext);
+  if (!context) {
+    throw new Error('useSheetData must be used within a DashboardProvider');
+  }
+  return context;
+}
+
+/**
+ * Hook to subscribe ONLY to Filters, Search, Chips and Slice settings.
+ */
+export function useFilterSettings(): Partial<DashboardContextType> {
+  const context = useContext(FilterSettingsContext);
+  if (!context) {
+    throw new Error('useFilterSettings must be used within a DashboardProvider');
+  }
+  return context;
+}
+
+/**
+ * Hook to subscribe ONLY to Offline Queue, Audits and Connectivity status.
+ */
+export function useOfflineSyncState(): Partial<DashboardContextType> {
+  const context = useContext(OfflineSyncContext);
+  if (!context) {
+    throw new Error('useOfflineSyncState must be used within a DashboardProvider');
+  }
+  return context;
+}
+
+/**
+ * Hook to subscribe ONLY to UI Forms, Modals and Presentation styles.
+ */
+export function useFormState(): Partial<DashboardContextType> {
+  const context = useContext(FormStateContext);
+  if (!context) {
+    throw new Error('useFormState must be used within a DashboardProvider');
   }
   return context;
 }

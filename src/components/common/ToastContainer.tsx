@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, AlertCircle, Loader2, Info, X } from 'lucide-react';
+import { eventBus } from '../../utils/eventBus';
 
 export type ToastType = 'success' | 'error' | 'loading' | 'info' | 'warning';
 
@@ -42,6 +43,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     return id;
   }, []);
+
+  useEffect(() => {
+    const unsub = eventBus.on('toast:show', (payload) => {
+      showToast(payload.message, payload.type, payload.title, payload.duration);
+    });
+    return unsub;
+  }, [showToast]);
 
   const updateToast = useCallback((id: string, message: string, type?: ToastType, title?: string, duration: number = 4000) => {
     setToasts(prev => prev.map(t => {
