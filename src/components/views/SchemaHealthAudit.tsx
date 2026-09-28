@@ -26,13 +26,26 @@ export const SchemaHealthAudit: React.FC<SchemaHealthAuditProps> = ({
 }) => {
   // Analyze current schema health
   const { score, issues, checkedSheetsCount } = useMemo(() => {
-    const sheetList = metadata?.sheets || [];
+    // Collect unique valid sheet names from metadata and sheetConfig.schema
+    const nameSet = new Set<string>();
+    if (metadata?.sheets) {
+      metadata.sheets.forEach(s => {
+        const title = s.properties?.title || s.title;
+        if (title && typeof title === 'string') nameSet.add(title);
+      });
+    }
+    if (sheetConfig.schema) {
+      Object.keys(sheetConfig.schema).forEach(k => {
+        if (k && typeof k === 'string') nameSet.add(k);
+      });
+    }
+
+    const sheetNames = Array.from(nameSet);
     const issuesList: HealthIssue[] = [];
     let passedChecks = 0;
     let totalChecks = 0;
 
-    sheetList.forEach(sheet => {
-      const sheetName = sheet.title;
+    sheetNames.forEach((sheetName, index) => {
       const schemaMap = sheetConfig.schema?.[sheetName] || {};
       const columns = Object.keys(schemaMap);
 
@@ -44,10 +57,10 @@ export const SchemaHealthAudit: React.FC<SchemaHealthAuditProps> = ({
         // Auto fix candidate: find SKU, ID, or first column
         const candidateKey = columns.find(c => /sku|id|codigo|folio|cu_vc/i.test(c)) || columns[0];
         issuesList.push({
-          id: `no-key-${sheetName}`,
+          id: `no-key-${sheetName}-${index}`,
           severity: 'warning',
           sheetName,
-          message: `La tabla no tiene definida una Clave Primaria (ID Key).`,
+          message: `La tabla "${sheetName}" no tiene definida una Clave Primaria (ID Key).`,
           autoFixLabel: candidateKey ? `Fijar "${candidateKey}" como Clave` : undefined,
           autoFix: candidateKey ? () => {
             const updatedSchema = { ...(sheetConfig.schema || {}) };
@@ -71,10 +84,10 @@ export const SchemaHealthAudit: React.FC<SchemaHealthAuditProps> = ({
       const nonTextTypes = Object.values(schemaMap).filter(col => col.type && col.type !== 'Text');
       if (columns.length > 0 && nonTextTypes.length === 0) {
         issuesList.push({
-          id: `all-text-${sheetName}`,
+          id: `all-text-${sheetName}-${index}`,
           severity: 'info',
           sheetName,
-          message: `Todas las columnas están con tipo genérico "Text". Puedes precisar fechas, números o relaciones.`,
+          message: `Todas las columnas de "${sheetName}" están con tipo genérico "Text". Puedes precisar fechas, números o relaciones.`,
           autoFixLabel: 'Auto-detectar Tipos',
           autoFix: () => {
             const updatedSchema = { ...(sheetConfig.schema || {}) };
@@ -94,20 +107,19 @@ export const SchemaHealthAudit: React.FC<SchemaHealthAuditProps> = ({
             saveConfig({ ...sheetConfig, schema: updatedSchema });
             showToast?.(`Tipos de datos inferidos para la tabla ${sheetName}`, 'success');
           }
-        }
-        );
+        });
       } else {
         passedChecks++;
       }
 
       // 3. Search Indexing check
       const hasIndexed = Object.values(schemaMap).some(col => col.isIndexed !== false);
-      if (!hasIndexed) {
+      if (columns.length > 0 && !hasIndexed) {
         issuesList.push({
-          id: `no-search-${sheetName}`,
+          id: `no-search-${sheetName}-${index}`,
           severity: 'info',
           sheetName,
-          message: `Ninguna columna está marcada para el buscador universal.`
+          message: `Ninguna columna de "${sheetName}" está marcada para el buscador universal.`
         });
       } else {
         passedChecks++;
@@ -119,7 +131,7 @@ export const SchemaHealthAudit: React.FC<SchemaHealthAuditProps> = ({
     return {
       score: calculatedScore,
       issues: issuesList,
-      checkedSheetsCount: sheetList.length
+      checkedSheetsCount: sheetNames.length
     };
   }, [sheetConfig, metadata, saveConfig, showToast]);
 
