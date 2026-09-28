@@ -53,6 +53,7 @@ import { ItemDetailDrawer } from './drawers/ItemDetailDrawer';
 import { ViewConfigControlDrawer } from './drawers/ViewConfigControlDrawer';
 import { usePrecomputedColumns } from '../hooks/usePrecomputedColumns';
 import { TicketPrintView } from './views/TicketPrintView';
+import { isModuleEnabled } from '../utils/modulesRegistry';
 import { buildBulkActionContext, isActionEnabledForTable } from '../utils/bulkActionsRegistry';
 import { SkeletonLoader } from './common/SkeletonLoader';
 import { useToast } from './common/ToastContainer';
@@ -203,6 +204,15 @@ export const InventoryDashboard: React.FC = () => {
   // este hook necesita sus setters de estado offline: el ciclo se rompe con un
   // ref, que el callback diferido lee en la sincronización (no en render).
   fetchDataRef.current = fetchData;
+
+  // Redirección si la vista activa se desactiva globalmente en los módulos
+  useEffect(() => {
+    if (sheetConfig?.enabledModules && activeView !== 'main') {
+      if (!isModuleEnabled(activeView, sheetConfig.enabledModules)) {
+        setActiveView('main');
+      }
+    }
+  }, [activeView, sheetConfig?.enabledModules]);
 
   const frcBodCol = useMemo<string | null>(() => {
     return findColumnBySemantic(headers, 'frc_bod') || 

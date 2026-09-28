@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
+import { isModuleEnabled } from '../../utils/modulesRegistry';
 
 interface SidebarItemProps {
   key?: string;
@@ -58,6 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ forceExpanded = false, onNavig
   const isSidebarCollapsed = forceExpanded ? false : (dashboard.isSidebarCollapsed ?? false);
   const setIsSidebarCollapsed = dashboard.setIsSidebarCollapsed ?? (() => {});
   const { activeView, setActiveView, setSelectedProduct } = dashboard;
+  const enabledModules = dashboard.sheetConfig?.enabledModules ?? {};
   const otherSheets = dashboard.otherSheets ?? [];
   const onOpenConfig = () => { modalsActions.setIsConfigOpen(true); onNavigate?.(); };
   const onOpenStockCount = () => { modalsActions.setIsStockCountOpen?.(true); onNavigate?.(); };
@@ -86,69 +88,83 @@ export const Sidebar: React.FC<SidebarProps> = ({ forceExpanded = false, onNavig
       
       <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-6">
         <div className="flex flex-col gap-1">
-          <SidebarItem 
-            icon={<Database className="w-5 h-5" />} 
-            label="Vencimientos & Radar" 
-            active={activeView === 'main'} 
-            onClick={() => navigate('main')}
-            collapsed={isSidebarCollapsed}
-          />
-          <SidebarItem 
-            icon={<FileSpreadsheet className="w-5 h-5" />} 
-            label="Incidencias & FRC" 
-            active={activeView === 'events'} 
-            onClick={() => navigate('events')}
-            collapsed={isSidebarCollapsed}
-          />
-          <SidebarItem 
-            icon={<Package className="w-5 h-5" />} 
-            label="Catálogo Productos" 
-            active={activeView === 'products'} 
-            onClick={() => navigate('products')}
-            collapsed={isSidebarCollapsed}
-          />
-          <SidebarItem 
-            icon={<FileText className="w-5 h-5" />} 
-            label="Políticas de Canje" 
-            active={activeView === 'policies'} 
-            onClick={() => navigate('policies')}
-            collapsed={isSidebarCollapsed}
-          />
+          {isModuleEnabled('main', enabledModules) && (
+            <SidebarItem 
+              icon={<Database className="w-5 h-5" />} 
+              label="Vencimientos & Radar" 
+              active={activeView === 'main'} 
+              onClick={() => navigate('main')}
+              collapsed={isSidebarCollapsed}
+            />
+          )}
+          {isModuleEnabled('events', enabledModules) && (
+            <SidebarItem 
+              icon={<FileSpreadsheet className="w-5 h-5" />} 
+              label="Incidencias & FRC" 
+              active={activeView === 'events'} 
+              onClick={() => navigate('events')}
+              collapsed={isSidebarCollapsed}
+            />
+          )}
+          {isModuleEnabled('products', enabledModules) && (
+            <SidebarItem 
+              icon={<Package className="w-5 h-5" />} 
+              label="Catálogo Productos" 
+              active={activeView === 'products'} 
+              onClick={() => navigate('products')}
+              collapsed={isSidebarCollapsed}
+            />
+          )}
+          {isModuleEnabled('policies', enabledModules) && (
+            <SidebarItem 
+              icon={<FileText className="w-5 h-5" />} 
+              label="Políticas de Canje" 
+              active={activeView === 'policies'} 
+              onClick={() => navigate('policies')}
+              collapsed={isSidebarCollapsed}
+            />
+          )}
 
-            {canCount && (
-              <SidebarItem 
-                icon={<Barcode className="w-5 h-5" />} 
-                label="Conteo de Stock" 
-                active={false} 
-                onClick={onOpenStockCount}
-                collapsed={isSidebarCollapsed}
-                badge="Físico"
-              />
-            )}
+          {canCount && isModuleEnabled('conteo', enabledModules) && (
+            <SidebarItem 
+              icon={<Barcode className="w-5 h-5" />} 
+              label="Conteo de Stock" 
+              active={false} 
+              onClick={onOpenStockCount}
+              collapsed={isSidebarCollapsed}
+              badge="Físico"
+            />
+          )}
           
           <div className="my-2 border-t border-slate-100 dark:border-slate-800"></div>
           
-          <SidebarItem 
-            icon={<TableProperties className="w-5 h-5" />} 
-            label="Estructura de Datos" 
-            active={activeView === 'schema'} 
-            onClick={() => navigate('schema')}
-            collapsed={isSidebarCollapsed}
-          />
-          <SidebarItem 
-            icon={<PieChart className="w-5 h-5" />} 
-            label="Analítica & Dashboard" 
-            active={activeView === 'analytics'} 
-            onClick={() => navigate('analytics')}
-            collapsed={isSidebarCollapsed}
-          />
-          <SidebarItem 
-            icon={<Calendar className="w-5 h-5" />} 
-            label="Agenda & Calendario" 
-            active={activeView === 'calendar'} 
-            onClick={() => navigate('calendar')}
-            collapsed={isSidebarCollapsed}
-          />
+          {isModuleEnabled('schema', enabledModules) && (
+            <SidebarItem 
+              icon={<TableProperties className="w-5 h-5" />} 
+              label="Estructura de Datos" 
+              active={activeView === 'schema'} 
+              onClick={() => navigate('schema')}
+              collapsed={isSidebarCollapsed}
+            />
+          )}
+          {isModuleEnabled('analytics', enabledModules) && (
+            <SidebarItem 
+              icon={<PieChart className="w-5 h-5" />} 
+              label="Analítica & Dashboard" 
+              active={activeView === 'analytics'} 
+              onClick={() => navigate('analytics')}
+              collapsed={isSidebarCollapsed}
+            />
+          )}
+          {isModuleEnabled('calendar', enabledModules) && (
+            <SidebarItem 
+              icon={<Calendar className="w-5 h-5" />} 
+              label="Agenda & Calendario" 
+              active={activeView === 'calendar'} 
+              onClick={() => navigate('calendar')}
+              collapsed={isSidebarCollapsed}
+            />
+          )}
         </div>
 
         {otherSheets.length > 0 && (

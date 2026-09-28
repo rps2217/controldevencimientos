@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Settings, X, Database, FileSpreadsheet, Package, FileText, CheckCircle2, Sliders, BookOpen, Plus, Server, Sparkles } from 'lucide-react';
+import { Settings, X, Database, FileSpreadsheet, Package, FileText, CheckCircle2, Sliders, BookOpen, Plus, Server, Sparkles, ToggleRight } from 'lucide-react';
 import { SheetConfig, SpreadsheetMetadata } from '../../types';
 import { SEMANTIC_FIELD_OPTIONS } from '../../utils/columnAliases';
 import { TableBulkActionsPanel } from '../settings/TableBulkActionsPanel';
 import { TableCapabilitiesPanel } from '../settings/TableCapabilitiesPanel';
 import { BackendMirrorPanel } from '../settings/BackendMirrorPanel';
+import { AppModulesPanel } from '../settings/AppModulesPanel';
 
 interface GlobalConfigModalProps {
   isOpen: boolean;
@@ -17,7 +18,7 @@ interface GlobalConfigModalProps {
   activeView: string;
   activeSheetTitle?: string;
   headers?: string[];
-  initialTab?: 'sheets' | 'dictionary' | 'bulkActions' | 'capabilities' | 'backendMirror';
+  initialTab?: 'sheets' | 'dictionary' | 'bulkActions' | 'capabilities' | 'globalModules' | 'backendMirror';
 }
 
 const SEMANTIC_FIELDS = SEMANTIC_FIELD_OPTIONS;
@@ -35,7 +36,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
   headers = [],
   initialTab = 'sheets'
 }) => {
-  const [activeTab, setActiveTab] = useState<'sheets' | 'dictionary' | 'bulkActions' | 'capabilities' | 'backendMirror'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'sheets' | 'dictionary' | 'bulkActions' | 'capabilities' | 'globalModules' | 'backendMirror'>(initialTab);
   const [selectedField, setSelectedField] = useState<string>('sku');
   const [newAliasInput, setNewAliasInput] = useState<string>('');
 
@@ -136,7 +137,18 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
             }`}
           >
             <Sparkles className="w-4 h-4" />
-            <span>Módulos de la Hoja</span>
+            <span>Capacidades Hoja</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('globalModules')}
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+              activeTab === 'globalModules'
+                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700'
+            }`}
+          >
+            <ToggleRight className="w-4 h-4" />
+            <span>Módulos de la App</span>
           </button>
           <button
             onClick={() => setActiveTab('backendMirror')}
@@ -339,6 +351,12 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
               saveConfig={saveConfig}
               tableKey={activeView}
               headers={headers}
+            />
+          ) : activeTab === 'globalModules' ? (
+            <AppModulesPanel
+              sheetConfig={sheetConfig}
+              setSheetConfig={setSheetConfig}
+              saveConfig={saveConfig}
             />
           ) : (
             <BackendMirrorPanel

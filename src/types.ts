@@ -84,6 +84,7 @@ export interface SheetConfig {
   ticketPrintConfig?: GlobalTicketConfig;
   backendMirror?: BackendMirrorConfig;
   enableStickyColumns?: boolean;
+  enabledModules?: Record<string, boolean>;
   updatedAt?: string;
 }
 
