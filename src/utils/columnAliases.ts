@@ -108,14 +108,7 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^registro_id$/i,
     /^id_registro$/i,
     /^folio$/i,
-    /^nro_registro$/i,
-    /^frc(_|\/|\s)?n(ro)?$/i,
-    /^frc$/i,
-    /^n(_|\s)?frc$/i,
-    /^nro(_|\s)?frc$/i,
-    /^folio(_|\s)?frc$/i,
-    /^frc(_|\s)?folio$/i,
-    /^numero(_|\s)?frc$/i
+    /^nro_registro$/i
   ],
   sku: [
     /^(^|_|\s)*sku(_|\s)?(vc|calculado)?$/i,
