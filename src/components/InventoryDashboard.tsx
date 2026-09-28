@@ -1247,7 +1247,7 @@ export const InventoryDashboard: React.FC = () => {
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-hidden p-2 md:p-6 min-h-0 flex flex-col">
+        <div className={`flex-1 min-h-0 flex flex-col p-2 md:p-6 ${activeView === 'main' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           {error && (
             <div className="mb-6 rounded-xl bg-red-50 p-4 border border-red-100">
               <div className="flex items-center">
