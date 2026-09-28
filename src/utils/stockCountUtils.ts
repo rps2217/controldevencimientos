@@ -11,7 +11,6 @@ import { parseLocaleNumber, getEndOfMonthDateForYm, formatDisplayDate } from './
 import { findMasterProduct, getMasterProductSummary } from './referenceResolver';
 import { exportToExcel } from './exportUtils';
 import { STORAGE_KEYS, readStorage, objectArraySchema } from './appStorage';
-import { toAuditSheetStatus } from './auditConsolidation';
 
 // El ciclo de campañas (snapshot ERP, matriz de cuadratura, reportes y su
 // persistencia) vive en `campaignUtils.ts`. Este módulo cubre las sesiones de
@@ -512,36 +511,7 @@ export async function exportStockCountToExcel(
 }
 
 
-/**
- * Builds formatted rows from a single stock count session for the dedicated audit tab (_AUDITORIA_INVENTARIO)
- */
-export function buildAuditRowsFromSession(
-  session: StockCountSession,
-  reconciliation: StockCountReconciliationItem[],
-  campaign?: InventoryCampaign | null
-): SheetRecord[] {
-  const nowIso = new Date().toISOString();
-  const dateStr = new Date().toLocaleDateString('es-CL');
-
-  return reconciliation.map(item => {
-    return {
-      ID_CAMPANA: campaign ? campaign.id : `ses_${session.id}`,
-      FECHA_AUDITORIA: dateStr,
-      LOCAL: campaign?.local || session.ubicacion || '',
-      SKU: item.sku,
-      DESCRIPCION: item.descripcion,
-      PROVEEDOR: item.rutProveedor || '',
-      STOCK_ERP: item.teorico,
-      STOCK_FISICO: item.contado,
-      DIFERENCIA: item.diferencia,
-      VENTA_AJUSTE: item.ajusteMovimiento || 0,
-      ESTADO_AUDITORIA: toAuditSheetStatus(item.estado),
-      UBICACIONES_MUEBLES: session.ubicacion || session.nombre,
-      USUARIO_TERMINAL: 'Operario',
-      ULTIMA_ACTUALIZACION: nowIso
-    };
-  });
-}
+export { buildAuditRowsFromSession } from './auditConsolidation';
 
 // AudioContext singleton to avoid repeated instantiation and memory leaks on mobile/PDA devices
 let sharedAudioContext: AudioContext | null = null;

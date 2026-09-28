@@ -1,5 +1,32 @@
 import type { CellValue, SheetRow, SheetMatrix } from '../lib/sheets';
-import type { StockCountReconciliationItem } from '../types';
+import type {
+  StockCountSession,
+  StockCountReconciliationItem,
+  InventoryCampaign,
+  CampaignConsolidationMatrix,
+  CampaignAuditRow,
+  SheetRecord
+} from '../types';
+
+/**
+ * Lista canónica de encabezados para la pestaña de auditoría `_AUDITORIA_INVENTARIO`.
+ */
+export const AUDIT_SHEET_CANONICAL_HEADERS: string[] = [
+  'ID_CAMPANA',
+  'FECHA_AUDITORIA',
+  'LOCAL',
+  'SKU',
+  'DESCRIPCION',
+  'PROVEEDOR',
+  'STOCK_ERP',
+  'STOCK_FISICO',
+  'DIFERENCIA',
+  'VENTA_AJUSTE',
+  'ESTADO_AUDITORIA',
+  'UBICACIONES_MUEBLES',
+  'USUARIO_TERMINAL',
+  'ULTIMA_ACTUALIZACION'
+];
 
 /**
  * Vocabulario canónico de la columna `ESTADO_AUDITORIA` de la pestaña
@@ -29,6 +56,87 @@ export function toAuditSheetStatus(
   if (estado === 'CUADRADO') return 'CUADRADO_OK';
   if (estado === 'NO_CATALOGADO') return 'HALLAZGO_NO_ERP';
   return estado;
+}
+
+/**
+ * Genera los registros en formato objeto para la pestaña de auditoría a partir
+ * de una sesión individual de conteo y su reconciliación.
+ */
+export function buildAuditRowsFromSession(
+  session: StockCountSession,
+  reconciliation: StockCountReconciliationItem[],
+  campaign?: InventoryCampaign | null
+): SheetRecord[] {
+  const nowIso = new Date().toISOString();
+  const dateStr = new Date().toLocaleDateString('es-CL');
+
+  return reconciliation.map(item => {
+    return {
+      ID_CAMPANA: campaign ? campaign.id : `ses_${session.id}`,
+      FECHA_AUDITORIA: dateStr,
+      LOCAL: campaign?.local || session.ubicacion || '',
+      SKU: item.sku,
+      DESCRIPCION: item.descripcion,
+      PROVEEDOR: item.rutProveedor || '',
+      STOCK_ERP: item.teorico,
+      STOCK_FISICO: item.contado,
+      DIFERENCIA: item.diferencia,
+      VENTA_AJUSTE: item.ajusteMovimiento || 0,
+      ESTADO_AUDITORIA: toAuditSheetStatus(item.estado),
+      UBICACIONES_MUEBLES: session.ubicacion || session.nombre,
+      USUARIO_TERMINAL: 'Operario',
+      ULTIMA_ACTUALIZACION: nowIso
+    };
+  });
+}
+
+/**
+ * Genera los registros en formato objeto para la pestaña de auditoría a partir
+ * de la matriz de consolidación de una campaña.
+ */
+export function buildAuditRowsFromCampaignMatrix(
+  matrix: CampaignConsolidationMatrix,
+  campaign: InventoryCampaign
+): SheetRecord[] {
+  const allRows: CampaignAuditRow[] = [
+    ...matrix.cuadrados,
+    ...matrix.discrepancias,
+    ...matrix.hallazgos,
+    ...matrix.nuncaPistoleados
+  ];
+
+  const nowIso = new Date().toISOString();
+  const dateStr = new Date().toLocaleDateString('es-CL');
+
+  return allRows.map(r => {
+    let estadoLabel: AuditSheetStatus;
+    if (r.esCerrado) estadoLabel = 'VALIDADO_CERRADO';
+    else if (r.estadoGlobal === 'VALIDADO_OK') estadoLabel = 'CUADRADO_OK';
+    else if (r.estadoGlobal === 'DISCREPANCIA') estadoLabel = r.diferenciaNeta < 0 ? 'FALTANTE' : 'SOBRANTE';
+    else if (r.estadoGlobal === 'NUNCA_PISTOLEADO') estadoLabel = 'NUNCA_PISTOLEADO';
+    else estadoLabel = 'HALLAZGO_NO_ERP';
+
+    const ubicacionesStr = r.sesionesDondeAparece && r.sesionesDondeAparece.length > 0
+      ? r.sesionesDondeAparece.map(s => `${s.ubicacion || s.nombreSesion} (${s.cantidad} u.)`).join('; ')
+      : (r.stockFisicoTotal === 0 ? 'Sin lecturas' : 'General');
+
+    return {
+      ID_CAMPANA: campaign.id,
+      FECHA_AUDITORIA: dateStr,
+      LOCAL: campaign.local || r.local || '',
+      SKU: r.sku,
+      DESCRIPCION: r.descripcion,
+      PROVEEDOR: r.proveedor || '',
+      STOCK_ERP: r.stockTeorico,
+      STOCK_FISICO: r.stockFisicoTotal,
+      DIFERENCIA: r.diferenciaNeta,
+      VENTA_AJUSTE: r.ajusteManualVenta || 0,
+      ESTADO_AUDITORIA: estadoLabel,
+      UBICACIONES_MUEBLES: ubicacionesStr,
+      USUARIO_TERMINAL: 'Operario / Consolidado',
+      ULTIMA_ACTUALIZACION: nowIso
+    };
+  });
 }
 
 /** Construye los valores de una fila de auditoría según el orden de `headerList`. */

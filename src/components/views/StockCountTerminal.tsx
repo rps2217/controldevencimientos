@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { X, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2, Undo2 } from 'lucide-react';
 import { StockCountSession, StockCountEntry, InventoryItem, InventoryCampaign, SheetRecord } from '../../types';
-import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorage, saveStockCountSessionsToStorageDebounced, flushStockCountSessionsToStorage, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
+import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorageDebounced, flushStockCountSessionsToStorage, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
 import { loadCampaignsFromStorage, saveCampaignsToStorage, getActiveCampaignId, setActiveCampaignId } from '../../utils/campaignUtils';
 import { saveAuditRowsToDedicatedSheet, syncCampaignsWithCloud } from '../../lib/sheets';
 import { LazyFallback } from '../common/LazyFallback';
@@ -93,7 +93,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
         setCampaigns(res.mergedCampaigns);
         setSessions(res.mergedSessions);
         saveCampaignsToStorage(res.mergedCampaigns);
-        saveStockCountSessionsToStorage(res.mergedSessions);
+        flushStockCountSessionsToStorage();
 
         if (res.activeCampaignId) {
           setActiveCampaignIdState(res.activeCampaignId);
@@ -139,7 +139,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       };
       const updatedSessions = sessions.map(s => s.id === sessionToBackup.id ? updatedSession : s);
       setSessions(updatedSessions);
-      saveStockCountSessionsToStorage(updatedSessions);
 
       const res = await syncCampaignsWithCloud({
         campaigns,
@@ -151,7 +150,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
         setCampaigns(res.mergedCampaigns);
         setSessions(res.mergedSessions);
         saveCampaignsToStorage(res.mergedCampaigns);
-        saveStockCountSessionsToStorage(res.mergedSessions);
+        flushStockCountSessionsToStorage();
         playBeep('success');
         showToast(
           `✅ Manifiesto de "${sessionToBackup.nombre}" respaldado en la nube (${sessionToBackup.conteos.length} lecturas).`,
@@ -225,7 +224,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     // Update sessions
     const updatedSessions = [newSession, ...sessions];
     setSessions(updatedSessions);
-    saveStockCountSessionsToStorage(updatedSessions);
 
     // If campaign exists, link session to campaign
     if (activeCampaignIdState) {
@@ -279,11 +277,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       sincronizadoNube: false
     };
 
-    setSessions(prev => {
-      const updated = [newSession, ...prev];
-      saveStockCountSessionsToStorage(updated);
-      return updated;
-    });
+    setSessions(prev => [newSession, ...prev]);
 
     if (activeCampaignIdState) {
       setCampaigns(prev => {
@@ -551,11 +545,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       sincronizadoNube: false
     };
 
-    setSessions(prev => {
-      const updated = [newSession, ...prev];
-      saveStockCountSessionsToStorage(updated);
-      return updated;
-    });
+    setSessions(prev => [newSession, ...prev]);
 
     // Automatically link to active campaign if one is selected
     if (activeCampaignIdState) {

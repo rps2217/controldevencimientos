@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle, Settings2 } from 'lucide-react';
+import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle, Settings2, Calendar } from 'lucide-react';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { ThemeSelector } from './ThemeSelector';
 import { useDashboard } from '../../context/DashboardContext';
@@ -106,6 +106,12 @@ export const DashboardTopNav: React.FC = () => {
           title: 'Analítica & Métricas',
           icon: <PieChart className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />,
           actionLabel: 'Nuevo'
+        };
+      case 'calendar':
+        return {
+          title: 'Agenda & Calendario',
+          icon: <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />,
+          actionLabel: 'Nueva Tarea'
         };
       default:
         return {

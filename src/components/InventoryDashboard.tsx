@@ -41,6 +41,7 @@ import { DashboardTopNav } from './navigation/DashboardTopNav';
 import { DashboardPageHeader } from './navigation/DashboardPageHeader';
 import { DashboardFilterPanels } from './views/DashboardFilterPanels';
 import { SchemaEditorView } from './views/SchemaEditorView';
+import { OperationalCalendarView } from './views/OperationalCalendarView';
 import { LazyFallback } from './common/LazyFallback';
 import { FloatingBulkActionBar } from './dashboard/FloatingBulkActionBar';
 import { DashboardModalsManager } from './dashboard/DashboardModalsManager';
@@ -1282,6 +1283,12 @@ export const InventoryDashboard: React.FC = () => {
             <Suspense fallback={<LazyFallback />}>
               <AnalyticsDashboard items={filteredItems} headers={headers} />
             </Suspense>
+          ) : activeView === 'calendar' ? (
+            <OperationalCalendarView
+              items={filteredItems.length > 0 ? filteredItems : items}
+              headers={headers}
+              onSelectItem={(item) => setSelectedProduct(item)}
+            />
           ) : !activeSheet && !loading ? (
             <div className="h-full w-full flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50 dark:bg-slate-900/60">
               <div className="text-center max-w-sm">

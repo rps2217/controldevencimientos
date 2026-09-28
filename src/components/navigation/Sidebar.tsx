@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Database, FileSpreadsheet, Package, FileText, TableProperties, List, Settings, PanelLeftClose, PanelLeftOpen, PieChart, Barcode
+  Database, FileSpreadsheet, Package, FileText, TableProperties, List, Settings, PanelLeftClose, PanelLeftOpen, PieChart, Barcode, Calendar
 } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
@@ -140,6 +140,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ forceExpanded = false, onNavig
             label="Analítica & Dashboard" 
             active={activeView === 'analytics'} 
             onClick={() => navigate('analytics')}
+            collapsed={isSidebarCollapsed}
+          />
+          <SidebarItem 
+            icon={<Calendar className="w-5 h-5" />} 
+            label="Agenda & Calendario" 
+            active={activeView === 'calendar'} 
+            onClick={() => navigate('calendar')}
             collapsed={isSidebarCollapsed}
           />
         </div>

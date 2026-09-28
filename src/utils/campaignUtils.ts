@@ -17,13 +17,11 @@ import {
   CampaignAuditRow,
   StockCountSession,
   StockCountEntry,
-  SheetRecord,
 } from '../types';
 import { findColumnBySemantic } from './columnAliases';
 import { parseLocaleNumber, rowToObject } from './pureCalculations';
 import { exportToExcel } from './exportUtils';
 import { STORAGE_KEYS, readStorage, objectArraySchema } from './appStorage';
-import type { AuditSheetStatus } from './auditConsolidation';
 
 // ==========================================
 // CAMPAÑA DE INVENTARIO CÍCLICO MULTISESIÓN
@@ -754,53 +752,4 @@ export async function exportDiscrepanciesForRecountSheet(
   await exportToExcel(filename, headers, rows, 'Reconteo_Discrepancias');
 }
 
-/**
- * Builds formatted rows for the dedicated Google Sheets audit tab (_AUDITORIA_INVENTARIO).
- * This ensures audit and campaign counts NEVER touch or pollute the VENCIMIENTOS tab.
- */
-export function buildAuditRowsFromCampaignMatrix(
-  matrix: CampaignConsolidationMatrix,
-  campaign: InventoryCampaign
-): SheetRecord[] {
-  const allRows: CampaignAuditRow[] = [
-    ...matrix.cuadrados,
-    ...matrix.discrepancias,
-    ...matrix.hallazgos,
-    ...matrix.nuncaPistoleados
-  ];
-
-  const nowIso = new Date().toISOString();
-  const dateStr = new Date().toLocaleDateString('es-CL');
-
-  return allRows.map(r => {
-    // Cada rama cubre un estadoGlobal; `DISCREPANCIA` se abre en faltante/sobrante.
-    // El tipo de retorno obliga a que todas queden cubiertas por el vocabulario.
-    let estadoLabel: AuditSheetStatus;
-    if (r.esCerrado) estadoLabel = 'VALIDADO_CERRADO';
-    else if (r.estadoGlobal === 'VALIDADO_OK') estadoLabel = 'CUADRADO_OK';
-    else if (r.estadoGlobal === 'DISCREPANCIA') estadoLabel = r.diferenciaNeta < 0 ? 'FALTANTE' : 'SOBRANTE';
-    else if (r.estadoGlobal === 'NUNCA_PISTOLEADO') estadoLabel = 'NUNCA_PISTOLEADO';
-    else estadoLabel = 'HALLAZGO_NO_ERP';
-
-    const ubicacionesStr = r.sesionesDondeAparece && r.sesionesDondeAparece.length > 0
-      ? r.sesionesDondeAparece.map(s => `${s.ubicacion || s.nombreSesion} (${s.cantidad} u.)`).join('; ')
-      : (r.stockFisicoTotal === 0 ? 'Sin lecturas' : 'General');
-
-    return {
-      ID_CAMPANA: campaign.id,
-      FECHA_AUDITORIA: dateStr,
-      LOCAL: campaign.local || r.local || '',
-      SKU: r.sku,
-      DESCRIPCION: r.descripcion,
-      PROVEEDOR: r.proveedor || '',
-      STOCK_ERP: r.stockTeorico,
-      STOCK_FISICO: r.stockFisicoTotal,
-      DIFERENCIA: r.diferenciaNeta,
-      VENTA_AJUSTE: r.ajusteManualVenta || 0,
-      ESTADO_AUDITORIA: estadoLabel,
-      UBICACIONES_MUEBLES: ubicacionesStr,
-      USUARIO_TERMINAL: 'Terminal Web',
-      ULTIMA_ACTUALIZACION: nowIso
-    };
-  });
-}
+export { buildAuditRowsFromCampaignMatrix } from './auditConsolidation';

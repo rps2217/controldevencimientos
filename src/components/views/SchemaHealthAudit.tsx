@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ShieldCheck, AlertTriangle, CheckCircle2, Wand2, Download, Upload, HelpCircle, Activity } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Wand2, Download, Upload, Activity } from 'lucide-react';
 import { SheetConfig, SpreadsheetMetadata, ColumnSchema } from '../../types';
 
 interface SchemaHealthAuditProps {
@@ -80,14 +80,14 @@ export const SchemaHealthAudit: React.FC<SchemaHealthAuditProps> = ({
         passedChecks++;
       }
 
-      // 2. Column Types Check (check if everything is default Text)
-      const nonTextTypes = Object.values(schemaMap).filter(col => col.type && col.type !== 'Text');
+      // 2. Column Types Check (check if everything is default text)
+      const nonTextTypes = Object.values(schemaMap).filter(col => col.type && col.type !== 'text');
       if (columns.length > 0 && nonTextTypes.length === 0) {
         issuesList.push({
           id: `all-text-${sheetName}-${index}`,
           severity: 'info',
           sheetName,
-          message: `Todas las columnas de "${sheetName}" están con tipo genérico "Text". Puedes precisar fechas, números o relaciones.`,
+          message: `Todas las columnas de "${sheetName}" están con tipo genérico "text". Puedes precisar fechas, números o relaciones.`,
           autoFixLabel: 'Auto-detectar Tipos',
           autoFix: () => {
             const updatedSchema = { ...(sheetConfig.schema || {}) };
@@ -95,10 +95,10 @@ export const SchemaHealthAudit: React.FC<SchemaHealthAuditProps> = ({
 
             Object.keys(currentSheetSchema).forEach(col => {
               const lower = col.toLowerCase();
-              let inferredType: ColumnSchema['type'] = 'Text';
-              if (/fecha|date|vto|venc|retiro/i.test(lower)) inferredType = 'Date';
-              else if (/cantidad|cant|monto|precio|stock|total|dias|unidades/i.test(lower)) inferredType = 'Number';
-              else if (/sku|codigo|ean|barcode/i.test(lower)) inferredType = 'Text';
+              let inferredType: ColumnSchema['type'] = 'text';
+              if (/fecha|date|vto|venc|retiro/i.test(lower)) inferredType = 'date';
+              else if (/cantidad|cant|monto|precio|stock|total|dias|unidades/i.test(lower)) inferredType = 'number';
+              else if (/sku|codigo|ean|barcode/i.test(lower)) inferredType = 'text';
 
               currentSheetSchema[col] = { ...currentSheetSchema[col], type: inferredType };
             });
@@ -107,19 +107,6 @@ export const SchemaHealthAudit: React.FC<SchemaHealthAuditProps> = ({
             saveConfig({ ...sheetConfig, schema: updatedSchema });
             showToast?.(`Tipos de datos inferidos para la tabla ${sheetName}`, 'success');
           }
-        });
-      } else {
-        passedChecks++;
-      }
-
-      // 3. Search Indexing check
-      const hasIndexed = Object.values(schemaMap).some(col => col.isIndexed !== false);
-      if (columns.length > 0 && !hasIndexed) {
-        issuesList.push({
-          id: `no-search-${sheetName}-${index}`,
-          severity: 'info',
-          sheetName,
-          message: `Ninguna columna de "${sheetName}" está marcada para el buscador universal.`
         });
       } else {
         passedChecks++;

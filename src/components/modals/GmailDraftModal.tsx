@@ -90,8 +90,8 @@ export const GmailDraftModal: React.FC<GmailDraftModalProps> = ({
       const todayStr = new Date().toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
       
       setSubject(`[Notificación Logística] Detalle de ${count} producto(s) - ${todayStr}`);
-      setIntroText(`Estimados,\n\nJunto con saludar, comparto el detalle de los productos seleccionados (${activeViewTitle}) para su revisión, gestión de canje o retiro preventivo:`);
-      setFooterText(`Quedamos atentos a la confirmación de la fecha de retiro o recepción de la orden de cambio.\n\nSaludos cordiales,`);
+      setIntroText(`Estimad@(s). Solicito su ayuda con precios de descuento para drenar productos detallados en la tabla adjunta ya que corresponden a productos sin canje y pronto vencimiento`);
+      setFooterText(`Gracias por la ayuda, Saludos cordiales`);
       
       // Auto detect email if present in any selected item field
       let detectedEmail = '';
