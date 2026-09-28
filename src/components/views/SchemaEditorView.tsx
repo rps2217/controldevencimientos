@@ -6,6 +6,7 @@ import {
 import { SheetConfig, SpreadsheetMetadata, SheetProperties, ColumnSchema, ColumnType, ColumnBehavior, UserVirtualColumn } from '../../types';
 import { getSheetData } from '../../lib/sheets';
 import { VisualSchemaDesigner } from './VisualSchemaDesigner';
+import { SchemaHealthAudit } from './SchemaHealthAudit';
 
 interface SchemaEditorViewProps {
   configStorageMode: 'properties' | 'sheet' | 'local';
@@ -186,6 +187,13 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
         </p>
       </div>
 
+      {/* Schema Health Audit Monitor */}
+      <SchemaHealthAudit
+        sheetConfig={sheetConfig}
+        metadata={metadata}
+        saveConfig={saveConfig}
+      />
+
       {/* Sub-view Toggle */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6">
         <button
@@ -308,6 +316,19 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
                   const updateCol = <K extends keyof ColumnSchema>(key: K, value: ColumnSchema[K]) => {
                     const newSchema = { ...sheetConfig.schema };
                     if (!newSchema[activeSheet.title]) newSchema[activeSheet.title] = {};
+                    
+                    // Al marcar como clave primaria, desmarcar isKey en otras columnas de la misma tabla
+                    if (key === 'isKey' && value === true) {
+                      Object.keys(newSchema[activeSheet.title]).forEach(colName => {
+                        if (colName !== header) {
+                          newSchema[activeSheet.title][colName] = {
+                            ...newSchema[activeSheet.title][colName],
+                            isKey: false
+                          };
+                        }
+                      });
+                    }
+
                     newSchema[activeSheet.title][header] = { ...schema, [key]: value };
                     saveConfig({ ...sheetConfig, schema: newSchema });
                   };
@@ -526,19 +547,37 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
                     <option value="sum">Suma</option>
                     <option value="diff_days">Diferencia Días</option>
                   </select>
-                  <select
-                    multiple
-                    value={uvc.sourceColumns}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                      const selected = Array.from(e.target.selectedOptions as HTMLCollectionOf<HTMLOptionElement>).map(option => option.value);
-                      const updated = [...(sheetConfig.userVirtualColumns || [])];
-                      updated[index].sourceColumns = selected;
-                      saveConfig({ ...sheetConfig, userVirtualColumns: updated });
-                    }}
-                    className="col-span-1 px-3 py-2 text-sm border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 outline-none h-20"
-                  >
-                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
-                  </select>
+                  <div className="col-span-1 flex flex-wrap gap-1 max-h-24 overflow-y-auto p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+                    {headers.length === 0 ? (
+                      <span className="text-xs text-slate-400">Sin columnas</span>
+                    ) : (
+                      headers.map(h => {
+                        const isSelected = (uvc.sourceColumns || []).includes(h);
+                        return (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() => {
+                              const currentSelected = uvc.sourceColumns || [];
+                              const nextSelected = isSelected
+                                ? currentSelected.filter(col => col !== h)
+                                : [...currentSelected, h];
+                              const updated = [...(sheetConfig.userVirtualColumns || [])];
+                              updated[index].sourceColumns = nextSelected;
+                              saveConfig({ ...sheetConfig, userVirtualColumns: updated });
+                            }}
+                            className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300'
+                            }`}
+                          >
+                            {isSelected ? `✓ ${h}` : h}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                   <button
                     onClick={() => {
                       const updated = (sheetConfig.userVirtualColumns || []).filter((_, i) => i !== index);

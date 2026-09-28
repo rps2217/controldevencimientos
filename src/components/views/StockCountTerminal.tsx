@@ -462,7 +462,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     };
   }, []);
 
-  // Focus SKU input whenever switching to counting view & attach desktop hotkeys
+  // Focus SKU input whenever switching to counting view
   useEffect(() => {
     if (viewState === 'COUNTING') {
       setTimeout(() => {
@@ -470,26 +470,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       }, 100);
     }
   }, [viewState]);
-
-  // Global Desktop Keyboard Shortcuts (Ctrl+Z to Undo, Esc to Clear SKU)
-  useEffect(() => {
-    if (viewState !== 'COUNTING') return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        handleUndoLastEntry();
-      } else if (e.key === 'Escape') {
-        if (scannedSku) {
-          e.preventDefault();
-          handleSkuChange('');
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewState, scannedSku, handleUndoLastEntry]);
 
   // Current active session
   const currentSession = useMemo(() => {
@@ -851,6 +831,26 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     playBeep('skip');
     showToast(`Deshecha lectura: ${last.sku} (-${last.cantidad})`, 'info');
   };
+
+  // Global Desktop Keyboard Shortcuts (Ctrl+Z to Undo, Esc to Clear SKU)
+  useEffect(() => {
+    if (viewState !== 'COUNTING') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndoLastEntry();
+      } else if (e.key === 'Escape') {
+        if (scannedSku) {
+          e.preventDefault();
+          handleSkuChange('');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewState, scannedSku]);
 
   // Group count entries by SKU for consolidated view on mobile/desktop
   const groupedSkuEntries = useMemo(() => groupSkuEntries(currentSession), [currentSession]);
