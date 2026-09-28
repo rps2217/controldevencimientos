@@ -254,12 +254,12 @@ export const BUILT_IN_SLICES: TableSlice[] = [
   },
   {
     id: 'builtin_events_averias',
-    name: 'Mermas y Averías',
-    description: 'Roturas, frascos quebrados o deterioros físicos en bodega',
+    name: 'Sobrantes Inventario',
+    description: 'Sobrantes de stock físico detectados en auditorías o conteos',
     tableKey: 'events',
     requiredCapability: 'incidencia',
-    icon: 'Flame',
-    color: 'rose',
+    icon: 'PlusCircle',
+    color: 'emerald',
     isBuiltIn: true,
     filterConfig: {
       eventFilter: ['AVERIA']
@@ -267,15 +267,15 @@ export const BUILT_IN_SLICES: TableSlice[] = [
   },
   {
     id: 'builtin_events_canjes',
-    name: 'Canjes y Devoluciones',
-    description: 'Mercadería para devolución al proveedor o canje 1x1',
+    name: 'Faltantes Inventario',
+    description: 'Faltantes de stock físico o pérdidas no justificadas',
     tableKey: 'events',
     requiredCapability: 'incidencia',
-    icon: 'RotateCcw',
-    color: 'indigo',
+    icon: 'MinusCircle',
+    color: 'rose',
     isBuiltIn: true,
     filterConfig: {
-      eventFilter: ['CANJES', 'DEVOLUCION']
+      eventFilter: ['DEVOLUCION']
     }
   },
   {

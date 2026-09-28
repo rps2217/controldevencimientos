@@ -51,8 +51,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ items, h
       { name: 'Dif. Pedido', value: diferencia, color: '#8b5cf6' }, // purple
       { name: 'Cal. Interna', value: calInterna, color: '#10b981' }, // emerald
       { name: 'Cal. Externa', value: calExterna, color: '#06b6d4' }, // cyan
-      { name: 'Avería', value: averia, color: '#f43f5e' }, // rose
-      { name: 'Devolución', value: devolucion, color: '#14b8a6' }, // teal
+      { name: 'Sobrante Invent.', value: averia, color: '#10b981' }, // emerald
+      { name: 'Faltante Invent.', value: devolucion, color: '#f43f5e' }, // rose
       { name: 'Venc. Cercano', value: vencimientoCercano, color: '#6366f1' }, // indigo
       { name: 'Canjes', value: canjes, color: '#ec4899' }, // pink
     ].filter(d => d.value > 0);

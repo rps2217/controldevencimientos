@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Truck, FileSpreadsheet, PackageX, RotateCcw, Clock, AlertCircle, AlertTriangle, Clock3, Flame, CheckCircle2, Tag, ArrowLeftRight, Trash2
+  Truck, FileSpreadsheet, Clock, AlertCircle, AlertTriangle, Clock3, Flame, CheckCircle2, Tag, ArrowLeftRight, Trash2, PlusCircle, MinusCircle
 } from 'lucide-react';
 import { InventoryItem, EventCategory, EventTypeDefinition } from '../types';
 import { 
@@ -146,29 +146,29 @@ export const EVENT_CATEGORIES: Record<EventCategory, EventTypeDefinition> = {
   },
   AVERIA: {
     id: 'AVERIA',
-    rawCode: 'AVERIA',
-    name: 'Avería / Merma Almacén',
-    shortLabel: 'Avería Almacén',
-    description: 'Derrame, caída accidental o rotura interna de producto en bodega',
+    rawCode: 'SOBRANTE INVENT.',
+    name: 'Sobrante Inventario',
+    shortLabel: 'Sobrante Invent.',
+    description: 'Unidades sobrantes detectadas en conteos físicos o auditorías de inventario',
+    badgeBg: 'bg-emerald-50 dark:bg-emerald-950/60',
+    badgeText: 'text-emerald-800 dark:text-emerald-300',
+    badgeBorder: 'border-emerald-200 dark:border-emerald-800',
+    cardBorder: 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/30',
+    cardBg: 'bg-emerald-600 text-white',
+    iconBg: 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300'
+  },
+  DEVOLUCION: {
+    id: 'DEVOLUCION',
+    rawCode: 'FALTANTE INVENT.',
+    name: 'Faltante Inventario',
+    shortLabel: 'Faltante Invent.',
+    description: 'Unidades faltantes o mermas físicas no justificadas detectadas en inventario',
     badgeBg: 'bg-rose-50 dark:bg-rose-950/60',
     badgeText: 'text-rose-800 dark:text-rose-300',
     badgeBorder: 'border-rose-200 dark:border-rose-800',
     cardBorder: 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/50 dark:bg-rose-950/30',
     cardBg: 'bg-rose-600 text-white',
     iconBg: 'bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300'
-  },
-  DEVOLUCION: {
-    id: 'DEVOLUCION',
-    rawCode: 'DEVOLUCION',
-    name: 'Reclamo / Devolución',
-    shortLabel: 'Devolución Proveedor',
-    description: 'Producto no conforme retenido para gestión de canje o nota de crédito',
-    badgeBg: 'bg-teal-50 dark:bg-teal-950/60',
-    badgeText: 'text-teal-800 dark:text-teal-300',
-    badgeBorder: 'border-teal-200 dark:border-teal-800',
-    cardBorder: 'border-teal-500 ring-2 ring-teal-500/20 bg-teal-50/50 dark:bg-teal-950/30',
-    cardBg: 'bg-teal-600 text-white',
-    iconBg: 'bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300'
   }
 };
 
@@ -182,9 +182,9 @@ export function renderEventIcon(category: EventCategory, className = 'w-4 h-4') 
     case 'CAL_EXTERNA':
       return <CheckCircle2 className={className} />;
     case 'AVERIA':
-      return <PackageX className={className} />;
+      return <PlusCircle className={className} />;
     case 'DEVOLUCION':
-      return <RotateCcw className={className} />;
+      return <MinusCircle className={className} />;
     case 'VENCIMIENTO_CERCANO':
       return <Clock3 className={className} />;
     case 'CANJES':

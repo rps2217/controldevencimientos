@@ -110,8 +110,8 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({
               <option value="CANJES">CANJES (Canjes)</option>
               <option value="DIF. PED">DIF. PED (Diferencia de pedido)</option>
               <option value="VENCIMIENTO">VENCIMIENTO (Vencimiento regular)</option>
-              <option value="AVERIA">AVERIA (Avería / Merma)</option>
-              <option value="DEVOLUCION">DEVOLUCION (Reclamo / Devolución)</option>
+              <option value="SOBRANTE INVENT.">SOBRANTE INVENT. (Sobrante de inventario)</option>
+              <option value="FALTANTE INVENT.">FALTANTE INVENT. (Faltante de inventario)</option>
             </select>
           </div>
 

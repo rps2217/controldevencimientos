@@ -69,9 +69,9 @@ const DYNAMIC_RANGE_PRESETS = [
 const EVENT_CATEGORY_OPTIONS = [
   { id: 'TRANSPORTE', label: 'Transporte', icon: 'Truck', color: 'blue' },
   { id: 'DIFERENCIA', label: 'Diferencia Stock', icon: 'Scale', color: 'purple' },
-  { id: 'AVERIA', label: 'Mermas & Averías', icon: 'Flame', color: 'rose' },
+  { id: 'AVERIA', label: 'Sobrante Invent.', icon: 'PlusCircle', color: 'emerald' },
   { id: 'CANJES', label: 'Canjes', icon: 'RotateCcw', color: 'indigo' },
-  { id: 'DEVOLUCION', label: 'Devolución', icon: 'RotateCcw', color: 'amber' },
+  { id: 'DEVOLUCION', label: 'Faltante Invent.', icon: 'MinusCircle', color: 'rose' },
   { id: 'CALIDAD', label: 'Calidad', icon: 'ShieldCheck', color: 'emerald' }
 ];
 

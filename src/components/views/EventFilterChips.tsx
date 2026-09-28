@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock3, Truck, CheckCircle2, Tag, FileSpreadsheet, PackageX, RotateCcw, Building2 } from 'lucide-react';
+import { Clock3, Truck, CheckCircle2, Tag, FileSpreadsheet, Building2, PlusCircle, MinusCircle } from 'lucide-react';
 
 interface EventMetrics {
   vencimientoCercano: number;
@@ -138,26 +138,26 @@ export const EventFilterChips: React.FC<EventFilterChipsProps> = ({
           onClick={(e) => onFilterClick('AVERIA', e.ctrlKey || e.metaKey)}
           className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all ${
             activeEventSet.has('AVERIA')
-              ? 'bg-rose-600 text-white shadow-sm shadow-rose-200 dark:shadow-none' 
-              : 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50'
+              ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-200 dark:shadow-none' 
+              : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
           }`}
           title="Clic normal: Solo este. Ctrl+Clic: Sumar filtro."
         >
-          <PackageX className="w-3.5 h-3.5" />
-          <span>AVERIA ({metrics.averia})</span>
+          <PlusCircle className="w-3.5 h-3.5" />
+          <span>SOBRANTE ({metrics.averia})</span>
         </button>
         
         <button 
           onClick={(e) => onFilterClick('DEVOLUCION', e.ctrlKey || e.metaKey)}
           className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all ${
             activeEventSet.has('DEVOLUCION')
-              ? 'bg-teal-600 text-white shadow-sm shadow-teal-200 dark:shadow-none' 
-              : 'bg-teal-50 dark:bg-teal-950/50 text-teal-800 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/50'
+              ? 'bg-rose-600 text-white shadow-sm shadow-rose-200 dark:shadow-none' 
+              : 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50'
           }`}
           title="Clic normal: Solo este. Ctrl+Clic: Sumar filtro."
         >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>DEVOLUCION ({metrics.devolucion})</span>
+          <MinusCircle className="w-3.5 h-3.5" />
+          <span>FALTANTE ({metrics.devolucion})</span>
         </button>
       </div>
 

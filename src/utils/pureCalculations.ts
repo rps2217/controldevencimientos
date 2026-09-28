@@ -28,10 +28,10 @@ export function getCategoryFromEventValue(rawVal: unknown): EventCategory | null
   if (raw === 'DIF. PED' || raw === 'DIF. PED.' || raw.includes('DIF. PED') || raw.includes('DIF.PED') || raw.includes('DIFER')) {
     return 'DIFERENCIA';
   }
-  if (raw.includes('AVER') || raw.includes('MERMA') || raw.includes('ROTURA')) {
+  if (raw === 'SOBRANTE INVENT.' || raw.includes('SOBRANTE') || raw.includes('AVER') || raw.includes('MERMA') || raw.includes('ROTURA')) {
     return 'AVERIA';
   }
-  if (raw.includes('DEVOL') || raw.includes('RECLAM')) {
+  if (raw === 'FALTANTE INVENT.' || raw.includes('FALTANTE') || raw.includes('DEVOL') || raw.includes('RECLAM')) {
     return 'DEVOLUCION';
   }
   if (raw.includes('VENC') || raw.includes('CADUC')) {

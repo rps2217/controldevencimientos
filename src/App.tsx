@@ -31,8 +31,15 @@ export default function App() {
       setSecurityToken(storedToken);
       setSpreadsheetId(storedSheetId);
 
-      if (!storedUrl && !hasDemoEntry()) {
-        setNeedsSetup(true);
+      const isMobileDevice = window.innerWidth < 768;
+      if (!storedUrl) {
+        if (isMobileDevice) {
+          // En dispositivos móviles, por defecto siempre mostramos el formulario de Google Apps Script si está vacío
+          setNeedsSetup(true);
+        } else if (!hasDemoEntry()) {
+          // En escritorio, solo lo mostramos si el usuario aún no ha elegido explorar con datos de demo
+          setNeedsSetup(true);
+        }
       }
     } catch (err) {
       console.warn('LocalStorage initialization error:', err);

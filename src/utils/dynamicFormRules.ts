@@ -24,7 +24,7 @@ const CATEGORY_FIELD_PATTERNS: Record<EventCategory, { relevant: RegExp[]; secon
     secondaryExcluded: [/pol[ií]tica|canje|d[ií]as_retiro|d[ií]as_anticipaci[oó]n|cuarentena/i]
   },
   AVERIA: {
-    relevant: [/aver[ií]a|merma|deterioro|rotura|embalaje|empaque|baja|disposici[oó]n|quiebre|da[ñn]o/i],
+    relevant: [/sobrante|inventario|cuadratura|conteo|ajuste|f[ií]sico/i],
     secondaryExcluded: [/pol[ií]tica|canje|d[ií]as_retiro|d[ií]as_anticipaci[oó]n|cami[oó]n|patente/i]
   },
   CAL_INTERNA: {
@@ -40,7 +40,7 @@ const CATEGORY_FIELD_PATTERNS: Record<EventCategory, { relevant: RegExp[]; secon
     secondaryExcluded: [/cami[oó]n|patente|chofer|temperatura/i]
   },
   DEVOLUCION: {
-    relevant: [/devoluci[oó]n|cliente|factura|nota_cr[eé]dito|motivo|recepci[oó]n/i],
+    relevant: [/faltante|inventario|p[eé]rdida|merma|ajuste|conteo/i],
     secondaryExcluded: [/cami[oó]n|patente|chofer|temperatura/i]
   },
   VENCIMIENTO_CERCANO: {
@@ -131,10 +131,10 @@ export function getOperationalSuggestions(category: EventCategory): string[] {
       ];
     case 'AVERIA':
       return [
-        'Rotura / derrame accidental en pasillo de bodega',
-        'Envase perforado o golpeado en reposición',
-        'Producto quebrado dado de baja para destrucción',
-        'Empaque secundario desgarrado e inhabilitado'
+        'Sobrante físico detectado en cuadratura',
+        'Sobrante de mercadería no ingresada',
+        'Sobrante hallado en mueble de bodega',
+        'Unidades sobrantes en auditoría interna'
       ];
     case 'CAL_INTERNA':
       return [
@@ -157,10 +157,10 @@ export function getOperationalSuggestions(category: EventCategory): string[] {
       ];
     case 'DEVOLUCION':
       return [
-        'Devolución comercial autorizada por jefatura',
-        'Cliente devuelve por error de despacho / SKU equivocado',
-        'Mercadería devuelta por cliente en buen estado para reingreso',
-        'Devolución con Nota de Crédito pendiente de emisión'
+        'Faltante de stock físico en auditoría',
+        'Faltante no justificado en conteo cíclico',
+        'Merma o merma física por pérdida',
+        'Faltante detectado al preparar pedido'
       ];
     case 'VENCIMIENTO_CERCANO':
     case 'VENCIMIENTO':
