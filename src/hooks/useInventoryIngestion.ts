@@ -110,6 +110,8 @@ export const useInventoryIngestion = ({
     try {
       setIsSaving(true);
       const isDemo = isDemoMode();
+      const now = new Date();
+      const currentFormattedDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' ');
 
       // Consolidacion por CU_VC solo donde la hoja tiene dominio de vencimiento. El
       // respaldo por nombre se conserva para no perder hojas de stock que hoy si
@@ -136,7 +138,15 @@ export const useInventoryIngestion = ({
 
         let updatedItemsList = [...items];
         for (const updateOp of reconciliation.rowsToUpdate) {
-          const rowValues = headers.map(h => updateOp.updatedItem[h] !== undefined ? String(updateOp.updatedItem[h]) : '');
+          const rowValues = headers.map(h => {
+            const val = updateOp.updatedItem[h] !== undefined && updateOp.updatedItem[h] !== null ? String(updateOp.updatedItem[h]) : '';
+            const colSchema = sheetConfig.schema?.[activeSheet.title]?.[h];
+            if (!val && (colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro/i.test(h))) {
+              updateOp.updatedItem[h] = currentFormattedDateTime;
+              return currentFormattedDateTime;
+            }
+            return val;
+          });
           updatedItemsList = updatedItemsList.map(it => it._rowIndex === updateOp.rowIndex ? { ...it, ...updateOp.updatedItem } : it);
 
           if (!isDemo) {
@@ -161,7 +171,15 @@ export const useInventoryIngestion = ({
         let nextRowIndex = validRowIndexes.length ? Math.max(...validRowIndexes) + 1 : 2;
 
         for (const newRow of reconciliation.rowsToAppend) {
-          const rowValues = headers.map(h => newRow[h] !== undefined ? String(newRow[h]) : '');
+          const rowValues = headers.map(h => {
+            const val = newRow[h] !== undefined && newRow[h] !== null ? String(newRow[h]) : '';
+            const colSchema = sheetConfig.schema?.[activeSheet.title]?.[h];
+            if (!val && (colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro/i.test(h))) {
+              newRow[h] = currentFormattedDateTime;
+              return currentFormattedDateTime;
+            }
+            return val;
+          });
           const newItem: InventoryItem = { _rowIndex: nextRowIndex++, ...newRow };
           const identityInfo = resolveItemIdentity(newItem, headers, activeSheet.title);
           newItem._entityKey = identityInfo.keyValue;
@@ -208,7 +226,14 @@ export const useInventoryIngestion = ({
         const updatedItemsList = [...items];
 
         for (const item of mappedData) {
-          const rowValues = headers.map(h => item[h] !== undefined ? String(item[h]) : '');
+          const rowValues = headers.map(h => {
+            const val = item[h] !== undefined && item[h] !== null ? String(item[h]) : '';
+            const colSchema = sheetConfig.schema?.[activeSheet.title]?.[h];
+            if (!val && (colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro/i.test(h))) {
+              return currentFormattedDateTime;
+            }
+            return val;
+          });
           const newItem: InventoryItem = { ...rowToObject(headers, rowValues), _rowIndex: nextRowIndex++ };
           const identityInfo = resolveItemIdentity(newItem, headers, activeSheet.title);
           newItem._entityKey = identityInfo.keyValue;
