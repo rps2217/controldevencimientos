@@ -190,8 +190,6 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   const category = getEventCategory(product, productKeys);
   const catDef = EVENT_CATEGORIES[category];
   const resStatus = getItemResolutionStatus(product, productKeys);
-  const idCol = findColumnBySemantic(productKeys, 'id', customAliases);
-  const folio = idCol ? product[idCol] : undefined;
 
   // Query linked master products if we are in POLICY mode
   const policyNameCol = findColumnBySemantic(productKeys, 'politica', customAliases) || 
@@ -484,11 +482,6 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {folio && (
-                      <span className="text-xs font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-lg border border-slate-300 dark:border-slate-700">
-                        N° {String(folio)}
-                      </span>
-                    )}
                     {sku && sku !== '-' && (
                       <span className="text-xs font-mono font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800">
                         SKU: {sku}
@@ -563,9 +556,11 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="hidden" style={{ display: 'none' }} aria-hidden="true">
-                      SKU: {sku}
-                    </span>
+                    {sku && sku !== '-' && (
+                      <span className="text-xs font-mono font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 px-2.5 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800">
+                        SKU: {sku}
+                      </span>
+                    )}
                     <span className="text-[10px] font-black tracking-wider uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
                       Ficha de Catálogo
                     </span>
@@ -588,9 +583,11 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="hidden" style={{ display: 'none' }} aria-hidden="true">
-                      SKU: {sku}
-                    </span>
+                    {sku && sku !== '-' && (
+                      <span className="text-xs font-mono font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 px-2.5 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800">
+                        SKU: {sku}
+                      </span>
+                    )}
                     {policyName !== '-' && (
                       <span className="text-[11px] font-medium bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-lg border border-amber-200 dark:border-amber-800 truncate max-w-[14rem]" title={policyName}>
                         Política: {policyName}
