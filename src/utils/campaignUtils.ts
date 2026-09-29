@@ -22,6 +22,7 @@ import { findColumnBySemantic } from './columnAliases';
 import { parseLocaleNumber, rowToObject } from './pureCalculations';
 import { exportToExcel } from './exportUtils';
 import { STORAGE_KEYS, readStorage, objectArraySchema } from './appStorage';
+import { indexedDbService } from '../db/indexedDbService';
 
 // ==========================================
 // CAMPAÑA DE INVENTARIO CÍCLICO MULTISESIÓN
@@ -42,8 +43,13 @@ export function saveCampaignsToStorage(campaigns: InventoryCampaign[]): void {
   try {
     localStorage.setItem(STORAGE_KEYS.CAMPAIGNS, JSON.stringify(campaigns));
   } catch (e) {
-    console.warn('Error saving campaigns to storage:', e);
+    console.warn('LocalStorage quota limit reached for campaigns, saving to IndexedDB:', e);
   }
+
+  // Respaldo asíncrono robusto en IndexedDB (sin límite de 5MB)
+  indexedDbService.saveSetting(STORAGE_KEYS.CAMPAIGNS, campaigns).catch((err) => {
+    console.warn('Error backing up campaigns to IndexedDB:', err);
+  });
 }
 
 /**

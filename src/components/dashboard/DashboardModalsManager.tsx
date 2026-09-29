@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { InventoryItem, SheetConfig, EventCategory, GlobalTicketConfig, ViewTicketConfig, TableSlice, SheetRecord, SheetProperties, SpreadsheetMetadata, SortConfig, SliceFilterConfig } from '../../types';
 import { LazyFallback } from '../common/LazyFallback';
+import { ScopedErrorBoundary } from '../common/ScopedErrorBoundary';
 import { ImportConsolidationMode } from '../../utils/cuVcConsolidator';
 import { OfflineMutation, AuditLogEntry } from '../../db/indexedDbService';
 import { ConnectionHealthStatus } from '../../hooks/useOfflineSync';
@@ -287,13 +288,15 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     <>
       {/* 2. PM DRAINAGE REPORT MODAL */}
       {isPmReportOpen && (
-        <Suspense fallback={<LazyFallback />}>
-          <PmReportModal
-            isOpen={isPmReportOpen}
-            onClose={() => setIsPmReportOpen(false)}
-            drainageReportItems={drainageReportItems}
-          />
-        </Suspense>
+        <ScopedErrorBoundary moduleName="Reporte PM / Drenaje" onReset={() => setIsPmReportOpen(false)}>
+          <Suspense fallback={<LazyFallback />}>
+            <PmReportModal
+              isOpen={isPmReportOpen}
+              onClose={() => setIsPmReportOpen(false)}
+              drainageReportItems={drainageReportItems}
+            />
+          </Suspense>
+        </ScopedErrorBoundary>
       )}
 
       {/* 3. GOOGLE APPS SCRIPT CODE MODAL */}
@@ -308,48 +311,52 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
 
       {/* 4. MAIN FORM MODAL */}
       {isModalOpen && (
-        <Suspense fallback={<LazyFallback />}>
-          <ItemFormModal
-            isOpen={isModalOpen}
-            onClose={handleCloseModal}
-            editingItem={editingItem}
-            onSetEditingItem={setEditingItem}
-            existingItems={items}
-            activeSheet={activeSheet}
-            canExpire={context.tableCapabilities?.has('vencimiento') ?? false}
-            canLogEvents={context.tableCapabilities?.has('incidencia') ?? false}
-            headers={headers}
-            formData={formData}
-            formErrors={formErrors}
-            selectedEventCategory={selectedEventCategory}
-            onSelectEventCategory={handleSelectEventCategory}
-            onChange={handleFormChange}
-            onSave={handleSave}
-            isSaving={isSaving}
-            sheetConfig={sheetConfig}
-            products={products}
-            onBatchUpdateFormData={handleBatchFormUpdate}
-            policies={policies}
-          />
-        </Suspense>
+        <ScopedErrorBoundary moduleName="Formulario de Registro" onReset={handleCloseModal}>
+          <Suspense fallback={<LazyFallback />}>
+            <ItemFormModal
+              isOpen={isModalOpen}
+              onClose={handleCloseModal}
+              editingItem={editingItem}
+              onSetEditingItem={setEditingItem}
+              existingItems={items}
+              activeSheet={activeSheet}
+              canExpire={context.tableCapabilities?.has('vencimiento') ?? false}
+              canLogEvents={context.tableCapabilities?.has('incidencia') ?? false}
+              headers={headers}
+              formData={formData}
+              formErrors={formErrors}
+              selectedEventCategory={selectedEventCategory}
+              onSelectEventCategory={handleSelectEventCategory}
+              onChange={handleFormChange}
+              onSave={handleSave}
+              isSaving={isSaving}
+              sheetConfig={sheetConfig}
+              products={products}
+              onBatchUpdateFormData={handleBatchFormUpdate}
+              policies={policies}
+            />
+          </Suspense>
+        </ScopedErrorBoundary>
       )}
 
       {/* 5. GLOBAL CONFIG MODAL */}
       {isConfigOpen && (
-        <Suspense fallback={<LazyFallback />}>
-          <GlobalConfigModal
-            isOpen={isConfigOpen}
-            onClose={() => setIsConfigOpen(false)}
-            sheetConfig={sheetConfig}
-            setSheetConfig={setSheetConfig}
-            saveConfig={saveConfig}
-            metadata={metadata}
-            fetchData={fetchData}
-            activeView={activeView}
-            activeSheetTitle={activeSheet?.title || activeView}
-            headers={headers}
-          />
-        </Suspense>
+        <ScopedErrorBoundary moduleName="Configuración Global" onReset={() => setIsConfigOpen(false)}>
+          <Suspense fallback={<LazyFallback />}>
+            <GlobalConfigModal
+              isOpen={isConfigOpen}
+              onClose={() => setIsConfigOpen(false)}
+              sheetConfig={sheetConfig}
+              setSheetConfig={setSheetConfig}
+              saveConfig={saveConfig}
+              metadata={metadata}
+              fetchData={fetchData}
+              activeView={activeView}
+              activeSheetTitle={activeSheet?.title || activeView}
+              headers={headers}
+            />
+          </Suspense>
+        </ScopedErrorBoundary>
       )}
 
       {/* BARCODE SCANNER MODAL */}
@@ -485,17 +492,19 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
 
       {/* UNIVERSAL IMPORT MODAL */}
       {isBulkImportOpen && (
-        <Suspense fallback={<LazyFallback />}>
-          <UniversalImportModal
-            isOpen={isBulkImportOpen}
-            onClose={() => setIsBulkImportOpen(false)}
-            targetHeaders={headers}
-            activeSheetTitle={activeSheet?.title || 'Hoja Activa'}
-            existingItems={items}
-            customAliases={sheetConfig.customAliases}
-            onImportConfirmed={handleUniversalImportConfirmed}
-          />
-        </Suspense>
+        <ScopedErrorBoundary moduleName="Importador Universal" onReset={() => setIsBulkImportOpen(false)}>
+          <Suspense fallback={<LazyFallback />}>
+            <UniversalImportModal
+              isOpen={isBulkImportOpen}
+              onClose={() => setIsBulkImportOpen(false)}
+              targetHeaders={headers}
+              activeSheetTitle={activeSheet?.title || 'Hoja Activa'}
+              existingItems={items}
+              customAliases={sheetConfig.customAliases}
+              onImportConfirmed={handleUniversalImportConfirmed}
+            />
+          </Suspense>
+        </ScopedErrorBoundary>
       )}
 
       {/* BULK ACTIONS CONFIGURATION MODAL */}
@@ -569,17 +578,19 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
       {isStockCountOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
           <div className="w-full h-full max-w-7xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col">
-            <Suspense fallback={<LazyFallback />}>
-              <StockCountTerminal
-                sheetItems={items}
-                headers={headers}
-                masterProducts={products}
-                activeSheetTitle={activeSheet?.title || 'VENCIMIENTOS'}
-                onSyncRowsToVencimientos={handleSyncRowsToVencimientos}
-                showToast={showToast}
-                onClose={() => setIsStockCountOpen(false)}
-              />
-            </Suspense>
+            <ScopedErrorBoundary moduleName="Terminal de Conteo e Inventario" onReset={() => setIsStockCountOpen(false)}>
+              <Suspense fallback={<LazyFallback />}>
+                <StockCountTerminal
+                  sheetItems={items}
+                  headers={headers}
+                  masterProducts={products}
+                  activeSheetTitle={activeSheet?.title || 'VENCIMIENTOS'}
+                  onSyncRowsToVencimientos={handleSyncRowsToVencimientos}
+                  showToast={showToast}
+                  onClose={() => setIsStockCountOpen(false)}
+                />
+              </Suspense>
+            </ScopedErrorBoundary>
           </div>
         </div>
       )}

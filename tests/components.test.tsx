@@ -23,6 +23,8 @@ import { TicketConfigModal } from '../src/components/modals/TicketConfigModal';
 import { useTicketPrinting } from '../src/hooks/useTicketPrinting';
 import { STORAGE_KEYS } from '../src/utils/appStorage';
 import { ROLLOS } from '../src/utils/labelMediaProfile';
+import { useHardwareBarcodeScanner } from '../src/hooks/useHardwareBarcodeScanner';
+import { ScopedErrorBoundary } from '../src/components/common/ScopedErrorBoundary';
 import type { SheetConfig, CampaignAuditRow, CampaignConsolidationMatrix, ViewTicketSettings, InventoryItem, InventoryCampaign, StockCountSession } from '../src/types';
 
 let passed = 0;
@@ -598,6 +600,69 @@ async function testFullFlowContarCycle() {
   assert(labNorteAfter.contados === 1, 'Lab Norte tiene 1 SKU contado de 2', labNorteAfter.contados);
 }
 
+function TestScannerConsumer({ onScan }: { onScan: (code: string) => void }) {
+  useHardwareBarcodeScanner({
+    enabled: true,
+    onScan,
+    minBarcodeLength: 3,
+    maxIntervalMs: 50,
+  });
+  return <div>Scanner Active</div>;
+}
+
+async function testHardwareBarcodeScanner() {
+  console.log('\n--- 13. Lector Físico de Códigos de Barra (Hardware Laser / USB HID) ---');
+
+  const scans: string[] = [];
+  await mount(<TestScannerConsumer onScan={(code) => scans.push(code)} />);
+
+  // Simular ráfaga de escáner (< 50ms entre caracteres) seguida de Enter
+  const chars = ['7', '8', '0', '1', '2', '3', '4'];
+  for (const char of chars) {
+    window.dispatchEvent(new (window as any).KeyboardEvent('keydown', { key: char, bubbles: true }));
+  }
+  window.dispatchEvent(new (window as any).KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+  assert(scans.length === 1, 'una ráfaga con Enter dispara exactamente un escaneo', scans.length);
+  assert(scans[0] === '7801234', 'el código de barras capturado coincide con la ráfaga', scans[0]);
+
+  // Simular código demasiado corto (< minBarcodeLength 3)
+  scans.length = 0;
+  window.dispatchEvent(new (window as any).KeyboardEvent('keydown', { key: '1', bubbles: true }));
+  window.dispatchEvent(new (window as any).KeyboardEvent('keydown', { key: '2', bubbles: true }));
+  window.dispatchEvent(new (window as any).KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+  assert(scans.length === 0, 'códigos menores a la longitud mínima se descartan', scans.length);
+}
+
+function BrokenComponent(): React.ReactElement {
+  throw new Error('Error simulado en módulo secundario');
+}
+
+async function testScopedErrorBoundary() {
+  console.log('\n--- 14. Error Boundaries Granulares (Aislamiento de Fallos en UI) ---');
+
+  const resets: string[] = [];
+  const view = await mount(
+    <ScopedErrorBoundary moduleName="Módulo de Prueba" onReset={() => { resets.push('reset'); }}>
+      <BrokenComponent />
+    </ScopedErrorBoundary>
+  );
+
+  const text = view.container.textContent || '';
+  assert(text.includes('Discrepancia en Módulo de Prueba'), 'el error boundary captura la excepción y muestra el nombre del módulo', text);
+  assert(text.includes('Error simulado en módulo secundario'), 'muestra el mensaje de diagnóstico del error', text);
+
+  const retryBtn = view.container.querySelector('button');
+  assert(retryBtn !== null, 'ofrece un botón de reintento para recuperar el componente');
+  if (retryBtn) {
+    await React.act(async () => {
+      retryBtn.click();
+    });
+    assert(resets.length === 1, 'el botón de reintento invoca el callback onReset', resets.length);
+  }
+}
+
 async function main() {
   console.log('========================================');
   console.log(' PRUEBAS DE COMPONENTE (Fase 0)');
@@ -615,6 +680,8 @@ async function main() {
   await testImpresionEtiquetaRespetaConfig();
   await testLocationProgressPanel();
   await testFullFlowContarCycle();
+  await testHardwareBarcodeScanner();
+  await testScopedErrorBoundary();
 
   teardownDom();
 

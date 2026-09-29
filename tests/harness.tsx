@@ -34,6 +34,7 @@ export function setupDom(): JSDOM {
   expose('navigator', dom.window.navigator);
   expose('HTMLElement', dom.window.HTMLElement);
   expose('HTMLInputElement', dom.window.HTMLInputElement);
+  expose('HTMLTextAreaElement', dom.window.HTMLTextAreaElement);
   expose('HTMLSelectElement', dom.window.HTMLSelectElement);
   expose('Element', dom.window.Element);
   expose('Node', dom.window.Node);

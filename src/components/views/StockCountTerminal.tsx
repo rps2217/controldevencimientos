@@ -24,6 +24,8 @@ import { executeThermalPrint } from '../../utils/ticketUtils';
 import { TicketPrintView } from './TicketPrintView';
 import { getErrorMessage } from '../../utils/pureCalculations';
 import { useConfirm } from '../common/ConfirmDialog';
+import { useHardwareBarcodeScanner } from '../../hooks/useHardwareBarcodeScanner';
+import { ScopedErrorBoundary } from '../common/ScopedErrorBoundary';
 
 import { STORAGE_KEYS } from '../../utils/appStorage';
 const CampaignConsolidationDashboard = lazy(() => import('./CampaignConsolidationDashboard').then(m => ({ default: m.CampaignConsolidationDashboard })));
@@ -742,6 +744,18 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     }
   };
 
+  // Hardware Laser / Bluetooth / USB HID Gun Scanner listener
+  useHardwareBarcodeScanner({
+    enabled: viewState === 'COUNTING' && !!currentSession && !isCameraScannerOpen && !expiryPromptSku,
+    onScan: (barcode) => {
+      handleCameraScanCode(barcode);
+    },
+    minBarcodeLength: 3,
+    maxIntervalMs: 50,
+    preventDefaultOnEnter: true,
+    interceptInputFocus: true,
+  });
+
   const handleSkuScannedOrEntered = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!currentSession) return;
@@ -1341,52 +1355,56 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
         {/* BODY - VIEW 0: CAMPAIGN CONSOLIDATION DASHBOARD          */}
         {/* ======================================================== */}
         {viewState === 'CAMPAIGN' && (
-          isMobile && !forceDesktopCampaignView ? (
-            <MobileErpSnapshotView
-              campaigns={campaigns}
-              activeCampaignId={activeCampaignIdState}
-              sessions={sessions}
-              onUpdateCampaigns={handleUpdateCampaigns}
-              onSelectCampaign={handleSelectCampaign}
-              onSwitchToTerminal={handleSwitchToTerminal}
-              showToast={showToast}
-              onSyncCloud={() => handleCloudSync(false)}
-              isSyncingCloud={isSyncingCloud}
-              lastCloudSyncDate={lastCloudSyncDate || undefined}
-              onOpenDesktopView={() => setForceDesktopCampaignView(true)}
-            />
-          ) : (
-            <Suspense fallback={<LazyFallback />}>
-              <CampaignConsolidationDashboard
+          <ScopedErrorBoundary moduleName="Consolidación de Campaña">
+            {isMobile && !forceDesktopCampaignView ? (
+              <MobileErpSnapshotView
                 campaigns={campaigns}
                 activeCampaignId={activeCampaignIdState}
                 sessions={sessions}
                 onUpdateCampaigns={handleUpdateCampaigns}
                 onSelectCampaign={handleSelectCampaign}
-                onStartTargetedRecount={handleStartTargetedRecount}
-                onStartProviderCount={handleStartProviderCount}
-                showToast={showToast}
-                onUpdateSessions={setSessions}
-                onNavigateToSessionList={() => setViewState('LIST')}
                 onSwitchToTerminal={handleSwitchToTerminal}
+                showToast={showToast}
+                onSyncCloud={() => handleCloudSync(false)}
+                isSyncingCloud={isSyncingCloud}
+                lastCloudSyncDate={lastCloudSyncDate || undefined}
+                onOpenDesktopView={() => setForceDesktopCampaignView(true)}
               />
-            </Suspense>
-          )
+            ) : (
+              <Suspense fallback={<LazyFallback />}>
+                <CampaignConsolidationDashboard
+                  campaigns={campaigns}
+                  activeCampaignId={activeCampaignIdState}
+                  sessions={sessions}
+                  onUpdateCampaigns={handleUpdateCampaigns}
+                  onSelectCampaign={handleSelectCampaign}
+                  onStartTargetedRecount={handleStartTargetedRecount}
+                  onStartProviderCount={handleStartProviderCount}
+                  showToast={showToast}
+                  onUpdateSessions={setSessions}
+                  onNavigateToSessionList={() => setViewState('LIST')}
+                  onSwitchToTerminal={handleSwitchToTerminal}
+                />
+              </Suspense>
+            )}
+          </ScopedErrorBoundary>
         )}
 
         {/* ======================================================== */}
         {/* BODY - VIEW 1: SESSIONS LIST & NEW SESSION CREATOR       */}
         {/* ======================================================== */}
         {viewState === 'LIST' && (
-          <StockCountSessionsListView
-            sessions={sessions}
-            isSyncingCloud={isSyncingCloud}
-            onCreateSession={handleCreateSession}
-            onOpenSession={handleOpenSession}
-            onDeleteSession={handleDeleteSession}
-            onBackupSessionToCloud={handleBackupSessionToCloud}
-            onCloudSync={handleCloudSync}
-          />
+          <ScopedErrorBoundary moduleName="Lista de Sesiones">
+            <StockCountSessionsListView
+              sessions={sessions}
+              isSyncingCloud={isSyncingCloud}
+              onCreateSession={handleCreateSession}
+              onOpenSession={handleOpenSession}
+              onDeleteSession={handleDeleteSession}
+              onBackupSessionToCloud={handleBackupSessionToCloud}
+              onCloudSync={handleCloudSync}
+            />
+          </ScopedErrorBoundary>
         )}
 
         {/* ======================================================== */}
@@ -2582,27 +2600,29 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
         {/* BODY - VIEW 3: RECONCILIATION & SHEET SYNCHRONIZATION    */}
         {/* ======================================================== */}
         {viewState === 'RECONCILIATION' && currentSession && (
-          <StockCountReconciliationView
-            currentSession={currentSession}
-            reconciliation={reconciliation}
-            filteredReconciliation={filteredReconciliation}
-            reconciliationProviders={reconciliationProviders}
-            reconciliationFilter={reconciliationFilter}
-            setReconciliationFilter={setReconciliationFilter}
-            selectedProviderFilter={selectedProviderFilter}
-            setSelectedProviderFilter={setSelectedProviderFilter}
-            metrics={metrics}
-            isSummaryCopied={isSummaryCopied}
-            isSyncingToSheet={isSyncingToSheet}
-            handleUpdateAdjustment={handleUpdateAdjustment}
-            handleCopyReconciliationSummary={handleCopyReconciliationSummary}
-            handleShareReconciliationWhatsApp={handleShareReconciliationWhatsApp}
-            handleCopyDiscrepanciesReport={handleCopyDiscrepanciesReport}
-            handlePrintSupplierTicket={handlePrintSupplierTicket}
-            handleExportExcel={handleExportExcel}
-            handleSyncToVencimientos={handleSyncToVencimientos}
-            handleSyncToAuditSheet={handleSyncToAuditSheet}
-          />
+          <ScopedErrorBoundary moduleName="Cuadratura y Conciliación">
+            <StockCountReconciliationView
+              currentSession={currentSession}
+              reconciliation={reconciliation}
+              filteredReconciliation={filteredReconciliation}
+              reconciliationProviders={reconciliationProviders}
+              reconciliationFilter={reconciliationFilter}
+              setReconciliationFilter={setReconciliationFilter}
+              selectedProviderFilter={selectedProviderFilter}
+              setSelectedProviderFilter={setSelectedProviderFilter}
+              metrics={metrics}
+              isSummaryCopied={isSummaryCopied}
+              isSyncingToSheet={isSyncingToSheet}
+              handleUpdateAdjustment={handleUpdateAdjustment}
+              handleCopyReconciliationSummary={handleCopyReconciliationSummary}
+              handleShareReconciliationWhatsApp={handleShareReconciliationWhatsApp}
+              handleCopyDiscrepanciesReport={handleCopyDiscrepanciesReport}
+              handlePrintSupplierTicket={handlePrintSupplierTicket}
+              handleExportExcel={handleExportExcel}
+              handleSyncToVencimientos={handleSyncToVencimientos}
+              handleSyncToAuditSheet={handleSyncToAuditSheet}
+            />
+          </ScopedErrorBoundary>
         )}
 
         {/* Mobile Camera Barcode Scanner Modal for PDA / Cellphones */}

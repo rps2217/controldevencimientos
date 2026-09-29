@@ -11,6 +11,7 @@ import { parseLocaleNumber, getEndOfMonthDateForYm, formatDisplayDate } from './
 import { findMasterProduct, getMasterProductSummary } from './referenceResolver';
 import { exportToExcel } from './exportUtils';
 import { STORAGE_KEYS, readStorage, objectArraySchema } from './appStorage';
+import { indexedDbService } from '../db/indexedDbService';
 
 // El ciclo de campañas (snapshot ERP, matriz de cuadratura, reportes y su
 // persistencia) vive en `campaignUtils.ts`. Este módulo cubre las sesiones de
@@ -91,8 +92,13 @@ export function saveStockCountSessionsToStorage(sessions: StockCountSession[]): 
   try {
     localStorage.setItem(STORAGE_KEYS.STOCK_COUNT_SESSIONS, JSON.stringify(sessions));
   } catch (e) {
-    console.warn('Error saving stock count sessions to storage:', e);
+    console.warn('LocalStorage quota limit reached for sessions, saving to IndexedDB:', e);
   }
+
+  // Respaldo asíncrono robusto en IndexedDB (sin límite de 5MB)
+  indexedDbService.saveSetting(STORAGE_KEYS.STOCK_COUNT_SESSIONS, sessions).catch((err) => {
+    console.warn('Error backing up sessions to IndexedDB:', err);
+  });
 }
 
 /**
