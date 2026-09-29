@@ -11,6 +11,7 @@ import { ModalsProvider } from './context/ModalsContext';
 import { UiSettingsProvider } from './context/UiSettingsContext';
 import type { ThemeMode } from './types';
 import { useBarcodeScanner } from './hooks/useBarcodeScanner';
+import QRCode from 'qrcode';
 
 import { STORAGE_KEYS, hasDemoEntry, setDemoEntry, isDemoMode } from './utils/appStorage';
 
@@ -26,6 +27,7 @@ export default function App() {
   const [isQrScannerActive, setIsQrScannerActive] = useState(false);
   const [qrMessage, setQrMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
   // Sintetizador de audio nativo para feedback en la configuración
   const triggerAudioFeedback = (type: 'success' | 'error') => {
@@ -131,6 +133,31 @@ export default function App() {
       console.warn('LocalStorage initialization error:', err);
     }
   }, []);
+
+  // Generar código QR offline con la librería local
+  useEffect(() => {
+    if (isQrGeneratorOpen && setupUrl) {
+      const payload = JSON.stringify({
+        url: setupUrl,
+        token: securityToken,
+        sheetId: spreadsheetId
+      });
+      QRCode.toDataURL(payload, {
+        width: 250,
+        margin: 2,
+        color: {
+          dark: '#1e293b', // slate-800
+          light: '#ffffff' // white
+        }
+      })
+      .then(url => {
+        setQrDataUrl(url);
+      })
+      .catch(err => {
+        console.error('Error generando QR offline:', err);
+      });
+    }
+  }, [isQrGeneratorOpen, setupUrl, securityToken, spreadsheetId]);
 
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     try {
@@ -415,12 +442,17 @@ export default function App() {
                   ) : (
                     <div className="flex flex-col items-center gap-3 bg-white dark:bg-slate-800 p-4 rounded-xl border border-blue-100 dark:border-blue-900/60 shadow-2xs">
                       <div className="bg-white p-2 rounded-xl border border-slate-200/80 shadow-xs">
-                        <img
-                          src={`https://chart.googleapis.com/chart?cht=qr&chs=200x200&chl=${encodeURIComponent(JSON.stringify({ url: setupUrl, token: securityToken, sheetId: spreadsheetId }))}`}
-                          alt="Código QR de Configuración"
-                          className="w-36 h-36 object-contain"
-                          loading="lazy"
-                        />
+                        {qrDataUrl ? (
+                          <img
+                            src={qrDataUrl}
+                            alt="Código QR de Configuración Offline"
+                            className="w-36 h-36 object-contain"
+                          />
+                        ) : (
+                          <div className="w-36 h-36 flex items-center justify-center text-slate-400 text-[10px] animate-pulse">
+                            Generando código QR...
+                          </div>
+                        )}
                       </div>
                       <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center max-w-[200px] leading-relaxed">
                         Apunta la cámara del nuevo dispositivo a este código QR para auto-configurarlo de inmediato.
