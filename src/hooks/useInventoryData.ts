@@ -83,6 +83,7 @@ export function useInventoryData({
       currentView === 'events' ? (currentConfig.events || 'FRC') :
       currentView === 'products' ? (currentConfig.products || 'Catalogo_Productos') :
       currentView === 'policies' ? (currentConfig.policies || 'Politicas_Canje') :
+      currentView === 'recepBultos' ? (currentConfig.recepBultos || 'RECEP_BULTOS') :
       currentView;
     try {
       const scriptUrl = localStorage.getItem(STORAGE_KEYS.SCRIPT_URL);
@@ -203,11 +204,13 @@ export function useInventoryData({
       const eventsSheetTitle = currentConfig.events || allSheets.find((t: string) => /^frc$|evento|incidencia|averia|merma|diferencia|transporte/i.test(t));
       const prodSheetTitle = currentConfig.products || allSheets.find((t: string) => /producto/i.test(t));
       const polSheetTitle = currentConfig.policies || allSheets.find((t: string) => /política|politica|canje/i.test(t));
+      const recepBultosSheetTitle = currentConfig.recepBultos || allSheets.find((t: string) => /bulto|recep/i.test(t));
       
       if (!currentConfig.main && mainSheetTitle) currentConfig.main = mainSheetTitle;
       if (!currentConfig.events && eventsSheetTitle) currentConfig.events = eventsSheetTitle;
       if (!currentConfig.products && prodSheetTitle) currentConfig.products = prodSheetTitle;
       if (!currentConfig.policies && polSheetTitle) currentConfig.policies = polSheetTitle;
+      if (!currentConfig.recepBultos && recepBultosSheetTitle) currentConfig.recepBultos = recepBultosSheetTitle;
       if (currentConfig !== sheetConfig) {
         setSheetConfig(currentConfig);
         writeStorage(STORAGE_KEYS.SHEET_CONFIG, currentConfig);
@@ -219,6 +222,7 @@ export function useInventoryData({
       else if (currentView === 'events') targetSheetTitle = currentConfig.events || eventsSheetTitle || '';
       else if (currentView === 'products') targetSheetTitle = currentConfig.products || '';
       else if (currentView === 'policies') targetSheetTitle = currentConfig.policies || '';
+      else if (currentView === 'recepBultos') targetSheetTitle = currentConfig.recepBultos || recepBultosSheetTitle || 'RECEP_BULTOS';
       else targetSheetTitle = currentView;
 
       const targetSheetProp = meta.sheets.find(s => s.properties.title === targetSheetTitle)?.properties;
@@ -328,7 +332,8 @@ export function useInventoryData({
           { properties: { sheetId: 1, title: 'Vencimientos_Inventario', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } } },
           { properties: { sheetId: 2, title: 'FRC', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } } },
           { properties: { sheetId: 3, title: 'Catalogo_Productos', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } } },
-          { properties: { sheetId: 4, title: 'Politicas_Canje', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } } }
+          { properties: { sheetId: 4, title: 'Politicas_Canje', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } } },
+          { properties: { sheetId: 5, title: currentConfig.recepBultos || 'RECEP_BULTOS', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } } }
         ]
       });
 
@@ -346,6 +351,11 @@ export function useInventoryData({
         setHeaders(Object.keys(SAMPLE_POLICIES[0] || {}));
         const defaultPols = SAMPLE_POLICIES.map((p, i) => ({ _rowIndex: i + 2, ...p }));
         setItems(getStoredDemoItems('policies', defaultPols));
+      } else if (currentView === 'recepBultos') {
+        const bultoTitle = currentConfig.recepBultos || 'RECEP_BULTOS';
+        setActiveSheet({ sheetId: 5, title: bultoTitle, hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } });
+        setHeaders(['TIMESTAMP', 'CODIGO_BULTO']);
+        setItems(getStoredDemoItems('recepBultos', []));
       } else {
         setActiveSheet({ sheetId: 1, title: 'Vencimientos_Inventario', hidden: false, gridProperties: { rowCount: 10, columnCount: 10 } });
         setHeaders(SAMPLE_HEADERS);

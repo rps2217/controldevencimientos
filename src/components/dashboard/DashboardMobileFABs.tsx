@@ -1,5 +1,5 @@
 import React from 'react';
-import { Barcode, Plus } from 'lucide-react';
+import { Barcode, Plus, Truck } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
 
@@ -29,6 +29,17 @@ export const DashboardMobileFABs: React.FC = () => {
           <Barcode className="w-4 h-4 text-rose-300 animate-pulse" />
           <span>Pistoleo Móvil</span>
         </button>
+      )}
+
+      {activeView === 'recepBultos' && (
+        <a
+          href="/recepcion-bultos"
+          className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-600 via-amber-600 to-orange-600 text-white font-extrabold text-xs rounded-full shadow-[0_8px_25px_rgba(234,88,12,0.45)] border border-orange-400/40 active:scale-95 transition-all cursor-pointer"
+          title="Abrir Terminal Móvil de Pistoleo Rápido"
+        >
+          <Truck className="w-4 h-4 text-white" />
+          <span>Terminal Rápida</span>
+        </a>
       )}
 
       <button

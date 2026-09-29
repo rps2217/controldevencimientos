@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle, Settings2, Calendar } from 'lucide-react';
+import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle, Settings2, Calendar, Truck } from 'lucide-react';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { ThemeSelector } from './ThemeSelector';
 import { useDashboard } from '../../context/DashboardContext';
@@ -112,6 +112,12 @@ export const DashboardTopNav: React.FC = () => {
           title: 'Agenda & Calendario',
           icon: <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />,
           actionLabel: 'Nueva Tarea'
+        };
+      case 'recepBultos':
+        return {
+          title: 'Recepción de Bultos',
+          icon: <Truck className="w-4 h-4 text-orange-600 dark:text-orange-400" />,
+          actionLabel: 'Pistolear Bulto'
         };
       default:
         return {
@@ -265,6 +271,18 @@ export const DashboardTopNav: React.FC = () => {
             <Sliders className="w-3.5 h-3.5 text-blue-600" />
             <span>Apps Script</span>
           </button>
+        )}
+
+        {/* Acceso a Terminal Móvil de Recepción de Bultos */}
+        {activeView === 'recepBultos' && (
+          <a
+            href="/recepcion-bultos"
+            className="hidden sm:flex h-10 items-center gap-1.5 px-3.5 rounded-2xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 text-orange-700 dark:text-orange-300 text-xs font-bold transition-all shadow-2xs shrink-0 cursor-pointer active:scale-95"
+            title="Abrir Terminal Móvil de Pistoleo Rápido de Arribo"
+          >
+            <Truck className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+            <span>Terminal Arribo</span>
+          </a>
         )}
 
         {/* PRIMARY ACTION BUTTON (+ Nuevo Registro) */}
