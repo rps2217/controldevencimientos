@@ -226,11 +226,10 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
       {onCopy && (
         <button
           onClick={() => onCopy(product)}
-          className="p-2 text-blue-700 dark:text-blue-300 bg-blue-600/10 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
-          title="Copia esta fila y edítala (crea un nuevo registro prellenando los campos)"
+          className="p-2 text-blue-700 dark:text-blue-300 bg-blue-600/10 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-600 hover:text-white transition-colors cursor-pointer"
+          title="Copiar y editar registro"
         >
           <Copy className="w-4 h-4" />
-          <span className="hidden sm:inline">Copiar y Editar</span>
         </button>
       )}
       {onDeleteRow && (
