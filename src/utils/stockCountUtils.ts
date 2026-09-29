@@ -832,3 +832,73 @@ export function mergeCampaignsAndSessions(
   };
 }
 
+/**
+ * Resultado de la interpretación inteligente del texto de ventas del turno
+ */
+export interface ParsedSalesAdjustmentResult {
+  adjustments: Record<string, number>;
+  totalUnits: number;
+  totalSkus: number;
+  unrecognizedLines: number;
+  previewRows: Array<{ sku: string; qty: number }>;
+}
+
+/**
+ * Parsea un texto libre copiado de Excel, CSV o reporte POS con columnas [SKU, Cantidad]
+ * Soporta tabulaciones, comas, punto y coma o espacios múltiples.
+ */
+export function parseSalesAdjustmentsText(text: string): ParsedSalesAdjustmentResult {
+  const lines = text.split(/\r\n|\n/).map(l => l.trim()).filter(Boolean);
+  const adjustments: Record<string, number> = {};
+  let totalUnits = 0;
+  let unrecognizedLines = 0;
+  const previewRows: Array<{ sku: string; qty: number }> = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let parts: string[] = [];
+    if (line.includes('\t')) parts = line.split('\t');
+    else if (line.includes(';')) parts = line.split(';');
+    else if (line.includes(',')) parts = line.split(',');
+    else if (line.includes('|')) parts = line.split('|');
+    else parts = line.split(/\s+/);
+
+    parts = parts.map(p => p.trim()).filter(Boolean);
+    if (parts.length < 2) {
+      unrecognizedLines++;
+      continue;
+    }
+
+    const rawSku = parts[0];
+    const rawQty = parts[parts.length - 1];
+
+    // Omitir fila de encabezados si no son numéricos
+    if (i === 0 && (isNaN(Number(rawQty.replace(',', '.'))) || /sku|c[oó]digo|item|cant|venta|qty/i.test(rawSku))) {
+      continue;
+    }
+
+    const cleanSku = String(rawSku).trim();
+    const qty = parseLocaleNumber(rawQty, NaN);
+
+    if (!cleanSku || isNaN(qty) || qty === 0) {
+      unrecognizedLines++;
+      continue;
+    }
+
+    const absQty = Math.abs(qty);
+    adjustments[cleanSku] = (adjustments[cleanSku] || 0) + absQty;
+    totalUnits += absQty;
+    if (previewRows.length < 15) {
+      previewRows.push({ sku: cleanSku, qty: absQty });
+    }
+  }
+
+  return {
+    adjustments,
+    totalUnits,
+    totalSkus: Object.keys(adjustments).length,
+    unrecognizedLines,
+    previewRows
+  };
+}
+

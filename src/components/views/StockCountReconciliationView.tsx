@@ -1,9 +1,10 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { CheckCircle2, CheckCheck, Copy, MessageSquare, FileWarning, Printer, Download, Database, ShieldCheck, Building2 } from 'lucide-react';
+import { CheckCircle2, CheckCheck, Copy, MessageSquare, FileWarning, Printer, Download, Database, ShieldCheck, Building2, ReceiptText } from 'lucide-react';
 import { StockCountReconciliationItem, StockCountSession } from '../../types';
 import type { ReconciliationFilter, ReconciliationMetrics } from '../../utils/countAggregation';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
+import { BulkSalesAdjustmentModal } from '../modals/BulkSalesAdjustmentModal';
 
 export type { ReconciliationFilter, ReconciliationMetrics };
 
@@ -55,6 +56,8 @@ export const StockCountReconciliationView: React.FC<StockCountReconciliationView
   handleSyncToVencimientos,
   handleSyncToAuditSheet
 }) => {
+  const [isBulkSalesOpen, setIsBulkSalesOpen] = useState(false);
+
   // Virtualización de la tabla de alto volumen (10.000+ ítems)
   const reconciliationTableContainerRef = useRef<HTMLDivElement>(null);
   const reconciliationRowVirtualizer = useVirtualizer({
@@ -71,11 +74,28 @@ export const StockCountReconciliationView: React.FC<StockCountReconciliationView
       ? reconciliationRowVirtualizer.getTotalSize() - (virtualReconciliationRows[virtualReconciliationRows.length - 1]?.end || 0)
       : 0;
 
+  // Manejador de pegado masivo de ventas del turno en la sesión
+  const handleApplySessionBulkSales = (adjustments: Record<string, number>, mode: 'ADD' | 'REPLACE') => {
+    let appliedCount = 0;
+    for (const [sku, qty] of Object.entries(adjustments)) {
+      if (qty > 0) {
+        const match = reconciliation.find(r => r.sku === sku || r.itemKey === sku);
+        const targetKey = match ? match.itemKey : sku;
+        const currentAdj = match?.ajusteMovimiento || 0;
+        // En la sesión, la fórmula es: teórico efectivo = teórico + ajuste
+        // Para descontar ventas, el ajuste debe ser negativo (-qty)
+        const newAdj = mode === 'REPLACE' ? -qty : currentAdj - qty;
+        handleUpdateAdjustment(targetKey, newAdj);
+        appliedCount++;
+      }
+    }
+  };
+
   return (
 <div className="flex-1 overflow-hidden flex flex-col p-3 sm:p-6">
   
   {/* KPI Cards Row */}
-  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-5 shrink-0">
+  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-3 shrink-0">
     <div className="p-3.5 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-900">
       <span className="text-[10px] font-bold uppercase text-blue-700 dark:text-blue-300 block">Total Físico</span>
       <span className="text-xl font-extrabold text-blue-900 dark:text-blue-100 mt-1 block">
@@ -130,6 +150,31 @@ export const StockCountReconciliationView: React.FC<StockCountReconciliationView
       <span className="text-[10px] text-amber-600 mt-0.5 block">Mayor a teórico</span>
     </div>
   </div>
+
+  {/* Formula Helper Banner & Quick Sales Paste */}
+  {currentSession.modo !== 'BLIND' && (
+    <div className="mb-3 px-3.5 py-2 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-900/50 flex flex-wrap items-center justify-between gap-2.5 shrink-0 text-xs shadow-2xs">
+      <div className="flex items-center gap-2 text-blue-900 dark:text-blue-200">
+        <span className="text-sm select-none">📐</span>
+        <div>
+          <span className="font-bold">Fórmula Operativa: </span>
+          <span className="font-semibold">Teórico Base + Ajuste Flujo = Teórico Ajustado</span>
+          <span className="text-[11px] text-blue-700/80 dark:text-blue-300/80 ml-1.5 hidden sm:inline">
+            (Ventas descuentan con <code className="font-mono font-bold bg-blue-100 dark:bg-blue-900/60 px-1 py-0.2 rounded text-rose-600 dark:text-rose-400">-N</code>; recepciones suman con <code className="font-mono font-bold bg-blue-100 dark:bg-blue-900/60 px-1 py-0.2 rounded text-emerald-600 dark:text-emerald-400">+N</code>)
+          </span>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => setIsBulkSalesOpen(true)}
+        className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer active:scale-95"
+        title="Pegar reporte de ventas del turno para descontar automáticamente del teórico"
+      >
+        <ReceiptText className="w-3.5 h-3.5" />
+        <span>Pegar Ventas de Turno</span>
+      </button>
+    </div>
+  )}
 
   {/* Filter Tabs & Actions Bar */}
   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-3 shrink-0">
@@ -369,18 +414,39 @@ export const StockCountReconciliationView: React.FC<StockCountReconciliationView
 
           {/* Movement adjustment if not blind mode */}
           {currentSession.modo !== 'BLIND' && (
-            <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-700 text-xs">
-              <span className="text-[11px] text-slate-500 font-medium">Ajuste Flujo (Venta/Recep):</span>
-              <input
-                type="number"
-                value={item.ajusteMovimiento || ''}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10) || 0;
-                  handleUpdateAdjustment(item.itemKey, val);
-                }}
-                placeholder="0"
-                className="w-20 px-2 py-1 text-center font-mono font-bold text-xs bg-slate-100 dark:bg-slate-700 rounded-lg outline-none text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-600"
-              />
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-700 text-xs">
+              <div className="flex flex-col">
+                <span className="text-[11px] text-slate-600 dark:text-slate-300 font-semibold">Ajuste Flujo:</span>
+                <span className="text-[9px] text-slate-400">Ventas (-) / Recep (+)</span>
+              </div>
+              <div className="inline-flex items-center bg-slate-100 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 overflow-hidden shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => handleUpdateAdjustment(item.itemKey, (item.ajusteMovimiento || 0) - 1)}
+                  className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-200 dark:hover:bg-slate-600 font-black text-xs transition-colors cursor-pointer select-none"
+                  title="Venta: restar 1 unidad (-1)"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  value={item.ajusteMovimiento || ''}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10) || 0;
+                    handleUpdateAdjustment(item.itemKey, val);
+                  }}
+                  placeholder="0"
+                  className="w-12 text-center font-mono font-bold text-xs bg-transparent outline-none text-slate-800 dark:text-slate-100 p-0"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleUpdateAdjustment(item.itemKey, (item.ajusteMovimiento || 0) + 1)}
+                  className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-200 dark:hover:bg-slate-600 font-black text-xs transition-colors cursor-pointer select-none"
+                  title="Recepción: sumar 1 unidad (+1)"
+                >
+                  +
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -404,7 +470,12 @@ export const StockCountReconciliationView: React.FC<StockCountReconciliationView
           {currentSession.modo !== 'BLIND' ? (
             <>
               <th className="p-3 font-bold text-slate-600 dark:text-slate-400 text-right" title="Stock teórico capturado al iniciar la sesión">Teórico Base</th>
-              <th className="p-3 font-bold text-slate-600 dark:text-slate-400 text-center" title="Ajuste por ventas (- unidades) o recepciones (+ unidades) durante el conteo">Ajuste Flujo (Venta/Recep)</th>
+              <th className="p-3 font-bold text-slate-600 dark:text-slate-400 text-center" title="Ajuste por ventas (- unidades) o recepciones (+ unidades) durante el conteo">
+                <div className="flex flex-col items-center leading-tight">
+                  <span>Ajuste Flujo</span>
+                  <span className="text-[9px] font-normal text-slate-400 normal-case">(Venta - / Recep +)</span>
+                </div>
+              </th>
               <th className="p-3 font-bold text-slate-600 dark:text-slate-400 text-right" title="Teórico Base + Ajuste de Flujo">Teórico Ajustado</th>
             </>
           ) : (
@@ -450,17 +521,35 @@ export const StockCountReconciliationView: React.FC<StockCountReconciliationView
                     {formatLocaleNumber(item.teorico)}
                   </td>
                   <td className="p-3 text-center">
-                    <input
-                      type="number"
-                      value={item.ajusteMovimiento || ''}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10) || 0;
-                        handleUpdateAdjustment(item.itemKey, val);
-                      }}
-                      placeholder="0"
-                      title="Ajuste por ventas (- unidades) o recepciones (+ unidades) durante el conteo"
-                      className="w-20 px-2 py-1 text-center font-mono font-bold text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 text-slate-800 dark:text-slate-100"
-                    />
+                    <div className="inline-flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateAdjustment(item.itemKey, (item.ajusteMovimiento || 0) - 1)}
+                        className="w-5 h-6 flex items-center justify-center text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer select-none font-black text-xs"
+                        title="Venta: restar 1 unidad (-1)"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        value={item.ajusteMovimiento || ''}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10) || 0;
+                          handleUpdateAdjustment(item.itemKey, val);
+                        }}
+                        placeholder="0"
+                        title="Ajuste por ventas (- unidades) o recepciones (+ unidades) durante el conteo"
+                        className="w-10 text-center font-mono font-bold text-xs bg-transparent outline-none text-slate-800 dark:text-slate-100 p-0"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateAdjustment(item.itemKey, (item.ajusteMovimiento || 0) + 1)}
+                        className="w-5 h-6 flex items-center justify-center text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer select-none font-black text-xs"
+                        title="Recepción: sumar 1 unidad (+1)"
+                      >
+                        +
+                      </button>
+                    </div>
                   </td>
                   <td className="p-3 text-right font-semibold text-slate-600 dark:text-slate-300">
                     {formatLocaleNumber(item.teorico + item.ajusteMovimiento)}
@@ -497,6 +586,16 @@ export const StockCountReconciliationView: React.FC<StockCountReconciliationView
       </tbody>
     </table>
   </div>
+
+  {/* Modal for bulk sales pasting in session */}
+  <BulkSalesAdjustmentModal
+    isOpen={isBulkSalesOpen}
+    onClose={() => setIsBulkSalesOpen(false)}
+    onApply={handleApplySessionBulkSales}
+    title="Cargar Ventas del Turno a la Sesión"
+    subtitle="Pega las ventas ocurridas para descontar del teórico de este mueble o sesión"
+    sourceContext="SESSION"
+  />
 
 </div>
   );

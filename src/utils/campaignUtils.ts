@@ -668,6 +668,41 @@ export function setCampaignManualSalesAdjustment(
 }
 
 /**
+ * Aplica un lote de ventas del turno masivamente a la campaña
+ */
+export function setCampaignBulkSalesAdjustments(
+  campaign: InventoryCampaign,
+  adjustments: Record<string, number>,
+  mode: 'ADD' | 'REPLACE' = 'ADD'
+): { updatedCampaign: InventoryCampaign; appliedCount: number; totalUnits: number } {
+  const current = mode === 'REPLACE' ? {} : { ...(campaign.ajustesVentaManual || {}) };
+  let appliedCount = 0;
+  let totalUnits = 0;
+
+  for (const [sku, qty] of Object.entries(adjustments)) {
+    if (sku && typeof qty === 'number' && !isNaN(qty) && qty > 0) {
+      if (mode === 'REPLACE') {
+        current[sku] = qty;
+      } else {
+        current[sku] = (current[sku] || 0) + qty;
+      }
+      appliedCount++;
+      totalUnits += qty;
+    }
+  }
+
+  return {
+    updatedCampaign: {
+      ...campaign,
+      fechaActualizacion: new Date().toISOString(),
+      ajustesVentaManual: current
+    },
+    appliedCount,
+    totalUnits
+  };
+}
+
+/**
  * Exports the complete Inventory Campaign Reconciliation Report to Excel (.xlsx)
  */
 export async function exportCampaignReportToExcel(

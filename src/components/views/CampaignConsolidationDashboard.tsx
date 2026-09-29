@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Download, RefreshCw, UploadCloud, FileSpreadsheet, Calendar, Layers, Plus, Store, Check, RotateCcw, Zap, Cloud, Database, Loader2, Scan, MoreVertical } from 'lucide-react';
 import { InventoryCampaign, CampaignConsolidationMatrix, CampaignAuditRow, StockCountSession, SheetRecord } from '../../types';
-import { computeCampaignConsolidationMatrix, importPharmacySnapshotToCampaign, markSkuAsClosedInCampaign, reopenSkuInCampaign, setCampaignManualSalesAdjustment, exportCampaignReportToExcel, exportDiscrepanciesForRecountSheet, createNewCampaign, saveCampaignsToStorage, buildAuditRowsFromCampaignMatrix } from '../../utils/campaignUtils';
+import { computeCampaignConsolidationMatrix, importPharmacySnapshotToCampaign, markSkuAsClosedInCampaign, reopenSkuInCampaign, setCampaignManualSalesAdjustment, setCampaignBulkSalesAdjustments, exportCampaignReportToExcel, exportDiscrepanciesForRecountSheet, createNewCampaign, saveCampaignsToStorage, buildAuditRowsFromCampaignMatrix } from '../../utils/campaignUtils';
 import { saveStockCountSessionsToStorage, playBeep } from '../../utils/stockCountUtils';
 import { syncCampaignsWithCloud, saveAuditRowsToDedicatedSheet } from '../../lib/sheets';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { resolveActiveCampaign, collectAllAuditRows, getAuditProviders, filterAuditRows, computeProviderProgress, getProviderPendingSkus } from '../../utils/campaignAggregation';
 import { parseDelimitedText, detectDelimiter } from '../../utils/universalImporter';
 import { CampaignQuickScanModal } from '../modals/CampaignQuickScanModal';
+import { BulkSalesAdjustmentModal } from '../modals/BulkSalesAdjustmentModal';
 import { CampaignMatrixTable } from '../campaign/CampaignMatrixTable';
 import { CampaignKpiSemaphore } from '../campaign/CampaignKpiSemaphore';
 import { CampaignProviderProgress } from '../campaign/CampaignProviderProgress';
@@ -60,6 +61,7 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
 
   // Quick Scan modal state & Tools menu state
   const [isQuickScanModalOpen, setIsQuickScanModalOpen] = useState(false);
+  const [isBulkSalesModalOpen, setIsBulkSalesModalOpen] = useState(false);
   const [isToolsDropdownOpen, setIsToolsDropdownOpen] = useState(false);
 
   // Snapshot upload states
@@ -216,6 +218,21 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
     const allUpdated = campaigns.map(c => c.id === updated.id ? updated : c);
     onUpdateCampaigns(allUpdated);
     autoSyncCampaignsToCloud(allUpdated, activeCampaign.id);
+  };
+
+  // Handle bulk sales adjustment for multiple SKUs from pasted POS/cashier report
+  const handleApplyBulkSales = (adjustments: Record<string, number>, mode: 'ADD' | 'REPLACE') => {
+    if (!activeCampaign) return;
+    const { updatedCampaign, appliedCount, totalUnits } = setCampaignBulkSalesAdjustments(activeCampaign, adjustments, mode);
+    const allUpdated = campaigns.map(c => c.id === updatedCampaign.id ? updatedCampaign : c);
+    onUpdateCampaigns(allUpdated);
+    autoSyncCampaignsToCloud(allUpdated, activeCampaign.id);
+    playBeep('success');
+    showToast(
+      `¡Se aplicaron ${appliedCount} ajustes de venta (${formatLocaleNumber(totalUnits)} unidades vendidas en turno)!`,
+      'success',
+      'Ventas Aplicadas'
+    );
   };
 
   // Handle processing pasted snapshot text from ERP Excel/CSV
@@ -847,6 +864,7 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
           onLaunchTargetedRecount={handleLaunchTargetedRecount}
           onToggleCloseSku={handleToggleCloseSku}
           onUpdateSalesAdjustment={handleUpdateSalesAdjustment}
+          onOpenBulkSalesModal={() => setIsBulkSalesModalOpen(true)}
           />
         </div>
       )}
@@ -1050,6 +1068,16 @@ export const CampaignConsolidationDashboard: React.FC<CampaignConsolidationDashb
           onSwitchToTerminal(sku);
         }}
         showToast={showToast}
+      />
+
+      {/* Bulk Sales Adjustment Modal for Fast POS / Cashier Pasting */}
+      <BulkSalesAdjustmentModal
+        isOpen={isBulkSalesModalOpen}
+        onClose={() => setIsBulkSalesModalOpen(false)}
+        onApply={handleApplyBulkSales}
+        title="Cargar Ventas del Turno (POS / Caja)"
+        subtitle="Pega las ventas en caja ocurridas durante la jornada para ajustar masivamente la góndola"
+        sourceContext="CAMPAIGN"
       />
     </div>
   );

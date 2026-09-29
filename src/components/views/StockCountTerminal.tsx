@@ -15,9 +15,10 @@ import { CountNumpad } from './CountNumpad';
 import { CampaignSkuErpBadge } from '../campaign/CampaignSkuBadges';
 import { MobileReadingsList } from './MobileReadingsList';
 import { LastScannedHeroCard } from './LastScannedHeroCard';
+import { OpticonTerminalView } from './OpticonTerminalView';
 import { MobileExpiryPrompt, MONTHS_LIST } from './MobileExpiryPrompt';
 import { buildMasterCatalogIndex, MasterProductSummary } from '../../utils/referenceResolver';
-import { formatLocaleNumber } from '../../utils/pureCalculations';
+import { formatLocaleNumber, parseLocaleNumber } from '../../utils/pureCalculations';
 import { groupSkuEntries, getLastScannedItem, filterGroupedEntries, filterChronoEntries, getReconciliationProviders, filterReconciliation, computeReconciliationMetrics, getPendingItems } from '../../utils/countAggregation';
 import { copyTextToClipboard } from '../../utils/exportUtils';
 import { executeThermalPrint } from '../../utils/ticketUtils';
@@ -361,8 +362,8 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   // Readings view mode: 'GROUPED' (consolidated by SKU) vs 'CHRONO' (chronological individual log)
   const [readingsViewMode, setReadingsViewMode] = useState<'GROUPED' | 'CHRONO'>('GROUPED');
   
-  // Mobile dedicated tab when in active counting session: 'SCAN' (Scanner / Keypad) | 'READINGS' (Full-screen readings list)
-  const [mobileCountingTab, setMobileCountingTab] = useState<'SCAN' | 'READINGS'>('SCAN');
+  // Mobile dedicated tab when in active counting session: 'OPTICON' (Industrial Collector) | 'SCAN' (Scanner / Keypad) | 'READINGS' (Full-screen readings list)
+  const [mobileCountingTab, setMobileCountingTab] = useState<'OPTICON' | 'SCAN' | 'READINGS'>('OPTICON');
   const [readingsSearch, setReadingsSearch] = useState<string>('');
 
   // Reconciliation filter & Supplier audit filter
@@ -961,6 +962,39 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     }));
   };
 
+  // Theoretical map for high-speed Opticon comparisons
+  const theoreticalItemsMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (currentSession?.modo === 'BLIND') return map;
+    sheetItems.forEach(item => {
+      const sku = String(item.SKU || item.sku || '').trim();
+      const qty = parseLocaleNumber(item.CANTIDAD || item.cantidad || item.STOCK || item.stock || 0, 0);
+      if (sku) {
+        map.set(sku, (map.get(sku) || 0) + qty);
+      }
+    });
+    return map;
+  }, [sheetItems, currentSession?.modo]);
+
+  // Opticon Industrial Data Collector Fast Commit
+  const handleOpticonScan = (sku: string, qty: number = 1) => {
+    if (!currentSession) return;
+    const cleanSku = sku.trim();
+    if (!cleanSku) return;
+
+    if (currentSession.requiereVencimiento) {
+      const existing = currentSession.conteos.find(c => c.sku === cleanSku && c.mm && c.yyyy);
+      if (!existing) {
+        setExpiryPromptSku(cleanSku);
+        setCountQuantity(qty);
+        return;
+      }
+    }
+
+    setCountQuantity(qty);
+    commitCountEntry(cleanSku);
+  };
+
   // Reconciled items for the active session (computed lazily only in RECONCILIATION view to optimize scan performance)
   const reconciliation = useMemo(() => {
     if (!currentSession || viewState !== 'RECONCILIATION') return [];
@@ -1488,6 +1522,24 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                   </button>
                 )}
               </div>
+
+              {/* MOBILE TAB 0: OPTICON INDUSTRIAL DATA COLLECTOR */}
+              {mobileCountingTab === 'OPTICON' && (
+                <OpticonTerminalView
+                  currentSession={currentSession}
+                  activeLocation={countLocation || currentSession.ubicacion || 'Mueble 1'}
+                  onChangeLocation={(newLoc) => setCountLocation(newLoc)}
+                  lastScanned={lastScannedItem}
+                  onCommitScan={(sku, qty) => handleOpticonScan(sku, qty)}
+                  onIncrementSku={handleIncrementSkuQuantity}
+                  onDecrementSku={handleDecrementSkuQuantity}
+                  onUndoLastReading={handleUndoLastEntry}
+                  onOpenLiveCamera={() => setIsCameraScannerOpen(true)}
+                  theoreticalItemsMap={theoreticalItemsMap}
+                  masterCatalogIndex={masterCatalogIndex}
+                  showToast={showToast}
+                />
+              )}
 
               {/* MOBILE TAB 1: SCANNER & KEYPAD PAD */}
               {mobileCountingTab === 'SCAN' && (
@@ -2535,60 +2587,77 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
               </div>
             </div>
 
-            {/* Fixed Mobile Bottom Action & Navigation Bar (3 dedicated touch tabs) */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-3 py-2 flex items-center justify-around shadow-2xl safe-bottom">
+            {/* Fixed Mobile Bottom Action & Navigation Bar (4 dedicated touch tabs) */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-2xl safe-bottom">
               
-              {/* Tab 1: Pistolear */}
+              {/* Tab 1: Opticon Terminal */}
+              <button
+                type="button"
+                onClick={() => {
+                  setViewState('COUNTING');
+                  setMobileCountingTab('OPTICON');
+                }}
+                className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                  viewState === 'COUNTING' && mobileCountingTab === 'OPTICON'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/50 scale-[1.02]'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Zap className={`w-4 h-4 ${viewState === 'COUNTING' && mobileCountingTab === 'OPTICON' ? 'fill-current' : ''}`} />
+                <span className="text-[10px] font-black tracking-tight">Opticon</span>
+              </button>
+
+              {/* Tab 2: Catálogo / Formulario */}
               <button
                 type="button"
                 onClick={() => {
                   setViewState('COUNTING');
                   setMobileCountingTab('SCAN');
                 }}
-                className={`flex-1 py-2 px-1 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
                   viewState === 'COUNTING' && mobileCountingTab === 'SCAN'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-[1.02]'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/50 scale-[1.02]'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <Barcode className="w-5 h-5" />
-                <span className="text-[11px] font-black tracking-tight">Pistolear</span>
+                <Barcode className="w-4 h-4" />
+                <span className="text-[10px] font-black tracking-tight">Catálogo</span>
               </button>
 
-              {/* Tab 2: Lecturas */}
+              {/* Tab 3: Lecturas */}
               <button
                 type="button"
                 onClick={() => {
                   setViewState('COUNTING');
                   setMobileCountingTab('READINGS');
                 }}
-                className={`flex-1 py-2 px-1 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
                   viewState === 'COUNTING' && mobileCountingTab === 'READINGS'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-[1.02]'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/50 scale-[1.02]'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <div className="relative">
-                  <Layers className="w-5 h-5" />
+                  <Layers className="w-4 h-4" />
                   {groupedSkuEntries.length > 0 && (
-                    <span className="absolute -top-1 -right-2 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full">
+                    <span className="absolute -top-1 -right-2 bg-emerald-500 text-white text-[8px] font-black px-1 rounded-full">
                       {groupedSkuEntries.length}
                     </span>
                   )}
                 </div>
-                <span className="text-[11px] font-black tracking-tight">
+                <span className="text-[10px] font-black tracking-tight">
                   Lecturas ({currentSession.conteos.reduce((a, b) => a + b.cantidad, 0)})
                 </span>
               </button>
 
-              {/* Tab 3: Cuadratura */}
+              {/* Tab 4: Cuadratura */}
               <button
                 type="button"
                 onClick={() => setViewState('RECONCILIATION')}
-                className="flex-1 py-2 px-1 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                className="flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer text-slate-400 hover:text-purple-400 hover:bg-purple-950/30"
               >
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="text-[11px] font-black tracking-tight">Cuadratura</span>
+                <CheckCircle2 className="w-4 h-4" />
+                <span className="text-[10px] font-black tracking-tight">Cuadratura</span>
               </button>
 
             </div>

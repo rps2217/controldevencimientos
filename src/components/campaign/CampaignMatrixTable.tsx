@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Scan, Download, RotateCcw, Package, Check, HelpCircle, Plus, AlertTriangle, MapPin, Clock } from 'lucide-react';
+import { Search, Scan, Download, RotateCcw, Package, Check, HelpCircle, Plus, AlertTriangle, MapPin, Clock, ReceiptText } from 'lucide-react';
 import { CampaignAuditRow, CampaignConsolidationMatrix } from '../../types';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 
@@ -20,6 +20,7 @@ interface CampaignMatrixTableProps {
   onLaunchTargetedRecount: () => void;
   onToggleCloseSku: (row: CampaignAuditRow) => void;
   onUpdateSalesAdjustment: (sku: string, val: number) => void;
+  onOpenBulkSalesModal?: () => void;
 }
 
 export const CampaignMatrixTable: React.FC<CampaignMatrixTableProps> = ({
@@ -36,7 +37,8 @@ export const CampaignMatrixTable: React.FC<CampaignMatrixTableProps> = ({
   onExportDiscrepancies,
   onLaunchTargetedRecount,
   onToggleCloseSku,
-  onUpdateSalesAdjustment
+  onUpdateSalesAdjustment,
+  onOpenBulkSalesModal
 }) => {
   return (
     <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">
@@ -79,7 +81,19 @@ export const CampaignMatrixTable: React.FC<CampaignMatrixTableProps> = ({
         </div>
 
         {/* Quick Action: Targeted 2nd Round Recount */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {onOpenBulkSalesModal && (
+            <button
+              type="button"
+              onClick={onOpenBulkSalesModal}
+              className="px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Cargar reporte de ventas en caja del turno para ajustar masivamente"
+            >
+              <ReceiptText className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Pegar Ventas de Turno</span>
+            </button>
+          )}
+
           <button
             onClick={() => onMatrixFilterChange('ALL')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
@@ -125,7 +139,12 @@ export const CampaignMatrixTable: React.FC<CampaignMatrixTableProps> = ({
               <th className="py-3 px-4 min-w-[240px]">Descripción / Proveedor</th>
               <th className="py-3 px-3 text-right w-24">Teórico ERP</th>
               <th className="py-3 px-3 text-right w-24">Físico Total</th>
-              <th className="py-3 px-3 text-center w-28">Venta / Ajuste</th>
+              <th className="py-3 px-3 text-center w-36" title="Ventas en turno: Descuenta del stock teórico esperado en góndola (Fórmula: Teórico - Venta)">
+                <div className="flex flex-col items-center leading-tight">
+                  <span>Venta / Ajuste</span>
+                  <span className="text-[9px] font-normal text-slate-400 normal-case">(Teórico - V)</span>
+                </div>
+              </th>
               <th className="py-3 px-3 text-right w-24">Diferencia</th>
               <th className="py-3 px-4 min-w-[180px]">Muebles / Sesiones</th>
               <th className="py-3 px-4 text-center w-28">Acción</th>
@@ -208,19 +227,43 @@ export const CampaignMatrixTable: React.FC<CampaignMatrixTableProps> = ({
                       {formatLocaleNumber(row.stockFisicoTotal)}
                     </td>
 
-                    {/* Venta en Turno / Ajuste Manual */}
+                    {/* Venta en Turno / Ajuste Manual con micro-botones [-] y [+] */}
                     <td className="py-2.5 px-3 text-center">
-                      <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
-                        <span className="text-[11px] text-slate-400 font-bold">V:</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={row.ajusteManualVenta || (row.ventaRegistrada > 0 ? row.ventaRegistrada : '')}
-                          onChange={(e) => onUpdateSalesAdjustment(row.sku, parseInt(e.target.value, 10) || 0)}
-                          placeholder="0"
-                          title="Ingresa unidades vendidas en caja durante el conteo"
-                          className="w-10 text-center font-bold text-slate-700 dark:text-slate-200 bg-transparent border-0 outline-none p-0 text-xs"
-                        />
+                      <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = row.ajusteManualVenta || (row.ventaRegistrada > 0 ? row.ventaRegistrada : 0);
+                            onUpdateSalesAdjustment(row.sku, Math.max(0, cur - 1));
+                          }}
+                          className="w-5 h-6 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer select-none font-black text-xs"
+                          title="Restar 1 unidad vendida (-1)"
+                        >
+                          -
+                        </button>
+                        <div className="px-1 flex items-center gap-0.5">
+                          <span className="text-[10px] text-slate-400 font-bold">V:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={row.ajusteManualVenta || (row.ventaRegistrada > 0 ? row.ventaRegistrada : '')}
+                            onChange={(e) => onUpdateSalesAdjustment(row.sku, Math.max(0, parseInt(e.target.value, 10) || 0))}
+                            placeholder="0"
+                            title="Unidades vendidas en caja durante el conteo (descuenta del teórico esperado)"
+                            className="w-8 text-center font-bold text-slate-700 dark:text-slate-200 bg-transparent border-0 outline-none p-0 text-xs font-mono"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = row.ajusteManualVenta || (row.ventaRegistrada > 0 ? row.ventaRegistrada : 0);
+                            onUpdateSalesAdjustment(row.sku, cur + 1);
+                          }}
+                          className="w-5 h-6 flex items-center justify-center text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors cursor-pointer select-none font-black text-xs"
+                          title="Sumar 1 unidad vendida (+1)"
+                        >
+                          +
+                        </button>
                       </div>
                     </td>
 
