@@ -143,6 +143,7 @@ export interface DashboardContextType {
   // Bulk Operations & Selection
   setSelectedRowIds?: React.Dispatch<React.SetStateAction<number[]>> | ((ids: number[]) => void);
   handleBulkDelete?: () => Promise<void> | void;
+  handleReconcileWithCatalog?: () => Promise<void> | void;
   bulkActionCtx?: BulkActionContext;
   /** Capacidades de dominio de la hoja activa (ver `detectTableCapabilities`). */
   tableCapabilities?: Set<TableCapability>;

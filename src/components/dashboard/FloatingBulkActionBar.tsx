@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Printer, Settings, Barcode, Mail, MessageSquare, Download, Flame, Edit2, Trash2, Sliders, X, Copy 
+  Printer, Settings, Barcode, Mail, MessageSquare, Download, Flame, Edit2, Trash2, Sliders, X, Copy, RefreshCw 
 } from 'lucide-react';
 import { isActionEnabledForTable, buildBulkActionContext } from '../../utils/bulkActionsRegistry';
 import { resolveActiveVirtualColumns } from '../../utils/virtualColumns';
@@ -29,6 +29,7 @@ export const FloatingBulkActionBar: React.FC = () => {
   const setIsPmReportOpen = modalsActions.setIsPmReportOpen;
   const setIsBulkEditOpen = modalsActions.setIsBulkEditOpen;
   const handleBulkDelete = dashboard.handleBulkDelete;
+  const handleReconcileWithCatalog = dashboard.handleReconcileWithCatalog;
   const handleOpenCopyModal = dashboard.handleOpenCopyModal;
   const setIsBulkActionsConfigOpen = modalsActions.setIsBulkActionsConfigOpen;
   const setSelectedRowIds = dashboard.setSelectedRowIds ?? (() => {});
@@ -137,6 +138,16 @@ export const FloatingBulkActionBar: React.FC = () => {
             className="text-xs hover:bg-slate-700 px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 bg-blue-600/40 text-blue-200 border border-blue-500/40 cursor-pointer"
           >
             <Edit2 className="w-3.5 h-3.5 text-blue-400" /> Edición Masiva FRC
+          </button>
+        )}
+
+        {handleReconcileWithCatalog && isActionEnabledForTable('reconcile_catalog', bulkActionCtx, sheetConfig) && (
+          <button 
+            onClick={handleReconcileWithCatalog}
+            className="text-xs hover:bg-slate-700 px-3 py-1.5 rounded-xl font-bold transition-colors flex items-center gap-1.5 bg-emerald-600/40 text-emerald-200 border border-emerald-500/40 shadow-sm cursor-pointer"
+            title="Reconcilia las filas seleccionadas con el Catálogo Maestro (actualiza descripción, proveedor y política)"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-emerald-300" /> Reconciliar Catálogo ({selectedRowIds.length})
           </button>
         )}
         

@@ -211,6 +211,20 @@ export const BUILT_IN_SLICES: TableSlice[] = [
       pmRadarFilter: ['en_regla']
     }
   },
+  {
+    id: 'builtin_main_orphan_sku',
+    name: 'Sin Ficha Maestra',
+    description: 'Lotes o ítems cuyo SKU no existe en el Catálogo Maestro de Productos',
+    tableKey: 'main',
+    requiredCapability: 'vencimiento',
+    icon: 'AlertTriangle',
+    color: 'amber',
+    isBuiltIn: true,
+    filterConfig: {
+      pmRadarFilter: ['orphan_catalog'],
+      orphanCatalogOnly: true
+    }
+  },
 
   // 2. Registro de Incidencias & FRC (events)
   {
@@ -446,7 +460,13 @@ export function itemMatchesSlice(
     else if (pmSet.has('en_regla') && st.code === 'NORMAL') matchesPm = true;
     else if (pmSet.has('canje_proveedor') && st.actionType === 'CANJE_PROVEEDOR') matchesPm = true;
     else if (pmSet.has('merma_directa') && st.actionType === 'MERMA_DIRECTA') matchesPm = true;
+    else if (pmSet.has('orphan_catalog') && item._isOrphan) matchesPm = true;
     if (!matchesPm) return false;
+  }
+
+  // Orphan catalog flag match
+  if (filterConfig.orphanCatalogOnly && !item._isOrphan) {
+    return false;
   }
 
   // 4. Event Category match

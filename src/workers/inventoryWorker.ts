@@ -22,6 +22,7 @@ export interface WorkerNormalizedItem {
   isResolved: boolean;
   traspasoVal: string | null;
   bodegaVal: string;
+  isOrphan: boolean;
 }
 
 export interface WorkerMetricsResult extends MetricsResult {
@@ -152,7 +153,8 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
         expiryMonthOffset: statusRaw.expiryMonthOffset,
         isResolved: res.isResolved,
         traspasoVal: res.traspasoNumber || null,
-        bodegaVal
+        bodegaVal,
+        isOrphan: Boolean(item._isOrphan)
       };
     }
 
@@ -237,6 +239,7 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
           else if (pmRadarFilterSet.has('en_regla') && item.statusCode === 'NORMAL') matchPm = true;
           else if (pmRadarFilterSet.has('canje_proveedor') && item.actionType === 'CANJE_PROVEEDOR') matchPm = true;
           else if (pmRadarFilterSet.has('merma_directa') && item.actionType === 'MERMA_DIRECTA') matchPm = true;
+          else if (pmRadarFilterSet.has('orphan_catalog') && item.isOrphan) matchPm = true;
           if (!matchPm) continue;
         }
         if (dynamicMonthRange) {

@@ -162,6 +162,7 @@ export interface InventoryItem {
   _entityKey?: string; // Stable business primary key or composite identity
   _entityKeyCol?: string; // Column name that holds the primary key
   _isSyntheticKey?: boolean; // Whether the key was auto-generated or derived from business fields
+  _isOrphan?: boolean; // Whether item has a SKU missing from the master product catalog
   [key: string]: any; // Dynamic columns based on the sheet's headers
 }
 
@@ -241,6 +242,7 @@ export interface SliceFilterConfig {
   columnFilters?: Record<string, string[]>;
   dynamicMonthFilter?: number[];
   dynamicMonthRange?: DynamicMonthRange | null;
+  orphanCatalogOnly?: boolean;
 }
 
 export interface TableSlice {

@@ -635,13 +635,15 @@ export const InventoryDashboard: React.FC = () => {
     showToast
   });
 
-  const { handleApplyBulkEdit, handleBulkDelete } = useInventoryBulkActions({
+  const { handleApplyBulkEdit, handleBulkDelete, handleReconcileWithCatalog } = useInventoryBulkActions({
     activeSheet,
     activeView,
     sheetConfig,
     headers,
     items,
     allMainItems,
+    products,
+    policies,
     selectedRowIds,
     setSelectedRowIds,
     setItems,
@@ -1124,6 +1126,7 @@ export const InventoryDashboard: React.FC = () => {
     // Bulk Operations & Selection
     setSelectedRowIds,
     handleBulkDelete,
+    handleReconcileWithCatalog,
     bulkActionCtx,
     tableCapabilities,
     columnLabelsMap,

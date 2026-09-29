@@ -170,24 +170,61 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     });
   }, [setSortConfig]);
 
-  // Virtual columns augmentation (avoid cloning objects when no virtual columns active)
-  const augmentedItems = useMemo(() => {
+  // Pre-computación O(1) de SKUs del Catálogo Maestro para detección de huérfanos
+  const catalogSkuSet = useMemo(() => {
+    if (!products || products.length === 0) return null;
+    const set = new Set<string>();
+    const firstProd = products[0];
+    const keys = Object.keys(firstProd || {});
+    const skuCol = findColumnBySemantic(keys, 'sku', sheetConfig?.customAliases) || keys.find(k => /sku|código|codigo/i.test(k));
+    for (let i = 0; i < products.length; i++) {
+      const p = products[i];
+      if (!p) continue;
+      const raw = skuCol ? p[skuCol] : (p.SKU || p.sku);
+      if (raw !== undefined && raw !== null) {
+        const clean = String(raw).trim().toLowerCase();
+        if (clean) {
+          set.add(clean);
+          const alpha = clean.replace(/[^a-z0-9]/g, '');
+          if (alpha) set.add(alpha);
+        }
+      }
+    }
+    return set;
+  }, [products, sheetConfig?.customAliases]);
+
+  // Virtual columns augmentation & master catalog orphan detection
+  const augmentedItems = useMemo<InventoryItem[]>(() => {
     const activeVCs = sheetConfig.activeVirtualColumns || [];
-    if (!activeVCs || activeVCs.length === 0) {
-      return items;
-    }
-    const targetVCs = VIRTUAL_COLUMNS.filter(col => activeVCs.includes(col.id));
-    if (targetVCs.length === 0) {
-      return items;
-    }
+    const targetVCs = activeVCs.length > 0 ? VIRTUAL_COLUMNS.filter(col => activeVCs.includes(col.id)) : [];
+    const skuCol = findColumnBySemantic(headers, 'sku', sheetConfig?.customAliases) || headers.find(h => /sku|código|codigo/i.test(h));
+    const hasCatalog = catalogSkuSet !== null && catalogSkuSet.size > 0;
+
     return items.map(item => {
       const virtualData: Record<string, string | number> = {};
-      targetVCs.forEach(col => {
-        virtualData[col.id] = col.calculate(item, headers, { products, policies });
-      });
-      return { ...item, ...virtualData };
+      if (targetVCs.length > 0) {
+        targetVCs.forEach(col => {
+          virtualData[col.id] = col.calculate(item, headers, { products, policies });
+        });
+      }
+
+      let isOrphan = false;
+      if (hasCatalog && skuCol) {
+        const rawSku = item[skuCol] || item.SKU || item.sku;
+        const cleanSku = rawSku !== undefined && rawSku !== null ? String(rawSku).trim().toLowerCase() : '';
+        if (cleanSku) {
+          const alpha = cleanSku.replace(/[^a-z0-9]/g, '');
+          isOrphan = !catalogSkuSet.has(cleanSku) && (!alpha || !catalogSkuSet.has(alpha));
+        }
+      }
+
+      return {
+        ...item,
+        ...virtualData,
+        _isOrphan: isOrphan
+      } as InventoryItem;
     });
-  }, [items, headers, sheetConfig.activeVirtualColumns, products, policies]);
+  }, [items, headers, sheetConfig.activeVirtualColumns, products, policies, catalogSkuSet, sheetConfig?.customAliases]);
 
   // Web Worker for non-blocking background calculations
   const { metrics, matchingIndices, isProcessing, isWorkerReady } = useInventoryWorker({
@@ -356,6 +393,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
             else if (pmRadarFilterSet.has('en_regla') && st.code === 'NORMAL') matchPm = true;
             else if (pmRadarFilterSet.has('canje_proveedor') && st.actionType === 'CANJE_PROVEEDOR') matchPm = true;
             else if (pmRadarFilterSet.has('merma_directa') && st.actionType === 'MERMA_DIRECTA') matchPm = true;
+            else if (pmRadarFilterSet.has('orphan_catalog') && item._isOrphan) matchPm = true;
             if (!matchPm) continue;
           }
           if (dynamicMonthRange) {

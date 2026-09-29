@@ -177,8 +177,18 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
 
           {/* SKU & Title */}
           <div>
-            <div className="font-mono text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 tracking-tight">
-              {skuCol && item[skuCol] ? String(item[skuCol]) : 'Sin SKU'}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                {skuCol && item[skuCol] ? String(item[skuCol]) : 'Sin SKU'}
+              </span>
+              {item._isOrphan && (
+                <span 
+                  className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800 shadow-2xs"
+                  title="Este SKU no existe en el Catálogo de Productos actual"
+                >
+                  ⚠️ Sin Maestro
+                </span>
+              )}
             </div>
             <div className="text-sm text-slate-600 dark:text-slate-300 leading-snug line-clamp-2 mt-0.5 font-medium">
               {descCol && item[descCol] ? String(item[descCol]) : 'Sin descripción'}
@@ -398,9 +408,19 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                   </span>
                 </button>
               ) : isSku && val ? (
-                <span className="font-mono font-semibold text-slate-800 dark:text-slate-100 truncate block text-left">
-                  {String(val)}
-                </span>
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="font-mono font-semibold text-slate-800 dark:text-slate-100 truncate block text-left">
+                    {String(val)}
+                  </span>
+                  {item._isOrphan && (
+                    <span 
+                      className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800 shrink-0 shadow-2xs"
+                      title="Este SKU no existe en el Catálogo de Productos actual"
+                    >
+                      Sin Maestro
+                    </span>
+                  )}
+                </div>
               ) : eventCat ? (
                 <button
                   onClick={(e) => { 

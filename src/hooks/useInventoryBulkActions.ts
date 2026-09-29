@@ -1,5 +1,5 @@
 import { updateRow, deleteRow, deleteRows } from '../lib/sheets';
-import { InventoryItem, SheetConfig, EventCategory, SheetProperties } from '../types';
+import { InventoryItem, SheetConfig, EventCategory, SheetProperties, SheetRecord } from '../types';
 import type { OfflineMutation, MutationValues } from '../db/indexedDbService';
 import type { FetchDataFn } from './useInventoryData';
 import { resolveItemIdentity } from '../utils/entityIdentityResolver';
@@ -10,12 +10,13 @@ import { isDemoMode } from '../utils/appStorage';
 import { saveStoredDemoItems } from '../utils/dashboardConfigUtils';
 import { useToast } from '../components/common/ToastContainer';
 import { useConfirm } from '../components/common/ConfirmDialog';
+import { findMasterProduct, dereferenceMasterProduct, resolveItemPolicyAndRetiro } from '../utils/referenceResolver';
 
 /**
- * Acciones masivas sobre las filas seleccionadas: edición en lote y eliminación
- * en lote. Comparten el mismo molde que la ingesta —optimismo local, escritura
- * fila a fila en Google Sheets y encolado de la mutación si la nube falla— pero
- * además calculan encabezados por semántica y remapean `_rowIndex` tras borrar.
+ * Acciones masivas sobre las filas seleccionadas: edición en lote, reconciliación
+ * con catálogo maestro y eliminación en lote. Comparten el mismo molde que la
+ * ingesta —optimismo local, escritura fila a fila en Google Sheets y encolado de la
+ * mutación si la nube falla— pero además calculan encabezados por semántica.
  */
 export const useInventoryBulkActions = ({
   activeSheet,
@@ -24,6 +25,8 @@ export const useInventoryBulkActions = ({
   headers,
   items,
   allMainItems,
+  products = [],
+  policies = [],
   selectedRowIds,
   setSelectedRowIds,
   setItems,
@@ -38,6 +41,8 @@ export const useInventoryBulkActions = ({
   headers: string[];
   items: InventoryItem[];
   allMainItems: InventoryItem[];
+  products?: SheetRecord[];
+  policies?: SheetRecord[];
   selectedRowIds: number[];
   setSelectedRowIds: React.Dispatch<React.SetStateAction<number[]>>;
   setItems: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
@@ -253,5 +258,172 @@ export const useInventoryBulkActions = ({
     }
   };
 
-  return { handleApplyBulkEdit, handleBulkDelete };
+  const handleReconcileWithCatalog = async () => {
+    if (!activeSheet || selectedRowIds.length === 0) return;
+
+    if (!products || products.length === 0) {
+      showToast('El Catálogo de Productos está vacío o no se ha cargado aún.', 'warning', 'Catálogo no disponible');
+      return;
+    }
+
+    const skuCol = findColumnBySemantic(headers, 'sku', sheetConfig.customAliases) || 
+                   headers.find(h => /sku|código|codigo/i.test(h));
+    if (!skuCol) {
+      showToast('No se encontró una columna de SKU en la tabla para reconciliar con el catálogo.', 'warning', 'Sin columna SKU');
+      return;
+    }
+
+    const count = selectedRowIds.length;
+    const confirmed = await confirm({
+      title: 'Reconciliar con Catálogo Maestro',
+      message: `¿Deseas actualizar los datos maestros (descripción, proveedor y política comercial) de ${count} fila(s) seleccionada(s) con la versión actual del Catálogo de Productos?`,
+      confirmLabel: `Reconciliar ${count} filas`
+    });
+    if (!confirmed) return;
+
+    const originalItems = [...items];
+    const originalMainItems = [...allMainItems];
+    const isDemo = isDemoMode();
+
+    try {
+      setIsSaving(true);
+      const toastId = showToast(`Reconciliando con catálogo... ${count} registros`, 'loading', 'Reconciliación', 0);
+
+      let reconciledCount = 0;
+      let orphanCount = 0;
+      const updatedRowsToSave: { rowIndex: number; rowValues: string[]; entityKey: string }[] = [];
+
+      const updatedItems = items.map(item => {
+        if (!selectedRowIds.includes(item._rowIndex as number)) return item;
+
+        const rawSku = item[skuCol] || item.SKU || item.sku;
+        const cleanSku = rawSku !== undefined && rawSku !== null ? String(rawSku).trim() : '';
+
+        if (!cleanSku) {
+          orphanCount++;
+          return item;
+        }
+
+        const masterProd = findMasterProduct(cleanSku, products, sheetConfig.customAliases);
+        if (!masterProd) {
+          orphanCount++;
+          return item;
+        }
+
+        // De-referenciar campos maestros hacia los encabezados de la hoja activa
+        const dereferenced = dereferenceMasterProduct(masterProd, headers, sheetConfig.customAliases);
+        const policyInfo = resolveItemPolicyAndRetiro(
+          { ...item, ...dereferenced },
+          headers,
+          products,
+          policies,
+          sheetConfig.customAliases
+        );
+
+        const updated: InventoryItem = { ...item, ...dereferenced, _isOrphan: false };
+
+        // Actualizar política y retiro si la tabla tiene esas columnas
+        const polCol = findColumnBySemantic(headers, 'politica', sheetConfig.customAliases);
+        if (polCol && policyInfo.policy) {
+          updated[polCol] = policyInfo.policy;
+        }
+        const diasCol = findColumnBySemantic(headers, 'dias_retiro', sheetConfig.customAliases);
+        if (diasCol && policyInfo.diasRetiro) {
+          updated[diasCol] = String(policyInfo.diasRetiro);
+        }
+        const retCol = findColumnBySemantic(headers, 'fecha_retiro', sheetConfig.customAliases);
+        if (retCol && policyInfo.fechaRetiroDisplay && policyInfo.fechaRetiroDisplay !== '-') {
+          updated[retCol] = policyInfo.fechaRetiroDisplay;
+        }
+
+        reconciledCount++;
+        const rowValues = headers.map(h => updated[h] !== undefined && updated[h] !== null ? String(updated[h]) : '');
+        const ident = resolveItemIdentity(updated, headers, activeSheet.title);
+        updatedRowsToSave.push({
+          rowIndex: item._rowIndex as number,
+          rowValues,
+          entityKey: ident.keyValue
+        });
+
+        return updated;
+      });
+
+      if (reconciledCount === 0) {
+        showToast('Ninguna de las filas seleccionadas tiene ficha en el catálogo maestro.', 'info', 'Sin cambios');
+        return;
+      }
+
+      setItems(updatedItems);
+      if (activeView === 'main') {
+        const updatedMain = allMainItems.map(item => {
+          const match = updatedItems.find(u => u._rowIndex === item._rowIndex);
+          return match || item;
+        });
+        setAllMainItems(updatedMain);
+        if (isDemo) saveStoredDemoItems('main', updatedMain);
+      }
+      if (isDemo) saveStoredDemoItems(activeView, updatedItems);
+
+      // Guardar en la nube o encolar offline
+      if (!isDemo) {
+        let remaining = updatedRowsToSave.length;
+        for (const rowData of updatedRowsToSave) {
+          try {
+            await updateRow(activeSheet.title, rowData.rowIndex, rowData.rowValues, {
+              entityKey: rowData.entityKey,
+              keyValue: rowData.entityKey
+            });
+          } catch (err) {
+            console.warn(`Error al actualizar fila ${rowData.rowIndex} en reconciliación, agregando a cola offline`, err);
+            await enqueueMutation({
+              type: 'update',
+              sheetTitle: activeSheet.title,
+              rowIndex: rowData.rowIndex,
+              entityKey: rowData.entityKey,
+              keyValue: rowData.entityKey,
+              headers,
+              values: rowData.rowValues
+            });
+          }
+          remaining--;
+          if (remaining > 0) {
+            updateToast(toastId, `Reconciliando... ${remaining} restantes`, 'loading', 'Reconciliación', 0);
+          }
+        }
+      }
+
+      // Audio feedback sutil de éxito
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+        if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+      } catch {}
+
+      setSelectedRowIds([]);
+      await fetchData(sheetConfig, activeView, true);
+
+      const msg = orphanCount > 0
+        ? `¡Se reconciliaron ${reconciledCount} filas! (${orphanCount} no encontradas en catálogo)`
+        : `¡Se reconciliaron ${reconciledCount} filas exitosamente con el catálogo maestro!`;
+      updateToast(toastId, msg, 'success', 'Reconciliación Exitosa');
+    } catch (err: unknown) {
+      setItems(originalItems);
+      setAllMainItems(originalMainItems);
+      showToast(`Error durante la reconciliación: ${getErrorMessage(err)}`, 'error', 'Error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return { handleApplyBulkEdit, handleBulkDelete, handleReconcileWithCatalog };
 };

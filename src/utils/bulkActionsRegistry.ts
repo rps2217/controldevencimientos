@@ -8,6 +8,7 @@ import {
   Edit2, 
   Trash2,
   Copy,
+  RefreshCw,
   LucideIcon 
 } from 'lucide-react';
 import { SheetConfig, TableCapabilitySetting } from '../types';
@@ -22,6 +23,7 @@ export type BulkActionId =
   | 'excel' 
   | 'pm_report' 
   | 'bulk_edit' 
+  | 'reconcile_catalog'
   | 'delete' 
   | string;
 
@@ -176,6 +178,25 @@ export const ALL_BULK_ACTIONS: BulkActionDefinition[] = [
         return 'Gestión de incidencias y estado de resolución de traspasos';
       }
       return 'Solo aplica a tablas de eventos o incidencias FRC';
+    }
+  },
+  {
+    id: 'reconcile_catalog',
+    label: 'Reconciliar con Catálogo',
+    shortLabel: 'Actualizar Catálogo',
+    description: 'Actualiza descripción, proveedor y política de las filas seleccionadas según el catálogo maestro',
+    category: 'operations',
+    icon: RefreshCw,
+    buttonClass: 'text-xs hover:bg-slate-700 px-3 py-1.5 rounded-xl font-bold transition-colors flex items-center gap-1.5 bg-emerald-600/40 text-emerald-200 border border-emerald-500/40 shadow-sm cursor-pointer',
+    iconClass: 'w-3.5 h-3.5 text-emerald-300',
+    defaultEnabled: (ctx) => {
+      // Activo siempre que la tabla tenga columna SKU
+      return ctx.headers.some(h => findColumnBySemantic([h], 'sku') !== undefined);
+    },
+    getContextualReason: (ctx) => {
+      const hasSku = ctx.headers.some(h => findColumnBySemantic([h], 'sku') !== undefined);
+      if (hasSku) return 'Detectada columna de SKU para reconciliación con catálogo maestro';
+      return 'Requiere columna SKU para cruzar con el maestro de productos';
     }
   },
   {
