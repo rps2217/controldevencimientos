@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Database, FileSpreadsheet, Package, FileText, TableProperties, List, Settings, PanelLeftClose, PanelLeftOpen, PieChart, Barcode, Calendar
+  Database, FileSpreadsheet, Package, FileText, TableProperties, List, Settings, PanelLeftClose, PanelLeftOpen, PieChart, Barcode, Calendar, Truck
 } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
@@ -133,6 +133,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ forceExpanded = false, onNavig
               onClick={onOpenStockCount}
               collapsed={isSidebarCollapsed}
               badge="Físico"
+            />
+          )}
+          {isModuleEnabled('recepBultos', enabledModules) && (
+            <SidebarItem 
+              icon={<Truck className="w-5 h-5" />} 
+              label="Recepción de Bultos" 
+              active={activeView === 'recepBultos'} 
+              onClick={() => navigate('recepBultos')}
+              collapsed={isSidebarCollapsed}
             />
           )}
           

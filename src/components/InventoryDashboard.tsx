@@ -40,6 +40,7 @@ import { Sidebar } from './navigation/Sidebar';
 import { DashboardTopNav } from './navigation/DashboardTopNav';
 import { DashboardPageHeader } from './navigation/DashboardPageHeader';
 import { DashboardFilterPanels } from './views/DashboardFilterPanels';
+import { RecepBultosTableView } from './views/RecepBultosTableView';
 import { SchemaEditorView } from './views/SchemaEditorView';
 import { OperationalCalendarView } from './views/OperationalCalendarView';
 import { LazyFallback } from './common/LazyFallback';

@@ -27,7 +27,7 @@ export type SpreadsheetMetadata = SheetMetadata;
  * propósito: admite títulos de hojas no mapeadas ("otras pestañas"), que no son
  * claves canónicas.
  */
-export const VIEW_KEYS = ['main', 'events', 'products', 'policies'] as const;
+export const VIEW_KEYS = ['main', 'events', 'products', 'policies', 'recepBultos'] as const;
 
 export type ViewKey = (typeof VIEW_KEYS)[number];
 
@@ -72,6 +72,7 @@ export interface SheetConfig {
   events?: string;
   products?: string;
   policies?: string;
+  recepBultos?: string;
   schema?: Record<string, Record<string, ColumnSchema>>;
   activeVirtualColumns?: string[];
   userVirtualColumns?: UserVirtualColumn[];

@@ -1,4 +1,4 @@
-import { Database, FileSpreadsheet, Package, FileText, TableProperties, PieChart, Calendar, Barcode, LucideIcon } from 'lucide-react';
+import { Database, FileSpreadsheet, Package, FileText, TableProperties, PieChart, Calendar, Barcode, Truck, LucideIcon } from 'lucide-react';
 
 export interface ModuleDefinition {
   id: string;
@@ -63,6 +63,14 @@ export const ALL_APP_MODULES: ModuleDefinition[] = [
     label: 'Analítica & Dashboard',
     description: 'Estadísticas gerenciales, semáforo de mermas y panel gráfico de drenaje y alertas.',
     icon: PieChart,
+    defaultEnabled: true,
+    canBeDisabled: true
+  },
+  {
+    id: 'recepBultos',
+    label: 'Recepción de Bultos',
+    description: 'Terminal móvil para pistoleo rápido de bultos cerrados y testimonio de arribo.',
+    icon: Truck,
     defaultEnabled: true,
     canBeDisabled: true
   },

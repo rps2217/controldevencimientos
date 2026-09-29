@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Link as LinkIcon, CheckCircle2, Compass } from 'lucide-react';
 import InventoryDashboard from './components/InventoryDashboard';
+import RecepcionBultosView from './components/views/RecepcionBultosView';
 import { ToastProvider } from './components/common/ToastContainer';
 import { ConfirmProvider } from './components/common/ConfirmDialog';
 import { PWAReloadPrompt } from './components/pwa/PWAReloadPrompt';
@@ -295,6 +296,7 @@ export default function App() {
                 <PWAReloadPrompt />
               </>
             } />
+            <Route path="/recepcion-bultos" element={<RecepcionBultosView />} />
             <Route path="/conteo" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
