@@ -144,18 +144,18 @@ export const DashboardTopNav: React.FC = () => {
         </button>
 
         {/* View Badge Pill */}
-        <div className="flex items-center gap-2 h-10 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
+        <div className="flex items-center gap-1.5 sm:gap-2 h-10 px-2 sm:px-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs max-w-[120px] xs:max-w-[160px] sm:max-w-none">
           <div className="shrink-0">
             {viewMeta.icon}
           </div>
-          <span className="font-bold text-xs text-slate-800 dark:text-slate-100 whitespace-nowrap">
+          <span className="font-bold text-xs text-slate-800 dark:text-slate-100 whitespace-nowrap truncate max-w-[50px] xs:max-w-[90px] sm:max-w-none">
             {viewMeta.title}
           </span>
-          <span className="font-mono text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white dark:bg-slate-700 border border-slate-200/60 dark:border-slate-600/60 text-slate-600 dark:text-slate-300">
+          <span className="font-mono text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-white dark:bg-slate-700 border border-slate-200/60 dark:border-slate-600/60 text-slate-600 dark:text-slate-300 shrink-0">
             {filteredItems.length}
           </span>
           {isRelationalActive && activeView === 'main' && (
-            <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+            <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0">
               <Sparkles className="w-2.5 h-2.5 text-emerald-500" /> Relacional
             </span>
           )}
@@ -163,9 +163,9 @@ export const DashboardTopNav: React.FC = () => {
       </div>
 
       {/* CENTER: buscador protagonista, en la misma franja que la configuración del entorno */}
-      <div className="flex-1 flex justify-center max-w-2xl px-1 sm:px-2">
+      <div className="flex-1 flex justify-center max-w-2xl px-1 sm:px-2 min-w-0">
         {(activeView !== 'schema' || searchableHeaders.length > 0) ? (
-          <div className="relative w-full h-11 flex items-center bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 rounded-2xl transition-all shadow-2xs">
+          <div className="relative w-full h-11 flex items-center bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/15 rounded-2xl transition-all shadow-2xs min-w-0">
             <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 ml-3 shrink-0" />
             
             <input
@@ -240,21 +240,23 @@ export const DashboardTopNav: React.FC = () => {
         <PWAInstallButton variant="compact" className="md:hidden" />
 
         {/* Configuración del entorno: mismo renglón que la búsqueda, no una barra aparte */}
-        <ThemeSelector />
-        <button
-          onClick={onEditBackendUrl}
-          className="flex h-10 w-10 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shadow-2xs items-center justify-center cursor-pointer active:scale-95 shrink-0"
-          title="URL de Apps Script · editar la conexión y las credenciales"
-          aria-label="URL de Apps Script: editar la conexión y las credenciales"
-        >
-          <Settings2 className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-        </button>
+        <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+          <ThemeSelector />
+          <button
+            onClick={onEditBackendUrl}
+            className="flex h-10 w-10 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shadow-2xs items-center justify-center cursor-pointer active:scale-95 shrink-0"
+            title="URL de Apps Script · editar la conexión y las credenciales"
+            aria-label="URL de Apps Script: editar la conexión y las credenciales"
+          >
+            <Settings2 className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+          </button>
+        </div>
 
         {/* Special Action: Bulk Import FRC (por capacidad de incidencia) */}
         {canLogEvents && setIsBulkImportOpen && (
           <button
             onClick={() => setIsBulkImportOpen(true)}
-            className="h-10 flex items-center gap-1.5 px-3.5 rounded-2xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+            className="hidden sm:flex h-10 items-center gap-1.5 px-3.5 rounded-2xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
             title="Importar masivamente Incidencias FRC desde Excel o Portapapeles"
           >
             <Upload className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
@@ -266,7 +268,7 @@ export const DashboardTopNav: React.FC = () => {
         {activeView === 'schema' && setIsScriptModalOpen && (
           <button
             onClick={() => setIsScriptModalOpen(true)}
-            className="hidden sm:flex h-10 items-center gap-1.5 px-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+            className="hidden sm:flex h-10 items-center gap-1.5 px-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
           >
             <Sliders className="w-3.5 h-3.5 text-blue-600" />
             <span>Apps Script</span>
@@ -290,7 +292,7 @@ export const DashboardTopNav: React.FC = () => {
           <button 
             disabled={!activeSheet || isModalOpen}
             onClick={() => handleOpenModal()}
-            className="h-10 flex items-center gap-1.5 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold shadow-xs shadow-blue-500/20 disabled:opacity-50 transition-all cursor-pointer shrink-0"
+            className="hidden sm:flex h-10 items-center gap-1.5 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold shadow-xs shadow-blue-500/20 disabled:opacity-50 transition-all cursor-pointer shrink-0"
             title={`Crear ${viewMeta.actionLabel}`}
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
