@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Sliders, Plus, Layers, SlidersHorizontal, Upload
+  Sliders, Plus, Layers, SlidersHorizontal, Upload 
 } from 'lucide-react';
 import { SLICE_COLOR_CLASSES } from '../../utils/sliceRegistry';
 import { SliceIcon } from '../slices/SliceSelectorBar';
