@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Printer, Trash2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useTicketPrinting } from '../../hooks/useTicketPrinting';
+import { executeThermalPrint } from '../../utils/ticketUtils';
 import { indexedDbService } from '../../db/indexedDbService';
 
 /**
@@ -12,8 +12,8 @@ export default function RecepcionBultosView() {
   const navigate = useNavigate();
   const [bultoCode, setBultoCode] = useState('');
   const [sessionItems, setSessionItems] = useState<{ code: string; timestamp: number }[]>([]);
+  const [isPrinting, setIsPrinting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { printTicket } = useTicketPrinting();
 
   // Focus automático al montar y tras cada escaneo
   useEffect(() => {
@@ -52,21 +52,19 @@ export default function RecepcionBultosView() {
     }
   };
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
     if (sessionItems.length === 0) return;
     
-    // Generar contenido del ticket de arribo
-    const content = `
-      ARRIBO DE BULTOS
-      Fecha: ${new Date().toLocaleDateString()}
-      Hora: ${new Date().toLocaleTimeString()}
-      Total: ${sessionItems.length}
-      -------------------
-      ${sessionItems.map(item => item.code).join('\n')}
-      -------------------
-    `;
-    
-    await printTicket(content);
+    setIsPrinting(true);
+    setTimeout(() => {
+      executeThermalPrint({
+        elementId: 'thermal-ticket-root',
+        paperWidth: '80mm',
+        orientation: 'portrait',
+        cutMarginMm: 2,
+        onAfterPrint: () => setIsPrinting(false)
+      });
+    }, 150);
   };
 
   return (
@@ -90,7 +88,7 @@ export default function RecepcionBultosView() {
           value={bultoCode}
           onChange={(e) => setBultoCode(e.target.value)}
           placeholder="Escanear código..."
-          className="flex-1 p-4 rounded-xl border-2 border-blue-500 bg-white dark:bg-slate-900 text-lg focus:outline-none"
+          className="flex-1 p-4 rounded-xl border-2 border-blue-500 bg-white dark:bg-slate-900 text-lg focus:outline-none text-slate-800 dark:text-slate-100"
         />
         <button type="submit" className="bg-blue-600 text-white px-6 rounded-xl font-bold">OK</button>
       </form>
@@ -109,13 +107,42 @@ export default function RecepcionBultosView() {
 
       {/* Acciones */}
       <div className="grid grid-cols-2 gap-2">
-        <button onClick={handleClear} className="flex items-center justify-center gap-2 bg-slate-200 dark:bg-slate-800 p-4 rounded-xl font-bold">
+        <button onClick={handleClear} className="flex items-center justify-center gap-2 bg-slate-200 dark:bg-slate-800 p-4 rounded-xl font-bold text-slate-700 dark:text-slate-300">
             <Trash2 size={20} /> Borrar
         </button>
         <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-emerald-600 text-white p-4 rounded-xl font-bold">
             <Printer size={20} /> Imprimir
         </button>
       </div>
+
+      {/* Printable Area invisible in normal web view but visible during executeThermalPrint / print */}
+      {isPrinting && (
+        <div id="thermal-ticket-root" className="bg-white text-black font-mono p-4 text-xs max-w-[80mm] mx-auto border border-slate-100">
+          <div className="font-bold text-sm mb-1 text-center">ARRIBO DE BULTOS</div>
+          <div className="text-[10px] text-center mb-2">
+            <div>Fecha: {new Date().toLocaleDateString('es-CL')}</div>
+            <div>Hora: {new Date().toLocaleTimeString('es-CL')}</div>
+          </div>
+          
+          <div className="border-t border-b border-black py-2 my-2 space-y-1">
+            {sessionItems.map((item, i) => (
+              <div key={i} className="flex justify-between text-xs">
+                <span>{i + 1}. {item.code}</span>
+                <span className="font-mono">{new Date(item.timestamp).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex justify-between font-bold mt-2">
+            <span>TOTAL BULTOS:</span>
+            <span>{sessionItems.length}</span>
+          </div>
+          
+          <div className="text-center text-[10px] mt-4 border-t border-dashed border-black pt-2">
+            --- FIN DE RECEPCIÓN ---
+          </div>
+        </div>
+      )}
     </div>
   );
 }
