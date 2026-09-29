@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Printer, Trash2, ArrowLeft, Truck, Check, AlertTriangle } from 'lucide-react';
+import { Printer, Trash2, ArrowLeft, Truck, Check, AlertTriangle, Scan } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { executeThermalPrint } from '../../utils/ticketUtils';
 import { indexedDbService } from '../../db/indexedDbService';
+import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 
 /**
  * Módulo de Recepción Rápida (Testimonio de Arribo)
@@ -14,16 +15,61 @@ export default function RecepcionBultosView() {
   const [sessionItems, setSessionItems] = useState<{ code: string; timestamp: number }[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Focus automático al montar, tras cada escaneo y al hacer click en el contenedor
   useEffect(() => {
-    inputRef.current?.focus();
-  }, [sessionItems, feedback]);
+    if (!isCameraActive) {
+      inputRef.current?.focus();
+    }
+  }, [sessionItems, feedback, isCameraActive]);
 
   const handleContainerClick = () => {
-    inputRef.current?.focus();
+    if (!isCameraActive) {
+      inputRef.current?.focus();
+    }
   };
+
+  // Callback de escaneo continuo con la cámara móvil
+  const handleCameraScan = (code: string) => {
+    const formattedCode = code.trim().toUpperCase();
+    if (!formattedCode) return;
+
+    if (sessionItems.some(item => item.code === formattedCode)) {
+      showTemporaryFeedback('error', `El bulto ${formattedCode} ya ha sido escaneado.`);
+      return;
+    }
+
+    const timestamp = Date.now();
+    void (async () => {
+      try {
+        await indexedDbService.enqueueMutation({
+          type: 'append',
+          sheetTitle: 'RECEP_BULTOS',
+          values: {
+            'TIMESTAMP': new Date(timestamp).toISOString(),
+            'CODIGO_BULTO': formattedCode
+          }
+        });
+
+        setSessionItems(prev => [...prev, { code: formattedCode, timestamp }]);
+        showTemporaryFeedback('success', `Bulto ${formattedCode} registrado.`);
+      } catch (err) {
+        console.error('Error guardando bulto:', err);
+        showTemporaryFeedback('error', 'Error al guardar bulto.');
+      }
+    })();
+  };
+
+  // Inicializar hook genérico de escaneo continuo
+  const { switchCamera, toggleTorch, hasTorch, torchOn } = useBarcodeScanner({
+    elementId: 'bultos-camera-viewport',
+    active: isCameraActive,
+    onScan: handleCameraScan,
+    repeatWindowMs: 2500, // Evitar lecturas duplicadas en ráfaga
+    fps: 15,
+  });
 
   // Sintetizador de audio nativo no-bloqueante para PDA/Móviles
   const triggerAudioFeedback = (type: 'success' | 'error') => {
@@ -160,19 +206,96 @@ export default function RecepcionBultosView() {
         </div>
       )}
 
-      {/* Input de Scanner */}
-      <form onSubmit={handleScan} className="flex gap-2">
-        <input
-          ref={inputRef}
-          type="text"
-          value={bultoCode}
-          onChange={(e) => setBultoCode(e.target.value)}
-          placeholder="Escanear código de barra bulto..."
-          className="flex-1 p-3.5 rounded-2xl border-2 border-orange-500 bg-white dark:bg-slate-900 text-base font-bold focus:outline-none text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-4 focus:ring-orange-500/15 transition-all shadow-2xs"
-          autoComplete="off"
-        />
-        <button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white px-5 rounded-2xl font-extrabold text-sm shadow-xs shadow-orange-500/20 active:scale-95 transition-all">OK</button>
-      </form>
+      {/* Input de Scanner con Captura Continua de Cámara Integrada */}
+      <div className="flex flex-col gap-2 shrink-0">
+        <form onSubmit={handleScan} className="flex gap-2">
+          <div className="relative flex-1 flex items-center">
+            <input
+              ref={inputRef}
+              type="text"
+              value={bultoCode}
+              onChange={(e) => setBultoCode(e.target.value)}
+              placeholder="Escanear bulto o toque icono cámara..."
+              className="w-full p-3.5 pr-12 rounded-2xl border-2 border-orange-500 bg-white dark:bg-slate-900 text-base font-bold focus:outline-none text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-4 focus:ring-orange-500/15 transition-all shadow-2xs"
+              autoComplete="off"
+            />
+            {/* Botón de Cámara Integrado dentro del Input */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsCameraActive(!isCameraActive);
+              }}
+              className={`absolute right-3.5 p-1.5 rounded-xl transition-all duration-300 ${
+                isCameraActive 
+                  ? 'bg-orange-600 text-white shadow-xs shadow-orange-500/35 scale-105 border border-orange-400' 
+                  : 'text-slate-400 dark:text-slate-500 hover:text-orange-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+              title="Activar captura continua usando la cámara del móvil"
+            >
+              <Scan size={18} className={`stroke-[2.5] ${isCameraActive ? 'animate-pulse' : ''}`} />
+            </button>
+          </div>
+          <button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white px-5 rounded-2xl font-extrabold text-sm shadow-xs shadow-orange-500/20 active:scale-95 transition-all shrink-0">OK</button>
+        </form>
+
+        {/* Visor de Cámara para Escaneo Continuo */}
+        {isCameraActive && (
+          <div className="relative bg-black rounded-2xl border-2 border-orange-500 overflow-hidden shadow-md animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Feed de Video */}
+            <div id="bultos-camera-viewport" className="w-full h-44 bg-slate-950" />
+            
+            {/* Guía Holográfica del Escáner */}
+            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+              <div className="w-4/5 h-1/2 border-2 border-dashed border-orange-500/70 rounded-xl relative">
+                {/* Láser óptico animado */}
+                <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-red-500 shadow-[0_0_8px_#ef4444] animate-bounce" />
+              </div>
+              <span className="text-[9px] text-white/90 font-bold bg-black/60 px-2 py-0.5 rounded-full mt-2 tracking-wide uppercase">
+                Alinee el código de barras
+              </span>
+            </div>
+
+            {/* Controles de Cámara flotantes */}
+            <div className="absolute bottom-2 left-2 right-2 flex justify-between gap-1.5 pointer-events-auto">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  switchCamera();
+                }}
+                className="bg-black/70 hover:bg-black text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+              >
+                Girar Cámara
+              </button>
+              {hasTorch && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleTorch();
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
+                    torchOn ? 'bg-orange-500 text-white' : 'bg-black/70 hover:bg-black text-white'
+                  }`}
+                >
+                  {torchOn ? 'Linterna: ON' : 'Linterna: OFF'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCameraActive(false);
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Lista de últimos escaneos */}
       <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col">
