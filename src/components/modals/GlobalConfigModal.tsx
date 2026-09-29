@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, X, Database, FileSpreadsheet, Package, FileText, CheckCircle2, Sliders, BookOpen, Plus, Server, Sparkles, ToggleRight, Compass, RotateCcw, Link2 } from 'lucide-react';
+import { Settings, X, Database, FileSpreadsheet, Package, FileText, CheckCircle2, Sliders, BookOpen, Plus, Server, Sparkles, ToggleRight, Compass, RotateCcw, Link2, Truck } from 'lucide-react';
 import { SheetConfig, SpreadsheetMetadata } from '../../types';
 import { SEMANTIC_FIELD_OPTIONS } from '../../utils/columnAliases';
 import { TableBulkActionsPanel } from '../settings/TableBulkActionsPanel';
@@ -295,6 +295,31 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                   value={sheetConfig.policies || ''}
                   onChange={(e) => {
                     const next = { ...sheetConfig, policies: e.target.value };
+                    setSheetConfig(next);
+                    saveConfig(next);
+                  }}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500"
+                >
+                  <option value="">-- Seleccionar Pestaña --</option>
+                  {metadata?.sheets
+                    .filter(s => !/^_/i.test(s.properties.title || ''))
+                    .map(s => (
+                      <option key={s.properties.sheetId} value={s.properties.title}>{s.properties.title}</option>
+                    ))}
+                </select>
+              </div>
+
+              {/* recepBultos / Recepción de Bultos */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+                <label className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-1">
+                  <Truck className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                  <span>5. Recepción de Bultos</span>
+                </label>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Pestaña destino para el registro de arribo de bultos.</p>
+                <select
+                  value={sheetConfig.recepBultos || ''}
+                  onChange={(e) => {
+                    const next = { ...sheetConfig, recepBultos: e.target.value };
                     setSheetConfig(next);
                     saveConfig(next);
                   }}
