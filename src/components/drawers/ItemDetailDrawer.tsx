@@ -563,7 +563,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 px-2.5 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <span className="hidden" style={{ display: 'none' }} aria-hidden="true">
                       SKU: {sku}
                     </span>
                     <span className="text-[10px] font-black tracking-wider uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
@@ -588,7 +588,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 px-2.5 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <span className="hidden" style={{ display: 'none' }} aria-hidden="true">
                       SKU: {sku}
                     </span>
                     {policyName !== '-' && (

@@ -223,6 +223,7 @@ export interface DashboardContextType {
   onOpenEmail?: (item: InventoryItem) => void;
   isWhatsAppEnabled?: boolean;
   isEmailEnabled?: boolean;
+  isCopyEnabled?: boolean;
   draggedCol?: string | null;
   setDraggedCol?: (col: string | null) => void;
   dragOverCol?: string | null;
@@ -457,6 +458,7 @@ export const DashboardProvider: React.FC<{
     onOpenEmail: value.onOpenEmail,
     isWhatsAppEnabled: value.isWhatsAppEnabled,
     isEmailEnabled: value.isEmailEnabled,
+    isCopyEnabled: value.isCopyEnabled,
     draggedCol: value.draggedCol,
     setDraggedCol: value.setDraggedCol,
     dragOverCol: value.dragOverCol,

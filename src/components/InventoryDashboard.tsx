@@ -1198,6 +1198,7 @@ export const InventoryDashboard: React.FC = () => {
     onOpenEmail: handleOpenEmail,
     isWhatsAppEnabled: isActionEnabledForTable('whatsapp', bulkActionCtx, sheetConfig),
     isEmailEnabled: isActionEnabledForTable('gmail', bulkActionCtx, sheetConfig),
+    isCopyEnabled: isActionEnabledForTable('copy_edit', bulkActionCtx, sheetConfig),
     draggedCol,
     setDraggedCol,
     dragOverCol,
@@ -1326,12 +1327,12 @@ export const InventoryDashboard: React.FC = () => {
                   setSelectedProduct(null);
                   handleOpenModal(prod);
                 }}
-                onCopy={(prod) => {
+                onCopy={isActionEnabledForTable('copy_edit', bulkActionCtx, sheetConfig) ? (prod) => {
                   setSelectedProduct(null);
                   handleOpenCopyModal(prod);
-                }}
-                onDeleteRow={handleDelete}
-                onPrintBarcode={(prod) => handlePrintTicket([prod], 'barcode')}
+                } : undefined}
+                onDeleteRow={isActionEnabledForTable('delete', bulkActionCtx, sheetConfig) ? handleDelete : undefined}
+                onPrintBarcode={isActionEnabledForTable('barcode_ticket', bulkActionCtx, sheetConfig) ? (prod) => handlePrintTicket([prod], 'barcode') : undefined}
                 onNewEventForProduct={(sku, category) => {
                   handleOpenModal(undefined, sku, category);
                 }}

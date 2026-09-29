@@ -48,7 +48,7 @@ export const InventoryTable: React.FC = () => {
   const onOpenWhatsApp = dashboard.onOpenWhatsApp;
   const onOpenEmail = dashboard.onOpenEmail;
   const sheetConfig = dashboard.sheetConfig;
-  const isCopyEnabled = isActionEnabledForTable(
+  const isCopyEnabled = dashboard.isCopyEnabled ?? isActionEnabledForTable(
     'copy_edit',
     dashboard.bulkActionCtx ?? buildBulkActionContext(headers, dashboard.activeView, dashboard.activeView),
     sheetConfig
