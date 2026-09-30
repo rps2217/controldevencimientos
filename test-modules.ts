@@ -2513,6 +2513,68 @@ console.log('\n--- 27. Servicio del espejo: fallo persistido y drenado (ruta rea
   (globalThis as any).localStorage = previoLs;
 }
 
+// --- 28. Plantillas puras de Reportes PM y Drenaje (Fase 1.3 / Ponytail) ---
+{
+  console.log('\n--- 28. Plantillas puras de Reportes PM y Drenaje (Zero-DOM) ---');
+  const { buildReportData, computePmReportMetrics } = await import('./src/utils/pmReportTemplates');
+
+  const testItems = [
+    { SKU: '1001', DESCRIPCION: 'Paracetamol 500mg', FECHA_VC: '2026-10-31', CANTIDAD: '10', PROVEEDOR: 'Laboratorio Chile', POLITICA: 'Canje 60 días' },
+    { SKU: '1002', DESCRIPCION: 'Ibuprofeno 400mg', FECHA_VC: '2026-10-15', CANTIDAD: '5', PROVEEDOR: 'Laboratorio Chile', POLITICA: 'Sin Canje' },
+    { SKU: '1003', DESCRIPCION: 'Amoxicilina 500mg', FECHA_VC: '2026-11-30', CANTIDAD: '20', PROVEEDOR: 'Saval', POLITICA: 'Canje 90 días' }
+  ];
+
+  const metrics = computePmReportMetrics(testItems as any);
+  assert(metrics.totalUnits === 35, 'pmReport: suma correctamente el total de unidades físicas (35)');
+  assert(typeof metrics.criticalCount === 'number', 'pmReport: calcula contador de severidad crítica');
+
+  const pmDraft = buildReportData({
+    template: 'PM',
+    items: testItems as any,
+    selectedProvider: 'Laboratorio Chile',
+    issuerName: 'Rolando Pizarro',
+    customNote: 'Evaluar liquidación 50%'
+  });
+  assert(pmDraft.subject.includes('[ALERTA DRENAJE PM]'), 'pmReport: genera asunto correcto para plantilla PM');
+  assert(pmDraft.body.includes('Paracetamol 500mg') && pmDraft.body.includes('Evaluar liquidación 50%'), 'pmReport: incluye SKUs y notas personalizadas en el cuerpo');
+
+  const canjeDraft = buildReportData({
+    template: 'PROVIDER_CANJE',
+    items: testItems as any,
+    selectedProvider: 'Laboratorio Chile',
+    issuerName: 'Rolando Pizarro'
+  });
+  assert(canjeDraft.subject.includes('[SOLICITUD CANJE]'), 'pmReport: genera asunto correcto para Canje Proveedor');
+  assert(canjeDraft.body.includes('SOLICITUD FORMAL DE RETIRO Y CANJE'), 'pmReport: cuerpo formal de Canje Proveedor');
+
+  const transferDraft = buildReportData({
+    template: 'LOGISTICS_TRANSFER',
+    items: testItems as any,
+    selectedProvider: 'ALL',
+    issuerName: 'Bodega Central',
+    transferFolio: 'TR-998877',
+    driverName: 'Carlos Chofer'
+  });
+  assert(transferDraft.subject.includes('TR-998877'), 'pmReport: incluye folio de traspaso en el asunto');
+  assert(transferDraft.body.includes('Carlos Chofer'), 'pmReport: incluye transportista en acta de traspaso');
+
+  const qualityDraft = buildReportData({
+    template: 'QUALITY_RECALL',
+    items: testItems as any,
+    selectedProvider: 'ALL',
+    issuerName: 'Control Calidad'
+  });
+  assert(qualityDraft.subject.includes('[ALERTA CALIDAD]'), 'pmReport: genera asunto correcto para bloqueo de calidad');
+
+  const execDraft = buildReportData({
+    template: 'EXECUTIVE_SUMMARY',
+    items: testItems as any,
+    selectedProvider: 'ALL',
+    issuerName: 'Gerencia Operaciones'
+  });
+  assert(execDraft.subject.includes('[RESUMEN EJECUTIVO]'), 'pmReport: genera asunto correcto para resumen ejecutivo');
+}
+
 console.log(`\n========================================`);
 console.log(`RESULTADOS DE PRUEBAS: ${passed} PASADAS, ${failed} FALLADAS`);
 console.log(`========================================\n`);

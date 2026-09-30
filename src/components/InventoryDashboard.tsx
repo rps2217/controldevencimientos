@@ -1,21 +1,14 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
-import { appendRow, updateRow, deleteRow, saveCloudConfig, saveScriptPropertiesConfig, clearSheetsCache } from '../lib/sheets';
+import { saveCloudConfig, saveScriptPropertiesConfig } from '../lib/sheets';
 import { InventoryItem, SheetConfig, EventCategory, VIEW_KEYS } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
 import { useModalsActions } from '../context/ModalsContext';
 import { DashboardProvider, DashboardContextType } from '../context/DashboardContext';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { AlertCircle, Package } from 'lucide-react';
 
 // Utilities & Hooks
-import { getEventCategory, getItemStatus, parseLocaleNumber } from '../utils/dateCalculations';
-import { rowToObject } from '../utils/pureCalculations';
+import { getEventCategory, getItemStatus } from '../utils/dateCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { resolveTableCapabilities } from '../utils/sliceRegistry';
-import { resolveItemIdentity } from '../utils/entityIdentityResolver';
-import { 
-  findExistingItemByCuVc
-} from '../utils/cuVcConsolidator';
 import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
 import { useColumnResize } from '../hooks/useColumnResize';
 import { useColumnManager } from '../hooks/useColumnManager';
@@ -27,12 +20,12 @@ import { useInventoryData } from '../hooks/useInventoryData';
 import type { FetchDataFn } from '../hooks/useInventoryData';
 import { useTicketPrinting } from '../hooks/useTicketPrinting';
 import { useModuleViewState } from '../hooks/useModuleViewState';
-import { indexedDbService } from '../db/indexedDbService';
-import { STORAGE_KEYS, readStorage, writeStorage, sheetConfigShapeSchema, isDemoMode } from '../utils/appStorage';
+import { useTableVirtualization } from '../hooks/useTableVirtualization';
+import { useInventoryMutations } from '../hooks/useInventoryMutations';
+import { STORAGE_KEYS, readStorage, writeStorage, sheetConfigShapeSchema } from '../utils/appStorage';
 
 // Helpers para almacenamiento persistente y configuración modular
-import { saveStoredDemoItems, mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
-import { getErrorMessage } from '../utils/pureCalculations';
+import { mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
 export { mergeCloudConfigs, type ModuleViewState };
 
 // Modals & Drawers & Sub-components
@@ -45,11 +38,10 @@ import { OperationalCalendarView } from './views/OperationalCalendarView';
 import { LazyFallback } from './common/LazyFallback';
 import { FloatingBulkActionBar } from './dashboard/FloatingBulkActionBar';
 import { DashboardModalsManager } from './dashboard/DashboardModalsManager';
+import { DashboardViewRouter } from './dashboard/DashboardViewRouter';
 import { ZenModeOverlay } from './dashboard/ZenModeOverlay';
 import { DashboardMobileDrawer } from './dashboard/DashboardMobileDrawer';
 import { DashboardMobileFABs } from './dashboard/DashboardMobileFABs';
-import { DashboardTableContainer } from './dashboard/DashboardTableContainer';
-import { ItemDetailDrawer } from './drawers/ItemDetailDrawer';
 import { ViewConfigControlDrawer } from './drawers/ViewConfigControlDrawer';
 import { usePrecomputedColumns } from '../hooks/usePrecomputedColumns';
 import { TicketPrintView } from './views/TicketPrintView';
@@ -225,8 +217,6 @@ export const InventoryDashboard: React.FC = () => {
   const [draggedCol, setDraggedCol] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
-  const tableContainerRef = useRef<HTMLDivElement>(null);
-
   // Capacidades de dominio de la hoja activa, derivadas de sus columnas: gobiernan qué UI
   // de dominio (conteo, pistoleo, columnas de estado, radar) se ofrece, en vez de asumir
   // por identidad de vista o nombre de pestaña. La corrección manual del usuario se aplica
@@ -265,8 +255,6 @@ export const InventoryDashboard: React.FC = () => {
     eventFilter,
     onBeforeOpen: () => setIsConfigOpen(false)
   });
-
-  const [isSaving, setIsSaving] = useState(false);
 
   // Contextual intelligence for bulk actions on the current table
   const bulkActionCtx = useMemo(() => {
@@ -535,24 +523,15 @@ export const InventoryDashboard: React.FC = () => {
   }, [searchTerm, activeQuickChip, activeView]);
 
 
-  const rowVirtualizer = useVirtualizer({
-    count: paginatedDisplayRows.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: (index) => {
-      const row = paginatedDisplayRows[index];
-      const isMobile = window.innerWidth < 768;
-      if (row && row.type === 'header') return isMobile ? 60 : 44;
-      return isMobile ? 160 : 60;
-    },
-    overscan: 10,
-  });
-  
-  const virtualRows = rowVirtualizer.getVirtualItems();
-  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
-  const paddingBottom = virtualRows.length > 0 
-    ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end 
-    : 0;
-
+  // Unified TanStack virtualization hook
+  const {
+    tableContainerRef,
+    virtualRows,
+    paddingTop,
+    paddingBottom,
+    measureElement,
+    rowVirtualizer
+  } = useTableVirtualization(paginatedDisplayRows);
 
   // Critical items for PM drainage report
   const drainageReportItems = useMemo(() => {
@@ -629,7 +608,7 @@ export const InventoryDashboard: React.FC = () => {
     setAllMainItems,
     setProducts,
     setPolicies,
-    setIsSaving,
+    setIsSaving: () => {},
     enqueueMutation,
     fetchData,
     showToast
@@ -648,314 +627,47 @@ export const InventoryDashboard: React.FC = () => {
     setSelectedRowIds,
     setItems,
     setAllMainItems,
-    setIsSaving,
+    setIsSaving: () => {},
     enqueueMutation,
     fetchData
   });
 
+  // Centralized Hook for Row/Pistoleo Mutations and Deletions
+  const {
+    isSaving,
+    handleSave,
+    handleSavePistoleoItem,
+    handleDelete
+  } = useInventoryMutations({
+    activeSheet,
+    activeView,
+    tableCapabilities,
+    sheetConfig,
+    headers,
+    items,
+    allMainItems,
+    products,
+    policies,
+    editingItem,
+    formData,
+    validateForm,
+    setFormErrors,
+    handleCloseModal,
+    setItems,
+    setAllMainItems,
+    setProducts,
+    setPolicies,
+    enqueueMutation,
+    fetchData,
+    showToast,
+    confirm
+  });
+
   useEffect(() => {
-    // Se recarga por `activeView` a propósito, no por `fetchData`/`sheetConfig`:
-    // `fetchData` rellena títulos de hoja faltantes llamando a `setSheetConfig`, así
-    // que listarlo como dependencia re-dispararía este efecto tras cada carga (bucle
-    // de fetch). El ref se lee al ejecutar, que es el patrón que ya usa el resto del
-    // dashboard para los callbacks diferidos.
     fetchDataRef.current?.(sheetConfig, activeView, false);
     setSelectedRowIds([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView]);
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeSheet || headers.length === 0) return;
-
-    const errors = validateForm();
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      return;
-    }
-    setFormErrors({});
-
-    const originalItems = [...items];
-    const originalMainItems = [...allMainItems];
-    const isDemo = isDemoMode();
-    
-    try {
-      setIsSaving(true);
-      const now = new Date();
-      const currentFormattedDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' ');
-
-      // Intelligent CU_VC Collision Detection: solo donde la hoja tiene dominio de
-      // vencimiento. El respaldo por nombre se conserva para no perder hojas de stock
-      // que hoy si consolidan; lo que se elimina es la identidad `activeView === 'main'`.
-      let targetExistingItem = editingItem;
-      let isConsolidatingWithExisting = false;
-
-      if (!targetExistingItem && (tableCapabilities.has('vencimiento') || /vencimiento|caducidad|stock/i.test(activeSheet.title))) {
-        const matched = findExistingItemByCuVc(formData, items, headers, sheetConfig.customAliases);
-        if (matched.exists && matched.existingItem) {
-          targetExistingItem = matched.existingItem;
-          isConsolidatingWithExisting = true;
-        }
-      }
-
-      // If consolidating with an existing row, sum up the quantities!
-      const mergedFormData = { ...formData };
-      if (isConsolidatingWithExisting && targetExistingItem) {
-        const qtyCol = findColumnBySemantic(headers, 'cantidad') || headers.find(h => /cant|stock|unidades/i.test(h));
-        if (qtyCol) {
-          const currentQty = parseLocaleNumber(targetExistingItem[qtyCol]);
-          const addQty = parseLocaleNumber(formData[qtyCol]);
-          mergedFormData[qtyCol] = String(currentQty + addQty);
-        }
-      }
-
-      const rowValues = headers.map(h => {
-        const val = mergedFormData[h] !== undefined && mergedFormData[h] !== null ? String(mergedFormData[h]) : '';
-        const colSchema = sheetConfig.schema?.[activeSheet.title]?.[h];
-        if (!val && (colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro/i.test(h))) {
-          return currentFormattedDateTime;
-        }
-        return val;
-      });
-      
-      // Calculate row index safely
-      const validRowIndexes = items.map(i => typeof i._rowIndex === 'number' ? i._rowIndex : parseInt(String(i._rowIndex || '0'), 10)).filter(n => !isNaN(n) && n > 0);
-      const nextRowIndex = targetExistingItem ? (targetExistingItem._rowIndex || 2) : (validRowIndexes.length ? Math.max(...validRowIndexes) + 1 : 2);
-
-      // Optimistic update
-      const newItem: InventoryItem = { ...rowToObject(headers, rowValues), _rowIndex: nextRowIndex };
-
-      const identityInfo = resolveItemIdentity(newItem, headers, activeSheet.title);
-      newItem._entityKey = identityInfo.keyValue;
-      newItem._entityKeyCol = identityInfo.keyColumn || undefined;
-      newItem._isSyntheticKey = identityInfo.isSynthetic;
-      
-      let nextItems: InventoryItem[];
-      if (targetExistingItem) {
-        nextItems = items.map(item => item._rowIndex === targetExistingItem!._rowIndex ? newItem : item);
-      } else {
-        nextItems = [...items, newItem];
-      }
-
-      setItems(nextItems);
-      if (activeView === 'main') setAllMainItems(nextItems);
-      if (activeView === 'products') setProducts(nextItems);
-      if (activeView === 'policies') setPolicies(nextItems);
-
-      // Update persistent demo storage
-      saveStoredDemoItems(activeView, nextItems);
-
-      // Save to IndexedDB cached sheet
-      try {
-        const cachedRows = [headers, ...nextItems.map(it => headers.map(h => it[h] !== undefined && it[h] !== null ? String(it[h]) : ''))];
-        await indexedDbService.saveCachedSheet(activeSheet.title, cachedRows);
-      } catch (cacheErr) {
-        console.warn('Error saving to IndexedDB:', cacheErr);
-      }
-
-      handleCloseModal();
-
-      const isUpdate = Boolean(targetExistingItem && targetExistingItem._rowIndex && targetExistingItem._rowIndex > 1);
-      const targetRowIndex = isUpdate ? targetExistingItem!._rowIndex : undefined;
-
-      if (isDemo) {
-        if (isConsolidatingWithExisting) {
-          showToast('Registro consolidado con éxito: Se sumó la cantidad al vencimiento existente (Modo Local)', 'success', 'Consolidación Inteligente');
-        } else {
-          showToast(isUpdate ? 'Registro actualizado con éxito (Modo Local)' : 'Registro guardado con éxito (Modo Local)', 'success', 'Operación Exitosa');
-        }
-        return;
-      }
-
-      try {
-        if (isUpdate && targetRowIndex) {
-          await updateRow(activeSheet.title, targetRowIndex, rowValues, {
-            entityKey: identityInfo.keyValue,
-            keyValue: identityInfo.keyValue
-          });
-        } else {
-          await appendRow(activeSheet.title, rowValues);
-        }
-        clearSheetsCache(activeSheet.title);
-        if (isConsolidatingWithExisting) {
-          showToast('Registro consolidado con éxito: Se sumó la cantidad en Google Sheets.', 'success', 'Consolidación Inteligente');
-        } else {
-          showToast(isUpdate ? 'Registro actualizado en Google Sheets con éxito.' : 'Registro guardado en Google Sheets con éxito.', 'success', 'Guardado');
-        }
-      } catch (saveErr) {
-        console.warn('Network error during save, adding to offline queue:', saveErr);
-        await enqueueMutation({
-          type: isUpdate ? 'update' : 'append',
-          sheetTitle: activeSheet.title,
-          rowIndex: targetRowIndex,
-          entityKey: identityInfo.keyValue,
-          entityKeyCol: identityInfo.keyColumn || undefined,
-          keyValue: identityInfo.keyValue,
-          keyColumn: identityInfo.keyColumn || undefined,
-          headers,
-          values: rowValues
-        });
-        showToast('Sin conexión con Google Sheets. Los cambios se guardaron localmente en la cola offline.', 'info', 'Modo Offline');
-      }
-    } catch (err: unknown) {
-      // Rollback
-      setItems(originalItems);
-      setAllMainItems(originalMainItems);
-      showToast(`Error guardando datos (rollback aplicado): ${getErrorMessage(err)}`, 'error', 'Error');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleSavePistoleoItem = async (formPayload: Record<string, string>, targetExistingItem?: InventoryItem) => {
-    if (!activeSheet || headers.length === 0) return;
-    setIsSaving(true);
-    try {
-      const isDemo = isDemoMode();
-      const now = new Date();
-      const currentFormattedDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' ');
-
-      const rowValues = headers.map(h => {
-        const val = formPayload[h] !== undefined && formPayload[h] !== null ? String(formPayload[h]) : '';
-        const colSchema = sheetConfig.schema?.[activeSheet.title]?.[h];
-        if (!val && (colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro/i.test(h))) {
-          return currentFormattedDateTime;
-        }
-        return val;
-      });
-
-      const validRowIndexes = items.map(i => typeof i._rowIndex === 'number' ? i._rowIndex : parseInt(String(i._rowIndex || '0'), 10)).filter(n => !isNaN(n) && n > 0);
-      const nextRowIndex = targetExistingItem ? (targetExistingItem._rowIndex || 2) : (validRowIndexes.length ? Math.max(...validRowIndexes) + 1 : 2);
-
-      const newItem: InventoryItem = { ...rowToObject(headers, rowValues), _rowIndex: nextRowIndex };
-
-      const identityInfo = resolveItemIdentity(newItem, headers, activeSheet.title);
-      newItem._entityKey = identityInfo.keyValue;
-      newItem._entityKeyCol = identityInfo.keyColumn || undefined;
-      newItem._isSyntheticKey = identityInfo.isSynthetic;
-
-      let nextItems: InventoryItem[];
-      if (targetExistingItem && targetExistingItem._rowIndex) {
-        nextItems = items.map(item => item._rowIndex === targetExistingItem._rowIndex ? newItem : item);
-      } else {
-        nextItems = [...items, newItem];
-      }
-
-      setItems(nextItems);
-      if (activeView === 'main') setAllMainItems(nextItems);
-      saveStoredDemoItems(activeView, nextItems);
-
-      try {
-        const cachedRows = [headers, ...nextItems.map(it => headers.map(h => it[h] !== undefined && it[h] !== null ? String(it[h]) : ''))];
-        await indexedDbService.saveCachedSheet(activeSheet.title, cachedRows);
-      } catch (cacheErr) {
-        console.warn('Error saving pistoleo item to IndexedDB:', cacheErr);
-      }
-
-      if (isDemo) {
-        showToast(targetExistingItem ? 'Registro de pistoleo actualizado' : 'Nuevo registro de pistoleo guardado', 'success', 'Pistoleo Exitoso');
-        return;
-      }
-
-      if (targetExistingItem && targetExistingItem._rowIndex && targetExistingItem._rowIndex > 1) {
-        try {
-          await updateRow(activeSheet.title, targetExistingItem._rowIndex, rowValues, {
-            entityKey: identityInfo.keyValue,
-            keyValue: identityInfo.keyValue
-          });
-        } catch (err) {
-          await enqueueMutation({
-            type: 'update',
-            sheetTitle: activeSheet.title,
-            rowIndex: targetExistingItem._rowIndex,
-            entityKey: identityInfo.keyValue,
-            headers,
-            values: rowValues
-          });
-        }
-      } else {
-        try {
-          await appendRow(activeSheet.title, rowValues);
-        } catch (err) {
-          await enqueueMutation({
-            type: 'append',
-            sheetTitle: activeSheet.title,
-            entityKey: identityInfo.keyValue,
-            headers,
-            values: rowValues
-          });
-        }
-      }
-      showToast('Cambios de pistoleo guardados en la nube', 'success', 'Sincronización');
-    } catch (err: unknown) {
-      showToast(`Error al guardar pistoleo: ${getErrorMessage(err)}`, 'error', 'Error');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDelete = useCallback(async (item: InventoryItem) => {
-    if (!activeSheet) return;
-    const confirmed = await confirm({ title: 'Eliminar fila', message: `¿Estás seguro de que deseas eliminar la fila ${item._rowIndex}? Esta acción no se puede deshacer.`, confirmLabel: 'Eliminar' });
-    if (!confirmed) return;
-
-    const originalItems = [...items];
-    const originalMainItems = [...allMainItems];
-    const isDemo = isDemoMode();
-
-    try {
-      setIsSaving(true);
-      
-      const nextItems = items
-        .filter(i => i._rowIndex !== item._rowIndex)
-        .map((it, idx) => ({ ...it, _rowIndex: idx + 2 }));
-
-      setItems(nextItems);
-      saveStoredDemoItems(activeView, nextItems);
-
-      if (activeView === 'main') {
-        const nextMain = allMainItems
-          .filter(i => i._rowIndex !== item._rowIndex)
-          .map((it, idx) => ({ ...it, _rowIndex: idx + 2 }));
-        setAllMainItems(nextMain);
-        saveStoredDemoItems('main', nextMain);
-      }
-
-      if (isDemo) {
-        showToast('Registro eliminado en modo demostración', 'success', 'Eliminación Completada');
-      } else {
-        const ident = resolveItemIdentity(item, headers, activeSheet.title);
-        try {
-          await deleteRow(activeSheet.sheetId, item._rowIndex as number, activeSheet.title, {
-            entityKey: ident.keyValue,
-            keyValue: ident.keyValue,
-            entityKeyCol: ident.keyColumn || undefined,
-          });
-          showToast('Registro eliminado de Google Sheets', 'success', 'Eliminación Completada');
-        } catch (delErr) {
-          console.warn('Error al eliminar en la nube, agregando a cola offline:', delErr);
-          await enqueueMutation({
-            type: 'delete',
-            sheetId: activeSheet.sheetId,
-            sheetTitle: activeSheet.title,
-            rowIndex: item._rowIndex as number,
-            entityKey: ident.keyValue,
-            entityKeyCol: ident.keyColumn || undefined,
-            keyValue: ident.keyValue,
-            keyColumn: ident.keyColumn || undefined,
-            headers
-          });
-          showToast('Sin conexión. La eliminación se guardó localmente en cola offline.', 'info', 'Modo Offline');
-        }
-        await fetchData(sheetConfig, activeView, true);
-      }
-    } catch (err: unknown) {
-      setItems(originalItems);
-      setAllMainItems(originalMainItems);
-      showToast(`Error al eliminar fila: ${getErrorMessage(err)}`, 'error', 'Error de Eliminación');
-    } finally {
-      setIsSaving(false);
-    }
-  }, [activeSheet, items, allMainItems, activeView, headers, sheetConfig, confirm, showToast, fetchData, setItems, setAllMainItems, enqueueMutation]);
 
   const handleSelectRow = useCallback((rowIndex: number, selected: boolean) => {
     setSelectedRowIds(prev => selected ? [...prev, rowIndex] : prev.filter(id => id !== rowIndex));
@@ -1216,7 +928,7 @@ export const InventoryDashboard: React.FC = () => {
     paddingBottom,
     onSelectGroupRows: handleSelectGroupRows,
     toggleGroupCollapse,
-    measureElementRef: rowVirtualizer.measureElement,
+    measureElementRef: measureElement,
     handleToggleSort,
     expandAllGroups,
     collapseAllGroups,
@@ -1263,96 +975,24 @@ export const InventoryDashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Content Body */}
-        <div className={`flex-1 min-h-0 flex flex-col p-2 md:p-6 ${activeView === 'main' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-          {error && (
-            <div className="mb-6 rounded-xl bg-red-50 p-4 border border-red-100">
-              <div className="flex items-center">
-                <AlertCircle className="h-5 w-5 text-red-500" />
-                <div className="ml-3 text-sm font-medium text-red-700">{error}</div>
-              </div>
-            </div>
-          )}
+        {/* Content Body & Active View Routing (Modularized - Ponytail Protocol) */}
+        <DashboardViewRouter
+          configStorageMode={configStorageMode}
+          hasCloudConfigSheet={hasCloudConfigSheet}
+          cloudConfigSheetName={cloudConfigSheetName}
+          syncSuccessMessage={syncSuccessMessage}
+          isSyncingCloud={isSyncingCloud}
+          isSchemaLoading={isSchemaLoading}
+          setIsSchemaLoading={setIsSchemaLoading}
+          handlePushPropertiesConfig={handlePushPropertiesConfig}
+          handlePushCloudConfig={handlePushCloudConfig}
+        />
 
-          {activeView === 'schema' ? (
-            <SchemaEditorView
-              configStorageMode={configStorageMode}
-              hasCloudConfigSheet={hasCloudConfigSheet}
-              cloudConfigSheetName={cloudConfigSheetName}
-              syncSuccessMessage={syncSuccessMessage}
-              isSyncingCloud={isSyncingCloud}
-              metadata={metadata}
-              activeSheet={activeSheet}
-              setActiveSheet={setActiveSheet}
-              headers={headers}
-              setHeaders={setHeaders}
-              isSchemaLoading={isSchemaLoading}
-              setIsSchemaLoading={setIsSchemaLoading}
-              sheetConfig={sheetConfig}
-              saveConfig={saveConfig}
-              setIsScriptModalOpen={setIsScriptModalOpen}
-              handlePushPropertiesConfig={handlePushPropertiesConfig}
-              handlePushCloudConfig={handlePushCloudConfig}
-              activeView={activeView}
-            />
-          ) : activeView === 'analytics' ? (
-            <Suspense fallback={<LazyFallback />}>
-              <AnalyticsDashboard items={filteredItems} headers={headers} />
-            </Suspense>
-          ) : activeView === 'calendar' ? (
-            <OperationalCalendarView
-              items={filteredItems.length > 0 ? filteredItems : items}
-              headers={headers}
-              onSelectItem={(item) => setSelectedProduct(item)}
-            />
-          ) : !activeSheet && !loading ? (
-            <div className="h-full w-full flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50 dark:bg-slate-900/60">
-              <div className="text-center max-w-sm">
-                <div className="w-16 h-16 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-4">
-                  <Package className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200">Módulo sin asignar</h3>
-                <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm">Aún no has seleccionado qué pestaña de tu Google Sheet cumplirá esta función.</p>
-                <button onClick={() => setIsConfigOpen(true)} className="mt-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm px-6 py-2.5 rounded-xl shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
-                  Abrir Configuración
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex gap-3 lg:gap-4 min-h-0 overflow-hidden relative h-full">
-              <div className="flex-1 min-w-0 h-full">
-                <DashboardTableContainer />
-              </div>
-              <ItemDetailDrawer
-                product={selectedProduct}
-                onClose={() => setSelectedProduct(null)}
-                onEdit={(prod) => {
-                  setSelectedProduct(null);
-                  handleOpenModal(prod);
-                }}
-                onCopy={isActionEnabledForTable('copy_edit', bulkActionCtx, sheetConfig) ? (prod) => {
-                  setSelectedProduct(null);
-                  handleOpenCopyModal(prod);
-                } : undefined}
-                onDeleteRow={isActionEnabledForTable('delete', bulkActionCtx, sheetConfig) ? handleDelete : undefined}
-                onPrintBarcode={isActionEnabledForTable('barcode_ticket', bulkActionCtx, sheetConfig) ? (prod) => handlePrintTicket([prod], 'barcode') : undefined}
-                onNewEventForProduct={(sku, category) => {
-                  handleOpenModal(undefined, sku, category);
-                }}
-                allMainItems={allMainItems}
-                policies={policies}
-                products={products}
-                customAliases={sheetConfig.customAliases}
-              />
-            </div>
-          )}
+        {/* FLOATING ACTION BAR (BULK ACTIONS) */}
+        <FloatingBulkActionBar />
 
-          {/* FLOATING ACTION BAR (BULK ACTIONS) */}
-          <FloatingBulkActionBar />
-
-          {/* MOBILE ONLY FABs (Floating Action Buttons) */}
-          <DashboardMobileFABs />
-        </div>
+        {/* MOBILE ONLY FABs (Floating Action Buttons) */}
+        <DashboardMobileFABs />
       </div>
 
       {/* WORKSPACE SIDE DRAWER */}
@@ -1360,7 +1000,6 @@ export const InventoryDashboard: React.FC = () => {
 
       {/* CENTRALIZED DASHBOARD MODALS AND DRAWERS (Consumes state from DashboardContext) */}
       <DashboardModalsManager />
-
     </div>
 
     {/* HIDDEN UNLESS PRINTING: TICKET PRINT VIEW */}

@@ -41,6 +41,8 @@ El proyecto sigue una estructura modular limpia construida en **React 18+**, **T
     │   ├── useBarcodeScanner.ts  # Ciclo de vida compartido de la cámara de lectura (Html5Qrcode)
     │   ├── useInventoryWorker.ts # Hook de comunicación no bloqueante con el Web Worker
     │   ├── useInventoryFiltering.ts # Orquestación de filtros, paginación y agrupación
+    │   ├── useInventoryMutations.ts # Mutaciones CRUD, optimismo, rollback y persistencia IndexedDB/Sheets
+    │   ├── useTableVirtualization.ts# Virtualización de alto rendimiento TanStack Virtualizer
     │   ├── useModuleViewState.ts # Persistencia y transiciones de estado por módulo/pestaña
     │   ├── useOfflineSync.ts     # Hook de sincronización y vaciado de cola offline
     │   └── useColumnResize.ts    # Manejo interactivo del ancho de columnas
