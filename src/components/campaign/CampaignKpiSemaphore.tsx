@@ -33,7 +33,7 @@ export const CampaignKpiSemaphore: React.FC<CampaignKpiSemaphoreProps> = ({
 }) => {
   if (!matrix) return null;
   return (
-<div className="px-6 py-4 bg-white/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 shrink-0 backdrop-blur-xs">
+<div className="px-3 sm:px-6 py-3 sm:py-4 bg-white/70 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 shrink-0 backdrop-blur-xs">
   
   {/* Storage & Separation Notice */}
   <div className="mb-3 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">

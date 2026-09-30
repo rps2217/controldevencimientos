@@ -48,10 +48,10 @@ export const FloatingBulkActionBar: React.FC = () => {
   };
 
   return (
-    <div className="hidden md:flex absolute bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white px-4 py-3 rounded-2xl shadow-2xl items-center gap-4 animate-in slide-in-from-bottom-10 fade-in duration-300 border border-slate-700">
-      <div className="flex items-center gap-2 border-r border-slate-600 pr-4">
-        <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-inner">{selectedRowIds.length}</span>
-        <span className="text-sm font-medium whitespace-nowrap">seleccionados</span>
+    <div className="flex fixed bottom-3 left-3 right-3 md:left-1/2 md:right-auto md:-translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white p-2.5 sm:px-4 sm:py-3 rounded-2xl shadow-2xl items-center gap-2.5 sm:gap-4 animate-in slide-in-from-bottom-10 fade-in duration-300 border border-slate-700/90 max-w-full overflow-x-auto no-scrollbar pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
+      <div className="flex items-center gap-1.5 sm:gap-2 border-r border-slate-700 pr-2.5 sm:pr-4 shrink-0">
+        <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 sm:py-1 rounded-lg shadow-inner">{selectedRowIds.length}</span>
+        <span className="text-xs sm:text-sm font-medium whitespace-nowrap hidden sm:inline">seleccionados</span>
       </div>
       
       <div className="flex items-center gap-2">

@@ -998,7 +998,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
           </div>
 
           {/* Footer Actions */}
-          <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between gap-2 shrink-0">
+          <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between gap-2 shrink-0">
             <div className="text-[11px] text-slate-400 dark:text-slate-500 hidden sm:block">
               Presiona Enter para guardar o Esc para cancelar
             </div>

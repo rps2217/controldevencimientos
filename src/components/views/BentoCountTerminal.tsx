@@ -77,6 +77,7 @@ export interface BentoCountTerminalProps {
   setTempYyyy: (yyyy: string) => void;
   onBackToSessions?: () => void;
   onBackToCampaign?: () => void;
+  onFinishFurnitureAndNext?: () => void;
 }
 
 /**
@@ -113,7 +114,8 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
   tempYyyy,
   setTempYyyy,
   onBackToSessions,
-  onBackToCampaign
+  onBackToCampaign,
+  onFinishFurnitureAndNext
 }) => {
   // Input buffer for direct typing via Industrial Numpad or Bluetooth Laser gun
   const [inputBuffer, setInputBuffer] = useState<string>('');
@@ -407,6 +409,18 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Cuadratura</span>
               </button>
+
+              {onFinishFurnitureAndNext && (
+                <button
+                  type="button"
+                  onClick={onFinishFurnitureAndNext}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black transition-colors shadow-sm cursor-pointer flex items-center gap-1.5 active:scale-95"
+                  title="Guardar este mueble y pasar automáticamente al siguiente"
+                >
+                  <span>🏁 Siguiente Mueble</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -601,46 +615,53 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
                 </div>
               )}
 
-              {/* Quick Steppers (+1 / -1 / Multipliers) */}
-              <div className="grid grid-cols-4 gap-2 w-full mt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onDecrementSku(lastScannedItem.sku);
-                    triggerHaptic('undo');
-                  }}
-                  className="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-rose-400 font-black text-lg rounded-2xl border border-slate-700 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-xs"
-                  title="Restar 1 unidad (-1)"
-                >
-                  <Minus className="w-5 h-5" />
-                </button>
+              {/* Quick Touch Steppers (-1, +1, +5, +10, +25, +50) */}
+              <div className="w-full mt-3">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1 text-left">
+                  Sumar Cantidad al Producto Activo:
+                </span>
+                <div className="grid grid-cols-6 gap-1.5 w-full font-mono font-bold text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDecrementSku(lastScannedItem.sku);
+                      triggerHaptic('undo');
+                    }}
+                    className="py-2.5 bg-slate-800 hover:bg-slate-700 text-rose-400 font-black text-sm rounded-xl border border-slate-700 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                    title="Restar 1 unidad (-1)"
+                  >
+                    -1
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    onIncrementSku(lastScannedItem.sku);
-                    triggerHaptic('success');
-                    if (soundHapticsEnabled) playBeep('success');
-                  }}
-                  className="col-span-2 py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-base rounded-2xl shadow-lg shadow-emerald-950/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
-                  title="Sumar 1 unidad (+1)"
-                >
-                  <Plus className="w-5 h-5 stroke-[3]" />
-                  <span className="text-sm font-bold">+1 UNIDAD</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onIncrementSku(lastScannedItem.sku);
+                      triggerHaptic('success');
+                      if (soundHapticsEnabled) playBeep('success');
+                    }}
+                    className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl shadow-md active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                    title="Sumar 1 unidad (+1)"
+                  >
+                    +1
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    onCommitScan(lastScannedItem.sku, 5);
-                    triggerHaptic('success');
-                    if (soundHapticsEnabled) playBeep('success');
-                  }}
-                  className="py-3 bg-slate-800 hover:bg-indigo-950/60 text-indigo-300 font-bold text-sm rounded-2xl border border-slate-700 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
-                  title="Sumar 5 unidades (+5)"
-                >
-                  +5
-                </button>
+                  {[5, 10, 25, 50].map((inc) => (
+                    <button
+                      key={inc}
+                      type="button"
+                      onClick={() => {
+                        onCommitScan(lastScannedItem.sku, inc);
+                        triggerHaptic('success');
+                        if (soundHapticsEnabled) playBeep('success');
+                      }}
+                      className="py-2.5 bg-slate-800 hover:bg-indigo-950/80 hover:text-indigo-200 text-slate-300 rounded-xl border border-slate-700/80 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                      title={`Sumar ${inc} unidades (+${inc})`}
+                    >
+                      +{inc}
+                    </button>
+                  ))}
+                </div>
               </div>
 
             </div>
@@ -890,13 +911,13 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
           </div>
 
           {/* Zero-OS Touch Numpad Grid */}
-          <div className="grid grid-cols-4 gap-1.5 sm:gap-2 font-mono">
+          <div className="grid grid-cols-4 gap-1.5 sm:gap-2 font-mono max-w-2xl mx-auto w-full">
             {['7', '8', '9'].map(d => (
               <button
                 key={d}
                 type="button"
                 onClick={() => handleNumpadPress(d)}
-                className="h-12 bg-slate-900 hover:bg-slate-700 active:bg-blue-600 text-slate-100 font-black text-xl rounded-xl border border-slate-700/80 shadow-xs active:scale-95 transition-all cursor-pointer"
+                className="h-10 sm:h-11 bg-slate-900 hover:bg-slate-700 active:bg-blue-600 text-slate-100 font-black text-lg sm:text-xl rounded-xl border border-slate-700/80 shadow-xs active:scale-95 transition-all cursor-pointer"
               >
                 {d}
               </button>
@@ -904,7 +925,7 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
             <button
               type="button"
               onClick={() => handleNumpadPress('CLEAR')}
-              className="h-12 bg-rose-950/70 hover:bg-rose-900 text-rose-300 font-black text-xs rounded-xl border border-rose-800/80 shadow-xs active:scale-95 transition-all cursor-pointer"
+              className="h-10 sm:h-11 bg-rose-950/70 hover:bg-rose-900 text-rose-300 font-black text-xs rounded-xl border border-rose-800/80 shadow-xs active:scale-95 transition-all cursor-pointer"
             >
               CLR
             </button>
@@ -914,7 +935,7 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
                 key={d}
                 type="button"
                 onClick={() => handleNumpadPress(d)}
-                className="h-12 bg-slate-900 hover:bg-slate-700 active:bg-blue-600 text-slate-100 font-black text-xl rounded-xl border border-slate-700/80 shadow-xs active:scale-95 transition-all cursor-pointer"
+                className="h-10 sm:h-11 bg-slate-900 hover:bg-slate-700 active:bg-blue-600 text-slate-100 font-black text-lg sm:text-xl rounded-xl border border-slate-700/80 shadow-xs active:scale-95 transition-all cursor-pointer"
               >
                 {d}
               </button>
@@ -922,7 +943,7 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
             <button
               type="button"
               onClick={() => handleNumpadPress('BACKSPACE')}
-              className="h-12 bg-slate-900 hover:bg-slate-700 text-amber-400 font-black text-sm rounded-xl border border-slate-700/80 shadow-xs active:scale-95 transition-all cursor-pointer"
+              className="h-10 sm:h-11 bg-slate-900 hover:bg-slate-700 text-amber-400 font-black text-sm rounded-xl border border-slate-700/80 shadow-xs active:scale-95 transition-all cursor-pointer"
             >
               ⌫
             </button>
@@ -932,7 +953,7 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
                 key={d}
                 type="button"
                 onClick={() => handleNumpadPress(d)}
-                className="h-12 bg-slate-900 hover:bg-slate-700 active:bg-blue-600 text-slate-100 font-black text-xl rounded-xl border border-slate-700/80 shadow-xs active:scale-95 transition-all cursor-pointer"
+                className="h-10 sm:h-11 bg-slate-900 hover:bg-slate-700 active:bg-blue-600 text-slate-100 font-black text-lg sm:text-xl rounded-xl border border-slate-700/80 shadow-xs active:scale-95 transition-all cursor-pointer"
               >
                 {d}
               </button>
@@ -942,21 +963,21 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
               onClick={onOpenLiveCamera}
               className="row-span-2 h-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-lg shadow-indigo-950/50 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center gap-1"
             >
-              <Camera className="w-5 h-5" />
+              <Camera className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="text-[10px] uppercase">Cámara</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleNumpadPress('0')}
-              className="col-span-2 h-12 bg-slate-900 hover:bg-slate-700 active:bg-blue-600 text-slate-100 font-black text-xl rounded-xl border border-slate-700/80 shadow-xs active:scale-95 transition-all cursor-pointer"
+              className="col-span-2 h-10 sm:h-11 bg-slate-900 hover:bg-slate-700 active:bg-blue-600 text-slate-100 font-black text-lg sm:text-xl rounded-xl border border-slate-700/80 shadow-xs active:scale-95 transition-all cursor-pointer"
             >
               0
             </button>
             <button
               type="button"
               onClick={() => handleNumpadPress('ENTER')}
-              className="h-12 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-base rounded-xl shadow-md shadow-emerald-950/40 active:scale-95 transition-all cursor-pointer"
+              className="h-10 sm:h-11 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-base rounded-xl shadow-md shadow-emerald-950/40 active:scale-95 transition-all cursor-pointer"
             >
               OK
             </button>

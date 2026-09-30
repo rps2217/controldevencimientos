@@ -136,11 +136,11 @@ export const DashboardPageHeader: React.FC = () => {
         {activeView !== 'schema' && activeView !== 'analytics' && onOpenViewConfig && (
           <button
             onClick={onOpenViewConfig}
-            className="px-3.5 py-1.5 rounded-xl font-bold border border-blue-200 dark:border-blue-800/80 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-all flex items-center gap-2 shadow-xs cursor-pointer"
+            className="px-2.5 sm:px-3.5 py-1.5 rounded-xl font-bold border border-blue-200 dark:border-blue-800/80 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 shrink-0"
             title="Abrir Panel Lateral de Control, Densidad y Vistas"
           >
             <Sliders className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>Vistas & Ajustes</span>
+            <span className="hidden sm:inline">Vistas & Ajustes</span>
           </button>
         )}
       </div>

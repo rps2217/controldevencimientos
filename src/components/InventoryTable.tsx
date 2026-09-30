@@ -420,63 +420,69 @@ export const InventoryTable: React.FC = () => {
                     >
                       <td
                         colSpan={visibleHeaders.length + extraCols}
-                        className="px-4 py-2.5"
+                        className="p-2 sm:px-4 sm:py-2"
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 flex items-center justify-center">
-                              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
-                            </div>
+                        <div className="flex items-center gap-2 sm:gap-3.5 flex-wrap min-w-0 max-w-full overflow-hidden">
+                          {/* Chevron Icon */}
+                          <div className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 flex items-center justify-center shrink-0">
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
+                          </div>
 
-                            {/* Group Selection Control */}
-                            {groupRowIndexes.length > 0 && (
-                              <div 
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/80 dark:bg-slate-900/80 border border-slate-300 dark:border-slate-600 hover:border-blue-500 transition-colors shadow-xs"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isAllGroupSelected}
-                                  ref={(el) => {
-                                    if (el) el.indeterminate = isSomeGroupSelected;
-                                  }}
-                                  onChange={(e) => {
-                                    if (onSelectGroupRows) {
-                                      onSelectGroupRows(groupRowIndexes, e.target.checked);
-                                    } else {
-                                      if (e.target.checked) {
-                                        const newSelected = Array.from(new Set([...selectedRowIds, ...groupRowIndexes]));
-                                        setSelectedRowIds(newSelected);
-                                      } else {
-                                        setSelectedRowIds(selectedRowIds.filter(id => !groupRowIndexes.includes(id)));
-                                      }
-                                    }
-                                  }}
-                                  className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                  title={isAllGroupSelected ? 'Deseleccionar todos los registros de este grupo' : 'Seleccionar todos los registros de este grupo'}
-                                />
-                                <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                                  {isAllGroupSelected 
-                                    ? 'Grupo seleccionado' 
-                                    : isSomeGroupSelected 
-                                    ? `${groupRowIndexes.filter(id => selectedRowIds.includes(id)).length}/${groupRowIndexes.length} selecc.` 
-                                    : 'Seleccionar grupo'}
-                                </span>
-                              </div>
-                            )}
-
-                            <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                          {/* Group Field Name & Value */}
+                          <div className="flex items-center gap-1.5 min-w-0 shrink-0">
+                            <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold shrink-0">
                               {groupByColumn}:
                             </span>
-                            <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                            <span className="font-extrabold text-slate-900 dark:text-slate-100 text-xs sm:text-sm truncate max-w-[200px] sm:max-w-none">
                               {rowData.groupKey}
                             </span>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-mono font-bold">
-                              {rowData.count} {rowData.count === 1 ? 'registro' : 'registros'}
-                            </span>
                           </div>
-                          <span className="text-[11px] text-slate-400 dark:text-slate-500 italic">
-                            {isCollapsed ? 'Contraído (clic para ver)' : 'Expandido'}
+
+                          {/* Count Badge */}
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-mono font-bold shrink-0">
+                            {rowData.count} {rowData.count === 1 ? 'reg.' : 'registros'}
+                          </span>
+
+                          {/* Group Selection Checkbox Button */}
+                          {groupRowIndexes.length > 0 && (
+                            <div 
+                              className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/90 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-600 hover:border-blue-500 transition-colors shadow-2xs cursor-pointer shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isAllGroupSelected}
+                                ref={(el) => {
+                                  if (el) el.indeterminate = isSomeGroupSelected;
+                                }}
+                                onChange={(e) => {
+                                  if (onSelectGroupRows) {
+                                    onSelectGroupRows(groupRowIndexes, e.target.checked);
+                                  } else {
+                                    if (e.target.checked) {
+                                      const newSelected = Array.from(new Set([...selectedRowIds, ...groupRowIndexes]));
+                                      setSelectedRowIds(newSelected);
+                                    } else {
+                                      setSelectedRowIds(selectedRowIds.filter(id => !groupRowIndexes.includes(id)));
+                                    }
+                                  }
+                                }}
+                                className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                title={isAllGroupSelected ? 'Deseleccionar grupo' : 'Seleccionar grupo'}
+                              />
+                              <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                {isAllGroupSelected 
+                                  ? 'Grupo' 
+                                  : isSomeGroupSelected 
+                                  ? `${groupRowIndexes.filter(id => selectedRowIds.includes(id)).length}/${groupRowIndexes.length}` 
+                                  : 'Grupo'}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Collapse State Indicator */}
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500 italic shrink-0 ml-auto sm:ml-0">
+                            {isCollapsed ? 'Contraído' : 'Expandido'}
                           </span>
                         </div>
                       </td>

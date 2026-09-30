@@ -180,17 +180,27 @@ export default function RecepcionBultosView() {
       onClick={handleContainerClick}
       className="flex flex-col h-screen w-full bg-slate-50 dark:bg-slate-950 p-2 sm:p-4 gap-2 select-none"
     >
-      {/* Header Mobile */}
-      <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-3 rounded-2xl shadow-xs border border-slate-200/80 dark:border-slate-800">
-        <button onClick={() => navigate('/')} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
-          <ArrowLeft size={22} className="stroke-[2.5]" />
-        </button>
-        <div className="flex items-center gap-2">
-          <Truck className="w-5 h-5 text-orange-500" />
-          <h1 className="text-base font-extrabold text-slate-800 dark:text-slate-100">Arribo de Bultos</h1>
+      {/* Standard Header Mobile */}
+      <div className="flex items-center justify-between gap-3 bg-white dark:bg-slate-900 px-3.5 py-2.5 rounded-2xl shadow-2xs border border-slate-200/80 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <button 
+            onClick={() => navigate('/')} 
+            className="h-10 w-10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer active:scale-95"
+            title="Volver al dashboard"
+          >
+            <ArrowLeft size={20} className="stroke-[2.5]" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-orange-50 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400">
+              <Truck className="w-4 h-4" />
+            </div>
+            <h1 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight whitespace-nowrap">
+              Arribo de Bultos
+            </h1>
+          </div>
         </div>
-        <span className="ml-auto bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 px-3 py-1 rounded-full font-extrabold text-xs">
-          {sessionItems.length} Registrados
+        <span className="font-mono text-xs font-extrabold px-3 py-1 rounded-full bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200/80 dark:border-orange-900/60 shrink-0">
+          {sessionItems.length} Bultos
         </span>
       </div>
 

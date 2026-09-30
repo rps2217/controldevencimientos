@@ -899,7 +899,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
         </div>
 
         {/* ================= FOOTER ACTIONS SECTION ================= */}
-        <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
+        <div className="p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 shrink-0">
           {detailMode === 'incidencia' ? (
             /* Incident Mode Footer */
             <div className="flex items-center gap-2 w-full">

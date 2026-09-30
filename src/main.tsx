@@ -7,10 +7,24 @@ import './index.css';
 
 migrateLegacyStorageKeys();
 
-// Suppress harmless ResizeObserver loop limit exceeded error
+// Suppress harmless browser ResizeObserver loop errors (Recharts, Virtualizer)
+const isResizeObserverError = (msg: string) =>
+  msg.includes('ResizeObserver') ||
+  msg.includes('undelivered notifications');
+
 window.addEventListener('error', (e) => {
-  if (e.message && e.message.includes('ResizeObserver loop completed with undelivered notifications')) {
+  const msg = e.message || (e.error && e.error.message) || '';
+  if (isResizeObserverError(msg)) {
     e.stopImmediatePropagation();
+    e.preventDefault();
+  }
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = (e.reason && (e.reason.message || String(e.reason))) || '';
+  if (isResizeObserverError(msg)) {
+    e.stopImmediatePropagation();
+    e.preventDefault();
   }
 });
 
