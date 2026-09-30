@@ -89,6 +89,8 @@ export const InventoryTable: React.FC = () => {
   const collapseAllGroups = dashboard.collapseAllGroups;
   const isSticky = sheetConfig?.enableStickyColumns === true;
 
+  const selectedRowIdSet = useMemo(() => new Set(selectedRowIds.map(Number)), [selectedRowIds]);
+
   // Calculate padding class based on table density
   const paddingClass = useMemo(() => {
     if (tableDensity === 'comfortable') return 'p-4';
@@ -121,10 +123,10 @@ export const InventoryTable: React.FC = () => {
                   <input
                     type="checkbox"
                     className="w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-800 focus:ring-blue-500 cursor-pointer"
-                    checked={filteredItems.length > 0 && selectedRowIds.length === filteredItems.length}
+                    checked={filteredItems.length > 0 && filteredItems.every(i => selectedRowIdSet.has(Number(i._rowIndex)))}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedRowIds(filteredItems.map(i => i._rowIndex as number));
+                        setSelectedRowIds(filteredItems.map(i => Number(i._rowIndex)));
                       } else {
                         setSelectedRowIds([]);
                       }
@@ -406,8 +408,8 @@ export const InventoryTable: React.FC = () => {
                     .map((it) => it._rowIndex)
                     .filter((id): id is number => typeof id === 'number');
                   
-                  const isAllGroupSelected = groupRowIndexes.length > 0 && groupRowIndexes.every(id => selectedRowIds.includes(id));
-                  const isSomeGroupSelected = groupRowIndexes.some(id => selectedRowIds.includes(id)) && !isAllGroupSelected;
+                  const isAllGroupSelected = groupRowIndexes.length > 0 && groupRowIndexes.every(id => selectedRowIdSet.has(Number(id)));
+                  const isSomeGroupSelected = groupRowIndexes.some(id => selectedRowIdSet.has(Number(id))) && !isAllGroupSelected;
 
                   return (
                     <tr
@@ -460,10 +462,11 @@ export const InventoryTable: React.FC = () => {
                                     onSelectGroupRows(groupRowIndexes, e.target.checked);
                                   } else {
                                     if (e.target.checked) {
-                                      const newSelected = Array.from(new Set([...selectedRowIds, ...groupRowIndexes]));
+                                      const newSelected = Array.from(new Set([...selectedRowIds.map(Number), ...groupRowIndexes.map(Number)]));
                                       setSelectedRowIds(newSelected);
                                     } else {
-                                      setSelectedRowIds(selectedRowIds.filter(id => !groupRowIndexes.includes(id)));
+                                      const groupSet = new Set(groupRowIndexes.map(Number));
+                                      setSelectedRowIds(selectedRowIds.filter(id => !groupSet.has(Number(id))));
                                     }
                                   }
                                 }}
@@ -474,7 +477,7 @@ export const InventoryTable: React.FC = () => {
                                 {isAllGroupSelected 
                                   ? 'Grupo' 
                                   : isSomeGroupSelected 
-                                  ? `${groupRowIndexes.filter(id => selectedRowIds.includes(id)).length}/${groupRowIndexes.length}` 
+                                  ? `${groupRowIndexes.filter(id => selectedRowIdSet.has(Number(id))).length}/${groupRowIndexes.length}` 
                                   : 'Grupo'}
                               </span>
                             </div>
@@ -501,7 +504,7 @@ export const InventoryTable: React.FC = () => {
                     showExpiryCol={showExpiryCol}
                     showResolutionCol={showResolutionCol}
                     isCatalog={caps?.has('catalogo') ?? false}
-                    isSelected={selectedRowIds.includes(item._rowIndex as number)}
+                    isSelected={selectedRowIdSet.has(Number(item._rowIndex))}
                     isActiveDetail={activeDetailRowIndex === item._rowIndex}
                     frcBodFilter={frcBodFilter}
                     getColWidth={getColWidth}

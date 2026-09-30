@@ -24,6 +24,7 @@ export const FloatingBulkActionBar: React.FC = () => {
   const handlePrintTicket = dashboard.handlePrintTicket;
   const setIsTicketConfigOpen = modalsActions.setIsTicketConfigOpen;
   const setIsGmailModalOpen = modalsActions.setIsGmailModalOpen;
+  const setGmailModalItems = modalsActions.setGmailModalItems;
   const setWhatsAppModalItems = modalsActions.setWhatsAppModalItems;
   const setIsWhatsAppModalOpen = modalsActions.setIsWhatsAppModalOpen;
   const setIsPmReportOpen = modalsActions.setIsPmReportOpen;
@@ -38,7 +39,8 @@ export const FloatingBulkActionBar: React.FC = () => {
     return null;
   }
 
-  const selectedItems = filteredItems.filter(i => selectedRowIds.includes(i._rowIndex as number));
+  const selectedSet = new Set(selectedRowIds.map(Number));
+  const selectedItems = filteredItems.filter(i => selectedSet.has(Number(i._rowIndex)));
 
   const handleExportSelectedExcel = () => {
     const activeVirtual = resolveActiveVirtualColumns(sheetConfig);
@@ -85,10 +87,13 @@ export const FloatingBulkActionBar: React.FC = () => {
         
         {isActionEnabledForTable('gmail', bulkActionCtx, sheetConfig) && (
           <button 
-            onClick={() => setIsGmailModalOpen(true)}
+            onClick={() => {
+              setGmailModalItems(selectedItems);
+              setIsGmailModalOpen(true);
+            }}
             className="text-xs hover:bg-slate-700 px-3 py-1.5 rounded-xl font-bold transition-colors flex items-center gap-1.5 bg-red-600/40 text-red-200 border border-red-500/40 shadow-sm cursor-pointer"
           >
-            <Mail className="w-3.5 h-3.5 text-red-400" /> Borrador Gmail
+            <Mail className="w-3.5 h-3.5 text-red-400" /> Borrador Gmail ({selectedRowIds.length})
           </button>
         )}
 

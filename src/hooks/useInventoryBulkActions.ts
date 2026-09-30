@@ -111,8 +111,9 @@ export const useInventoryBulkActions = ({
         }
       }
 
+      const selectedSet = new Set(selectedRowIds.map(Number));
       const updatedItems = items.map(item => {
-        if (!selectedRowIds.includes(item._rowIndex as number)) return item;
+        if (!selectedSet.has(Number(item._rowIndex))) return item;
         const updated = { ...item };
         if (values.frc_n && colFrcN) updated[colFrcN] = values.frc_n;
         if (values.n_traspaso && colTraspaso) updated[colTraspaso] = values.n_traspaso;
@@ -131,7 +132,7 @@ export const useInventoryBulkActions = ({
         const rowIndex = typeof rawRowIndex === 'number' ? rawRowIndex : parseInt(String(rawRowIndex), 10);
         if (!rowIndex || isNaN(rowIndex) || rowIndex < 2) continue;
 
-        const itemToUpdate = updatedItems.find(i => i._rowIndex === rowIndex);
+        const itemToUpdate = updatedItems.find(i => Number(i._rowIndex) === Number(rowIndex));
         if (itemToUpdate) {
           const rowValues = currentHeaders.map(h => itemToUpdate[h] || '');
           const ident = resolveItemIdentity(itemToUpdate, currentHeaders, activeSheet.title);
@@ -187,9 +188,9 @@ export const useInventoryBulkActions = ({
     try {
       setIsSaving(true);
 
-      const selectedSet = new Set(selectedRowIds);
+      const selectedSet = new Set(selectedRowIds.map(Number));
       const remainingItems = items
-        .filter(i => !selectedSet.has(i._rowIndex as number))
+        .filter(i => !selectedSet.has(Number(i._rowIndex)))
         .map((it, idx) => ({ ...it, _rowIndex: idx + 2 }));
 
       setItems(remainingItems);
@@ -197,14 +198,14 @@ export const useInventoryBulkActions = ({
 
       if (activeView === 'main') {
         const remainingMain = allMainItems
-          .filter(i => !selectedSet.has(i._rowIndex as number))
+          .filter(i => !selectedSet.has(Number(i._rowIndex)))
           .map((it, idx) => ({ ...it, _rowIndex: idx + 2 }));
         setAllMainItems(remainingMain);
         saveStoredDemoItems('main', remainingMain);
       }
 
       // Sort row indices in DESCENDING order so that deleting earlier rows doesn't shift later row indices
-      const sortedRowIds = [...selectedRowIds].sort((a, b) => (b as number) - (a as number));
+      const sortedRowIds = [...selectedRowIds].map(Number).sort((a, b) => b - a);
 
       if (isDemo) {
         setSelectedRowIds([]);
@@ -216,7 +217,7 @@ export const useInventoryBulkActions = ({
           console.warn('deleteRows masivo falló o no soportado, ejecutando eliminaciones individuales descendentes:', batchErr);
           let remainingDelete = count;
           for (const rowIndex of sortedRowIds) {
-            const itemToDelete = originalItems.find(i => i._rowIndex === rowIndex);
+            const itemToDelete = originalItems.find(i => Number(i._rowIndex) === Number(rowIndex));
             const ident = itemToDelete ? resolveItemIdentity(itemToDelete, headers, activeSheet.title) : null;
             try {
               await deleteRow(activeSheet.sheetId, rowIndex, activeSheet.title, {
@@ -293,8 +294,9 @@ export const useInventoryBulkActions = ({
       let orphanCount = 0;
       const updatedRowsToSave: { rowIndex: number; rowValues: string[]; entityKey: string }[] = [];
 
+      const selectedSet = new Set(selectedRowIds.map(Number));
       const updatedItems = items.map(item => {
-        if (!selectedRowIds.includes(item._rowIndex as number)) return item;
+        if (!selectedSet.has(Number(item._rowIndex))) return item;
 
         const rawSku = item[skuCol] || item.SKU || item.sku;
         const cleanSku = rawSku !== undefined && rawSku !== null ? String(rawSku).trim() : '';

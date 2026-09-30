@@ -293,7 +293,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
             <PmReportModal
               isOpen={isPmReportOpen}
               onClose={() => setIsPmReportOpen(false)}
-              drainageReportItems={drainageReportItems}
+              drainageReportItems={selectedRowIds.length > 0 ? filteredItems.filter(i => new Set(selectedRowIds.map(Number)).has(Number(i._rowIndex))) : drainageReportItems}
             />
           </Suspense>
         </ScopedErrorBoundary>
@@ -412,7 +412,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
               setIsGmailModalOpen(false);
               setGmailModalItems([]);
             }}
-            selectedItems={gmailModalItems.length > 0 ? gmailModalItems : (selectedRowIds.length > 0 ? filteredItems.filter(i => selectedRowIds.includes(i._rowIndex as number)) : filteredItems)}
+            selectedItems={gmailModalItems.length > 0 ? gmailModalItems : (selectedRowIds.length > 0 ? filteredItems.filter(i => new Set(selectedRowIds.map(Number)).has(Number(i._rowIndex))) : filteredItems)}
             headers={visibleHeaders.length > 0 ? visibleHeaders : headers}
             customAliases={sheetConfig.customAliases}
             activeViewTitle={
@@ -436,7 +436,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
               setIsWhatsAppModalOpen(false);
               setWhatsAppModalItems([]);
             }}
-            selectedItems={whatsAppModalItems.length > 0 ? whatsAppModalItems : (selectedRowIds.length > 0 ? filteredItems.filter(i => selectedRowIds.includes(i._rowIndex as number)) : filteredItems)}
+            selectedItems={whatsAppModalItems.length > 0 ? whatsAppModalItems : (selectedRowIds.length > 0 ? filteredItems.filter(i => new Set(selectedRowIds.map(Number)).has(Number(i._rowIndex))) : filteredItems)}
             headers={headers}
             customAliases={sheetConfig.customAliases}
           />
