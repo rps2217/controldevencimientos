@@ -1,5 +1,27 @@
 import React, { useState } from 'react';
-import { Play, Check, FileSpreadsheet, EyeOff, Calendar, MapPin, Database, Loader2, Cloud, CloudOff, CloudUpload, Barcode, Zap, Trash2, ChevronRight, CheckCircle2, Sparkles, HelpCircle } from 'lucide-react';
+import { 
+  Play, 
+  Check, 
+  FileSpreadsheet, 
+  EyeOff, 
+  Calendar, 
+  MapPin, 
+  Database, 
+  Loader2, 
+  Cloud, 
+  CloudOff, 
+  CloudUpload, 
+  Barcode, 
+  Zap, 
+  Trash2, 
+  ChevronRight, 
+  CheckCircle2, 
+  Sparkles, 
+  HelpCircle,
+  UploadCloud,
+  ArrowRight,
+  PackageCheck
+} from 'lucide-react';
 import { StockCountSession, StockCountMode } from '../../types';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 
@@ -18,6 +40,10 @@ export interface StockCountSessionsListViewProps {
   sessions: StockCountSession[];
   isSyncingCloud: boolean;
   realProviders?: string[];
+  erpSnapshotCount?: number;
+  activeCampaignName?: string;
+  onOpenUploadErp?: () => void;
+  onOpenWorkflowGuide?: () => void;
   onCreateSession: (config: NewSessionConfig) => void;
   onOpenSession: (session: StockCountSession) => void;
   onDeleteSession: (sessionId: string, e: React.MouseEvent) => void;
@@ -29,6 +55,10 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
   sessions,
   isSyncingCloud,
   realProviders = [],
+  erpSnapshotCount = 0,
+  activeCampaignName,
+  onOpenUploadErp,
+  onOpenWorkflowGuide,
   onCreateSession,
   onOpenSession,
   onDeleteSession,
@@ -77,7 +107,64 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-7xl mx-auto w-full">
+    <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 max-w-7xl mx-auto w-full">
+
+      {/* Top Guided Step 0 Banner: ERP Snapshot Source */}
+      <div className="p-4 rounded-3xl bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900/60 border border-blue-500/30 backdrop-blur-sm shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-md shadow-blue-500/30 shrink-0">
+            <UploadCloud className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-extrabold border border-blue-400/30">
+                Paso 0: Inventario Teórico ERP
+              </span>
+              {erpSnapshotCount > 0 ? (
+                <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {formatLocaleNumber(erpSnapshotCount)} SKUs teóricos cargados
+                </span>
+              ) : (
+                <span className="text-xs font-bold text-amber-300 flex items-center gap-1">
+                  Sin archivo ERP cargado aún
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              {erpSnapshotCount > 0 
+                ? `Campaña activa: "${activeCampaignName || 'Principal'}". Las terminales móviles ya comparan faltantes y sobrantes.`
+                : 'Carga tu planilla Excel (.xlsx) o CSV del ERP para auditar diferencias automáticamente en cada mueble.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+          {onOpenUploadErp && (
+            <button
+              type="button"
+              onClick={onOpenUploadErp}
+              className="flex-1 md:flex-none px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>{erpSnapshotCount > 0 ? 'Actualizar Archivo ERP' : 'Cargar Archivo ERP (.xlsx / .csv)'}</span>
+            </button>
+          )}
+          {onOpenWorkflowGuide && (
+            <button
+              type="button"
+              onClick={onOpenWorkflowGuide}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-xl border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Ver guía paso a paso del flujo de conteo"
+            >
+              <HelpCircle className="w-4 h-4 text-amber-400" />
+              <span className="hidden sm:inline">Guía de Flujo</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 w-full">
 
       {/* Left: New Session Creator (Always top on mobile) */}
       <div className="order-1 lg:order-1 lg:col-span-5 bg-white dark:bg-slate-800/80 p-4 sm:p-5 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
@@ -386,6 +473,8 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
             })}
           </div>
         )}
+      </div>
+
       </div>
 
     </div>

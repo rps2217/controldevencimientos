@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2, Undo2 } from 'lucide-react';
+import { X, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2, Undo2, HelpCircle, UploadCloud } from 'lucide-react';
 import { StockCountSession, StockCountEntry, InventoryItem, InventoryCampaign, SheetRecord } from '../../types';
 import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorageDebounced, flushStockCountSessionsToStorage, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
 import { loadCampaignsFromStorage, saveCampaignsToStorage, getActiveCampaignId, setActiveCampaignId } from '../../utils/campaignUtils';
@@ -30,6 +30,8 @@ import { useHardwareBarcodeScanner } from '../../hooks/useHardwareBarcodeScanner
 import { ScopedErrorBoundary } from '../common/ScopedErrorBoundary';
 
 import { STORAGE_KEYS } from '../../utils/appStorage';
+import { ErpSnapshotUploadModal } from '../modals/ErpSnapshotUploadModal';
+import { StockCountWorkflowGuideModal } from '../modals/StockCountWorkflowGuideModal';
 const CampaignConsolidationDashboard = lazy(() => import('./CampaignConsolidationDashboard').then(m => ({ default: m.CampaignConsolidationDashboard })));
 
 interface StockCountTerminalProps {
@@ -82,6 +84,32 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   // Session list & active session
   const [sessions, setSessions] = useState<StockCountSession[]>(() => loadStockCountSessionsFromStorage());
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+  // ERP & Workflow guide modals state
+  const [isErpUploadModalOpen, setIsErpUploadModalOpen] = useState<boolean>(false);
+  const [isWorkflowGuideModalOpen, setIsWorkflowGuideModalOpen] = useState<boolean>(false);
+
+  // Computed snapshot count
+  const erpSnapshotCount = useMemo(() => {
+    return activeCampaign ? Object.keys(activeCampaign.snapshotTeoricoActual || {}).length : 0;
+  }, [activeCampaign]);
+
+  // Auto-sync helper for ERP upload modal
+  const handleAutoSyncCampaignsToCloud = useCallback(async (camps: InventoryCampaign[], actId: string | null) => {
+    try {
+      const res = await syncCampaignsWithCloud({
+        campaigns: camps,
+        activeCampaignId: actId,
+        sessions
+      });
+      if (res && res.success) {
+        setCampaigns(res.mergedCampaigns);
+        setSessions(res.mergedSessions);
+      }
+    } catch (e) {
+      console.warn('AutoSync cloud error:', e);
+    }
+  }, [sessions]);
 
   // Cloud sync handler (Two-Way Merging between this device and Google Sheets)
   const handleCloudSync = useCallback(async (silent: boolean = false) => {
@@ -1369,10 +1397,45 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
             </div>
           </div>
 
-          {/* Sub-bar Navigation Pills (Horizontally Scrollable on Mobile & Tablet) */}
+          {/* Sub-bar Navigation Pills & Direct ERP Action Button (Horizontally Scrollable on Mobile & Tablet) */}
           <div className="px-3 sm:px-6 py-2 bg-slate-100/90 dark:bg-slate-900/80 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              {/* Tab 1: Active Pistoleo */}
+              
+              {/* DIRECT ERP UPLOAD TRIGGER BUTTON */}
+              <button
+                type="button"
+                onClick={() => setIsErpUploadModalOpen(true)}
+                className={`px-3 sm:px-3.5 py-1.5 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer shadow-xs active:scale-95 ${
+                  erpSnapshotCount > 0
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white animate-pulse'
+                }`}
+                title="Cargar o actualizar archivo de stock ERP (.xlsx, .csv)"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>
+                  {erpSnapshotCount > 0 
+                    ? `ERP: ${formatLocaleNumber(erpSnapshotCount)} SKUs` 
+                    : '📂 Cargar Archivo ERP'}
+                </span>
+              </button>
+
+              <span className="text-slate-300 dark:text-slate-700 mx-0.5 font-light">|</span>
+
+              {/* Step 1: Sesiones por Mueble */}
+              <button
+                onClick={() => setViewState('LIST')}
+                className={`px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                  viewState === 'LIST'
+                    ? 'bg-indigo-600 text-white shadow-sm font-black'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>1. Muebles ({sessions.length})</span>
+              </button>
+
+              {/* Step 2: Active Pistoleo */}
               <button
                 onClick={() => handleSwitchToTerminal()}
                 className={`px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
@@ -1384,23 +1447,10 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                 }`}
               >
                 <Zap className={`w-3.5 h-3.5 ${currentSession ? 'text-amber-500 fill-amber-500' : ''}`} />
-                <span>1. Pistolear {currentSession ? `(${currentSession.conteos.length})` : ''}</span>
+                <span>2. Pistolear {currentSession ? `(${currentSession.conteos.length})` : ''}</span>
               </button>
 
-              {/* Tab 2: Sesiones por Mueble */}
-              <button
-                onClick={() => setViewState('LIST')}
-                className={`px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
-                  viewState === 'LIST'
-                    ? 'bg-blue-600 text-white shadow-sm font-black'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>2. Muebles ({sessions.length})</span>
-              </button>
-
-              {/* Tab 3: Cuadratura */}
+              {/* Step 3: Cuadratura */}
               <button
                 onClick={() => {
                   if (currentSession) {
@@ -1425,7 +1475,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                 <span>3. Cuadratura</span>
               </button>
 
-              {/* Tab 4: Campaña Farmacia / Tienda Completa */}
+              {/* Step 4: Campaña Farmacia / Tienda Completa */}
               {!(isBlind && viewState === 'COUNTING') && (
                 <button
                   onClick={() => {
@@ -1434,7 +1484,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                   }}
                   className={`px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
                     viewState === 'CAMPAIGN'
-                      ? 'bg-indigo-600 text-white shadow-sm font-black'
+                      ? 'bg-purple-600 text-white shadow-sm font-black'
                       : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
                   }`}
                 >
@@ -1442,6 +1492,16 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                   <span>4. Tienda Completa</span>
                 </button>
               )}
+
+              {/* Guided Flow Help Button */}
+              <button
+                type="button"
+                onClick={() => setIsWorkflowGuideModalOpen(true)}
+                className="p-1.5 text-slate-500 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer shrink-0"
+                title="¿Cómo funciona el flujo de conteo?"
+              >
+                <HelpCircle className="w-4 h-4 text-amber-500" />
+              </button>
             </div>
 
             {/* Quick Session / Furniture Switcher Dropdown */}
@@ -1522,6 +1582,10 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
               sessions={sessions}
               isSyncingCloud={isSyncingCloud}
               realProviders={availableRealProviders}
+              erpSnapshotCount={erpSnapshotCount}
+              activeCampaignName={activeCampaign?.nombre}
+              onOpenUploadErp={() => setIsErpUploadModalOpen(true)}
+              onOpenWorkflowGuide={() => setIsWorkflowGuideModalOpen(true)}
               onCreateSession={handleCreateSession}
               onOpenSession={handleOpenSession}
               onDeleteSession={handleDeleteSession}
@@ -1758,6 +1822,26 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
           />,
           document.body
         )}
+        {/* ERP Snapshot Upload Modal */}
+        <ErpSnapshotUploadModal
+          isOpen={isErpUploadModalOpen}
+          onClose={() => setIsErpUploadModalOpen(false)}
+          campaigns={campaigns}
+          activeCampaignId={activeCampaignIdState}
+          sessions={sessions}
+          onUpdateCampaigns={handleUpdateCampaigns}
+          onSelectCampaign={handleSelectCampaign}
+          onAutoSyncCloud={handleAutoSyncCampaignsToCloud}
+          showToast={showToast}
+        />
+
+        {/* Guided Workflow Help Modal */}
+        <StockCountWorkflowGuideModal
+          isOpen={isWorkflowGuideModalOpen}
+          onClose={() => setIsWorkflowGuideModalOpen(false)}
+          onOpenUploadErp={() => setIsErpUploadModalOpen(true)}
+          onOpenNewSession={() => setViewState('LIST')}
+        />
       </div>
   );
 };
