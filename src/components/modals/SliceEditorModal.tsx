@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useConfirm } from '../common/ConfirmDialog';
-import { X, Layers, Sparkles, Tag, Check, Trash2, Sliders, Columns, Filter, ArrowUpDown, RefreshCw, Copy, Search, Clock, CheckCircle2, Truck, ArrowUpAZ, ArrowDownZA } from 'lucide-react';
+import { X, Layers, Check, Trash2, Sliders, Columns, Filter, Copy } from 'lucide-react';
 import { 
   TableSlice, SliceFilterConfig, SliceColor, SortConfig, DynamicMonthRange 
 } from '../../types';
-import { SliceIcon } from '../slices/SliceSelectorBar';
-import { SLICE_COLOR_CLASSES } from '../../utils/sliceRegistry';
+
+// Subcomponents (Ponytail Protocol Modularization)
+import { SliceGeneralTab } from './sliceEditor/SliceGeneralTab';
+import { SliceFiltersTab } from './sliceEditor/SliceFiltersTab';
+import { SliceColumnsTab } from './sliceEditor/SliceColumnsTab';
 
 interface SliceEditorModalProps {
   isOpen: boolean;
@@ -144,49 +147,40 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
 
   const isBuiltIn = Boolean(editingSlice?.isBuiltIn);
 
-  // Track modal open/close transitions to avoid continuous resets on parent re-renders
   const prevIsOpenRef = useRef(false);
   const prevEditingIdRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     const justOpened = isOpen && !prevIsOpenRef.current;
-    const editingTargetChanged = isOpen && editingSlice?.id !== prevEditingIdRef.current;
-
+    const editingChanged = editingSlice?.id !== prevEditingIdRef.current;
+    
     prevIsOpenRef.current = isOpen;
     prevEditingIdRef.current = editingSlice?.id;
 
     if (!isOpen) return;
 
-    // Only populate form state on initial modal open or when editing a different slice
-    if (justOpened || editingTargetChanged) {
+    if (justOpened || editingChanged) {
       if (editingSlice) {
-        setName(isBuiltIn ? `${editingSlice.name} (Personalizado)` : editingSlice.name);
+        setName(isBuiltIn ? `${editingSlice.name} (Mi Copia)` : editingSlice.name);
         setDescription(editingSlice.description || '');
-        setIcon(editingSlice.icon || 'Layers');
+        setIcon(editingSlice.icon || 'Bookmark');
         setColor(editingSlice.color || 'blue');
         setFilterConfig(editingSlice.filterConfig ? { ...editingSlice.filterConfig } : {});
         setGroupByColumn(editingSlice.groupByColumn || 'none');
         setGroupByDirection(editingSlice.groupByDirection || 'asc');
-        if (editingSlice.sortConfig && editingSlice.sortConfig.column) {
-          setSortColumn(editingSlice.sortConfig.column);
-          setSortDirection(editingSlice.sortConfig.direction === 'desc' ? 'desc' : 'asc');
-        } else {
-          setSortColumn('');
-          setSortDirection('asc');
-        }
+        setSortColumn(editingSlice.sortConfig?.column || '');
+        setSortDirection(editingSlice.sortConfig?.direction || 'asc');
         if (editingSlice.visibleColumns && editingSlice.visibleColumns.length > 0) {
+          setSelectedColumns([...editingSlice.visibleColumns]);
           setUseCustomColumns(true);
-          setSelectedColumns(editingSlice.visibleColumns);
         } else {
+          setSelectedColumns([...headers]);
           setUseCustomColumns(false);
-          setSelectedColumns(currentVisibleHeaders.length > 0 ? currentVisibleHeaders : headers);
         }
       } else {
-        // Initialize new slice with currently applied view filters
-        const defaultName = getSuggestedSliceName(currentFilters, currentGroupBy, tableKey);
-        setName(defaultName);
+        setName(getSuggestedSliceName(currentFilters, currentGroupBy, tableKey));
         setDescription('');
-        setIcon('Bookmark');
+        setIcon(tableKey === 'events' ? 'AlertTriangle' : 'Bookmark');
         setColor('blue');
         setFilterConfig({
           searchTerm: currentFilters.searchTerm || undefined,
@@ -210,64 +204,21 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
           setSortColumn('');
           setSortDirection('asc');
         }
-        setUseCustomColumns(false);
-        setSelectedColumns(currentVisibleHeaders.length > 0 ? currentVisibleHeaders : headers);
+        if (currentVisibleHeaders && currentVisibleHeaders.length > 0) {
+          setSelectedColumns([...currentVisibleHeaders]);
+          setUseCustomColumns(currentVisibleHeaders.length !== headers.length);
+        } else {
+          setSelectedColumns([...headers]);
+          setUseCustomColumns(false);
+        }
       }
+      setErrors({});
       setColumnSearch('');
       setActiveTab('general');
-      setErrors({});
     }
-  }, [
-    isOpen,
-    editingSlice,
-    isBuiltIn,
-    currentFilters,
-    currentGroupBy,
-    currentGroupByDirection,
-    currentSort,
-    currentVisibleHeaders,
-    headers,
-    tableKey,
-  ]);
-
-  // Close on Escape key
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, editingSlice, headers, currentFilters, currentSort, currentGroupBy, currentGroupByDirection, currentVisibleHeaders, isBuiltIn, tableKey]);
 
   if (!isOpen) return null;
-
-  const handleSyncWithActiveScreen = () => {
-    setFilterConfig({
-      searchTerm: currentFilters.searchTerm || undefined,
-      quickChip: currentFilters.quickChip || undefined,
-      eventFilter: currentFilters.eventFilter?.length ? [...currentFilters.eventFilter] : undefined,
-      pmRadarFilter: currentFilters.pmRadarFilter?.length ? [...currentFilters.pmRadarFilter] : undefined,
-      dynamicMonthFilter: currentFilters.dynamicMonthFilter?.length ? [...currentFilters.dynamicMonthFilter] : undefined,
-      dynamicMonthRange: currentFilters.dynamicMonthRange ? { ...currentFilters.dynamicMonthRange } : undefined,
-      eventResolutionFilter: currentFilters.eventResolutionFilter?.length ? [...currentFilters.eventResolutionFilter] : undefined,
-      frcBodFilter: currentFilters.frcBodFilter?.length ? [...currentFilters.frcBodFilter] : undefined,
-      columnFilters: currentFilters.columnFilters && Object.keys(currentFilters.columnFilters).length > 0
-        ? { ...currentFilters.columnFilters }
-        : undefined
-    });
-    setGroupByColumn(currentGroupBy || 'none');
-    if (currentSort && currentSort.column) {
-      setSortColumn(currentSort.column);
-      setSortDirection(currentSort.direction === 'desc' ? 'desc' : 'asc');
-    }
-    if (currentVisibleHeaders && currentVisibleHeaders.length > 0) {
-      setSelectedColumns([...currentVisibleHeaders]);
-      setUseCustomColumns(currentVisibleHeaders.length !== headers.length);
-    }
-  };
 
   const handleToggleColumn = (col: string) => {
     setSelectedColumns(prev => 
@@ -380,12 +331,6 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
     }
   };
 
-  // Filtered headers for visible columns search
-  const filteredHeaders = headers.filter(h => 
-    h.toLowerCase().includes(columnSearch.trim().toLowerCase())
-  );
-
-  // Human-readable summary of captured filters
   const filterSummary: string[] = [];
   if (filterConfig.searchTerm) filterSummary.push(`Búsqueda: "${filterConfig.searchTerm}"`);
   if (filterConfig.quickChip) filterSummary.push(`Píldora: "${filterConfig.quickChip}"`);
@@ -413,11 +358,9 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
       onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
+        if (e.target === e.currentTarget) onClose();
       }}
     >
       <div 
@@ -487,7 +430,7 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
             <Filter className="w-3.5 h-3.5" />
             <span>2. Criterios de Filtrado</span>
             {filterSummary.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-mono">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-mono font-bold">
                 {filterSummary.length}
               </span>
             )}
@@ -505,7 +448,7 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
             <Columns className="w-3.5 h-3.5" />
             <span>3. Columnas & Orden</span>
             {useCustomColumns && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 font-mono">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 font-mono font-bold">
                 {selectedColumns.length}
               </span>
             )}
@@ -514,625 +457,58 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {/* TAB 1: GENERAL & DISEÑO */}
           {activeTab === 'general' && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              {/* Nombre y Descripción */}
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Nombre del Slice / Vista <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      if (errors.name) setErrors({});
-                    }}
-                    placeholder="Ej. Retiro Urgente Bodega 1, Lotes 2026, Reclamos Chofer..."
-                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-medium bg-slate-50 dark:bg-slate-800/50 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.name ? 'border-red-500 bg-red-50/20' : 'border-slate-200 dark:border-slate-700'
-                    }`}
-                  />
-                  {errors.name && (
-                    <p className="text-xs text-red-500 mt-1.5 font-bold flex items-center gap-1">
-                      <span>⚠️</span> {errors.name}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Descripción Operativa (Opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Breve nota sobre qué registros agrupa este slice..."
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium bg-slate-50 dark:bg-slate-800/50 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Color & Icon Selector */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Color de Distinción
-                  </label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {AVAILABLE_COLORS.map((c) => {
-                      const scheme = SLICE_COLOR_CLASSES[c] || SLICE_COLOR_CLASSES.blue;
-                      const isSelected = color === c;
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setColor(c)}
-                          className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
-                            scheme.bg
-                          } ${scheme.border} ${
-                            isSelected ? 'ring-2 ring-blue-500 scale-110 shadow-xs' : 'hover:scale-105'
-                          }`}
-                          title={`Color ${c}`}
-                        >
-                          {isSelected && <Check className={`w-4 h-4 ${scheme.text}`} />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Ícono Representativo
-                  </label>
-                  <div className="flex items-center gap-1.5 flex-wrap max-h-24 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-                    {AVAILABLE_ICONS.map((ic) => {
-                      const isSelected = icon === ic;
-                      return (
-                        <button
-                          key={ic}
-                          type="button"
-                          onClick={() => setIcon(ic)}
-                          className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                              : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
-                          }`}
-                          title={ic}
-                        >
-                          <SliceIcon iconName={ic} className="w-3.5 h-3.5" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Vista Previa de la Píldora */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    Vista Previa del Botón en la Barra:
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {(() => {
-                      const scheme = SLICE_COLOR_CLASSES[color] || SLICE_COLOR_CLASSES.blue;
-                      return (
-                        <div className={`text-xs px-3 py-1.5 rounded-xl font-bold border flex items-center gap-1.5 ${scheme.bg} ${scheme.text} ${scheme.border}`}>
-                          <SliceIcon iconName={icon} className="w-3.5 h-3.5" />
-                          <span>{name || 'Mi Slice'}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold ml-1 ${scheme.badgeBg} ${scheme.badgeText}`}>
-                            12
-                          </span>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-                
-                <button
-                  type="button"
-                  onClick={handleSyncWithActiveScreen}
-                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs hover:bg-slate-50 cursor-pointer"
-                  title="Capturar y sincronizar filtros, orden y columnas actuales de la pantalla"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Sincronizar con Pantalla</span>
-                </button>
-              </div>
-            </div>
+            <SliceGeneralTab
+              name={name}
+              setName={setName}
+              description={description}
+              setDescription={setDescription}
+              icon={icon}
+              setIcon={setIcon}
+              color={color}
+              setColor={setColor}
+              availableIcons={AVAILABLE_ICONS}
+              availableColors={AVAILABLE_COLORS}
+              errors={errors}
+              filterSummary={filterSummary}
+            />
           )}
 
-          {/* TAB 2: CRITERIOS DE FILTRADO (INTERACTIVO) */}
           {activeTab === 'filters' && (
-            <div className="space-y-4 animate-in fade-in duration-150">
-              {/* Quick Sync Button */}
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-xs text-blue-800 dark:text-blue-200 font-medium">
-                    Puedes ajustar los criterios manualmente o capturarlos desde la vista activa.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSyncWithActiveScreen}
-                  className="text-xs font-bold px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center gap-1 shrink-0 cursor-pointer"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  <span>Capturar Vista Actual</span>
-                </button>
-              </div>
-
-              {/* 1. Búsqueda por Texto */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Search className="w-3.5 h-3.5 text-blue-500" />
-                  <span>Término de Búsqueda Fijo (Opcional)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={filterConfig.searchTerm || ''}
-                    onChange={(e) => setFilterConfig(prev => ({ ...prev, searchTerm: e.target.value || undefined }))}
-                    placeholder="Filtrar siempre por un texto, SKU, nombre o proveedor..."
-                    className="w-full pl-3 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  {filterConfig.searchTerm && (
-                    <button
-                      type="button"
-                      onClick={() => setFilterConfig(prev => ({ ...prev, searchTerm: undefined }))}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                      aria-label="Limpiar búsqueda"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* 2. Filtros de Radar PM (Para Vencimientos o General) */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Estados de Vencimiento / Radar PM</span>
-                  </label>
-                  {filterConfig.pmRadarFilter && filterConfig.pmRadarFilter.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setFilterConfig(prev => ({ ...prev, pmRadarFilter: undefined }))}
-                      className="text-[10px] text-red-500 hover:underline font-bold cursor-pointer"
-                    >
-                      Limpiar
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {PM_STATUS_OPTIONS.map((opt) => {
-                    const isSelected = (filterConfig.pmRadarFilter || []).includes(opt.id);
-                    const scheme = SLICE_COLOR_CLASSES[opt.color] || SLICE_COLOR_CLASSES.blue;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => handleTogglePmStatus(opt.id)}
-                        className={`text-xs p-2 rounded-xl font-bold border transition-all flex items-center justify-between cursor-pointer ${
-                          isSelected
-                            ? `${scheme.bg} ${scheme.text} ${scheme.border} ring-2 ${scheme.ring}`
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <SliceIcon iconName={opt.icon} className="w-3.5 h-3.5" />
-                          <span>{opt.label}</span>
-                        </span>
-                        {isSelected && <Check className="w-3.5 h-3.5" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 2.5. Filtro Dinámico de Rango de Meses de Vencimiento */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Rango Dinámico de Meses de Vencimiento</span>
-                  </label>
-                  {filterConfig.dynamicMonthRange && (
-                    <button
-                      type="button"
-                      onClick={handleClearDynamicRange}
-                      className="text-[10px] text-red-500 hover:underline font-bold cursor-pointer"
-                    >
-                      Limpiar Rango
-                    </button>
-                  )}
-                </div>
-
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Define una ventana de tiempo móvil relativa al mes actual.
-                </p>
-
-                {/* Presets Rápidos */}
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                    Atajos de Ventanas Frecuentes:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DYNAMIC_RANGE_PRESETS.map((p) => {
-                      const isSelected =
-                        filterConfig.dynamicMonthRange?.startOffset === p.start &&
-                        filterConfig.dynamicMonthRange?.endOffset === p.end;
-                      return (
-                        <button
-                          key={p.label}
-                          type="button"
-                          onClick={() => handleSetDynamicRange(p.start, p.end)}
-                          title={p.desc}
-                          className={`text-[11px] px-2.5 py-1.5 rounded-xl font-bold border transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-1 ring-blue-500'
-                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                          }`}
-                        >
-                          {p.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Selectores de Inicio y Fin de Rango */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-200/80 dark:border-slate-700/60">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400">
-                      Desde (Mes de inicio):
-                    </label>
-                    <select
-                      value={filterConfig.dynamicMonthRange?.startOffset ?? ''}
-                      onChange={(e) => {
-                        if (e.target.value === '') {
-                          handleClearDynamicRange();
-                        } else {
-                          const start = parseInt(e.target.value, 10);
-                          const currentEnd = filterConfig.dynamicMonthRange?.endOffset ?? Math.max(1, start);
-                          handleSetDynamicRange(start, Math.max(start, currentEnd));
-                        }
-                      }}
-                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">-- Sin Rango Dinámico --</option>
-                      <option value="0">Mes actual (+0: {getOffsetMonthName(0)})</option>
-                      <option value="1">Próximo mes (+1: {getOffsetMonthName(1)})</option>
-                      <option value="2">En 2 meses (+2: {getOffsetMonthName(2)})</option>
-                      <option value="3">En 3 meses (+3: {getOffsetMonthName(3)})</option>
-                      <option value="4">En 4 meses (+4: {getOffsetMonthName(4)})</option>
-                      <option value="5">En 5 meses (+5: {getOffsetMonthName(5)})</option>
-                      <option value="6">En 6 meses (+6: {getOffsetMonthName(6)})</option>
-                      <option value="9">En 9 meses (+9: {getOffsetMonthName(9)})</option>
-                      <option value="12">En 1 año (+12: {getOffsetMonthName(12)})</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400">
-                      Hasta (Mes de fin):
-                    </label>
-                    <select
-                      disabled={filterConfig.dynamicMonthRange === undefined || filterConfig.dynamicMonthRange === null}
-                      value={filterConfig.dynamicMonthRange?.endOffset ?? ''}
-                      onChange={(e) => {
-                        const end = parseInt(e.target.value, 10);
-                        const currentStart = filterConfig.dynamicMonthRange?.startOffset ?? 0;
-                        handleSetDynamicRange(currentStart, end);
-                      }}
-                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {filterConfig.dynamicMonthRange ? (
-                        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24]
-                          .filter(val => val >= (filterConfig.dynamicMonthRange?.startOffset ?? 0))
-                          .map((val) => (
-                            <option key={val} value={val}>
-                              +{val} meses ({getOffsetMonthName(val)})
-                            </option>
-                          ))
-                      ) : (
-                        <option value="">Selecciona inicio primero</option>
-                      )}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Explicación en Tiempo Real */}
-                {filterConfig.dynamicMonthRange && (
-                  <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 flex items-start gap-2">
-                    <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                    <div className="text-[11px] text-blue-900 dark:text-blue-200">
-                      <span className="font-bold">Ventana activa: </span>
-                      Desde <span className="font-semibold">{getOffsetMonthName(filterConfig.dynamicMonthRange.startOffset)} (+{filterConfig.dynamicMonthRange.startOffset})</span> hasta <span className="font-semibold">{getOffsetMonthName(filterConfig.dynamicMonthRange.endOffset)} (+{filterConfig.dynamicMonthRange.endOffset})</span>.
-                      {filterConfig.dynamicMonthRange.startOffset > 0 && (
-                        <span className="block text-[10px] text-blue-700 dark:text-blue-300 mt-0.5">
-                          ✓ Excluye automáticamente el mes en curso ({getOffsetMonthName(0)}).
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 3. Filtros de Categoría de Incidencia (Para FRC / Events) */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <Truck className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Categorías de Incidencia (FRC)</span>
-                  </label>
-                  {filterConfig.eventFilter && filterConfig.eventFilter.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setFilterConfig(prev => ({ ...prev, eventFilter: undefined }))}
-                      className="text-[10px] text-red-500 hover:underline font-bold cursor-pointer"
-                    >
-                      Limpiar
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {EVENT_CATEGORY_OPTIONS.map((cat) => {
-                    const isSelected = (filterConfig.eventFilter || []).includes(cat.id);
-                    const scheme = SLICE_COLOR_CLASSES[cat.color] || SLICE_COLOR_CLASSES.blue;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => handleToggleEventCategory(cat.id)}
-                        className={`text-xs p-2 rounded-xl font-bold border transition-all flex items-center justify-between cursor-pointer ${
-                          isSelected
-                            ? `${scheme.bg} ${scheme.text} ${scheme.border} ring-1 ${scheme.ring}`
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5 truncate">
-                          <SliceIcon iconName={cat.icon} className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">{cat.label}</span>
-                        </span>
-                        {isSelected && <Check className="w-3.5 h-3.5 shrink-0 ml-1" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 4. Estado de Resolución / Traspaso */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Estado de Traspaso / Regularización</span>
-                  </label>
-                  {filterConfig.eventResolutionFilter && filterConfig.eventResolutionFilter.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setFilterConfig(prev => ({ ...prev, eventResolutionFilter: undefined }))}
-                      className="text-[10px] text-red-500 hover:underline font-bold cursor-pointer"
-                    >
-                      Limpiar
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleEventResolution('pending')}
-                    className={`text-xs p-2 rounded-xl font-bold border transition-all flex items-center justify-between cursor-pointer ${
-                      (filterConfig.eventResolutionFilter || []).includes('pending')
-                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 ring-1 ring-amber-500'
-                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Traspasos Pendientes (Sin Folio TR)</span>
-                    </span>
-                    {(filterConfig.eventResolutionFilter || []).includes('pending') && <Check className="w-3.5 h-3.5" />}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleToggleEventResolution('completed')}
-                    className={`text-xs p-2 rounded-xl font-bold border transition-all flex items-center justify-between cursor-pointer ${
-                      (filterConfig.eventResolutionFilter || []).includes('completed')
-                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 ring-1 ring-emerald-500'
-                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                      <span>Regularizados (Con Folio TR)</span>
-                    </span>
-                    {(filterConfig.eventResolutionFilter || []).includes('completed') && <Check className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* 5. Filtros de Columnas Específicos (si existieran) */}
-              {filterConfig.columnFilters && Object.keys(filterConfig.columnFilters).length > 0 && (
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      <Filter className="w-3.5 h-3.5 text-blue-500" />
-                      <span>Filtros Específicos por Columna</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setFilterConfig(prev => ({ ...prev, columnFilters: undefined }))}
-                      className="text-[10px] text-red-500 hover:underline font-bold cursor-pointer"
-                    >
-                      Limpiar Filtros de Columnas
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {Object.entries(filterConfig.columnFilters).map(([col, vals]) => (
-                      <span key={col} className="text-[11px] px-2 py-0.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
-                        <strong>{col}:</strong> {Array.isArray(vals) ? vals.join(', ') : String(vals)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <SliceFiltersTab
+              filterConfig={filterConfig}
+              setFilterConfig={setFilterConfig}
+              headers={headers}
+              tableKey={tableKey}
+              handleTogglePmStatus={handleTogglePmStatus}
+              handleSetDynamicRange={handleSetDynamicRange}
+              handleClearDynamicRange={handleClearDynamicRange}
+              handleToggleEventCategory={handleToggleEventCategory}
+              handleToggleEventResolution={handleToggleEventResolution}
+              dynamicRangePresets={DYNAMIC_RANGE_PRESETS}
+              pmStatusOptions={PM_STATUS_OPTIONS}
+              eventCategoryOptions={EVENT_CATEGORY_OPTIONS}
+            />
           )}
 
-          {/* TAB 3: COLUMNAS & ORDEN */}
           {activeTab === 'columns' && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              {/* Grouping & Default Sorting */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                    <Tag className="w-3.5 h-3.5 text-blue-500" /> Agrupación Predeterminada
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={groupByColumn}
-                      onChange={(e) => setGroupByColumn(e.target.value)}
-                      className="flex-1 text-xs font-medium px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="none">Sin agrupación</option>
-                      {headers.map(h => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                    {groupByColumn !== 'none' && (
-                      <button
-                        type="button"
-                        onClick={() => setGroupByDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
-                        className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer flex items-center gap-1.5 shrink-0 transition-colors"
-                        title="Cambiar orden de los grupos (Ascendente A-Z / Descendente Z-A)"
-                      >
-                        {groupByDirection === 'asc' ? (
-                          <ArrowUpAZ className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        ) : (
-                          <ArrowDownZA className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        )}
-                        <span>{groupByDirection === 'asc' ? 'A-Z' : 'Z-A'}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                    <ArrowUpDown className="w-3.5 h-3.5 text-blue-500" /> Orden Predeterminado
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={sortColumn}
-                      onChange={(e) => setSortColumn(e.target.value)}
-                      className="flex-1 text-xs font-medium px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Predeterminado</option>
-                      {headers.map(h => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                    {sortColumn && (
-                      <button
-                        type="button"
-                        onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
-                        className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 cursor-pointer"
-                      >
-                        {sortDirection === 'asc' ? 'ASC' : 'DESC'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Visible Columns in Slice (AppSheet Slice Feature) */}
-              <div className="border-t border-slate-200 dark:border-slate-800 pt-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                    <Columns className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                    Columnas Visibles de este Slice
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={useCustomColumns}
-                      onChange={(e) => setUseCustomColumns(e.target.checked)}
-                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      Personalizar columnas
-                    </span>
-                  </label>
-                </div>
-
-                {useCustomColumns && (
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 space-y-2.5 animate-in fade-in duration-150">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <div className="relative flex-1 mr-3">
-                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          value={columnSearch}
-                          onChange={(e) => setColumnSearch(e.target.value)}
-                          placeholder="Buscar columna..."
-                          className="w-full pl-8 pr-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 font-bold text-blue-600 dark:text-blue-400 shrink-0">
-                        <span>{selectedColumns.length} de {headers.length}</span>
-                        <span>•</span>
-                        <button type="button" onClick={handleSelectAllColumns} className="hover:underline cursor-pointer">
-                          Todas
-                        </button>
-                        <span>•</span>
-                        <button type="button" onClick={handleClearColumns} className="hover:underline cursor-pointer">
-                          Limpiar
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto p-1">
-                      {filteredHeaders.map(col => {
-                        const isChecked = selectedColumns.includes(col);
-                        return (
-                          <label
-                            key={col}
-                            className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-xs cursor-pointer select-none transition-colors ${
-                              isChecked
-                                ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 font-medium'
-                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => handleToggleColumn(col)}
-                              className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 shrink-0"
-                            />
-                            <span className="truncate" title={col}>{col}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <SliceColumnsTab
+              headers={headers}
+              useCustomColumns={useCustomColumns}
+              setUseCustomColumns={setUseCustomColumns}
+              selectedColumns={selectedColumns}
+              columnSearch={columnSearch}
+              setColumnSearch={setColumnSearch}
+              handleToggleColumn={handleToggleColumn}
+              handleSelectAllColumns={handleSelectAllColumns}
+              handleClearColumns={handleClearColumns}
+              groupByColumn={groupByColumn}
+              setGroupByColumn={setGroupByColumn}
+              sortColumn={sortColumn}
+              setSortColumn={setSortColumn}
+              sortDirection={sortDirection}
+              setSortDirection={setSortDirection}
+            />
           )}
         </div>
 
