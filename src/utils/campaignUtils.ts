@@ -267,7 +267,7 @@ export function computeCampaignConsolidationMatrix(
   
   // 1. Filter sessions associated with this campaign
   const campaignSessions = allSessions.filter(s => 
-    campaign.sessionIds.length === 0 || campaign.sessionIds.includes(s.id)
+    !s.deleted && (campaign.sessionIds.length === 0 || campaign.sessionIds.includes(s.id))
   );
 
   // 2. Acumulación física. Hay dos clases de sesión y se agregan distinto:

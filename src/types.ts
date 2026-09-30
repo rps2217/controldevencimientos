@@ -332,6 +332,7 @@ export interface StockCountSession {
   deviceId?: string;               // Identificador único del dispositivo / terminal auditor
   lastUpdated?: string;            // Timestamp de última mutación (ISO)
   sincronizadoNube?: boolean;      // Indicador si esta versión ya fue respaldada en la nube
+  deleted?: boolean;               // Indicador de borrado lógico (Tombstone para sincronización en la nube)
 }
 export interface StockCountReconciliationItem {
   itemKey: string;                 // CU_VC (si aplica vencimiento) o SKU

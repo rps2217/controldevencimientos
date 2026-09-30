@@ -238,7 +238,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     const sku = scannedSku.trim();
     const itemInErp = activeCampaign?.snapshotTeoricoActual?.[sku];
     let totalFisicoCampana = 0;
-    sessions.forEach(sess => {
+    sessions.filter(s => !s.deleted).forEach(sess => {
       sess.conteos.forEach(c => {
         if (c.sku.trim() === sku) {
           totalFisicoCampana += c.cantidad;
@@ -372,7 +372,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
 
   // Current active session
   const currentSession = useMemo(() => {
-    return sessions.find(s => s.id === activeSessionId) || null;
+    return sessions.find(s => s.id === activeSessionId && !s.deleted) || null;
   }, [sessions, activeSessionId]);
 
   // En modalidad BLIND el operario no debe ver ningún dato teórico (AGENTS.md §M: auditoría limpia).
@@ -498,7 +498,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       return s;
     }));
 
-    const nextNumber = sessions.length + 1;
+    const nextNumber = sessions.filter(s => !s.deleted).length + 1;
     const nextName = `Mueble ${nextNumber}`;
     
     // Auto-create next session
@@ -522,10 +522,11 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
       setScannedSku(targetSku);
       handleSkuChange(targetSku);
     }
+    const activeSessions = sessions.filter(s => !s.deleted);
     if (currentSession && currentSession.estado !== 'COMPLETED') {
       setViewState('COUNTING');
-    } else if (sessions.length > 0) {
-      const inProgress = sessions.find(s => s.estado !== 'COMPLETED') || sessions[0];
+    } else if (activeSessions.length > 0) {
+      const inProgress = activeSessions.find(s => s.estado !== 'COMPLETED') || activeSessions[0];
       setActiveSessionId(inProgress.id);
       setViewState('COUNTING');
     } else {
@@ -533,16 +534,39 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     }
   };
 
-  // Delete session
+  // Delete session with logical deletion and real-time cloud propagation
   const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (await confirm({ title: 'Eliminar sesión', message: '¿Estás seguro de eliminar esta sesión de conteo?', confirmLabel: 'Eliminar' })) {
-      setSessions(prev => prev.filter(s => s.id !== sessionId));
+    if (await confirm({ title: 'Eliminar sesión', message: '¿Estás seguro de eliminar esta sesión de conteo? Se borrará también de la nube en tiempo real.', confirmLabel: 'Eliminar' })) {
+      const updatedSessions = sessions.map(s => {
+        if (s.id === sessionId) {
+          return {
+            ...s,
+            deleted: true,
+            conteos: [], // Limpiar conteos para no ocupar espacio en celdas de Sheets
+            lastUpdated: new Date().toISOString()
+          };
+        }
+        return s;
+      });
+      setSessions(updatedSessions);
+
+      // Sincronizar inmediatamente para propagar el borrado a Google Sheets
+      try {
+        await syncCampaignsWithCloud({
+          campaigns,
+          activeCampaignId: activeCampaignIdState,
+          sessions: updatedSessions
+        });
+      } catch (err) {
+        console.warn('[Sheets] No se pudo propagar el borrado de inmediato:', err);
+      }
+
       if (activeSessionId === sessionId) {
         setActiveSessionId(null);
         setViewState('LIST');
       }
-      showToast('Sesión de conteo eliminada', 'info');
+      showToast('Sesión de conteo eliminada y sincronizada', 'info');
     }
   };
 
@@ -1207,7 +1231,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
           viewState={viewState}
           setViewState={setViewState}
           currentSession={currentSession}
-          sessions={sessions}
+          sessions={sessions.filter(s => !s.deleted)}
           setActiveSessionId={setActiveSessionId}
           isSyncingCloud={isSyncingCloud}
           lastCloudSyncDate={lastCloudSyncDate}
@@ -1232,7 +1256,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
               <MobileErpSnapshotView
                 campaigns={campaigns}
                 activeCampaignId={activeCampaignIdState}
-                sessions={sessions}
+                sessions={sessions.filter(s => !s.deleted)}
                 onUpdateCampaigns={handleUpdateCampaigns}
                 onSelectCampaign={handleSelectCampaign}
                 onSwitchToTerminal={handleSwitchToTerminal}
@@ -1247,7 +1271,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
                 <CampaignConsolidationDashboard
                   campaigns={campaigns}
                   activeCampaignId={activeCampaignIdState}
-                  sessions={sessions}
+                  sessions={sessions.filter(s => !s.deleted)}
                   onUpdateCampaigns={handleUpdateCampaigns}
                   onSelectCampaign={handleSelectCampaign}
                   onStartTargetedRecount={handleStartTargetedRecount}
@@ -1268,7 +1292,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
         {viewState === 'LIST' && (
           <ScopedErrorBoundary moduleName="Lista de Sesiones">
             <StockCountSessionsListView
-              sessions={sessions}
+              sessions={sessions.filter(s => !s.deleted)}
               isSyncingCloud={isSyncingCloud}
               realProviders={availableRealProviders}
               erpSnapshotCount={erpSnapshotCount}
@@ -1443,7 +1467,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
               }`}
             >
               <Layers className="w-4 h-4" />
-              <span className="text-[10px]">Muebles ({sessions.length})</span>
+              <span className="text-[10px]">Muebles ({sessions.filter(s => !s.deleted).length})</span>
             </button>
 
             {/* Pistola Conteo */}

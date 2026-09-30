@@ -662,7 +662,7 @@ export function mergeCampaignsAndSessions(
   let newRemoteSessionsCount = 0;
   const localSessionIds = new Set(localSessions.map(s => s.id));
   for (const rSess of remoteSessions) {
-    if (rSess && rSess.id && !localSessionIds.has(rSess.id)) {
+    if (rSess && rSess.id && !localSessionIds.has(rSess.id) && !rSess.deleted) {
       newRemoteSessionsCount++;
     }
   }
@@ -675,32 +675,77 @@ export function mergeCampaignsAndSessions(
       // Sesión creada localmente que aún no existe en la nube
       sessionMap.set(lSess.id, lSess);
     } else {
-      // Existe en ambos: fusionar conteos de forma idempotente
-      const entryIdSet = new Set<string>();
-      const combinedConteos: StockCountEntry[] = [];
-      
-      const addEntry = (entry: StockCountEntry) => {
-        const uniqueKey = entry.id || `${entry.sku}_${entry.timestamp}_${entry.cantidad}_${entry.cu_vc || ''}`;
-        if (!entryIdSet.has(uniqueKey)) {
-          entryIdSet.add(uniqueKey);
-          combinedConteos.push(entry);
+      // Existe en ambos: resolver conflicto según timestamps (lastUpdated)
+      const localTime = new Date(lSess.lastUpdated || lSess.fechaInicio || 0).getTime();
+      const remoteTime = new Date(remote.lastUpdated || remote.fechaInicio || 0).getTime();
+
+      if (lSess.deleted || remote.deleted) {
+        // Al menos una de las dos está borrada.
+        if (localTime >= remoteTime) {
+          if (lSess.deleted) {
+            sessionMap.set(lSess.id, {
+              ...remote,
+              ...lSess,
+              deleted: true,
+              conteos: [], // Limpiar conteos para ahorrar ancho de banda
+              sincronizadoNube: true
+            });
+          } else {
+            // Revivir si la versión local es más nueva y está activa
+            sessionMap.set(lSess.id, {
+              ...remote,
+              ...sinIndefinidos(lSess),
+              deleted: false,
+              sincronizadoNube: true
+            });
+          }
+        } else {
+          if (remote.deleted) {
+            sessionMap.set(lSess.id, {
+              ...lSess,
+              ...remote,
+              deleted: true,
+              conteos: [],
+              sincronizadoNube: true
+            });
+          } else {
+            // Revivir si la versión remota es más nueva y está activa
+            sessionMap.set(lSess.id, {
+              ...lSess,
+              ...remote,
+              deleted: false,
+              sincronizadoNube: true
+            });
+          }
         }
-      };
+      } else {
+        // Ambas están activas: fusionar conteos normalmente
+        const entryIdSet = new Set<string>();
+        const combinedConteos: StockCountEntry[] = [];
+        
+        const addEntry = (entry: StockCountEntry) => {
+          const uniqueKey = entry.id || `${entry.sku}_${entry.timestamp}_${entry.cantidad}_${entry.cu_vc || ''}`;
+          if (!entryIdSet.has(uniqueKey)) {
+            entryIdSet.add(uniqueKey);
+            combinedConteos.push(entry);
+          }
+        };
 
-      (remote.conteos || []).forEach(addEntry);
-      (lSess.conteos || []).forEach(addEntry);
+        (remote.conteos || []).forEach(addEntry);
+        (lSess.conteos || []).forEach(addEntry);
 
-      const estado = (lSess.estado === 'COMPLETED' || remote.estado === 'COMPLETED') ? 'COMPLETED' : 'IN_PROGRESS';
-      
-      sessionMap.set(lSess.id, {
-        ...remote,
-        ...sinIndefinidos(lSess),
-        estado,
-        conteos: combinedConteos,
-        lastUpdated: new Date().toISOString(),
-        deviceId: lSess.deviceId || remote.deviceId || getOrCreateDeviceId(),
-        sincronizadoNube: true
-      });
+        const estado = (lSess.estado === 'COMPLETED' || remote.estado === 'COMPLETED') ? 'COMPLETED' : 'IN_PROGRESS';
+        
+        sessionMap.set(lSess.id, {
+          ...remote,
+          ...sinIndefinidos(lSess),
+          estado,
+          conteos: combinedConteos,
+          lastUpdated: new Date().toISOString(),
+          deviceId: lSess.deviceId || remote.deviceId || getOrCreateDeviceId(),
+          sincronizadoNube: true
+        });
+      }
     }
   }
 
