@@ -13,6 +13,7 @@ import { StockCountReconciliationView } from './StockCountReconciliationView';
 import { StockCountSessionsListView, NewSessionConfig } from './StockCountSessionsListView';
 import { CountNumpad } from './CountNumpad';
 import { CampaignSkuErpBadge } from '../campaign/CampaignSkuBadges';
+import { BentoCountTerminal } from './BentoCountTerminal';
 import { MobileReadingsList } from './MobileReadingsList';
 import { LastScannedHeroCard } from './LastScannedHeroCard';
 import { OpticonTerminalView } from './OpticonTerminalView';
@@ -178,10 +179,13 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     handleCloudSync(true);
   }, [handleCloudSync]);
 
-  // Navigation view inside modal: 'CAMPAIGN' | 'LIST' | 'COUNTING' | 'RECONCILIATION'
+  // Navigation view inside modal: 'COUNTING' | 'LIST' | 'RECONCILIATION' | 'CAMPAIGN'
   const [viewState, setViewState] = useState<'CAMPAIGN' | 'LIST' | 'COUNTING' | 'RECONCILIATION'>(() => {
-    const savedCampaigns = loadCampaignsFromStorage();
-    return savedCampaigns.length > 0 ? 'CAMPAIGN' : 'LIST';
+    const savedSessions = loadStockCountSessionsFromStorage();
+    if (savedSessions.length > 0) {
+      return 'COUNTING';
+    }
+    return 'LIST';
   });
 
   // Mobile layout detection & optional full desktop toggle
@@ -623,11 +627,11 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   };
 
   // Record a physical count entry with full business logic and validation
-  const commitCountEntry = (sku: string, mmVal?: string, yyyyVal?: string, isOmitted: boolean = false) => {
+  const commitCountEntry = (sku: string, mmVal?: string, yyyyVal?: string, isOmitted: boolean = false, overrideQty?: number) => {
     if (!currentSession) return;
 
     const cleanSku = sku.trim();
-    const qty = countQuantity;
+    const qty = overrideQty !== undefined ? overrideQty : countQuantity;
 
     // Lookup master info in O(1) to enrich entry
     const summary = masterCatalogIndex.getBySku(cleanSku);
@@ -860,6 +864,18 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   // Group count entries by SKU for consolidated view on mobile/desktop
   const groupedSkuEntries = useMemo(() => groupSkuEntries(currentSession), [currentSession]);
 
+  // Real providers extracted from the active sheet items
+  const availableRealProviders = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of sheetItems) {
+      const p = item.RUT_PROVEEDOR_VC || item.PROVEEDOR || item.proveedor || item.RUT_PROVEEDOR;
+      if (p && String(p).trim()) {
+        set.add(String(p).trim());
+      }
+    }
+    return Array.from(set).sort();
+  }, [sheetItems]);
+
   // Last scanned item with cumulative quantity for instant visual feedback on mobile
   const lastScannedItem = useMemo(() => getLastScannedItem(currentSession), [currentSession]);
 
@@ -929,9 +945,10 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   };
 
   // Remove all count entries for a specific SKU
-  const handleRemoveSkuAllEntries = async (sku: string, desc: string) => {
+  const handleRemoveSkuAllEntries = async (sku: string, desc?: string) => {
     if (!currentSession) return;
-    if (await confirm({ title: 'Eliminar lecturas', message: `¿Eliminar todas las lecturas registradas para el SKU ${sku} (${desc})?`, confirmLabel: 'Eliminar' })) {
+    const label = desc ? `${sku} (${desc})` : sku;
+    if (await confirm({ title: 'Eliminar lecturas', message: `¿Eliminar todas las lecturas registradas para el SKU ${label}?`, confirmLabel: 'Eliminar' })) {
       setSessions(prev => prev.map(s => {
         if (s.id === currentSession.id) {
           return {
@@ -976,23 +993,21 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     return map;
   }, [sheetItems, currentSession?.modo]);
 
-  // Opticon Industrial Data Collector Fast Commit
-  const handleOpticonScan = (sku: string, qty: number = 1) => {
+  // Bento & Opticon Fast Scan Commit Handler
+  const handleCommitBentoScan = (sku: string, qty: number, mm?: string, yyyy?: string) => {
     if (!currentSession) return;
     const cleanSku = sku.trim();
     if (!cleanSku) return;
 
-    if (currentSession.requiereVencimiento) {
-      const existing = currentSession.conteos.find(c => c.sku === cleanSku && c.mm && c.yyyy);
-      if (!existing) {
-        setExpiryPromptSku(cleanSku);
-        setCountQuantity(qty);
-        return;
-      }
+    if (mm && yyyy) {
+      commitCountEntry(cleanSku, mm, yyyy, false, qty);
+    } else {
+      commitCountEntry(cleanSku, undefined, undefined, false, qty);
     }
+  };
 
-    setCountQuantity(qty);
-    commitCountEntry(cleanSku);
+  const handleOpticonScan = (sku: string, qty: number = 1) => {
+    handleCommitBentoScan(sku, qty);
   };
 
   // Reconciled items for the active session (computed lazily only in RECONCILIATION view to optimize scan performance)
@@ -1321,66 +1336,90 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
           </div>
 
           {/* Sub-bar Navigation Pills (Horizontally Scrollable on Mobile) */}
-          <div className="px-3 sm:px-6 py-1.5 bg-slate-100/70 dark:bg-slate-900/60 border-t border-slate-200/70 dark:border-slate-800/70 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            {/* Tab: Campaña Farmacia / Foto ERP (oculto durante pistoleo a ciegas) */}
-            {!(isBlind && viewState === 'COUNTING') && (
-            <button
-              onClick={() => {
-                setForceDesktopCampaignView(false);
-                setViewState('CAMPAIGN');
-              }}
-              className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
-                viewState === 'CAMPAIGN'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              <Store className="w-3.5 h-3.5" />
-              <span>{isMobile ? 'Foto ERP' : 'Matriz Campaña'}</span>
-            </button>
-            )}
-
-            {/* Tab: Sesiones por Mueble */}
-            <button
-              onClick={() => setViewState('LIST')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
-                viewState === 'LIST'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Muebles & Pasillos ({sessions.length})</span>
-            </button>
-
-            {/* Tab: Active Pistoleo */}
-            <button
-              onClick={() => handleSwitchToTerminal()}
-              className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
-                viewState === 'COUNTING'
-                  ? 'bg-amber-500 text-white shadow-xs font-black'
-                  : currentSession
-                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 font-bold'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              <Zap className={`w-3.5 h-3.5 ${currentSession ? 'text-amber-500 fill-amber-500' : ''}`} />
-              <span>Pistola Conteo {currentSession ? `(${currentSession.conteos.length})` : ''}</span>
-            </button>
-
-            {/* Tab: Cuadratura (if session exists) */}
-            {currentSession && (
+          <div className="px-3 sm:px-6 py-2 bg-slate-100/90 dark:bg-slate-900/80 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Tab 1: Active Pistoleo */}
               <button
-                onClick={() => setViewState('RECONCILIATION')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                onClick={() => handleSwitchToTerminal()}
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                  viewState === 'COUNTING'
+                    ? 'bg-amber-500 text-white shadow-sm font-black'
+                    : currentSession
+                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 font-bold border border-amber-200 dark:border-amber-800/50'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Zap className={`w-3.5 h-3.5 ${currentSession ? 'text-amber-500 fill-amber-500' : ''}`} />
+                <span>1. Pistolear {currentSession ? `(${currentSession.conteos.length})` : ''}</span>
+              </button>
+
+              {/* Tab 2: Sesiones por Mueble */}
+              <button
+                onClick={() => setViewState('LIST')}
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                  viewState === 'LIST'
+                    ? 'bg-blue-600 text-white shadow-sm font-black'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>2. Muebles ({sessions.length})</span>
+              </button>
+
+              {/* Tab 3: Cuadratura */}
+              <button
+                onClick={() => {
+                  if (currentSession) {
+                    setViewState('RECONCILIATION');
+                  } else if (sessions.length > 0) {
+                    setActiveSessionId(sessions[0].id);
+                    setViewState('RECONCILIATION');
+                  } else {
+                    setViewState('LIST');
+                    showToast('Crea o selecciona un mueble primero para ver su cuadratura.', 'info');
+                  }
+                }}
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
                   viewState === 'RECONCILIATION'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                    ? 'bg-emerald-600 text-white shadow-sm font-black'
+                    : currentSession
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800/50'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
                 }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Cuadratura</span>
+                <span>3. Cuadratura</span>
               </button>
+
+              {/* Tab 4: Campaña Farmacia / Tienda Completa */}
+              {!(isBlind && viewState === 'COUNTING') && (
+                <button
+                  onClick={() => {
+                    setForceDesktopCampaignView(false);
+                    setViewState('CAMPAIGN');
+                  }}
+                  className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                    viewState === 'CAMPAIGN'
+                      ? 'bg-indigo-600 text-white shadow-sm font-black'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <Store className="w-3.5 h-3.5" />
+                  <span>4. Tienda Completa</span>
+                </button>
+              )}
+            </div>
+
+            {/* Context furniture pill in sub-bar */}
+            {currentSession && viewState !== 'COUNTING' && (
+              <div 
+                onClick={() => setViewState('COUNTING')}
+                className="hidden md:flex items-center gap-2 px-3 py-1 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 rounded-xl text-xs font-bold text-amber-800 dark:text-amber-200 cursor-pointer hover:bg-amber-100 transition-colors"
+                title="Hacer clic para volver al terminal de este mueble"
+              >
+                <MapPin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span className="truncate max-w-[180px]">Mueble activo: {currentSession.nombre}</span>
+              </div>
             )}
           </div>
         </div>
@@ -1432,6 +1471,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
             <StockCountSessionsListView
               sessions={sessions}
               isSyncingCloud={isSyncingCloud}
+              realProviders={availableRealProviders}
               onCreateSession={handleCreateSession}
               onOpenSession={handleOpenSession}
               onDeleteSession={handleDeleteSession}
@@ -1442,1228 +1482,91 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
         )}
 
         {/* ======================================================== */}
-        {/* BODY - VIEW 2: ACTIVE COUNTING TERMINAL                  */}
+        {/* BODY - VIEW 2: ACTIVE BENTO COUNTING TERMINAL            */}
         {/* ======================================================== */}
-        {viewState === 'COUNTING' && currentSession && (
-          <div className="flex-1 overflow-hidden flex flex-col md:flex-row relative">
-            
-            {/* ======================================================== */}
-            {/* MOBILE VIEW (< md): DEDICATED HIGH-PERFORMANCE SCREEN    */}
-            {/* ======================================================== */}
-            <div className="flex-1 flex flex-col overflow-hidden md:hidden pb-20">
-              
-              {/* Context Header Bar for Mobile PDA */}
-              <div className="px-3.5 py-2.5 bg-slate-100/90 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700/80 flex items-center justify-between gap-2 shrink-0">
-                <div className="flex items-center gap-1.5 truncate flex-1 min-w-0">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                  <span className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">
-                    {currentSession.nombre}
-                  </span>
+        {viewState === 'COUNTING' && (
+          currentSession ? (
+            <ScopedErrorBoundary moduleName="Terminal Bento de Conteo">
+              <BentoCountTerminal
+                currentSession={currentSession}
+                activeLocation={countLocation || currentSession.ubicacion || 'Mueble 1'}
+                onChangeLocation={(newLoc) => setCountLocation(newLoc)}
+                isLocationLocked={isLocationLocked}
+                onToggleLocationLock={() => {
+                  const nextLock = !isLocationLocked;
+                  setIsLocationLocked(nextLock);
+                  playBeep('skip');
+                  showToast(nextLock ? 'Ubicación fijada' : 'Ubicación libre', 'info');
+                }}
+                lastScannedItem={lastScannedItem}
+                onCommitScan={handleCommitBentoScan}
+                onIncrementSku={handleIncrementSkuQuantity}
+                onDecrementSku={handleDecrementSkuQuantity}
+                onRemoveSkuAllEntries={handleRemoveSkuAllEntries}
+                onRemoveEntry={handleRemoveEntry}
+                onUndoLastEntry={handleUndoLastEntry}
+                groupedSkuEntries={groupedSkuEntries}
+                pendingItems={pendingItems}
+                theoreticalItemsMap={theoreticalItemsMap}
+                masterCatalogIndex={masterCatalogIndex}
+                onOpenLiveCamera={() => setIsCameraScannerOpen(true)}
+                onGoToReconciliation={() => setViewState('RECONCILIATION')}
+                showToast={showToast}
+                campaignSkuStats={campaignSkuStats}
+                yearsList={yearsList}
+                expiryPromptSku={expiryPromptSku}
+                setExpiryPromptSku={setExpiryPromptSku}
+                tempMm={tempMm}
+                setTempMm={setTempMm}
+                tempYyyy={tempYyyy}
+                setTempYyyy={setTempYyyy}
+                onBackToSessions={() => setViewState('LIST')}
+                onBackToCampaign={activeCampaign ? () => setViewState('CAMPAIGN') : undefined}
+              />
+            </ScopedErrorBoundary>
+          ) : (
+            /* Friendly Empty State / Quick Starter if no session is active */
+            <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-900 text-slate-100 overflow-y-auto">
+              <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 rounded-3xl p-6 sm:p-8 text-center shadow-xl">
+                <div className="w-16 h-16 rounded-3xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto mb-4">
+                  <Zap className="w-8 h-8" />
                 </div>
+                <h3 className="text-xl font-bold text-white mb-2">
+                  ¿Listo para comenzar a contar?
+                </h3>
+                <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+                  Para pistolear productos, primero elige qué mueble o pasillo vas a auditar.
+                </p>
 
-                {/* Real-time Session Counter Pills */}
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex flex-col gap-3">
                   <button
                     type="button"
-                    onClick={handleUndoLastEntry}
-                    disabled={currentSession.conteos.length === 0}
-                    className="p-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-all cursor-pointer"
-                    title="Deshacer la última lectura"
+                    onClick={() => handleCreateSession({
+                      nombre: `Mueble ${sessions.length + 1}`,
+                      modo: 'DOCUMENT',
+                      requiereVencimiento: false,
+                      ubicacion: `Mueble ${sessions.length + 1}`
+                    })}
+                    className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-2xl shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 text-sm"
                   >
-                    <Undo2 className="w-4 h-4" />
-                  </button>
-                  <span className="px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 text-[11px] font-black">
-                    {groupedSkuEntries.length} SKUs
-                  </span>
-                  <span className="px-2 py-0.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 text-[11px] font-black font-mono">
-                    {currentSession.conteos.reduce((a, b) => a + b.cantidad, 0)} unids
-                  </span>
-                </div>
-              </div>
-
-              {/* Mobile Mode Switcher Bar */}
-              <div className="px-3 py-1.5 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/80 flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setMobileCountingTab('SCAN')}
-                  className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    mobileCountingTab === 'SCAN'
-                      ? 'bg-amber-500 text-white shadow-xs font-black'
-                      : 'bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                  }`}
-                >
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>Pistolear</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMobileCountingTab('READINGS')}
-                  className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    mobileCountingTab === 'READINGS'
-                      ? 'bg-blue-600 text-white shadow-xs font-black'
-                      : 'bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                  }`}
-                >
-                  <ListTodo className="w-3.5 h-3.5" />
-                  <span>Lecturas ({currentSession.conteos.length})</span>
-                </button>
-                {!isBlind && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForceDesktopCampaignView(false);
-                      setViewState('CAMPAIGN');
-                    }}
-                    className="py-1.5 px-2.5 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900 flex items-center gap-1 shrink-0 cursor-pointer"
-                    title="Consultar Foto ERP"
-                  >
-                    <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                    <span className="text-[11px] font-extrabold">Foto ERP</span>
-                  </button>
-                )}
-              </div>
-
-              {/* MOBILE TAB 0: OPTICON INDUSTRIAL DATA COLLECTOR */}
-              {mobileCountingTab === 'OPTICON' && (
-                <OpticonTerminalView
-                  currentSession={currentSession}
-                  activeLocation={countLocation || currentSession.ubicacion || 'Mueble 1'}
-                  onChangeLocation={(newLoc) => setCountLocation(newLoc)}
-                  lastScanned={lastScannedItem}
-                  onCommitScan={(sku, qty) => handleOpticonScan(sku, qty)}
-                  onIncrementSku={handleIncrementSkuQuantity}
-                  onDecrementSku={handleDecrementSkuQuantity}
-                  onUndoLastReading={handleUndoLastEntry}
-                  onOpenLiveCamera={() => setIsCameraScannerOpen(true)}
-                  theoreticalItemsMap={theoreticalItemsMap}
-                  masterCatalogIndex={masterCatalogIndex}
-                  showToast={showToast}
-                />
-              )}
-
-              {/* MOBILE TAB 1: SCANNER & KEYPAD PAD */}
-              {mobileCountingTab === 'SCAN' && (
-                <div className="flex-1 p-3.5 overflow-y-auto flex flex-col gap-3.5">
-                  
-                  {/* Location & Burst Mode Quick Bar */}
-                  <div className="flex items-center gap-2">
-                    {/* Location Input with Lock */}
-                    <div className="flex-1 p-2 bg-slate-50 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shadow-xs">
-                      <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                      <input
-                        type="text"
-                        value={countLocation}
-                        onChange={(e) => setCountLocation(e.target.value)}
-                        placeholder="Pasillo / Ubicación..."
-                        className="w-full bg-transparent text-xs font-bold text-slate-800 dark:text-slate-100 outline-none placeholder:text-slate-400"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextLock = !isLocationLocked;
-                          setIsLocationLocked(nextLock);
-                          playBeep('skip');
-                          showToast(nextLock ? 'Ubicación fijada' : 'Ubicación libre', 'info');
-                        }}
-                        className={`p-1 rounded-lg text-xs font-bold transition-all shrink-0 ${
-                          isLocationLocked
-                            ? 'bg-amber-500 text-white shadow-xs'
-                            : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                        }`}
-                        title={isLocationLocked ? 'Ubicación FIJA' : 'Ubicación LIBRE'}
-                      >
-                        {isLocationLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-
-                    {/* Mode Toggle: Ráfaga +1 vs Manual */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextBurst = !isBurstScanMode;
-                        setIsBurstScanMode(nextBurst);
-                        playBeep('success');
-                        showToast(nextBurst ? 'Modo Ráfaga (+1 directo)' : 'Modo Manual', 'info');
-                      }}
-                      className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shrink-0 min-h-[42px] border ${
-                        isBurstScanMode
-                          ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20'
-                          : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                      }`}
-                    >
-                      <Zap className={`w-3.5 h-3.5 ${isBurstScanMode ? 'fill-current animate-pulse' : ''}`} />
-                      <span>{isBurstScanMode ? 'Ráfaga +1' : 'Manual'}</span>
-                    </button>
-                  </div>
-
-                  {/* Expiry Prompt Modal / Step inside Mobile */}
-                  {expiryPromptSku ? (
-                    <MobileExpiryPrompt
-                      sku={expiryPromptSku}
-                      quantity={countQuantity}
-                      yearsList={yearsList}
-                      tempYyyy={tempYyyy}
-                      tempMm={tempMm}
-                      onSelectYear={(y) => {
-                        setTempYyyy(y);
-                        if (tempMm) commitCountEntry(expiryPromptSku, tempMm, y, false);
-                      }}
-                      onSelectMonth={(m) => {
-                        setTempMm(m);
-                        if (tempYyyy) commitCountEntry(expiryPromptSku, m, tempYyyy, false);
-                      }}
-                      onSkip={() => commitCountEntry(expiryPromptSku, undefined, undefined, true)}
-                      onClose={() => {
-                        setExpiryPromptSku(null);
-                        playBeep('skip');
-                      }}
-                    />
-                  ) : (
-                    /* Mobile Scanner & Entry Form */
-                    <form onSubmit={handleSkuScannedOrEntered} className="flex flex-col gap-3">
-                      
-                      {/* SKU / Barcode input & Camera Trigger */}
-                      <div className="relative">
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                            <Barcode className="w-4 h-4 text-blue-600" />
-                            <span>Código SKU o Barra (Láser / Teclado)</span>
-                          </label>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <div className="relative flex-1">
-                            <input
-                              ref={skuInputRef}
-                              type="text"
-                              value={scannedSku}
-                              onChange={(e) => handleSkuChange(e.target.value)}
-                              placeholder="Pistolea o escribe código..."
-                              className="w-full pl-3.5 pr-9 py-3 rounded-xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-lg font-mono font-black text-slate-800 dark:text-slate-100 focus:border-blue-600 outline-none shadow-sm min-h-[50px]"
-                              autoComplete="off"
-                            />
-                            {scannedSku && (
-                              <button
-                                type="button"
-                                onClick={() => handleSkuChange('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
-                                aria-label="Limpiar SKU"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Camera Scanner Trigger Button */}
-                          <button
-                            type="button"
-                            onClick={() => setIsCameraScannerOpen(true)}
-                            className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-md shadow-blue-500/25 active:scale-95 transition-all flex items-center gap-1.5 font-black text-xs shrink-0 cursor-pointer min-h-[50px]"
-                            title="Abrir cámara móvil"
-                          >
-                            <Camera className="w-5 h-5" />
-                            <span>Cámara</span>
-                          </button>
-                        </div>
-
-                        {/* Matched product title if found in catalog */}
-                        {selectedProductDesc && (
-                          <div className="mt-1.5 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 flex flex-col gap-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-bold shadow-xs">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 truncate flex-1">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                                <span className="truncate">{selectedProductDesc}</span>
-                              </div>
-                              {!isBlind && <CampaignSkuErpBadge stats={campaignSkuStats} />}
-                            </div>
-
-                            {/* Campaign Status Pill Bar */}
-                            {!isBlind && campaignSkuStats && (
-                              <div className="pt-1 border-t border-emerald-200/60 dark:border-emerald-800/60 flex items-center justify-between text-[11px]">
-                                <span className="text-slate-600 dark:text-slate-300 font-medium">
-                                  Total Farmacia: <strong className="font-mono text-slate-800 dark:text-slate-100">{campaignSkuStats.totalFisicoCampana}</strong> un
-                                </span>
-                                {campaignSkuStats.isValidatedInCampaign ? (
-                                  <span className="px-2 py-0.5 rounded-lg bg-emerald-600 text-white text-[10px] font-black">
-                                    ✓ Validado en Campaña
-                                  </span>
-                                ) : campaignSkuStats.diferencia !== null ? (
-                                  <span className={`px-2 py-0.5 rounded-lg font-black text-[10px] ${
-                                    campaignSkuStats.diferencia === 0
-                                      ? 'bg-emerald-200 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200'
-                                      : campaignSkuStats.diferencia > 0
-                                      ? 'bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200'
-                                      : 'bg-rose-200 dark:bg-rose-900 text-rose-900 dark:text-rose-200'
-                                  }`}>
-                                    {campaignSkuStats.diferencia === 0 ? '🟢 Cuadrado' : `${campaignSkuStats.diferencia > 0 ? '🟡 Sobran +' : '🔴 Faltan '}${campaignSkuStats.diferencia}`}
-                                  </span>
-                                ) : null}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Autocomplete dropdown from master catalog */}
-                        {isSearchDropdownOpen && catalogSearchResults.length > 0 && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-30 max-h-52 overflow-y-auto p-1.5">
-                            {catalogSearchResults.map(prod => (
-                              <button
-                                key={prod.sku}
-                                type="button"
-                                onClick={() => handleSelectProductFromCatalog(prod)}
-                                className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-blue-50 dark:hover:bg-slate-700 flex items-center justify-between text-xs transition-colors"
-                              >
-                                <div className="truncate pr-2">
-                                  <span className="font-bold text-blue-600 dark:text-blue-400 font-mono mr-2">{prod.sku}</span>
-                                  <span className="text-slate-700 dark:text-slate-200 font-medium">{prod.name}</span>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Industrial Quantity Control & Multipliers */}
-                      <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                        {/* Header: Mode selector & Current Qty */}
-                        <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-200 dark:border-slate-700">
-                          <div className="flex items-center gap-1 bg-slate-200/80 dark:bg-slate-900/80 p-0.5 rounded-xl">
-                            <button
-                              type="button"
-                              onClick={() => setMobileEntryMode('NUMPAD')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
-                                mobileEntryMode === 'NUMPAD'
-                                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                              }`}
-                            >
-                              ⌨️ Teclado PDA
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setMobileEntryMode('CHIPS')}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
-                                mobileEntryMode === 'CHIPS'
-                                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                              }`}
-                            >
-                              ⚡ Rápido
-                            </button>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] uppercase font-bold text-slate-400">Total:</span>
-                            <span className="text-sm font-mono font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
-                              {countQuantity} un
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Large Touch Stepper & Value Display */}
-                        <div className="flex items-center gap-2 mb-2.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCountQuantity(Math.max(1, countQuantity - 1));
-                              playBeep('skip');
-                            }}
-                            className="w-13 h-12 bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl font-black text-xl text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 shadow-xs flex items-center justify-center cursor-pointer active:scale-90 transition-all shrink-0"
-                            title="Descontar 1 unidad"
-                          >
-                            <Minus className="w-5 h-5" />
-                          </button>
-
-                          <div className="flex-1 py-1 px-3 text-center rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-inner flex items-center justify-center min-h-[48px]">
-                            <span className="text-2xl font-black font-mono text-blue-600 dark:text-blue-400 tracking-tight">
-                              {countQuantity}
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCountQuantity(countQuantity + 1);
-                              playBeep('skip');
-                            }}
-                            className="w-13 h-12 bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl font-black text-xl text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 shadow-xs flex items-center justify-center cursor-pointer active:scale-90 transition-all shrink-0"
-                            title="Sumar 1 unidad"
-                          >
-                            <Plus className="w-5 h-5" />
-                          </button>
-                        </div>
-
-                        {/* Packaging Multipliers / Presets Selector */}
-                        <div className="mb-2.5">
-                          <div className="flex items-center justify-between mb-1.5 px-0.5">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                              {packMultiplierCategory === 'UNITS' ? 'Incremento por Unidades (+)' : 'Multiplicador por Empaque (×)'}
-                            </span>
-                            <div className="flex items-center gap-1 text-[10px] font-extrabold">
-                              <button
-                                type="button"
-                                onClick={() => setPackMultiplierCategory('UNITS')}
-                                className={`px-1.5 py-0.5 rounded ${packMultiplierCategory === 'UNITS' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-400 hover:text-slate-600'}`}
-                              >
-                                + Unids
-                              </button>
-                              <span className="text-slate-300">|</span>
-                              <button
-                                type="button"
-                                onClick={() => setPackMultiplierCategory('PACKS')}
-                                className={`px-1.5 py-0.5 rounded ${packMultiplierCategory === 'PACKS' ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600'}`}
-                              >
-                                × Cajas
-                              </button>
-                            </div>
-                          </div>
-
-                          {packMultiplierCategory === 'UNITS' ? (
-                            <div className="grid grid-cols-5 gap-1">
-                              {[1, 5, 10, 25, 50].map(inc => (
-                                <button
-                                  key={inc}
-                                  type="button"
-                                  onClick={() => {
-                                    setCountQuantity(inc);
-                                    playBeep('skip');
-                                  }}
-                                  className={`py-2 text-xs font-black rounded-xl transition-all border cursor-pointer ${
-                                    countQuantity === inc
-                                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
-                                  }`}
-                                >
-                                  +{inc}
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-4 gap-1">
-                              {[
-                                { factor: 6, label: '×6' },
-                                { factor: 10, label: '×10 Blíster' },
-                                { factor: 14, label: '×14' },
-                                { factor: 20, label: '×20 Caja' },
-                                { factor: 28, label: '×28 Mes' },
-                                { factor: 30, label: '×30 Estándar' },
-                                { factor: 50, label: '×50 Pack' },
-                                { factor: 100, label: '×100 Hosp' }
-                              ].map(pack => (
-                                <button
-                                  key={pack.factor}
-                                  type="button"
-                                  onClick={() => handleApplyPackagingMultiplier(pack.factor)}
-                                  className="py-1.5 px-1 text-[11px] font-black rounded-xl bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-all cursor-pointer active:scale-95 text-center truncate"
-                                  title={`Multiplicar por ${pack.factor}`}
-                                >
-                                  {pack.label}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* On-Screen Industrial Numeric Keypad (PDA Touch-Optimized) */}
-                        {mobileEntryMode === 'NUMPAD' && (
-                          <CountNumpad
-                            onDigit={handleNumpadDigit}
-                            onClear={handleNumpadClear}
-                            onBackspace={handleNumpadBackspace}
-                            onMultiply={handleApplyPackagingMultiplier}
-                            onIncrement={() => {
-                              setCountQuantity(prev => prev + 1);
-                              playBeep('skip');
-                            }}
-                          />
-                        )}
-                      </div>
-
-                      {/* Primary Submit Button */}
-                      <button
-                        type="submit"
-                        className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-black text-base rounded-2xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[52px]"
-                      >
-                        <Plus className="w-5 h-5" />
-                        <span>REGISTRAR (+{countQuantity} un)</span>
-                      </button>
-                    </form>
-                  )}
-
-                  <LastScannedHeroCard
-                    entry={lastScannedItem}
-                    onIncrement={handleIncrementSkuQuantity}
-                    onDecrement={handleDecrementSkuQuantity}
-                  />
-
-                </div>
-              )}
-
-              {/* MOBILE TAB 2: FULL READINGS LIST */}
-              {/* MOBILE TAB 2: FULL READINGS LIST */}
-              {mobileCountingTab === 'READINGS' && (
-                <MobileReadingsList
-                  currentSession={currentSession}
-                  readingsSearch={readingsSearch}
-                  onReadingsSearchChange={setReadingsSearch}
-                  readingsViewMode={readingsViewMode}
-                  onReadingsViewModeChange={setReadingsViewMode}
-                  groupedSkuEntries={groupedSkuEntries}
-                  filteredGroupedSkuEntries={filteredGroupedSkuEntries}
-                  filteredChronoEntries={filteredChronoEntries}
-                  onGoToScan={() => setMobileCountingTab('SCAN')}
-                  onDecrementSku={handleDecrementSkuQuantity}
-                  onIncrementSku={handleIncrementSkuQuantity}
-                  onRemoveSkuAllEntries={handleRemoveSkuAllEntries}
-                  onRemoveEntry={handleRemoveEntry}
-                />
-              )}
-
-            </div>
-
-            {/* ======================================================== */}
-            {/* DESKTOP VIEW (>= md): SIDE-BY-SIDE POWER TERMINAL        */}
-            {/* ======================================================== */}
-            <div className="hidden md:flex flex-1 overflow-hidden flex-row">
-              
-              {/* Left: Input & Keypad Terminal */}
-              <div className="flex-1 p-6 overflow-y-auto border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-                <div>
-                  {/* Session Context & Location Bar */}
-                  <div className="flex flex-row gap-2 mb-4">
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between flex-1">
-                      <div className="flex items-center gap-2 truncate pr-2">
-                        <span className="text-xs font-bold text-slate-500 shrink-0">Sesión:</span>
-                        <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{currentSession.nombre}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={handleUndoLastEntry}
-                          disabled={currentSession.conteos.length === 0}
-                          className="px-3 py-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
-                          title="Deshacer la última lectura registrada"
-                        >
-                          <Undo2 className="w-3.5 h-3.5" />
-                          <span>Deshacer</span>
-                        </button>
-                        <button
-                          onClick={() => setViewState('RECONCILIATION')}
-                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Cuadratura</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Active Location / Pasillo with Lock Toggle & Burst Mode */}
-                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                      <input
-                        type="text"
-                        value={countLocation}
-                        onChange={(e) => setCountLocation(e.target.value)}
-                        placeholder="Ubicación..."
-                        className="w-36 bg-white dark:bg-slate-900 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextLock = !isLocationLocked;
-                          setIsLocationLocked(nextLock);
-                          playBeep('skip');
-                          showToast(nextLock ? 'Ubicación fijada' : 'Ubicación libre', 'info');
-                        }}
-                        className={`p-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                          isLocationLocked
-                            ? 'bg-amber-500 text-white shadow-sm'
-                            : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
-                        }`}
-                        title={isLocationLocked ? 'Ubicación FIJA' : 'Ubicación LIBRE'}
-                      >
-                        {isLocationLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                      </button>
-
-                      <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-0.5" />
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextBurst = !isBurstScanMode;
-                          setIsBurstScanMode(nextBurst);
-                          playBeep('success');
-                          showToast(nextBurst ? 'Modo Ráfaga activado (+1)' : 'Modo Manual activado', 'info');
-                        }}
-                        className={`px-2 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                          isBurstScanMode
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
-                        }`}
-                        title={isBurstScanMode ? 'Modo Ráfaga: escaneo continuo con +1 automático' : 'Modo Manual: ajuste de cantidad'}
-                      >
-                        <Zap className={`w-3.5 h-3.5 ${isBurstScanMode ? 'fill-current' : ''}`} />
-                        <span className="text-[11px] font-bold">{isBurstScanMode ? 'Ráfaga' : 'Manual'}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {expiryPromptSku ? (
-                    <div className="bg-blue-50/80 dark:bg-slate-800 p-6 rounded-2xl border-2 border-blue-400 dark:border-blue-900 shadow-lg animate-in zoom-in-95 duration-150">
-                      <div className="flex items-start justify-between gap-3 mb-4">
-                        <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-widest text-blue-600 dark:text-blue-400 block">
-                            Asistente de Vencimiento
-                          </span>
-                          <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 mt-0.5">
-                            ¿Cuándo vence {selectedProductDesc || 'este producto'}?
-                          </h3>
-                          <p className="text-xs text-slate-500 font-mono mt-0.5">
-                            SKU: {expiryPromptSku} • Cantidad: {countQuantity} {countLocation ? `• Ubic: ${countLocation}` : ''}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setExpiryPromptSku(null);
-                            playBeep('skip');
-                          }}
-                          className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                          aria-label="Omitir vencimiento"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      {/* Expiry Selector (Mes / Año) */}
-                      <div className="flex flex-col gap-4 mb-4">
-                        {/* Year Selector */}
-                        <div>
-                          <span className="text-xs font-bold text-slate-500 mb-1.5 block">1. Selecciona Año</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {yearsList.map(y => {
-                              const isSelected = tempYyyy === y;
-                              return (
-                                <button
-                                  key={y}
-                                  type="button"
-                                  onClick={() => {
-                                    setTempYyyy(y);
-                                    if (tempMm) {
-                                      commitCountEntry(expiryPromptSku, tempMm, y, false);
-                                    } else {
-                                      showToast('Ahora selecciona el mes', 'info');
-                                    }
-                                  }}
-                                  className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all border cursor-pointer ${
-                                    isSelected
-                                      ? 'bg-blue-600 border-blue-600 text-white shadow-md scale-[1.03]'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
-                                  }`}
-                                >
-                                  {y}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Month Selector */}
-                        <div>
-                          <span className="text-xs font-bold text-slate-500 mb-1.5 block">2. Selecciona Mes</span>
-                          <div className="grid grid-cols-6 gap-1.5">
-                            {MONTHS_LIST.map(m => {
-                              const isSelected = tempMm === m.val;
-                              return (
-                                <button
-                                  key={m.val}
-                                  type="button"
-                                  onClick={() => {
-                                    setTempMm(m.val);
-                                    if (tempYyyy) {
-                                      commitCountEntry(expiryPromptSku, m.val, tempYyyy, false);
-                                    } else {
-                                      showToast('Ahora selecciona el año', 'info');
-                                    }
-                                  }}
-                                  className={`py-2 px-1 rounded-xl text-xs font-extrabold transition-all text-center border cursor-pointer ${
-                                    isSelected
-                                      ? 'bg-blue-600 border-blue-600 text-white shadow-md scale-[1.02]'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
-                                  }`}
-                                >
-                                  {m.label.split(' - ')[0]}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 pt-2.5 border-t border-slate-200 dark:border-slate-700">
-                        <button
-                          type="button"
-                          onClick={() => commitCountEntry(expiryPromptSku, undefined, undefined, true)}
-                          className="flex-1 py-2.5 px-3 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Omitir Fecha (Sin Vencimiento)</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleSkuScannedOrEntered} className="flex flex-col gap-4">
-                      
-                      {/* SKU / Barcode input */}
-                      <div className="relative">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                            <Barcode className="w-4 h-4 text-blue-600" />
-                            <span>Escanear Código / SKU</span>
-                          </label>
-                          {selectedProductDesc && (
-                            <div className="flex items-center gap-2 truncate max-w-[420px]">
-                              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 truncate">
-                                ✓ {selectedProductDesc}
-                              </span>
-                              {!isBlind && <CampaignSkuErpBadge stats={campaignSkuStats} compact />}
-                              {!isBlind && campaignSkuStats && campaignSkuStats.diferencia !== null && (
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-black shrink-0 ${
-                                  campaignSkuStats.diferencia === 0
-                                    ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                                    : campaignSkuStats.diferencia > 0
-                                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
-                                    : 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
-                                }`}>
-                                  {campaignSkuStats.diferencia === 0 ? 'Cuadrado' : `${campaignSkuStats.diferencia > 0 ? '+' : ''}${campaignSkuStats.diferencia}`}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <div className="relative flex-1">
-                            <input
-                              ref={skuInputRef}
-                              type="text"
-                              value={scannedSku}
-                              onChange={(e) => handleSkuChange(e.target.value)}
-                              placeholder="Escanear o buscar SKU..."
-                              className="w-full pl-3.5 pr-9 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-base font-bold text-slate-800 dark:text-slate-100 focus:border-blue-600 outline-none transition-all shadow-inner"
-                              autoComplete="off"
-                            />
-                            {scannedSku && (
-                              <button
-                                type="button"
-                                onClick={() => handleSkuChange('')}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
-                                aria-label="Limpiar SKU"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Mobile Camera Scan Launcher Button */}
-                          <button
-                            type="button"
-                            onClick={() => setIsCameraScannerOpen(true)}
-                            className="px-3.5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-md shadow-blue-500/25 active:scale-95 transition-all flex items-center gap-1.5 font-bold text-xs shrink-0 cursor-pointer min-h-[44px]"
-                            title="Abrir lector con cámara de celular o PDA"
-                          >
-                            <Camera className="w-4 h-4" />
-                            <span>Cámara / PDA</span>
-                          </button>
-                        </div>
-
-                        {/* Autocomplete dropdown from master catalog */}
-                        {isSearchDropdownOpen && catalogSearchResults.length > 0 && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-30 max-h-56 overflow-y-auto p-1.5">
-                            <div className="px-2 py-1 text-[10px] font-bold uppercase text-slate-400">
-                              Catálogo Maestro de Productos
-                            </div>
-                            {catalogSearchResults.map(prod => (
-                              <button
-                                key={prod.sku}
-                                type="button"
-                                onClick={() => handleSelectProductFromCatalog(prod)}
-                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-slate-700 flex items-center justify-between text-xs transition-colors cursor-pointer"
-                              >
-                                <div className="truncate pr-2">
-                                  <span className="font-bold text-blue-600 dark:text-blue-400 font-mono mr-2">{prod.sku}</span>
-                                  <span className="text-slate-700 dark:text-slate-200 font-medium">{prod.name}</span>
-                                </div>
-                                <span className="text-[10px] text-slate-400 shrink-0 font-medium">{prod.provider || prod.category}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Expiry Status Indicator for Fast Scanners */}
-                      {currentSession.requiereVencimiento && (
-                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 leading-tight flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
-                          <span>
-                            Solicita vencimiento en la 1ra lectura por SKU y lo reutiliza de forma automática en los siguientes escaneos.
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Quantity Stepper & Direct Input */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-                          <span className="flex items-center gap-1">
-                            <Hash className="w-3.5 h-3.5 text-blue-600" />
-                            <span>Cantidad Contada</span>
-                          </span>
-                        </label>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setCountQuantity(Math.max(1, countQuantity - 1))}
-                            className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
-                            aria-label="Disminuir cantidad"
-                          >
-                            <Minus className="w-5 h-5" />
-                          </button>
-
-                          <input
-                            type="number"
-                            min="1"
-                            value={countQuantity}
-                            onChange={(e) => setCountQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="flex-1 py-3 text-center rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xl font-extrabold text-blue-600 dark:text-blue-400 focus:border-blue-600 outline-none"
-                          />
-
-                          <button
-                            type="button"
-                            onClick={() => setCountQuantity(countQuantity + 1)}
-                            className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
-                            aria-label="Aumentar cantidad"
-                          >
-                            <Plus className="w-5 h-5" />
-                          </button>
-                        </div>
-
-                        {/* Quick increment buttons & Packaging multipliers */}
-                        <div className="mt-2.5">
-                          <div className="flex items-center justify-between mb-1.5 px-0.5">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                              {packMultiplierCategory === 'UNITS' ? 'Incremento por Unidades (+)' : 'Multiplicador por Empaque (×)'}
-                            </span>
-                            <div className="flex items-center gap-1 text-[10px] font-extrabold">
-                              <button
-                                type="button"
-                                onClick={() => setPackMultiplierCategory('UNITS')}
-                                className={`px-1.5 py-0.5 rounded ${packMultiplierCategory === 'UNITS' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' : 'text-slate-400 hover:text-slate-600'}`}
-                              >
-                                + Unids
-                              </button>
-                              <span className="text-slate-300">|</span>
-                              <button
-                                type="button"
-                                onClick={() => setPackMultiplierCategory('PACKS')}
-                                className={`px-1.5 py-0.5 rounded ${packMultiplierCategory === 'PACKS' ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300' : 'text-slate-400 hover:text-slate-600'}`}
-                              >
-                                × Cajas
-                              </button>
-                            </div>
-                          </div>
-
-                          {packMultiplierCategory === 'UNITS' ? (
-                            <div className="grid grid-cols-5 gap-1.5">
-                              {[1, 5, 10, 25, 50].map(inc => (
-                                <button
-                                  key={inc}
-                                  type="button"
-                                  onClick={() => {
-                                    setCountQuantity(inc);
-                                    playBeep('skip');
-                                  }}
-                                  className={`py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer min-h-[38px] ${
-                                    countQuantity === inc
-                                      ? 'bg-blue-600 text-white shadow-xs'
-                                      : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                                  }`}
-                                >
-                                  +{inc}
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-4 gap-1.5">
-                              {[
-                                { factor: 6, label: '×6' },
-                                { factor: 10, label: '×10 Blíster' },
-                                { factor: 14, label: '×14' },
-                                { factor: 20, label: '×20 Caja' },
-                                { factor: 28, label: '×28 Mes' },
-                                { factor: 30, label: '×30 Estándar' },
-                                { factor: 50, label: '×50 Pack' },
-                                { factor: 100, label: '×100 Hosp' }
-                              ].map(pack => (
-                                <button
-                                  key={pack.factor}
-                                  type="button"
-                                  onClick={() => handleApplyPackagingMultiplier(pack.factor)}
-                                  className="py-1.5 px-1 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold rounded-lg transition-all cursor-pointer truncate text-center min-h-[38px]"
-                                  title={`Multiplicar por ${pack.factor}`}
-                                >
-                                  {pack.label}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Submit Button */}
-                      <button
-                        type="submit"
-                        className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer mt-0.5 min-h-[48px]"
-                      >
-                        <Plus className="w-5 h-5" />
-                        <span>Registrar Lectura</span>
-                      </button>
-                    </form>
-                  )}
-                </div>
-
-                {/* Bottom Quick KPI (Desktop view) */}
-                <div className="flex mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 items-center justify-between text-xs">
-                  <span className="text-slate-500">Total en sesión:</span>
-                  <span className="font-bold text-slate-800 dark:text-slate-100">
-                    {currentSession.conteos.length} lecturas • {formatLocaleNumber(currentSession.conteos.reduce((a, b) => a + b.cantidad, 0))} unidades
-                  </span>
-                </div>
-              </div>
-
-              {/* Right: Readings History & Pending Checklist Tabs */}
-              <div className="w-80 lg:w-96 bg-slate-50 dark:bg-slate-800/40 p-4 flex flex-col border-l border-slate-200 dark:border-slate-800">
-                {/* Tab Selector Header */}
-                <div className="flex items-center p-1 bg-slate-200/80 dark:bg-slate-900 rounded-xl mb-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setRightTab('READINGS')}
-                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      rightTab === 'READINGS'
-                        ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
-                    }`}
-                  >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span>Lecturas ({currentSession.conteos.length})</span>
+                    <Zap className="w-4 h-4 fill-slate-950" />
+                    <span>Iniciar Conteo Rápido (Mueble {sessions.length + 1})</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setRightTab('PENDING')}
-                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      rightTab === 'PENDING'
-                        ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
-                    }`}
+                    onClick={() => setViewState('LIST')}
+                    className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all text-xs"
                   >
-                    <ListTodo className="w-3.5 h-3.5" />
-                    <span>Pendientes ({pendingItems.length})</span>
+                    <Layers className="w-4 h-4 text-blue-400" />
+                    <span>Ver o Crear Muebles Específicos</span>
                   </button>
                 </div>
-
-                {rightTab === 'READINGS' ? (
-                  /* READINGS LIST */
-                  currentSession.conteos.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400">
-                      <Barcode className="w-8 h-8 mb-2 opacity-40" />
-                      <p className="text-xs font-semibold">Esperando primera lectura...</p>
-                      <p className="text-[11px] mt-1 text-slate-400">Escanea o ingresa un SKU para comenzar.</p>
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                      {/* View Switcher: Agrupado por SKU vs Cronológico */}
-                      <div className="flex items-center justify-between mb-2 px-1">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                          {readingsViewMode === 'GROUPED' ? `${groupedSkuEntries.length} SKUs Únicos` : `${currentSession.conteos.length} Lecturas`}
-                        </span>
-
-                        <div className="flex items-center bg-slate-200/80 dark:bg-slate-900 rounded-lg p-0.5 text-[11px] font-bold">
-                          <button
-                            type="button"
-                            onClick={() => setReadingsViewMode('GROUPED')}
-                            className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                              readingsViewMode === 'GROUPED'
-                                ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            Agrupado
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setReadingsViewMode('CHRONO')}
-                            className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                              readingsViewMode === 'CHRONO'
-                                ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            Historial
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Grouped View (Consolidated by SKU) */}
-                      {readingsViewMode === 'GROUPED' ? (
-                        <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-1">
-                          {groupedSkuEntries.map(group => (
-                            <div
-                              key={group.sku}
-                              className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between text-xs"
-                            >
-                              <div className="truncate pr-2 flex-1">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{group.sku}</span>
-                                  {group.mm && group.yyyy && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
-                                      {group.mm}/{group.yyyy}
-                                    </span>
-                                  )}
-                                  {group.ubicaciones.length > 0 && (
-                                    <span className="text-[9px] font-semibold text-slate-400 flex items-center gap-0.5">
-                                      <MapPin className="w-2.5 h-2.5" /> {group.ubicaciones.join(', ')}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-slate-700 dark:text-slate-200 truncate font-medium mt-0.5 text-xs">
-                                  {group.descripcion}
-                                </p>
-                                <span className="text-[10px] text-slate-400">
-                                  {group.readingsCount} {group.readingsCount === 1 ? 'escaneo' : 'escaneos'}
-                                </span>
-                              </div>
-
-                              {/* Quick Steppers & Actions */}
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDecrementSkuQuantity(group.sku)}
-                                  className="w-7 h-7 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg font-extrabold text-slate-700 dark:text-slate-200 flex items-center justify-center cursor-pointer active:scale-95 transition-all text-xs"
-                                  title="Reducir 1 unidad"
-                                >
-                                  -
-                                </button>
-
-                                <span className="font-extrabold text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2 py-1 rounded-lg min-w-[36px] text-center">
-                                  {group.totalCantidad}
-                                </span>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleIncrementSkuQuantity(group.sku)}
-                                  className="w-7 h-7 bg-blue-100 dark:bg-blue-900/60 hover:bg-blue-200 dark:hover:bg-blue-800/60 rounded-lg font-extrabold text-blue-700 dark:text-blue-300 flex items-center justify-center cursor-pointer active:scale-95 transition-all text-xs"
-                                  title="Sumar 1 unidad (+1)"
-                                >
-                                  +
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveSkuAllEntries(group.sku, group.descripcion)}
-                                  className="text-slate-400 hover:text-red-600 p-1 transition-colors ml-0.5 cursor-pointer"
-                                  title="Eliminar todas las lecturas de este SKU"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        /* Chronological View (Individual Scans) */
-                        <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-1">
-                          {currentSession.conteos.map(entry => (
-                            <div
-                              key={entry.id}
-                              className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between text-xs"
-                            >
-                              <div className="truncate pr-2">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{entry.sku}</span>
-                                  {entry.mm && entry.yyyy && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
-                                      {entry.mm}/{entry.yyyy}
-                                    </span>
-                                  )}
-                                  {entry.ubicacion && (
-                                    <span className="text-[9px] font-semibold text-slate-400 flex items-center gap-0.5">
-                                      <MapPin className="w-2.5 h-2.5" /> {entry.ubicacion}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-slate-600 dark:text-slate-300 truncate font-medium mt-0.5">
-                                  {entry.descripcion}
-                                </p>
-                                <span className="text-[10px] text-slate-400">
-                                  {new Date(entry.timestamp).toLocaleTimeString('es-CL')}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className="font-extrabold text-sm text-slate-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-lg">
-                                  +{entry.cantidad}
-                                </span>
-                                <button
-                                  onClick={() => handleRemoveEntry(entry.id)}
-                                  className="text-slate-400 hover:text-red-600 p-1 transition-colors cursor-pointer"
-                                  title="Eliminar lectura"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                ) : (
-                  /* PENDING ITEMS CHECKLIST */
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <div className="relative mb-2 shrink-0">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        value={pendingSearch}
-                        onChange={(e) => setPendingSearch(e.target.value)}
-                        placeholder="Buscar SKU o nombre..."
-                        className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold outline-none focus:border-blue-500 text-slate-800 dark:text-slate-100"
-                      />
-                    </div>
-
-                    {pendingItems.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400">
-                        <CheckCircle2 className="w-8 h-8 mb-2 text-emerald-500 opacity-60" />
-                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">¡Sin pendientes!</p>
-                        <p className="text-[11px] mt-1 text-slate-400">Todos los productos teóricos han sido contados.</p>
-                      </div>
-                    ) : (
-                      <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-1">
-                        {pendingItems.map(item => (
-                          <div
-                            key={item.sku}
-                            className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-amber-200/60 dark:border-amber-900/40 shadow-sm flex items-center justify-between text-xs"
-                          >
-                            <div className="truncate pr-2">
-                              <span className="font-mono font-bold text-amber-700 dark:text-amber-400 block">{item.sku}</span>
-                              <p className="text-slate-600 dark:text-slate-300 truncate font-medium mt-0.5">
-                                {item.descripcion}
-                              </p>
-                              <span className="text-[10px] font-bold text-slate-400">
-                                Teórico: {formatLocaleNumber(item.teorico)} unids
-                              </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleSkuChange(item.sku);
-                                setSelectedProductDesc(item.descripcion);
-                                skuInputRef.current?.focus();
-                                showToast(`SKU cargado: ${item.sku}`, 'info');
-                              }}
-                              className="px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 text-amber-800 dark:text-amber-300 font-bold rounded-lg border border-amber-200 dark:border-amber-800 transition-all text-[11px] shrink-0 cursor-pointer"
-                            >
-                              Cargar
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
-
-            {/* Fixed Mobile Bottom Action & Navigation Bar (4 dedicated touch tabs) */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-2xl safe-bottom">
-              
-              {/* Tab 1: Opticon Terminal */}
-              <button
-                type="button"
-                onClick={() => {
-                  setViewState('COUNTING');
-                  setMobileCountingTab('OPTICON');
-                }}
-                className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                  viewState === 'COUNTING' && mobileCountingTab === 'OPTICON'
-                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/50 scale-[1.02]'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Zap className={`w-4 h-4 ${viewState === 'COUNTING' && mobileCountingTab === 'OPTICON' ? 'fill-current' : ''}`} />
-                <span className="text-[10px] font-black tracking-tight">Opticon</span>
-              </button>
-
-              {/* Tab 2: Catálogo / Formulario */}
-              <button
-                type="button"
-                onClick={() => {
-                  setViewState('COUNTING');
-                  setMobileCountingTab('SCAN');
-                }}
-                className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                  viewState === 'COUNTING' && mobileCountingTab === 'SCAN'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/50 scale-[1.02]'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Barcode className="w-4 h-4" />
-                <span className="text-[10px] font-black tracking-tight">Catálogo</span>
-              </button>
-
-              {/* Tab 3: Lecturas */}
-              <button
-                type="button"
-                onClick={() => {
-                  setViewState('COUNTING');
-                  setMobileCountingTab('READINGS');
-                }}
-                className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                  viewState === 'COUNTING' && mobileCountingTab === 'READINGS'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/50 scale-[1.02]'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <div className="relative">
-                  <Layers className="w-4 h-4" />
-                  {groupedSkuEntries.length > 0 && (
-                    <span className="absolute -top-1 -right-2 bg-emerald-500 text-white text-[8px] font-black px-1 rounded-full">
-                      {groupedSkuEntries.length}
-                    </span>
-                  )}
-                </div>
-                <span className="text-[10px] font-black tracking-tight">
-                  Lecturas ({currentSession.conteos.reduce((a, b) => a + b.cantidad, 0)})
-                </span>
-              </button>
-
-              {/* Tab 4: Cuadratura */}
-              <button
-                type="button"
-                onClick={() => setViewState('RECONCILIATION')}
-                className="flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer text-slate-400 hover:text-purple-400 hover:bg-purple-950/30"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span className="text-[10px] font-black tracking-tight">Cuadratura</span>
-              </button>
-
-            </div>
-
-          </div>
+          )
         )}
+
 
         {/* ======================================================== */}
         {/* BODY - VIEW 3: RECONCILIATION & SHEET SYNCHRONIZATION    */}

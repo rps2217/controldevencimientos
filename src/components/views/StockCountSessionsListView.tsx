@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Check, FileSpreadsheet, EyeOff, Calendar, MapPin, Database, Loader2, Cloud, CloudOff, CloudUpload, Barcode, Zap, Trash2, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Play, Check, FileSpreadsheet, EyeOff, Calendar, MapPin, Database, Loader2, Cloud, CloudOff, CloudUpload, Barcode, Zap, Trash2, ChevronRight, CheckCircle2, Sparkles, HelpCircle } from 'lucide-react';
 import { StockCountSession, StockCountMode } from '../../types';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 
@@ -11,17 +11,13 @@ export interface NewSessionConfig {
   requiereVencimiento: boolean;
   rangoAnos?: { desde: number; hasta: number };
   ubicacion: string;
-  /**
-   * SKUs que esta sesión debe cubrir. Si viene, al abrir la sesión se acota el
-   * checklist de pendientes a ellos (p. ej. los pendientes de un proveedor). Vacío o
-   * ausente = toda la hoja.
-   */
   skuScope?: string[];
 }
 
 export interface StockCountSessionsListViewProps {
   sessions: StockCountSession[];
   isSyncingCloud: boolean;
+  realProviders?: string[];
   onCreateSession: (config: NewSessionConfig) => void;
   onOpenSession: (session: StockCountSession) => void;
   onDeleteSession: (sessionId: string, e: React.MouseEvent) => void;
@@ -32,6 +28,7 @@ export interface StockCountSessionsListViewProps {
 export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProps> = ({
   sessions,
   isSyncingCloud,
+  realProviders = [],
   onCreateSession,
   onOpenSession,
   onDeleteSession,
@@ -40,62 +37,159 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
 }) => {
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionMode, setNewSessionMode] = useState<StockCountMode>('BLIND');
-  const [newSessionRequireExpiry, setNewSessionRequireExpiry] = useState<boolean>(true);
+  const [newSessionRequireExpiry, setNewSessionRequireExpiry] = useState<boolean>(false);
   const [newSessionYearFrom, setNewSessionYearFrom] = useState<number>(CURRENT_YEAR);
   const [newSessionYearTo, setNewSessionYearTo] = useState<number>(CURRENT_YEAR + 3);
   const [newSessionLocation, setNewSessionLocation] = useState('');
 
+  // Preset quick selectors
+  const applyPreset = (preset: 'QUICK' | 'EXPIRY' | 'BLIND_AUDIT') => {
+    if (preset === 'QUICK') {
+      setNewSessionName(`Mueble ${sessions.length + 1} - Conteo Rápido`);
+      setNewSessionMode('DOCUMENT');
+      setNewSessionRequireExpiry(false);
+      setNewSessionLocation(`Mueble ${sessions.length + 1}`);
+    } else if (preset === 'EXPIRY') {
+      setNewSessionName(`Mueble ${sessions.length + 1} - Con Vencimientos`);
+      setNewSessionMode('DOCUMENT');
+      setNewSessionRequireExpiry(true);
+      setNewSessionLocation(`Mueble ${sessions.length + 1}`);
+    } else if (preset === 'BLIND_AUDIT') {
+      setNewSessionName(`Auditoría a Ciegas ${sessions.length + 1}`);
+      setNewSessionMode('BLIND');
+      setNewSessionRequireExpiry(false);
+      setNewSessionLocation(`Zona ${sessions.length + 1}`);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const finalName = newSessionName.trim() || `Mueble ${sessions.length + 1} - ${new Date().toLocaleDateString('es-CL')}`;
     onCreateSession({
-      nombre: newSessionName,
+      nombre: finalName,
       modo: newSessionMode,
       requiereVencimiento: newSessionRequireExpiry,
       rangoAnos: newSessionRequireExpiry ? { desde: newSessionYearFrom, hasta: newSessionYearTo } : undefined,
-      ubicacion: newSessionLocation,
+      ubicacion: newSessionLocation.trim() || finalName,
     });
     setNewSessionName('');
     setNewSessionLocation('');
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div className="flex-1 overflow-y-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-7xl mx-auto w-full">
 
-      {/* Left: New Session Creator */}
-      <div className="order-2 lg:order-1 lg:col-span-5 bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+      {/* Left: New Session Creator (Always top on mobile) */}
+      <div className="order-1 lg:order-1 lg:col-span-5 bg-white dark:bg-slate-800/80 p-4 sm:p-5 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-2 h-2 rounded-full bg-blue-600"></div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-              Nueva Sesión de Conteo
-            </h3>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                Crear Mueble, Sección o Proveedor
+              </h3>
+            </div>
+            <span className="text-[11px] text-slate-500 font-mono">Paso 1</span>
           </div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {/* Quick Presets for New Users */}
+          <div className="mb-4 p-3 bg-blue-50/70 dark:bg-blue-950/30 rounded-2xl border border-blue-100 dark:border-blue-900/50">
+            <span className="text-[11px] font-bold text-blue-900 dark:text-blue-300 block mb-2 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              Plantillas Rápidas:
+            </span>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => applyPreset('QUICK')}
+                className="p-1.5 rounded-xl bg-white dark:bg-slate-900 hover:bg-blue-100/50 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 text-[11px] font-bold text-slate-700 dark:text-slate-200 transition-all text-center cursor-pointer active:scale-95"
+              >
+                ⚡ Rápido
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset('EXPIRY')}
+                className="p-1.5 rounded-xl bg-white dark:bg-slate-900 hover:bg-blue-100/50 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 text-[11px] font-bold text-slate-700 dark:text-slate-200 transition-all text-center cursor-pointer active:scale-95"
+              >
+                📅 Con Vto.
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset('BLIND_AUDIT')}
+                className="p-1.5 rounded-xl bg-white dark:bg-slate-900 hover:bg-blue-100/50 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 text-[11px] font-bold text-slate-700 dark:text-slate-200 transition-all text-center cursor-pointer active:scale-95"
+              >
+                👁️ A Ciegas
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
             <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">
-                Nombre o Identificador de la Sesión
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Nombre del Mueble, Sección o Proveedor
               </label>
               <input
                 type="text"
                 value={newSessionName}
                 onChange={(e) => setNewSessionName(e.target.value)}
-                placeholder="Ej: Pasillo 3 - Lácteos y Refrigerados"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                placeholder="Ej: Mueble 1, Pasillo 2 o Lab. Bagó"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               />
             </div>
 
+            {/* Quick chips for furniture or supplier name */}
             <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-1.5">
+                {realProviders.length > 0 ? `Proveedores Reales en Foto ERP (${realProviders.length}):` : 'Sugerencias Rápidas de Sección:'}
+              </span>
+              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                {(realProviders.length > 0 ? realProviders : ['Mueble 1', 'Mueble 2', 'Pasillo 1', 'Refrigerados', 'Bodega']).map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => {
+                      setNewSessionName(realProviders.length > 0 ? `Proveedor: ${chip}` : chip);
+                      setNewSessionLocation(chip);
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:text-blue-600 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                 Modalidad de Conteo
               </label>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNewSessionMode('DOCUMENT')}
+                  className={`p-2.5 rounded-2xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
+                    newSessionMode === 'DOCUMENT'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/50 ring-2 ring-blue-500/20'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full mb-1">
+                    <span className="text-xs font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                      <FileSpreadsheet className="w-3.5 h-3.5" /> Normal
+                    </span>
+                    {newSessionMode === 'DOCUMENT' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                  </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                    Muestra avance y compara con catálogo.
+                  </p>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setNewSessionMode('BLIND')}
-                  className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                  className={`p-2.5 rounded-2xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
                     newSessionMode === 'BLIND'
-                      ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 ring-2 ring-amber-500/20'
+                      ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/50 ring-2 ring-amber-500/20'
                       : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300'
                   }`}
                 >
@@ -105,43 +199,23 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
                     </span>
                     {newSessionMode === 'BLIND' && <Check className="w-3.5 h-3.5 text-amber-600" />}
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
-                    Sin stock teórico visible al operario. Auditoría limpia.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setNewSessionMode('DOCUMENT')}
-                  className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                    newSessionMode === 'DOCUMENT'
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 ring-2 ring-indigo-500/20'
-                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-1">
-                    <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
-                      <FileSpreadsheet className="w-3.5 h-3.5" /> Contra Doc.
-                    </span>
-                    {newSessionMode === 'DOCUMENT' && <Check className="w-3.5 h-3.5 text-indigo-600" />}
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
-                    Valida contra la hoja activa y muestra avance en tiempo real.
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                    Auditoría pura sin ver cantidades previas.
                   </p>
                 </button>
               </div>
             </div>
 
             {/* Expiry Date Toggle (MM/YYYY) */}
-            <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <div className="flex items-center gap-2.5 pr-2">
                 <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                 <div>
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                    Capturar Fecha de Vencimiento
+                    Capturar Mes y Año de Vencimiento
                   </span>
-                  <span className="text-[11px] text-slate-400 block leading-tight">
-                    Registra Mes y Año (genera <code className="text-blue-600 dark:text-blue-400 font-mono">CU_VC</code> y calcula <code className="text-blue-600 dark:text-blue-400 font-mono">FECHA_VC</code>).
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">
+                    Solicita MM/AAAA para control de caducidades.
                   </span>
                 </div>
               </div>
@@ -156,80 +230,12 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
               </label>
             </div>
 
-            {/* Range of Years (Configurable) */}
-            {newSessionRequireExpiry && (
-              <div className="p-3.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100/50 dark:border-blue-900/50 flex flex-col gap-2.5 animate-in slide-in-from-top-3 duration-150">
-                <span className="text-xs font-bold text-blue-900 dark:text-blue-200 block">
-                  Rango de Años de Interés
-                </span>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Desde Año</label>
-                    <select
-                      value={newSessionYearFrom}
-                      onChange={(e) => {
-                        const from = parseInt(e.target.value);
-                        setNewSessionYearFrom(from);
-                        if (newSessionYearTo < from) {
-                          setNewSessionYearTo(from);
-                        }
-                      }}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer text-slate-700 dark:text-slate-200"
-                    >
-                      {Array.from({ length: 8 }, (_, i) => CURRENT_YEAR - 2 + i).map(y => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Hasta Año</label>
-                    <select
-                      value={newSessionYearTo}
-                      onChange={(e) => setNewSessionYearTo(Math.max(newSessionYearFrom, parseInt(e.target.value)))}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer text-slate-700 dark:text-slate-200"
-                    >
-                      {Array.from({ length: 8 }, (_, i) => newSessionYearFrom + i).map(y => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Quick suggestion chips for furniture name */}
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {['Góndola 1', 'Góndola 2', 'Pasillo A', 'Refrigerados', 'Vitrina Principal', 'Bodega'].map((chip) => (
-                <button
-                  key={chip}
-                  type="button"
-                  onClick={() => setNewSessionName(chip)}
-                  className="px-2 py-0.5 rounded-lg bg-slate-200/80 dark:bg-slate-700/80 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-[11px] font-medium text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
-                >
-                  + {chip}
-                </button>
-              ))}
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" /> Ubicación o Bodega (Opcional)
-              </label>
-              <input
-                type="text"
-                value={newSessionLocation}
-                onChange={(e) => setNewSessionLocation(e.target.value)}
-                placeholder="Ej: Bodega Central - Rack A4"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              />
-            </div>
-
             <button
               type="submit"
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-1 cursor-pointer"
             >
-              <Play className="w-4 h-4 fill-white" />
-              <span>Comenzar Conteo Físico</span>
+              <Zap className="w-4 h-4 fill-white" />
+              <span>Crear y Comenzar a Pistolear</span>
             </button>
           </form>
         </div>
@@ -237,55 +243,70 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
 
       {/* Right: Existing Sessions List */}
       <div className="order-1 lg:order-2 lg:col-span-7 flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2">
-            <Database className="w-4 h-4 text-blue-600" />
-            <span>Historial de Sesiones ({sessions.length})</span>
-          </h3>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <Database className="w-4 h-4 text-blue-600" />
+              <span>Muebles Contados en Tienda</span>
+            </h3>
+            <span className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-[11px] font-bold font-mono">
+              {sessions.length}
+            </span>
+          </div>
+
           <button
             type="button"
             onClick={() => onCloudSync(false)}
             disabled={isSyncingCloud}
             className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="Sincronizar y combinar sesiones de todos los dispositivos móviles"
+            title="Sincronizar y combinar sesiones con Google Sheets"
           >
             {isSyncingCloud ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 dark:text-blue-400" />
             ) : (
               <Cloud className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             )}
-            <span>{isSyncingCloud ? 'Sincronizando...' : 'Sincronizar Todos'}</span>
+            <span className="hidden sm:inline">{isSyncingCloud ? 'Sincronizando...' : 'Sincronizar Nube'}</span>
           </button>
         </div>
 
         {sessions.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-center">
-            <Barcode className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-3" />
-            <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No hay sesiones de conteo registradas</p>
-            <p className="text-xs text-slate-400 mt-1 max-w-sm">
-              Inicia tu primera sesión de conteo a ciegas o contra documento para auditar inventario físico.
+          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white dark:bg-slate-800/80 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 text-blue-600 flex items-center justify-center mb-3">
+              <Barcode className="w-7 h-7" />
+            </div>
+            <h4 className="text-base font-bold text-slate-800 dark:text-slate-100">Aún no hay muebles contados</h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mb-4 leading-relaxed">
+              Crea tu primer mueble o pasillo en el panel izquierdo para comenzar a pistolear productos.
             </p>
+            <button
+              type="button"
+              onClick={() => applyPreset('QUICK')}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-blue-500/20 cursor-pointer"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>Usar Plantilla Rápida</span>
+            </button>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto flex flex-col gap-3 pr-1">
+          <div className="flex-1 overflow-y-auto flex flex-col gap-2.5 pr-1 max-h-[600px]">
             {sessions.map(s => {
               const totalLecturas = s.conteos.length;
               const totalUnidades = s.conteos.reduce((acc, curr) => acc + curr.cantidad, 0);
-              const deviceLabel = s.deviceId ? (s.deviceId.includes('movil') ? '📱 ' + s.deviceId : '💻 ' + s.deviceId) : 'Dispositivo';
 
               return (
                 <div
                   key={s.id}
                   onClick={() => onOpenSession(s)}
-                  className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition-all cursor-pointer flex items-center justify-between group"
+                  className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition-all cursor-pointer flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
-                    <div className={`p-3 rounded-xl shrink-0 ${
+                    <div className={`p-3 rounded-2xl shrink-0 ${
                       s.estado === 'COMPLETED'
                         ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
                         : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
                     }`}>
-                      {s.estado === 'COMPLETED' ? <CheckCircle2 className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                      {s.estado === 'COMPLETED' ? <CheckCircle2 className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
                     </div>
 
                     <div className="min-w-0">
@@ -296,13 +317,13 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                           s.modo === 'BLIND'
                             ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
-                            : 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300'
+                            : 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300'
                         }`}>
-                          {s.modo === 'BLIND' ? 'A Ciegas' : 'Contra Doc.'}
+                          {s.modo === 'BLIND' ? 'A Ciegas' : 'Normal'}
                         </span>
                         {s.requiereVencimiento && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 shrink-0">
-                            MM/YYYY
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 shrink-0">
+                            Vencimientos
                           </span>
                         )}
                         {s.sincronizadoNube ? (
@@ -310,20 +331,20 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
                             <Cloud className="w-3 h-3" /> Nube
                           </span>
                         ) : (
-                          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-0.5 shrink-0" title="Pendiente de respaldo en nube">
+                          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-0.5 shrink-0" title="Guardado localmente">
                             <CloudOff className="w-3 h-3" /> Local
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500 mt-1 flex-wrap">
-                        <span>📅 {new Date(s.fechaInicio).toLocaleDateString('es-CL')}</span>
-                        <span>📦 {totalLecturas} lecturas ({formatLocaleNumber(totalUnidades)} unids)</span>
-                        <span className="font-semibold text-slate-600 dark:text-slate-300">
-                          {s.estado === 'COMPLETED' ? 'Completado' : 'En progreso'}
+                      <div className="flex items-center gap-2.5 text-xs text-slate-500 dark:text-slate-400 mt-1 flex-wrap">
+                        <span className="font-bold text-slate-700 dark:text-slate-200">
+                          📦 {formatLocaleNumber(totalUnidades)} unidades
                         </span>
                         <span>•</span>
-                        <span className="text-slate-500 font-mono text-[11px]">{deviceLabel}</span>
+                        <span>{totalLecturas} registros</span>
+                        <span>•</span>
+                        <span>📅 {new Date(s.fechaInicio).toLocaleDateString('es-CL')}</span>
                       </div>
                     </div>
                   </div>
@@ -335,8 +356,8 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
                         e.stopPropagation();
                         onBackupSessionToCloud(s);
                       }}
-                      className="p-2 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                      title="Respaldar este mueble en la nube de Google Sheets"
+                      className="p-2 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                      title="Respaldar en la nube"
                     >
                       <CloudUpload className="w-4 h-4" />
                     </button>
@@ -346,15 +367,15 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
                         e.stopPropagation();
                         onOpenSession(s);
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-all cursor-pointer active:scale-95"
+                      className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-all cursor-pointer active:scale-95"
                     >
                       <Zap className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Pistolear</span>
+                      <span>Contar</span>
                     </button>
                     <button
                       onClick={(e) => onDeleteSession(s.id, e)}
-                      className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                      title="Eliminar sesión"
+                      className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                      title="Eliminar mueble"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
