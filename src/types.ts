@@ -146,6 +146,9 @@ export interface ColumnSchema {
   refTable?: string; // Target sheet name when type is 'ref'
   refKeyCol?: string; // Target key column
   refLabelCol?: string; // Target label column
+  showIfRule?: string; // Conditional visibility expression (e.g., "FRC_EVEN = 'TRANSPORTE'")
+  validIfRule?: string; // Custom validation expression (e.g., "CANTIDAD > 0")
+  validIfMessage?: string; // Custom validation error message
 }
 
 export type ResolutionStatus = 'PENDIENTE' | 'REALIZADO';

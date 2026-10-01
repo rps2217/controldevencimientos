@@ -144,6 +144,7 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^detalle(_|\s)?(producto)?(_|\s)?(vc|calculado)?$/i,
     /^denominaci[oó]n(_|\s)?(vc|calculado)?$/i,
     /^descripci[oó]n$/i,
+    /^descriptor(es)?$/i,
     /^producto_ev$/i,
     /.*_desc$/i,
     /^frc_desc$/i
@@ -166,7 +167,6 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^fecha(_|\s)?retiro(_|\s)?(calc|calculada)?$/i,
     /^fecha(_|\s)?(retiro|canje|limite|l[ií]mite)$/i,
     /^fecha(_|\s)?(de(_|\s)?)?(retiro|canje|limite|l[ií]mite)$/i,
-    /^retiro$/i,
     /^canje$/i,
     /^f(_|\s)?(retiro|canje)$/i,
     /^fecha(_|\s)?(limite|l[ií]mite)(_|\s)?(de)?(_|\s)?(retiro|canje)?$/i,
@@ -227,6 +227,7 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^policy$/i
   ],
   dias_anticipacion: [
+    /^retiro$/i,
     /^retiro(_|\s)?\((_|\s)?d[ií]as(_|\s)?\)$/i,
     /^retiro(_|\s)?d[ií]as$/i,
     /^d[ií]as(_|\s)?(de)?(_|\s)?(anticipaci[oó]n|anticipacion|canje|retiro)?$/i,
@@ -237,6 +238,7 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^days$/i
   ],
   dias_retiro: [
+    /^retiro$/i,
     /^retiro(_|\s)?\((_|\s)?d[ií]as(_|\s)?\)$/i,
     /^retiro(_|\s)?d[ií]as$/i,
     /^d[ií]as(_|\s)?(de)?(_|\s)?(retiro|canje|limite|l[ií]mite)?(_|\s)?(vc|calculado)?$/i,

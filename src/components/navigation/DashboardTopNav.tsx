@@ -146,13 +146,13 @@ export const DashboardTopNav: React.FC = () => {
               <h1 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-slate-100 tracking-tight whitespace-nowrap">
                 {viewMeta.title}
               </h1>
-              <span className="font-mono text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900/60 shrink-0">
-                {filteredItems.length}
+              <span className="text-slate-400 dark:text-slate-500 text-xs font-mono tabular-nums shrink-0 font-medium">
+                · {filteredItems.length} reg.
               </span>
             </div>
             {isRelationalActive && activeView === 'main' && (
-              <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0">
-                <Sparkles className="w-2.5 h-2.5 text-emerald-500" /> Relacional
+              <span className="hidden xl:inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Relacional
               </span>
             )}
           </div>

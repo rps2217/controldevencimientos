@@ -51,10 +51,14 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
 
   const isObs = /observ|nota|motivo|detalle|coment|causa/i.test(header);
   const isCant = /^cant|unidades|stock/i.test(header);
-  const isDateCol = (colSchema?.type === 'date' && !/dias|días|cant|stock|unidades|num/i.test(header)) || 
+  
+  const isDaysColumn = /dias|días|days|anticipacion|anticipaci[oó]n|cant|stock|unidades|num/i.test(header) || 
+                       /^retiro$/i.test(String(header).trim());
+
+  const isDateCol = (colSchema?.type === 'date' && !isDaysColumn) || 
                     (/fecha|vencimiento|vence|retiro/i.test(header) && 
                      !/time/i.test(header) && 
-                     !/dias|días|cant|stock|unidades|num/i.test(header));
+                     !isDaysColumn);
   const isDateTimeCol = colSchema?.type === 'datetime' || /timestamp|created_at/i.test(header);
   const isTraspasoCol = /traspaso/i.test(header);
   const traspasoVal = String(formData[header] || '').trim();

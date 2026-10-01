@@ -113,6 +113,76 @@ export function evaluateShowIf(
 }
 
 /**
+ * Safely evaluates a basic logical or mathematical expression against form data (Show_If or Valid_If)
+ * Supported:
+ * - Equality: FIELD = 'VALUE' or FIELD = 10
+ * - Comparisons: FIELD > 10, FIELD < 5, FIELD >= 10
+ * - Inequality: FIELD != 'VALUE'
+ * - Empty checks: FIELD = '' or FIELD != ''
+ */
+export function evaluateCustomRule(
+  expression: string,
+  formData: Record<string, string>
+): { success: boolean; error?: string } {
+  if (!expression || !expression.trim()) {
+    return { success: true };
+  }
+
+  try {
+    const expr = expression.trim();
+
+    // 1. Parse equality / inequality (e.g. FIELD = 'VALUE' or FIELD != 'VALUE')
+    const eqMatch = expr.match(/^([A-Za-z0-9_À-ÿ\s°º#-]+)\s*(!?=)\s*(['"]?)(.*?)\3$/);
+    if (eqMatch) {
+      const field = eqMatch[1].trim();
+      const operator = eqMatch[2];
+      const targetVal = eqMatch[4];
+
+      const currentVal = (formData[field] !== undefined ? String(formData[field]) : '').trim();
+
+      if (operator === '=') {
+        return { success: currentVal.toUpperCase() === targetVal.toUpperCase() };
+      } else {
+        return { success: currentVal.toUpperCase() !== targetVal.toUpperCase() };
+      }
+    }
+
+    // 2. Parse numeric comparisons (e.g. FIELD > 10, FIELD <= 100)
+    const compMatch = expr.match(/^([A-Za-z0-9_À-ÿ\s°º#-]+)\s*(>=?|<=?)\s*([0-9.-]+)$/);
+    if (compMatch) {
+      const field = compMatch[1].trim();
+      const operator = compMatch[2];
+      const targetNum = parseFloat(compMatch[3]);
+
+      const currentRaw = (formData[field] !== undefined ? String(formData[field]) : '').trim();
+      const currentNum = parseFloat(currentRaw);
+
+      if (isNaN(currentNum)) {
+        return { success: false }; // Not a number, comparison fails
+      }
+
+      switch (operator) {
+        case '>': return { success: currentNum > targetNum };
+        case '>=': return { success: currentNum >= targetNum };
+        case '<': return { success: currentNum < targetNum };
+        case '<=': return { success: currentNum <= targetNum };
+        default: return { success: false };
+      }
+    }
+
+    // Fallback: If it's a simple field name, return true if field is not empty
+    if (/^[A-Za-z0-9_À-ÿ\s°º#-]+$/.test(expr)) {
+      const val = (formData[expr] !== undefined ? String(formData[expr]) : '').trim();
+      return { success: val !== '' };
+    }
+
+    return { success: false, error: 'Expresión no soportada. Ejemplos válidos: CANTIDAD > 0, FRC_EVEN = \'TRANSPORTE\'' };
+  } catch (err) {
+    return { success: false, error: 'Error al evaluar expresión' };
+  }
+}
+
+/**
  * Operational suggestions for comments/observations (Valid_If assistance)
  */
 export function getOperationalSuggestions(category: EventCategory): string[] {
