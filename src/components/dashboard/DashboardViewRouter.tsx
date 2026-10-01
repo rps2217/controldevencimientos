@@ -132,7 +132,7 @@ export const DashboardViewRouter: React.FC<DashboardViewRouterProps> = ({
         </div>
       ) : (
         <div className="flex-1 flex gap-3 lg:gap-4 min-h-0 overflow-hidden relative h-full">
-          <div className="flex-1 min-w-0 h-full">
+          <div className="flex-1 min-w-0 h-full [contain:layout_style]">
             <DashboardTableContainer />
           </div>
           <ItemDetailDrawer

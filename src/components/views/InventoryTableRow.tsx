@@ -10,8 +10,7 @@ import {
   getCategoryFromEventValue, 
   EVENT_CATEGORIES, 
   renderEventIcon,
-  formatDisplayDate,
-  highlightMatchText
+  formatDisplayDate
 } from '../../utils/dateCalculations';
 import { ColumnMetadata } from '../../hooks/usePrecomputedColumns';
 import { findPhoneColumn, findEmailColumn, findColumnBySemantic } from '../../utils/columnAliases';
@@ -48,7 +47,6 @@ export interface InventoryTableRowProps {
   isEmailEnabled?: boolean;
   isStickyEnabled?: boolean;
   tableDensity?: 'comfortable' | 'compact' | 'ultra';
-  searchTerm?: string;
 }
 
 export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
@@ -79,7 +77,6 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   isEmailEnabled = true,
   isStickyEnabled = false,
   tableDensity = 'compact',
-  searchTerm = '',
 }) => {
   const eventCategory = getEventCategory(item, headers);
   const status = getItemStatus(item, headers);
@@ -182,7 +179,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-mono text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                {skuCol && item[skuCol] ? highlightMatchText(item[skuCol], searchTerm) : 'Sin SKU'}
+                {skuCol && item[skuCol] ? String(item[skuCol]) : 'Sin SKU'}
               </span>
               {item._isOrphan && (
                 <span 
@@ -194,7 +191,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
               )}
             </div>
             <div className="text-sm text-slate-600 dark:text-slate-300 leading-snug line-clamp-2 mt-0.5 font-medium">
-              {descCol && item[descCol] ? highlightMatchText(item[descCol], searchTerm) : 'Sin descripción'}
+              {descCol && item[descCol] ? String(item[descCol]) : 'Sin descripción'}
             </div>
           </div>
 
@@ -405,7 +402,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                   className="font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline flex items-center gap-1 truncate text-left"
                   title="Ver detalle del producto y registros relacionados"
                 >
-                  <span className="truncate max-w-[200px]">{highlightMatchText(val, searchTerm)}</span>
+                  <span className="truncate max-w-[200px]">{String(val ?? '')}</span>
                   <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 px-1 py-0.2 rounded font-mono shrink-0">
                     DETALLE
                   </span>
@@ -413,7 +410,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
               ) : isSku && val ? (
                 <div className="flex items-center gap-1.5 truncate">
                   <span className="font-mono font-semibold text-slate-800 dark:text-slate-100 truncate block text-left">
-                    {highlightMatchText(val, searchTerm)}
+                    {String(val)}
                   </span>
                   {item._isOrphan && (
                     <span 
@@ -434,7 +431,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                   title="Clic normal: Solo este tipo. Ctrl+Clic: Sumar."
                 >
                   {renderEventIcon(eventCat, 'w-3.5 h-3.5 shrink-0')}
-                  <span className="truncate">{highlightMatchText(val, searchTerm)}</span>
+                  <span className="truncate">{String(val)}</span>
                 </button>
               ) : isBodCol && val !== undefined && val !== null && String(val).trim() !== '' ? (
                 <button
@@ -451,13 +448,13 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                   title={`Bodega: ${String(val)}. Clic normal: Filtrar solo esta bodega. Ctrl+Clic: Sumar al filtro.`}
                 >
                   <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                  <span className="truncate">{highlightMatchText(val, searchTerm)}</span>
+                  <span className="truncate">{String(val)}</span>
                 </button>
               ) : isEventView && isTraspasoCol ? (
                 val !== undefined && val !== null && String(val).trim() !== '' ? (
                   <div className="flex items-center justify-start gap-1.5 group/traspaso w-full">
                     <span className="font-mono font-bold text-xs bg-emerald-100/90 dark:bg-emerald-950/70 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700/80 px-2 py-0.5 rounded-md truncate">
-                      {highlightMatchText(val, searchTerm)}
+                      {String(val)}
                     </span>
                     <button
                       onClick={(e) => {
@@ -488,7 +485,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                   {val !== undefined && val !== null && String(val).trim() !== ''
                     ? (isDateCol || (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}/i.test(val.trim())) || val instanceof Date)
                       ? formatDisplayDate(val)
-                      : highlightMatchText(val, searchTerm)
+                      : String(val)
                     : '-'}
                 </span>
               )}

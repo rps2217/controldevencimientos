@@ -55,39 +55,6 @@ export {
 };
 export type { CalculationColumnsContext, GroupAggregates };
 
-/**
- * Safely highlight search keyword matches inside text values for table cells.
- */
-export function highlightMatchText(text: unknown, query: string): React.ReactNode {
-  if (text === null || text === undefined) return null;
-  const strText = String(text);
-  if (!query || !query.trim()) return strText;
-
-  const trimmedQuery = query.trim();
-  const escapedQuery = trimmedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`(${escapedQuery})`, 'gi');
-  const parts = strText.split(regex);
-
-  if (parts.length <= 1) return strText;
-
-  return (
-    <>
-      {parts.map((part, i) =>
-        regex.test(part) ? (
-          <mark
-            key={i}
-            className="bg-amber-200 dark:bg-amber-900/90 text-amber-950 dark:text-amber-100 rounded-2xs px-0.5 font-bold underline decoration-amber-400 dark:decoration-amber-500 decoration-2 underline-offset-1"
-          >
-            {part}
-          </mark>
-        ) : (
-          part
-        )
-      )}
-    </>
-  );
-}
-
 export const EVENT_CATEGORIES: Record<EventCategory, EventTypeDefinition> = {
   VENCIMIENTO_CERCANO: {
     id: 'VENCIMIENTO_CERCANO',

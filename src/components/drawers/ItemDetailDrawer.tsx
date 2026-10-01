@@ -390,8 +390,8 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   // Render on Mobile: Slide-over Drawer with overlay
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-        <div className="w-full max-w-lg bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-200 overflow-hidden">
+      <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200 [contain:strict]">
+        <div className="w-full max-w-lg bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-200 overflow-hidden transform-gpu will-change-transform">
           {detailInnerContent}
         </div>
       </div>
@@ -403,8 +403,8 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
     <div 
       ref={drawerRef}
       style={{ width: `${panelWidth}px` }}
-      className={`h-full shrink-0 flex relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm animate-in slide-in-from-right duration-200 overflow-hidden ${
-        isResizing ? 'select-none transition-none' : 'transition-all duration-150'
+      className={`h-full shrink-0 flex relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm animate-in slide-in-from-right duration-200 overflow-hidden transform-gpu will-change-[width] [contain:layout_style] ${
+        isResizing ? 'select-none transition-none' : 'transition-[width] duration-150'
       }`}
     >
       {/* Resizable Vertical Splitter / Drag Handle (AppSheet Style) */}

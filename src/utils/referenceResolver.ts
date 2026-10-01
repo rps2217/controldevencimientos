@@ -21,6 +21,21 @@ export interface MasterCatalogIndex {
   search: (query: string, limit?: number) => MasterProductSummary[];
 }
 
+export interface MasterPoliciesIndex {
+  rutMap: Map<string, SheetRecord>;
+  exactNameMap: Map<string, SheetRecord>;
+  exactFamilyMap: Map<string, SheetRecord>;
+  exactPolicyMap: Map<string, SheetRecord>;
+  policyEntries: SheetRecord[];
+  findMatch: (
+    prodRut?: unknown,
+    prodProv?: unknown,
+    prodCategory?: unknown,
+    prodDesc?: unknown,
+    rawItemPolicy?: unknown
+  ) => SheetRecord | null;
+}
+
 /**
  * Normalizes a RUT string by removing dots, hyphens, and whitespace, in uppercase.
  * e.g. "76.123.456-7" -> "761234567"
@@ -118,16 +133,10 @@ export function resolveItemPolicyAndRetiro(
   const rutCol = headers.find(h => /rut.*prov|prov.*rut|^rut$/i.test(h));
   const rawItemRut = rutCol ? itemOrFormData[rutCol] : (itemOrFormData.RUT || itemOrFormData['RUT PROVEEDOR']);
 
-  // 2. Find Master Product
+  // 2. Find Master Product via O(1) indexed catalog
   let matchedProduct: SheetRecord | null = null;
   if (cleanSku && products && products.length > 0) {
     matchedProduct = findMasterProduct(cleanSku, products, customAliases) ?? null;
-    if (!matchedProduct) {
-      matchedProduct = products.find((p) => {
-        const pSku = p['COD PRODUCTO'] || p['C'] || p['Código'] || p['Código Producto'] || p['SKU'] || p['sku'];
-        return pSku && String(pSku).trim() === cleanSku;
-      }) ?? null;
-    }
   }
 
   // Extract metadata from master product or item
@@ -155,56 +164,11 @@ export function resolveItemPolicyAndRetiro(
     ? (matchedProduct['RETIRO (DÍAS)'] || matchedProduct['RETIRO DÍAS'] || matchedProduct['DIAS_RETIRO'] || matchedProduct['DIAS_RETIRO_VC'] || matchedProduct['DIAS DE ANTICIPACION'])
     : null;
 
-  // 3. Match row in policies table (Politicas_Canje)
+  // 3. Match row in policies table (Politicas_Canje) via O(1) indexed cache
   let matchedPolicyEntry: SheetRecord | null = null;
-
   if (policies && policies.length > 0) {
-    const cleanProdRut = normalizeRut(prodRut);
-
-    // Priority 3a: Match by Provider RUT
-    if (cleanProdRut) {
-      matchedPolicyEntry = policies.find((p) => {
-        const pRut = p['RUT'] || p['RUT PROVEEDOR'] || p['RUT_PROVEEDOR'] || p['A'];
-        return pRut && normalizeRut(pRut) === cleanProdRut;
-      }) ?? null;
-    }
-
-    // Priority 3b: Match by Provider Name (Fuzzy / Substring / Corporate Suffix stripped)
-    if (!matchedPolicyEntry && prodProv) {
-      const normProv = normalizeCleanText(prodProv);
-      if (normProv) {
-        matchedPolicyEntry = policies.find((p) => {
-          const pName = p['PROVEEDOR'] || p['NOMBRE'] || p['RAZON SOCIAL'] || p['LABORATORIO'] || p['NOMBRE PROVEEDOR'] || p['B'];
-          if (!pName) return false;
-          const normPName = normalizeCleanText(pName);
-          if (!normPName) return false;
-          return normProv === normPName || normProv.includes(normPName) || normPName.includes(normProv);
-        }) ?? null;
-      }
-    }
-
-    // Priority 3c: Match by Family / Category (or provider/description containing family)
-    if (!matchedPolicyEntry) {
-      const candidates = [prodCategory, prodProv, prodDesc, rawItemPolicy].filter(Boolean).map(s => normalizeCleanText(s));
-      matchedPolicyEntry = policies.find((p) => {
-        const pFam = p['FAMILIA'] || p['CATEGORIA'] || p['RUBRO'] || p['MUNDO'];
-        if (!pFam) return false;
-        const normFam = normalizeCleanText(pFam);
-        if (!normFam) return false;
-        return candidates.some(cand => cand.includes(normFam) || normFam.includes(cand));
-      }) ?? null;
-    }
-
-    // Priority 3d: Match by explicit item policy text
-    if (!matchedPolicyEntry && rawItemPolicy) {
-      const normItemPol = normalizeCleanText(rawItemPolicy);
-      matchedPolicyEntry = policies.find((p) => {
-        const pPol = p['POLITICA'] || p['ACCION'] || p['CANJE'] || p['NOMBRE'];
-        if (!pPol) return false;
-        const normPPol = normalizeCleanText(pPol);
-        return normItemPol === normPPol || normItemPol.includes(normPPol) || normPPol.includes(normItemPol);
-      }) ?? null;
-    }
+    const policiesIndex = getMasterPoliciesIndex(policies);
+    matchedPolicyEntry = policiesIndex.findMatch(prodRut, prodProv, prodCategory, prodDesc, rawItemPolicy);
   }
 
   // 4. Resolve Withdrawal Days
@@ -407,6 +371,19 @@ export function buildMasterCatalogIndex(
       if (numOnly && !alphaMap.has(numOnly)) {
         alphaMap.set(numOnly, prod);
       }
+
+      // Also index alternate SKU variations if present
+      const altSku = prod['COD PRODUCTO'] || prod['Código'] || prod['Código Producto'] || prod['C'];
+      if (altSku) {
+        const altStr = String(altSku).trim();
+        if (altStr && altStr !== skuStr) {
+          const altLower = altStr.toLowerCase();
+          if (!exactMap.has(altLower)) exactMap.set(altLower, prod);
+          if (!exactMap.has(altStr)) exactMap.set(altStr, prod);
+          const altAlpha = altLower.replace(/[^a-z0-9]/g, '');
+          if (altAlpha && !alphaMap.has(altAlpha)) alphaMap.set(altAlpha, prod);
+        }
+      }
     }
 
     // Also index by any barcode / EAN columns if present
@@ -516,6 +493,162 @@ export function getMasterCatalogIndex(
   cachedIndexAliases = customAliases;
   cachedIndexResult = buildMasterCatalogIndex(products, customAliases);
   return cachedIndexResult;
+}
+
+let cachedPolicies: SheetRecord[] | null = null;
+let cachedPoliciesIndex: MasterPoliciesIndex | null = null;
+
+export function getMasterPoliciesIndex(policies: SheetRecord[]): MasterPoliciesIndex {
+  if (!policies || policies.length === 0) {
+    return {
+      rutMap: new Map(),
+      exactNameMap: new Map(),
+      exactFamilyMap: new Map(),
+      exactPolicyMap: new Map(),
+      policyEntries: [],
+      findMatch: () => null
+    };
+  }
+
+  if (cachedPoliciesIndex && cachedPolicies === policies) {
+    return cachedPoliciesIndex;
+  }
+
+  const rutMap = new Map<string, SheetRecord>();
+  const exactNameMap = new Map<string, SheetRecord>();
+  const exactFamilyMap = new Map<string, SheetRecord>();
+  const exactPolicyMap = new Map<string, SheetRecord>();
+  const policyEntries: SheetRecord[] = [];
+
+  for (let i = 0; i < policies.length; i++) {
+    const p = policies[i];
+    if (!p) continue;
+    policyEntries.push(p);
+
+    const pRut = p['RUT'] || p['RUT PROVEEDOR'] || p['RUT_PROVEEDOR'] || p['A'];
+    if (pRut) {
+      const cleanRut = normalizeRut(pRut);
+      if (cleanRut && !rutMap.has(cleanRut)) {
+        rutMap.set(cleanRut, p);
+      }
+    }
+
+    const pName = p['PROVEEDOR'] || p['NOMBRE'] || p['RAZON SOCIAL'] || p['LABORATORIO'] || p['NOMBRE PROVEEDOR'] || p['B'];
+    if (pName) {
+      const normName = normalizeCleanText(pName);
+      if (normName && !exactNameMap.has(normName)) {
+        exactNameMap.set(normName, p);
+      }
+    }
+
+    const pFam = p['FAMILIA'] || p['CATEGORIA'] || p['RUBRO'] || p['MUNDO'];
+    if (pFam) {
+      const normFam = normalizeCleanText(pFam);
+      if (normFam && !exactFamilyMap.has(normFam)) {
+        exactFamilyMap.set(normFam, p);
+      }
+    }
+
+    const pPol = p['POLITICA'] || p['ACCION'] || p['CANJE'] || p['NOMBRE'];
+    if (pPol) {
+      const normPol = normalizeCleanText(pPol);
+      if (normPol && !exactPolicyMap.has(normPol)) {
+        exactPolicyMap.set(normPol, p);
+      }
+    }
+  }
+
+  const findMatch = (
+    prodRut?: unknown,
+    prodProv?: unknown,
+    prodCategory?: unknown,
+    prodDesc?: unknown,
+    rawItemPolicy?: unknown
+  ): SheetRecord | null => {
+    // Priority 3a: Match by Provider RUT (O(1))
+    const cleanProdRut = normalizeRut(prodRut);
+    if (cleanProdRut) {
+      const byRut = rutMap.get(cleanProdRut);
+      if (byRut) return byRut;
+    }
+
+    // Priority 3b: Match by Provider Name (O(1) exact, fallback substring)
+    if (prodProv) {
+      const normProv = normalizeCleanText(prodProv);
+      if (normProv) {
+        const byExactName = exactNameMap.get(normProv);
+        if (byExactName) return byExactName;
+
+        for (let i = 0; i < policyEntries.length; i++) {
+          const p = policyEntries[i];
+          const pName = p['PROVEEDOR'] || p['NOMBRE'] || p['RAZON SOCIAL'] || p['LABORATORIO'] || p['NOMBRE PROVEEDOR'] || p['B'];
+          if (pName) {
+            const normPName = normalizeCleanText(pName);
+            if (normPName && (normProv.includes(normPName) || normPName.includes(normProv))) {
+              return p;
+            }
+          }
+        }
+      }
+    }
+
+    // Priority 3c: Match by Family / Category (O(1) exact, fallback candidate includes)
+    if (prodCategory) {
+      const normCat = normalizeCleanText(prodCategory);
+      if (normCat) {
+        const byCat = exactFamilyMap.get(normCat);
+        if (byCat) return byCat;
+      }
+    }
+
+    const candidates = [prodCategory, prodProv, prodDesc, rawItemPolicy].filter(Boolean).map(s => normalizeCleanText(s));
+    if (candidates.length > 0) {
+      for (let i = 0; i < policyEntries.length; i++) {
+        const p = policyEntries[i];
+        const pFam = p['FAMILIA'] || p['CATEGORIA'] || p['RUBRO'] || p['MUNDO'];
+        if (pFam) {
+          const normFam = normalizeCleanText(pFam);
+          if (normFam && candidates.some(cand => cand.includes(normFam) || normFam.includes(cand))) {
+            return p;
+          }
+        }
+      }
+    }
+
+    // Priority 3d: Match by explicit item policy text (O(1) exact, fallback substring)
+    if (rawItemPolicy) {
+      const normItemPol = normalizeCleanText(rawItemPolicy);
+      if (normItemPol) {
+        const byPol = exactPolicyMap.get(normItemPol);
+        if (byPol) return byPol;
+
+        for (let i = 0; i < policyEntries.length; i++) {
+          const p = policyEntries[i];
+          const pPol = p['POLITICA'] || p['ACCION'] || p['CANJE'] || p['NOMBRE'];
+          if (pPol) {
+            const normPPol = normalizeCleanText(pPol);
+            if (normPPol && (normItemPol.includes(normPPol) || normPPol.includes(normItemPol))) {
+              return p;
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  };
+
+  cachedPolicies = policies;
+  cachedPoliciesIndex = {
+    rutMap,
+    exactNameMap,
+    exactFamilyMap,
+    exactPolicyMap,
+    policyEntries,
+    findMatch
+  };
+
+  return cachedPoliciesIndex;
 }
 
 /**
