@@ -144,7 +144,9 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^detalle(_|\s)?(producto)?(_|\s)?(vc|calculado)?$/i,
     /^denominaci[oó]n(_|\s)?(vc|calculado)?$/i,
     /^descripci[oó]n$/i,
-    /^producto_ev$/i
+    /^producto_ev$/i,
+    /.*_desc$/i,
+    /^frc_desc$/i
   ],
   fecha_vc: [
     /^fecha(_|\s)?(vc|vencimiento|caducidad|exp|expiracion|expiraci[oó]n|vto|vcto)$/i,

@@ -345,8 +345,14 @@ export function buildMasterCatalogIndex(
     };
   }
 
-  const firstProd = products[0];
-  const keys = Object.keys(firstProd || {});
+  // Scan up to 20 product rows to accumulate all unique keys, ensuring resilience against empty or dirty first rows
+  const keysSet = new Set<string>();
+  for (let i = 0; i < Math.min(products.length, 20); i++) {
+    if (products[i]) {
+      Object.keys(products[i]).forEach(k => keysSet.add(k));
+    }
+  }
+  const keys = Array.from(keysSet);
   const skuCol = findColumnBySemantic(keys, 'sku', customAliases) || keys.find(k => /sku|código|codigo/i.test(k));
 
   for (let i = 0; i < products.length; i++) {
