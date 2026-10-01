@@ -47,6 +47,23 @@ export function useStockCountSessions({ showToast }: UseStockCountSessionsProps)
   const [sessions, setSessions] = useState<StockCountSession[]>(() => loadStockCountSessionsFromStorage());
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
+  // Deleted session IDs tracking state to ensure real physical deletion is propagated without ghost revivals
+  const [deletedSessionIds, setDeletedSessionIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('app_deleted_session_ids_v1');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Save deletedSessionIds to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('app_deleted_session_ids_v1', JSON.stringify(deletedSessionIds));
+    } catch {}
+  }, [deletedSessionIds]);
+
   // Active session entity
   const activeSession = useMemo(() => {
     return sessions.find(s => s.id === activeSessionId) || null;
@@ -63,16 +80,20 @@ export function useStockCountSessions({ showToast }: UseStockCountSessionsProps)
       const res = await syncCampaignsWithCloud({
         campaigns: camps,
         activeCampaignId: actId,
-        sessions
+        sessions,
+        deletedSessionIds
       });
       if (res && res.success) {
         setCampaigns(res.mergedCampaigns);
         setSessions(res.mergedSessions);
+        if (res.deletedSessionIds) {
+          setDeletedSessionIds(res.deletedSessionIds);
+        }
       }
     } catch (e) {
       console.warn('AutoSync cloud error:', e);
     }
-  }, [sessions]);
+  }, [sessions, deletedSessionIds]);
 
   // Cloud sync handler (Two-Way Merging between this device and Google Sheets)
   const handleCloudSync = useCallback(async (silent: boolean = false) => {
@@ -81,12 +102,16 @@ export function useStockCountSessions({ showToast }: UseStockCountSessionsProps)
       const res = await syncCampaignsWithCloud({
         campaigns,
         activeCampaignId: activeCampaignIdState,
-        sessions
+        sessions,
+        deletedSessionIds
       });
 
       if (res && res.success) {
         setCampaigns(res.mergedCampaigns);
         setSessions(res.mergedSessions);
+        if (res.deletedSessionIds) {
+          setDeletedSessionIds(res.deletedSessionIds);
+        }
         saveCampaignsToStorage(res.mergedCampaigns);
         flushStockCountSessionsToStorage();
 
@@ -119,7 +144,7 @@ export function useStockCountSessions({ showToast }: UseStockCountSessionsProps)
     } finally {
       setIsSyncingCloud(false);
     }
-  }, [campaigns, activeCampaignIdState, sessions, showToast]);
+  }, [campaigns, activeCampaignIdState, sessions, deletedSessionIds, showToast]);
 
   // Respaldar manifiesto de una sesión / mueble específico a la nube
   const handleBackupSessionToCloud = async (sessionToBackup: StockCountSession) => {
@@ -138,12 +163,16 @@ export function useStockCountSessions({ showToast }: UseStockCountSessionsProps)
       const res = await syncCampaignsWithCloud({
         campaigns,
         activeCampaignId: activeCampaignIdState,
-        sessions: updatedSessions
+        sessions: updatedSessions,
+        deletedSessionIds
       });
 
       if (res && res.success) {
         setCampaigns(res.mergedCampaigns);
         setSessions(res.mergedSessions);
+        if (res.deletedSessionIds) {
+          setDeletedSessionIds(res.deletedSessionIds);
+        }
         saveCampaignsToStorage(res.mergedCampaigns);
         flushStockCountSessionsToStorage();
         playBeep('success');
@@ -189,6 +218,8 @@ export function useStockCountSessions({ showToast }: UseStockCountSessionsProps)
     activeCampaign,
     sessions,
     setSessions,
+    deletedSessionIds,
+    setDeletedSessionIds,
     activeSessionId,
     setActiveSessionId,
     activeSession,

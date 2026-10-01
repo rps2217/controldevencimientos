@@ -571,6 +571,7 @@ export async function saveCampaignsToCloud(
     activeCampaignId?: string | null;
     sessions?: StockCountSession[];
     lastUpdated?: string;
+    deletedSessionIds?: string[];
   },
   configSheetName = '_CONFIG_APP',
   expectedVersion: string | null = null
@@ -799,6 +800,7 @@ export async function syncCampaignsWithCloud(
     campaigns: InventoryCampaign[];
     activeCampaignId?: string | null;
     sessions: StockCountSession[];
+    deletedSessionIds?: string[];
   },
   configSheetName = '_CONFIG_APP'
 ): Promise<{
@@ -807,6 +809,7 @@ export async function syncCampaignsWithCloud(
   activeCampaignId: string | null;
   newRemoteSessionsCount: number;
   success: boolean;
+  deletedSessionIds?: string[];
 }> {
   if (!getScriptUrl()) {
     console.warn('[Sheets] syncCampaignsWithCloud omitido: URL de script no configurada (Modo Demo)');
@@ -815,7 +818,8 @@ export async function syncCampaignsWithCloud(
       mergedSessions: localPayload.sessions,
       activeCampaignId: localPayload.activeCampaignId || null,
       newRemoteSessionsCount: 0,
-      success: true
+      success: true,
+      deletedSessionIds: localPayload.deletedSessionIds || []
     };
   }
   try {
@@ -838,7 +842,8 @@ export async function syncCampaignsWithCloud(
       const saveRes = await saveCampaignsToCloud({
         campaigns: mergeResult.mergedCampaigns,
         activeCampaignId: mergeResult.activeCampaignId,
-        sessions: mergeResult.mergedSessions
+        sessions: mergeResult.mergedSessions,
+        deletedSessionIds: mergeResult.deletedSessionIds
       }, configSheetName, remoteData?.version ?? '');
 
       if (saveRes.success) {
@@ -854,7 +859,8 @@ export async function syncCampaignsWithCloud(
           mergedSessions: localPayload.sessions,
           activeCampaignId: localPayload.activeCampaignId || null,
           newRemoteSessionsCount: 0,
-          success: false
+          success: false,
+          deletedSessionIds: localPayload.deletedSessionIds || []
         };
       }
 
@@ -867,7 +873,8 @@ export async function syncCampaignsWithCloud(
       mergedSessions: localPayload.sessions,
       activeCampaignId: localPayload.activeCampaignId || null,
       newRemoteSessionsCount: 0,
-      success: false
+      success: false,
+      deletedSessionIds: localPayload.deletedSessionIds || []
     };
   } catch (err) {
     console.error('[Sheets] Error durante syncCampaignsWithCloud:', err);
@@ -876,7 +883,8 @@ export async function syncCampaignsWithCloud(
       mergedSessions: localPayload.sessions,
       activeCampaignId: localPayload.activeCampaignId || null,
       newRemoteSessionsCount: 0,
-      success: false
+      success: false,
+      deletedSessionIds: localPayload.deletedSessionIds || []
     };
   }
 }

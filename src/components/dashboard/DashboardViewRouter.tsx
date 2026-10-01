@@ -63,6 +63,18 @@ export const DashboardViewRouter: React.FC<DashboardViewRouterProps> = ({
   const setIsScriptModalOpen = modalsActions.setIsScriptModalOpen;
   const setIsConfigOpen = modalsActions.setIsConfigOpen;
 
+  const currentNavIndex = selectedProduct && filteredItems.length > 0
+    ? filteredItems.findIndex(item => (item._entityKey && selectedProduct._entityKey && item._entityKey === selectedProduct._entityKey) || item._rowIndex === selectedProduct._rowIndex)
+    : -1;
+
+  const handleNavigatePrev = currentNavIndex > 0
+    ? () => setSelectedProduct(filteredItems[currentNavIndex - 1])
+    : undefined;
+
+  const handleNavigateNext = currentNavIndex >= 0 && currentNavIndex < filteredItems.length - 1
+    ? () => setSelectedProduct(filteredItems[currentNavIndex + 1])
+    : undefined;
+
   return (
     <div className={`flex-1 min-h-0 flex flex-col p-2 md:p-6 ${activeView === 'main' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       {error && (
@@ -139,6 +151,10 @@ export const DashboardViewRouter: React.FC<DashboardViewRouterProps> = ({
             onNewEventForProduct={(sku, category) => {
               handleOpenModal(undefined, sku, category);
             }}
+            onNavigatePrev={handleNavigatePrev}
+            onNavigateNext={handleNavigateNext}
+            currentIndex={currentNavIndex >= 0 ? currentNavIndex + 1 : undefined}
+            totalCount={filteredItems.length}
             allMainItems={allMainItems}
             policies={policies}
             products={products}

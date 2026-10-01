@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Package, X, Edit2, Trash2, Copy, Barcode as BarcodeIcon, FileText 
+  Package, X, Edit2, Trash2, Copy, Barcode as BarcodeIcon, ChevronLeft, ChevronRight 
 } from 'lucide-react';
 import { InventoryItem } from '../../../types';
 
@@ -14,6 +14,10 @@ interface ItemDetailHeaderProps {
   onDeleteRow?: (product: InventoryItem) => void;
   onPrintBarcode?: (product: InventoryItem) => void;
   onClose: () => void;
+  onNavigatePrev?: () => void;
+  onNavigateNext?: () => void;
+  currentIndex?: number;
+  totalCount?: number;
 }
 
 export const ItemDetailHeader: React.FC<ItemDetailHeaderProps> = ({
@@ -25,7 +29,11 @@ export const ItemDetailHeader: React.FC<ItemDetailHeaderProps> = ({
   onCopy,
   onDeleteRow,
   onPrintBarcode,
-  onClose
+  onClose,
+  onNavigatePrev,
+  onNavigateNext,
+  currentIndex,
+  totalCount
 }) => {
   return (
     <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
@@ -55,52 +63,78 @@ export const ItemDetailHeader: React.FC<ItemDetailHeaderProps> = ({
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center gap-1.5 shrink-0">
-        {onPrintBarcode && sku && sku !== '-' && (
-          <button
-            onClick={() => onPrintBarcode(product)}
-            className="p-2 text-indigo-700 dark:text-indigo-300 bg-indigo-600/10 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-600 hover:text-white transition-colors cursor-pointer"
-            title="Imprimir código de barras del SKU en formato ticket"
-          >
-            <BarcodeIcon className="w-4 h-4" />
-          </button>
+      {/* Record Stepper & Action Buttons */}
+      <div className="flex items-center gap-2 shrink-0">
+        {totalCount !== undefined && totalCount > 0 && (
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700/80 text-xs shrink-0">
+            <button
+              onClick={onNavigatePrev}
+              disabled={!onNavigatePrev}
+              className="p-1 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-30 disabled:hover:text-slate-600 dark:disabled:hover:text-slate-300 rounded-lg hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:cursor-not-allowed"
+              title="Registro anterior (Flecha Arriba / Izquierda)"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-1.5 font-mono font-bold text-[11px] text-slate-700 dark:text-slate-300 whitespace-nowrap">
+              {currentIndex || 1} / {totalCount}
+            </span>
+            <button
+              onClick={onNavigateNext}
+              disabled={!onNavigateNext}
+              className="p-1 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-30 disabled:hover:text-slate-600 dark:disabled:hover:text-slate-300 rounded-lg hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer disabled:cursor-not-allowed"
+              title="Siguiente registro (Flecha Abajo / Derecha)"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         )}
-        <button
-          onClick={() => onEdit(product)}
-          className="p-2 text-blue-700 dark:text-blue-300 bg-blue-600/10 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-600 hover:text-white transition-colors cursor-pointer"
-          title="Editar registro"
-        >
-          <Edit2 className="w-4 h-4" />
-        </button>
-        {onCopy && (
+
+        <div className="flex items-center gap-1.5">
+          {onPrintBarcode && sku && sku !== '-' && (
+            <button
+              onClick={() => onPrintBarcode(product)}
+              className="p-2 text-indigo-700 dark:text-indigo-300 bg-indigo-600/10 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-600 hover:text-white transition-colors cursor-pointer"
+              title="Imprimir código de barras del SKU en formato ticket"
+            >
+              <BarcodeIcon className="w-4 h-4" />
+            </button>
+          )}
           <button
-            onClick={() => onCopy(product)}
+            onClick={() => onEdit(product)}
             className="p-2 text-blue-700 dark:text-blue-300 bg-blue-600/10 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-600 hover:text-white transition-colors cursor-pointer"
-            title="Copiar y editar registro"
+            title="Editar registro"
           >
-            <Copy className="w-4 h-4" />
+            <Edit2 className="w-4 h-4" />
           </button>
-        )}
-        {onDeleteRow && (
-          <button
-            onClick={() => {
-              onDeleteRow(product);
-              onClose();
-            }}
-            className="p-2 text-rose-600 dark:text-rose-400 bg-rose-600/10 border border-rose-200 dark:border-rose-800 rounded-xl hover:bg-rose-600 hover:text-white transition-colors cursor-pointer"
-            title="Eliminar registro"
+          {onCopy && (
+            <button
+              onClick={() => onCopy(product)}
+              className="p-2 text-blue-700 dark:text-blue-300 bg-blue-600/10 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-600 hover:text-white transition-colors cursor-pointer"
+              title="Copiar y editar registro"
+            >
+              <Copy className="w-4 h-4" />
+            </button>
+          )}
+          {onDeleteRow && (
+            <button
+              onClick={() => {
+                onDeleteRow(product);
+                onClose();
+              }}
+              className="p-2 text-rose-600 dark:text-rose-400 bg-rose-600/10 border border-rose-200 dark:border-rose-800 rounded-xl hover:bg-rose-600 hover:text-white transition-colors cursor-pointer"
+              title="Eliminar registro"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          <button 
+            onClick={onClose} 
+            className="p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+            title="Cerrar (Esc)"
           >
-            <Trash2 className="w-4 h-4" />
+            <X className="w-4 h-4" />
           </button>
-        )}
-        <button 
-          onClick={onClose} 
-          className="p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
-          title="Cerrar (Esc)"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        </div>
       </div>
     </div>
   );

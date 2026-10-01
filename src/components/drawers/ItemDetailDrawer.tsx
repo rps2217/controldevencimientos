@@ -27,6 +27,10 @@ interface ItemDetailDrawerProps {
   onDeleteRow?: (product: InventoryItem) => void;
   onPrintBarcode?: (product: InventoryItem) => void;
   onNewEventForProduct: (sku: string, category?: EventCategory) => void;
+  onNavigatePrev?: () => void;
+  onNavigateNext?: () => void;
+  currentIndex?: number;
+  totalCount?: number;
   allMainItems: InventoryItem[];
   policies: SheetRecord[];
   products?: SheetRecord[];
@@ -41,6 +45,10 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   onDeleteRow,
   onPrintBarcode,
   onNewEventForProduct,
+  onNavigatePrev,
+  onNavigateNext,
+  currentIndex,
+  totalCount,
   allMainItems,
   products = [],
   customAliases
@@ -57,7 +65,29 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   const [showAllFields, setShowAllFields] = useState(false);
   const [showSkuTrace, setShowSkuTrace] = useState(false);
   
+  // AppSheet Split View: Resizable panel width state
+  const DEFAULT_PANEL_WIDTH = 460;
+  const MIN_PANEL_WIDTH = 300;
+  const MAX_PANEL_WIDTH = 850;
+
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('appsheet_detail_panel_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= MIN_PANEL_WIDTH && parsed <= MAX_PANEL_WIDTH) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return DEFAULT_PANEL_WIDTH;
+  });
+
+  const [isResizing, setIsResizing] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   const productKeys = product ? Object.keys(product).filter(k => !k.startsWith('_')) : [];
   
@@ -97,13 +127,89 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
     setShowMasterRef(false);
   }, [identityKey, detailMode, product]);
 
-  // Escape key listener to close drawer
+  // Keyboard listener: Escape to close, Arrow keys for prev/next
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    if (!product) return;
+    const onKey = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || '').toUpperCase();
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag)) return;
+
+      if (e.key === 'Escape') {
+        onClose();
+      } else if ((e.key === 'ArrowUp' || e.key === 'ArrowLeft') && onNavigatePrev) {
+        e.preventDefault();
+        onNavigatePrev();
+      } else if ((e.key === 'ArrowDown' || e.key === 'ArrowRight') && onNavigateNext) {
+        e.preventDefault();
+        onNavigateNext();
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [product, onClose, onNavigatePrev, onNavigateNext]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const savePanelWidth = (w: number) => {
+    try {
+      localStorage.setItem('appsheet_detail_panel_width', String(w));
+    } catch {}
+  };
+
+  const startResizing = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const drawerRight = drawerRef.current
+        ? drawerRef.current.getBoundingClientRect().right
+        : window.innerWidth;
+      const newWidth = drawerRight - e.clientX;
+      const maxW = Math.min(MAX_PANEL_WIDTH, window.innerWidth * 0.65);
+      const clamped = Math.max(MIN_PANEL_WIDTH, Math.min(newWidth, maxW));
+      setPanelWidth(clamped);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!e.touches[0]) return;
+      const drawerRight = drawerRef.current
+        ? drawerRef.current.getBoundingClientRect().right
+        : window.innerWidth;
+      const newWidth = drawerRight - e.touches[0].clientX;
+      const maxW = Math.min(MAX_PANEL_WIDTH, window.innerWidth * 0.65);
+      const clamped = Math.max(MIN_PANEL_WIDTH, Math.min(newWidth, maxW));
+      setPanelWidth(clamped);
+    };
+
+    const stopResizing = () => {
+      setIsResizing(false);
+      savePanelWidth(panelWidth);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', stopResizing);
+    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchend', stopResizing);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', stopResizing);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', stopResizing);
+    };
+  }, [isResizing, panelWidth]);
+
+  // ALL HOOKS EXECUTED UNCONDITIONALLY ABOVE
   if (!product) return null;
 
   const toggleFieldVisibility = (key: string) => {
@@ -175,107 +281,151 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   // Status computation for expiration
   const status = getItemStatus(product, productKeys);
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-200 overflow-hidden">
+  // Content JSX rendered inside either mobile overlay or desktop split panel
+  const detailInnerContent = (
+    <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+      {/* Header */}
+      <ItemDetailHeader
+        product={product}
+        title={name}
+        sku={sku}
+        detailMode={detailMode}
+        onEdit={onEdit}
+        onCopy={onCopy}
+        onDeleteRow={onDeleteRow}
+        onPrintBarcode={onPrintBarcode}
+        onClose={onClose}
+        onNavigatePrev={onNavigatePrev}
+        onNavigateNext={onNavigateNext}
+        currentIndex={currentIndex}
+        totalCount={totalCount}
+      />
+
+      {/* Scrollable Content */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4">
         
-        {/* Header */}
-        <ItemDetailHeader
-          product={product}
-          title={name}
-          sku={sku}
+        {/* Expiration Status Banner */}
+        <ItemDetailStatusBanner
+          status={status}
           detailMode={detailMode}
-          onEdit={onEdit}
-          onCopy={onCopy}
-          onDeleteRow={onDeleteRow}
-          onPrintBarcode={onPrintBarcode}
-          onClose={onClose}
         />
 
-        {/* Scrollable Content */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4">
-          
-          {/* Expiration Status Banner */}
-          <ItemDetailStatusBanner
-            status={status}
-            detailMode={detailMode}
+        {/* Master Reference Card */}
+        {masterSummary && (
+          <ItemDetailMasterRefCard
+            masterSummary={masterSummary}
           />
+        )}
 
-          {/* Master Reference Card */}
-          {masterSummary && (
-            <ItemDetailMasterRefCard
-              masterSummary={masterSummary}
-            />
-          )}
+        {/* SKU Trace & Related Expirations / Events */}
+        {(expirations.length > 0 || incidents.length > 0) && (
+          <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowSkuTrace(!showSkuTrace)}
+              className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <span>Trazabilidad SKU ({expirations.length} vtos, {incidents.length} incidencias)</span>
+              </span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showSkuTrace ? 'rotate-180' : ''}`} />
+            </button>
 
-          {/* SKU Trace & Related Expirations / Events */}
-          {(expirations.length > 0 || incidents.length > 0) && (
-            <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setShowSkuTrace(!showSkuTrace)}
-                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <span>Trazabilidad SKU ({expirations.length} vtos, {incidents.length} incidencias)</span>
-                </span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showSkuTrace ? 'rotate-180' : ''}`} />
-              </button>
+            {showSkuTrace && (
+              <div className="p-3 border-t border-slate-200 dark:border-slate-700">
+                <ItemDetailSkuTrace
+                  sku={sku}
+                  expirations={expirations}
+                  incidents={incidents}
+                  onNewEventForProduct={onNewEventForProduct}
+                  customAliases={customAliases}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
-              {showSkuTrace && (
-                <div className="p-3 border-t border-slate-200 dark:border-slate-700">
-                  <ItemDetailSkuTrace
-                    sku={sku}
-                    expirations={expirations}
-                    incidents={incidents}
-                    onNewEventForProduct={onNewEventForProduct}
-                    customAliases={customAliases}
-                  />
-                </div>
-              )}
-            </div>
-          )}
+        {/* Barcode Preview Accordion */}
+        {sku && sku !== '-' && (
+          <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowBarcode(!showBarcode)}
+              className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <BarcodeIcon className="w-4 h-4 text-indigo-500" />
+                <span>Código de Barras</span>
+              </span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showBarcode ? 'rotate-180' : ''}`} />
+            </button>
 
-          {/* Barcode Preview Accordion */}
-          {sku && sku !== '-' && (
-            <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setShowBarcode(!showBarcode)}
-                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <BarcodeIcon className="w-4 h-4 text-indigo-500" />
-                  <span>Código de Barras</span>
-                </span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showBarcode ? 'rotate-180' : ''}`} />
-              </button>
+            {showBarcode && (
+              <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center gap-2">
+                <Barcode value={sku} width={2} height={50} showText={true} />
+              </div>
+            )}
+          </div>
+        )}
 
-              {showBarcode && (
-                <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center gap-2">
-                  <Barcode value={sku} width={2} height={50} showText={true} />
-                </div>
-              )}
-            </div>
-          )}
+        {/* Technical Fields Grid */}
+        <ItemDetailFieldsGrid
+          product={product}
+          productKeys={productKeys}
+          orderedKeys={orderedKeys}
+          hiddenFields={hiddenFields}
+          showAllFields={showAllFields}
+          isConfiguringFields={isConfiguringFields}
+          setShowAllFields={setShowAllFields}
+          setIsConfiguringFields={setIsConfiguringFields}
+          toggleFieldVisibility={toggleFieldVisibility}
+          handleShowAllFields={handleShowAllFields}
+          customAliases={customAliases}
+        />
 
-          {/* Technical Fields Grid */}
-          <ItemDetailFieldsGrid
-            product={product}
-            productKeys={productKeys}
-            orderedKeys={orderedKeys}
-            hiddenFields={hiddenFields}
-            showAllFields={showAllFields}
-            isConfiguringFields={isConfiguringFields}
-            setShowAllFields={setShowAllFields}
-            setIsConfiguringFields={setIsConfiguringFields}
-            toggleFieldVisibility={toggleFieldVisibility}
-            handleShowAllFields={handleShowAllFields}
-            customAliases={customAliases}
-          />
+      </div>
+    </div>
+  );
 
+  // Render on Mobile: Slide-over Drawer with overlay
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="w-full max-w-lg bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-200 overflow-hidden">
+          {detailInnerContent}
         </div>
       </div>
+    );
+  }
+
+  // Render on Desktop: AppSheet Contiguous Resizable Split View Panel (no backdrop overlay)
+  return (
+    <div 
+      ref={drawerRef}
+      style={{ width: `${panelWidth}px` }}
+      className={`h-full shrink-0 flex relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm animate-in slide-in-from-right duration-200 overflow-hidden ${
+        isResizing ? 'select-none transition-none' : 'transition-all duration-150'
+      }`}
+    >
+      {/* Resizable Vertical Splitter / Drag Handle (AppSheet Style) */}
+      <div
+        onMouseDown={startResizing}
+        onTouchStart={startResizing}
+        onDoubleClick={() => {
+          setPanelWidth(DEFAULT_PANEL_WIDTH);
+          savePanelWidth(DEFAULT_PANEL_WIDTH);
+        }}
+        className={`absolute left-0 top-0 bottom-0 w-3 -ml-1.5 z-30 cursor-col-resize group flex items-center justify-center transition-colors ${
+          isResizing ? 'bg-blue-500/30' : 'hover:bg-blue-500/20'
+        }`}
+        title="Arrastra para ajustar el ancho (Doble clic para restablecer)"
+      >
+        <div className={`w-1 h-12 rounded-full transition-colors ${
+          isResizing ? 'bg-blue-600 shadow-md' : 'bg-slate-300 dark:bg-slate-700 group-hover:bg-blue-500'
+        }`} />
+      </div>
+
+      {detailInnerContent}
     </div>
   );
 };

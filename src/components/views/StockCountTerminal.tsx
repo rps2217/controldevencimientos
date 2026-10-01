@@ -71,6 +71,8 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     activeCampaign,
     sessions,
     setSessions,
+    deletedSessionIds,
+    setDeletedSessionIds,
     activeSessionId,
     setActiveSessionId,
     activeSession,
@@ -534,30 +536,32 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     }
   };
 
-  // Delete session with logical deletion and real-time cloud propagation
+  // Delete session with real physical deletion and real-time cloud propagation
   const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (await confirm({ title: 'Eliminar sesión', message: '¿Estás seguro de eliminar esta sesión de conteo? Se borrará también de la nube en tiempo real.', confirmLabel: 'Eliminar' })) {
-      const updatedSessions = sessions.map(s => {
-        if (s.id === sessionId) {
-          return {
-            ...s,
-            deleted: true,
-            conteos: [], // Limpiar conteos para no ocupar espacio en celdas de Sheets
-            lastUpdated: new Date().toISOString()
-          };
-        }
-        return s;
-      });
+    if (await confirm({ title: 'Eliminar sesión', message: '¿Estás seguro de eliminar esta sesión de conteo? Se borrará por completo de la nube y de todos los dispositivos en tiempo real.', confirmLabel: 'Eliminar' })) {
+      // 1. Physically filter out the deleted session locally
+      const updatedSessions = sessions.filter(s => s.id !== sessionId);
       setSessions(updatedSessions);
+
+      // 2. Add to deletedSessionIds tracker to propagate deletion and prevent ghost revivals
+      const updatedDeletedSessionIds = Array.from(new Set([...deletedSessionIds, sessionId]));
+      setDeletedSessionIds(updatedDeletedSessionIds);
 
       // Sincronizar inmediatamente para propagar el borrado a Google Sheets
       try {
-        await syncCampaignsWithCloud({
+        const res = await syncCampaignsWithCloud({
           campaigns,
           activeCampaignId: activeCampaignIdState,
-          sessions: updatedSessions
+          sessions: updatedSessions,
+          deletedSessionIds: updatedDeletedSessionIds
         });
+        if (res && res.success) {
+          setSessions(res.mergedSessions);
+          if (res.deletedSessionIds) {
+            setDeletedSessionIds(res.deletedSessionIds);
+          }
+        }
       } catch (err) {
         console.warn('[Sheets] No se pudo propagar el borrado de inmediato:', err);
       }
@@ -966,9 +970,10 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     handleCommitBentoScan(sku, qty);
   };
 
-  // Reconciled items for the active session (computed lazily only in RECONCILIATION view to optimize scan performance)
+  // Reconciled items for the active session (computed lazily in RECONCILIATION & COUNTING views to optimize scan performance)
   const reconciliation = useMemo(() => {
-    if (!currentSession || viewState !== 'RECONCILIATION') return [];
+    if (!currentSession) return [];
+    if (viewState !== 'RECONCILIATION' && viewState !== 'COUNTING') return [];
     return reconcileStockCountSession(currentSession, sheetItems, headers, masterProducts);
   }, [currentSession, sheetItems, headers, masterProducts, viewState]);
 
@@ -1293,6 +1298,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
           <ScopedErrorBoundary moduleName="Lista de Sesiones">
             <StockCountSessionsListView
               sessions={sessions.filter(s => !s.deleted)}
+              sheetItems={sheetItems}
               isSyncingCloud={isSyncingCloud}
               realProviders={availableRealProviders}
               erpSnapshotCount={erpSnapshotCount}

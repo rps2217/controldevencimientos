@@ -22,7 +22,7 @@ import {
   ArrowRight,
   PackageCheck
 } from 'lucide-react';
-import { StockCountSession, StockCountMode } from '../../types';
+import { StockCountSession, StockCountMode, InventoryItem } from '../../types';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -38,6 +38,7 @@ export interface NewSessionConfig {
 
 export interface StockCountSessionsListViewProps {
   sessions: StockCountSession[];
+  sheetItems?: InventoryItem[];
   isSyncingCloud: boolean;
   realProviders?: string[];
   erpSnapshotCount?: number;
@@ -53,6 +54,7 @@ export interface StockCountSessionsListViewProps {
 
 export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProps> = ({
   sessions,
+  sheetItems = [],
   isSyncingCloud,
   realProviders = [],
   erpSnapshotCount = 0,
@@ -66,14 +68,34 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
   onCloudSync,
 }) => {
   const [newSessionName, setNewSessionName] = useState('');
-  const [newSessionMode, setNewSessionMode] = useState<StockCountMode>('BLIND');
+  const [newSessionMode, setNewSessionMode] = useState<StockCountMode>('DOCUMENT');
   const [newSessionRequireExpiry, setNewSessionRequireExpiry] = useState<boolean>(false);
   const [newSessionYearFrom, setNewSessionYearFrom] = useState<number>(CURRENT_YEAR);
   const [newSessionYearTo, setNewSessionYearTo] = useState<number>(CURRENT_YEAR + 3);
   const [newSessionLocation, setNewSessionLocation] = useState('');
 
+  // Enhanced provider directed audit mode
+  const [sessionType, setSessionType] = useState<'FREE' | 'PROVIDER'>('FREE');
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
+  const [providerSearch, setProviderSearch] = useState<string>('');
+
+  // Dynamically compute expected SKUs for the selected provider/lab
+  const providerSkus = React.useMemo(() => {
+    if (!selectedProvider) return [];
+    const cleanSel = selectedProvider.trim().toLowerCase();
+    const skusSet = new Set<string>();
+    sheetItems.forEach(item => {
+      const p = item.RUT_PROVEEDOR_VC || item.PROVEEDOR || item.proveedor || item.RUT_PROVEEDOR;
+      if (p && String(p).trim().toLowerCase() === cleanSel && item.SKU) {
+        skusSet.add(item.SKU.trim());
+      }
+    });
+    return Array.from(skusSet);
+  }, [selectedProvider, sheetItems]);
+
   // Preset quick selectors
   const applyPreset = (preset: 'QUICK' | 'EXPIRY' | 'BLIND_AUDIT') => {
+    setSessionType('FREE');
     if (preset === 'QUICK') {
       setNewSessionName(`Mueble ${sessions.length + 1} - Conteo Rápido`);
       setNewSessionMode('DOCUMENT');
@@ -94,16 +116,37 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalName = newSessionName.trim() || `Mueble ${sessions.length + 1} - ${new Date().toLocaleDateString('es-CL')}`;
+    
+    let finalName = '';
+    let finalUbicacion = '';
+    let skuScope: string[] | undefined = undefined;
+
+    if (sessionType === 'PROVIDER') {
+      if (!selectedProvider) {
+        return;
+      }
+      finalName = `${selectedProvider} - Conteo Dirigido`;
+      finalUbicacion = selectedProvider;
+      skuScope = providerSkus;
+    } else {
+      finalName = newSessionName.trim() || `Mueble ${sessions.length + 1} - ${new Date().toLocaleDateString('es-CL')}`;
+      finalUbicacion = newSessionLocation.trim() || finalName;
+    }
+
     onCreateSession({
       nombre: finalName,
       modo: newSessionMode,
       requiereVencimiento: newSessionRequireExpiry,
       rangoAnos: newSessionRequireExpiry ? { desde: newSessionYearFrom, hasta: newSessionYearTo } : undefined,
-      ubicacion: newSessionLocation.trim() || finalName,
+      ubicacion: finalUbicacion,
+      skuScope
     });
+
     setNewSessionName('');
     setNewSessionLocation('');
+    setSelectedProvider('');
+    setProviderSearch('');
+    setSessionType('FREE');
   };
 
   return (
@@ -211,40 +254,160 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Nombre del Mueble, Sección o Proveedor
-              </label>
-              <input
-                type="text"
-                value={newSessionName}
-                onChange={(e) => setNewSessionName(e.target.value)}
-                placeholder="Ej: Mueble 1, Pasillo 2 o Lab. Bagó"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              />
+            {/* Segmented Session Type Selector */}
+            <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setSessionType('FREE')}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  sessionType === 'FREE'
+                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                🏢 Por Mueble / Libre
+              </button>
+              <button
+                type="button"
+                onClick={() => setSessionType('PROVIDER')}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  sessionType === 'PROVIDER'
+                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                📦 Dirigido por Proveedor
+              </button>
             </div>
 
-            {/* Quick chips for furniture or supplier name */}
-            <div>
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-1.5">
-                {realProviders.length > 0 ? `Proveedores Reales en Foto ERP (${realProviders.length}):` : 'Sugerencias Rápidas de Sección:'}
-              </span>
-              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
-                {(realProviders.length > 0 ? realProviders : ['Mueble 1', 'Mueble 2', 'Pasillo 1', 'Refrigerados', 'Bodega']).map((chip) => (
-                  <button
-                    key={chip}
-                    type="button"
-                    onClick={() => {
-                      setNewSessionName(realProviders.length > 0 ? `Proveedor: ${chip}` : chip);
-                      setNewSessionLocation(chip);
-                    }}
-                    className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:text-blue-600 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {sessionType === 'FREE' ? (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Nombre del Mueble o Sección
+                  </label>
+                  <input
+                    type="text"
+                    value={newSessionName}
+                    onChange={(e) => setNewSessionName(e.target.value)}
+                    placeholder="Ej: Mueble 1, Pasillo 2 o Refrigerados"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  />
+                </div>
+
+                {/* Sugerencias Rápidas */}
+                <div>
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-1.5">
+                    Sugerencias Rápidas de Sección:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                    {['Mueble 1', 'Mueble 2', 'Pasillo 1', 'Pasillo 2', 'Refrigerados', 'Bodega Sur', 'Mesa de Ofertas'].map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => {
+                          setNewSessionName(chip);
+                          setNewSessionLocation(chip);
+                        }}
+                        className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:text-blue-600 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Directed Provider Audit Selector */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Escribe para buscar Proveedor <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={providerSearch}
+                      onChange={(e) => {
+                        setProviderSearch(e.target.value);
+                        if (selectedProvider) setSelectedProvider('');
+                      }}
+                      placeholder="Buscar por RUT o nombre de proveedor..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    />
+                    {providerSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProviderSearch('');
+                          setSelectedProvider('');
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold hover:text-slate-600"
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Suggestion overlay list */}
+                  {!selectedProvider && providerSearch.trim().length > 0 && (
+                    <div className="border border-slate-200 dark:border-slate-700 rounded-2xl max-h-40 overflow-y-auto bg-white dark:bg-slate-800 shadow-xl z-20 relative divide-y divide-slate-100 dark:divide-slate-700/50">
+                      {realProviders
+                        .filter(p => p.toLowerCase().includes(providerSearch.toLowerCase()))
+                        .slice(0, 15)
+                        .map(p => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => {
+                              setSelectedProvider(p);
+                              setProviderSearch(p);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors"
+                          >
+                            📦 {p}
+                          </button>
+                        ))}
+                      {realProviders.filter(p => p.toLowerCase().includes(providerSearch.toLowerCase())).length === 0 && (
+                        <div className="p-3 text-xs text-slate-400 text-center">
+                          No se encontraron laboratorios con ese nombre en el ERP
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Selected Provider Card */}
+                  {selectedProvider && (
+                    <div className="p-4 bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/60 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                          Laboratorio Seleccionado
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedProvider('');
+                            setProviderSearch('');
+                          }}
+                          className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
+                        >
+                          Cambiar
+                        </button>
+                      </div>
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                        {selectedProvider}
+                      </p>
+                      <div className="pt-2 border-t border-emerald-100 dark:border-emerald-900/40 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                        <span>SKUs teóricos del proveedor:</span>
+                        <span className="font-mono font-extrabold text-emerald-600 dark:text-emerald-400">
+                          {providerSkus.length} SKUs
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">

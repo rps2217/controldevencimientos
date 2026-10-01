@@ -135,6 +135,14 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
 
   const laserHardwareInputRef = useRef<HTMLInputElement>(null);
 
+  // Enhanced supplier directed count metrics
+  const progressPercent = useMemo(() => {
+    if (!currentSession?.skuScope || currentSession.skuScope.length === 0) return 0;
+    const totalExpected = currentSession.skuScope.length;
+    const countedInScope = groupedSkuEntries.filter(e => currentSession.skuScope?.includes(e.sku)).length;
+    return Math.round((countedInScope / totalExpected) * 100);
+  }, [currentSession, groupedSkuEntries]);
+
   // Trigger haptic vibration on mobile hardware
   const triggerHaptic = (type: 'success' | 'alert' | 'undo') => {
     if (!soundHapticsEnabled) return;
@@ -219,6 +227,22 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
       setMultiplier(1);
     }
     setIsSearchDropdownOpen(false);
+  };
+
+  // Fast complete remaining provider SKUs with 0 stock
+  const handleCompleteWithZeros = () => {
+    const uncounted = pendingItems.filter(item => !groupedSkuEntries.some(g => g.sku === item.sku));
+    if (uncounted.length === 0) {
+      showToast('No hay productos pendientes por completar con ceros', 'info');
+      return;
+    }
+    
+    // Commit a 0-quantity scan for each uncounted SKU
+    uncounted.forEach(item => {
+      onCommitScan(item.sku, 0);
+    });
+    
+    showToast(`Se registraron ${uncounted.length} productos con cantidad 0`, 'success');
   };
 
   // Handle hardware laser / keyboard scan submission
@@ -733,6 +757,27 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
             </button>
           </div>
 
+          {/* Supplier-directed active count progress banner */}
+          {currentSession.skuScope && currentSession.skuScope.length > 0 && (
+            <div className="mt-3 p-3 bg-indigo-950/40 rounded-2xl border border-indigo-500/25 space-y-2">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-extrabold text-indigo-300 flex items-center gap-1 uppercase tracking-wider">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  Progreso Laboratorio
+                </span>
+                <span className="font-mono font-black text-indigo-300">
+                  {groupedSkuEntries.filter(e => currentSession.skuScope?.includes(e.sku)).length} / {currentSession.skuScope.length} SKUs ({progressPercent}%)
+                </span>
+              </div>
+              <div className="w-full bg-slate-900/80 rounded-full h-2 border border-slate-700/60 overflow-hidden">
+                <div 
+                  className="bg-indigo-500 h-full rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(99,102,241,0.5)]" 
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Quick Search inside side tab */}
           <div className="relative my-2.5">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -799,29 +844,48 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
                   <span>¡Todo contado! No hay pendientes.</span>
                 </div>
               ) : (
-                filteredPendingItems.map(item => (
-                  <div
-                    key={item.sku}
-                    className="p-2.5 bg-slate-900/80 border border-amber-900/40 rounded-xl flex items-center justify-between gap-2 text-xs"
-                  >
-                    <div className="truncate flex-1">
-                      <span className="font-mono font-bold text-amber-400">{item.sku}</span>
-                      <p className="text-slate-300 truncate text-[11px] mt-0.5">{item.descripcion}</p>
-                      <span className="text-[10px] text-slate-400">Teórico: {item.teorico} u.</span>
-                    </div>
-
+                <>
+                  {currentSession.skuScope && currentSession.skuScope.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => {
-                        processScanCode(item.sku, 1);
-                        showToast(`Cargado: ${item.sku}`, 'info');
-                      }}
-                      className="px-2.5 py-1 bg-amber-600/80 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                      onClick={handleCompleteWithZeros}
+                      className="w-full py-2.5 mb-2 bg-indigo-900/40 hover:bg-indigo-900/60 text-indigo-200 border border-indigo-500/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                     >
-                      Contar
+                      <PackageCheck className="w-4 h-4 text-indigo-400" />
+                      <span>Completar Pendientes con Cantidad 0</span>
                     </button>
-                  </div>
-                ))
+                  )}
+                  {filteredPendingItems.map(item => (
+                    <div
+                      key={item.sku}
+                      onClick={() => {
+                        setInputBuffer(item.sku);
+                        showToast(`SKU ${item.sku} cargado. Usa el teclado para ingresar cantidad.`, 'info');
+                      }}
+                      className="p-2.5 bg-slate-900/80 hover:bg-slate-900 border border-amber-900/40 hover:border-amber-500/40 rounded-xl flex items-center justify-between gap-2 text-xs cursor-pointer transition-colors"
+                      title="Haz clic para cargar en el teclado digital"
+                    >
+                      <div className="truncate flex-1">
+                        <span className="font-mono font-bold text-amber-400">{item.sku}</span>
+                        <p className="text-slate-300 truncate text-[11px] mt-0.5">{item.descripcion}</p>
+                        <span className="text-[10px] text-slate-400">Teórico: {item.teorico} u.</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Avoid triggering card click
+                          processScanCode(item.sku, 1);
+                          showToast(`Contado: ${item.sku}`, 'info');
+                        }}
+                        className="px-2.5 py-1 bg-amber-600/80 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shrink-0"
+                      >
+                        Contar
+                      </button>
+                    </div>
+                  ))
+                  }
+                </>
               )
             )}
           </div>

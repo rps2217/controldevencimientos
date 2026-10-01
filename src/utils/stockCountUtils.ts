@@ -638,23 +638,41 @@ const sinIndefinidos = <T extends object>(obj: T): T =>
  * Fusiona sin pérdida de datos las campañas y sesiones de conteo locales con las remotas de Google Sheets
  */
 export function mergeCampaignsAndSessions(
-  localData: { campaigns: InventoryCampaign[]; sessions: StockCountSession[]; activeCampaignId?: string | null },
-  remoteData: { campaigns?: InventoryCampaign[]; sessions?: StockCountSession[]; activeCampaignId?: string | null } | null
+  localData: { campaigns: InventoryCampaign[]; sessions: StockCountSession[]; activeCampaignId?: string | null; deletedSessionIds?: string[] },
+  remoteData: { campaigns?: InventoryCampaign[]; sessions?: StockCountSession[]; activeCampaignId?: string | null; deletedSessionIds?: string[] } | null
 ): {
   mergedCampaigns: InventoryCampaign[];
   mergedSessions: StockCountSession[];
   activeCampaignId: string | null;
   newRemoteSessionsCount: number;
+  deletedSessionIds: string[];
 } {
   const localSessions = localData.sessions || [];
   const remoteSessions = (remoteData && Array.isArray(remoteData.sessions)) ? remoteData.sessions : [];
   
+  // Combine deleted session IDs from both local and remote data to ensure propagate deletions
+  const deletedSet = new Set<string>();
+  if (Array.isArray(localData.deletedSessionIds)) {
+    localData.deletedSessionIds.forEach(id => { if (id) deletedSet.add(id); });
+  }
+  if (remoteData && Array.isArray(remoteData.deletedSessionIds)) {
+    remoteData.deletedSessionIds.forEach(id => { if (id) deletedSet.add(id); });
+  }
+
+  // Also collect any sessions explicitly marked as deleted in either source
+  localSessions.forEach(s => {
+    if (s && s.id && s.deleted) deletedSet.add(s.id);
+  });
+  remoteSessions.forEach(s => {
+    if (s && s.id && s.deleted) deletedSet.add(s.id);
+  });
+
   // 1. Mapa de sesiones unificadas por ID
   const sessionMap = new Map<string, StockCountSession>();
   
-  // Registrar sesiones remotas primero
+  // Registrar sesiones remotas primero, omitiendo completamente las eliminadas físicamente
   for (const rSess of remoteSessions) {
-    if (rSess && rSess.id) {
+    if (rSess && rSess.id && !deletedSet.has(rSess.id)) {
       sessionMap.set(rSess.id, { ...rSess, sincronizadoNube: true });
     }
   }
@@ -662,96 +680,56 @@ export function mergeCampaignsAndSessions(
   let newRemoteSessionsCount = 0;
   const localSessionIds = new Set(localSessions.map(s => s.id));
   for (const rSess of remoteSessions) {
-    if (rSess && rSess.id && !localSessionIds.has(rSess.id) && !rSess.deleted) {
+    if (rSess && rSess.id && !localSessionIds.has(rSess.id) && !deletedSet.has(rSess.id)) {
       newRemoteSessionsCount++;
     }
   }
 
-  // Fusionar sesiones locales
+  // Fusionar sesiones locales, omitiendo completamente las eliminadas físicamente
   for (const lSess of localSessions) {
     if (!lSess || !lSess.id) continue;
+    if (deletedSet.has(lSess.id)) {
+      continue; // Skip physical deletion
+    }
     const remote = sessionMap.get(lSess.id);
     if (!remote) {
       // Sesión creada localmente que aún no existe en la nube
       sessionMap.set(lSess.id, lSess);
     } else {
       // Existe en ambos: resolver conflicto según timestamps (lastUpdated)
-      const localTime = new Date(lSess.lastUpdated || lSess.fechaInicio || 0).getTime();
-      const remoteTime = new Date(remote.lastUpdated || remote.fechaInicio || 0).getTime();
-
-      if (lSess.deleted || remote.deleted) {
-        // Al menos una de las dos está borrada.
-        if (localTime >= remoteTime) {
-          if (lSess.deleted) {
-            sessionMap.set(lSess.id, {
-              ...remote,
-              ...lSess,
-              deleted: true,
-              conteos: [], // Limpiar conteos para ahorrar ancho de banda
-              sincronizadoNube: true
-            });
-          } else {
-            // Revivir si la versión local es más nueva y está activa
-            sessionMap.set(lSess.id, {
-              ...remote,
-              ...sinIndefinidos(lSess),
-              deleted: false,
-              sincronizadoNube: true
-            });
-          }
-        } else {
-          if (remote.deleted) {
-            sessionMap.set(lSess.id, {
-              ...lSess,
-              ...remote,
-              deleted: true,
-              conteos: [],
-              sincronizadoNube: true
-            });
-          } else {
-            // Revivir si la versión remota es más nueva y está activa
-            sessionMap.set(lSess.id, {
-              ...lSess,
-              ...remote,
-              deleted: false,
-              sincronizadoNube: true
-            });
-          }
+      const entryIdSet = new Set<string>();
+      const combinedConteos: StockCountEntry[] = [];
+      
+      const addEntry = (entry: StockCountEntry) => {
+        const uniqueKey = entry.id || `${entry.sku}_${entry.timestamp}_${entry.cantidad}_${entry.cu_vc || ''}`;
+        if (!entryIdSet.has(uniqueKey)) {
+          entryIdSet.add(uniqueKey);
+          combinedConteos.push(entry);
         }
-      } else {
-        // Ambas están activas: fusionar conteos normalmente
-        const entryIdSet = new Set<string>();
-        const combinedConteos: StockCountEntry[] = [];
-        
-        const addEntry = (entry: StockCountEntry) => {
-          const uniqueKey = entry.id || `${entry.sku}_${entry.timestamp}_${entry.cantidad}_${entry.cu_vc || ''}`;
-          if (!entryIdSet.has(uniqueKey)) {
-            entryIdSet.add(uniqueKey);
-            combinedConteos.push(entry);
-          }
-        };
+      };
 
-        (remote.conteos || []).forEach(addEntry);
-        (lSess.conteos || []).forEach(addEntry);
+      (remote.conteos || []).forEach(addEntry);
+      (lSess.conteos || []).forEach(addEntry);
 
-        const estado = (lSess.estado === 'COMPLETED' || remote.estado === 'COMPLETED') ? 'COMPLETED' : 'IN_PROGRESS';
-        
-        sessionMap.set(lSess.id, {
-          ...remote,
-          ...sinIndefinidos(lSess),
-          estado,
-          conteos: combinedConteos,
-          lastUpdated: new Date().toISOString(),
-          deviceId: lSess.deviceId || remote.deviceId || getOrCreateDeviceId(),
-          sincronizadoNube: true
-        });
-      }
+      const estado = (lSess.estado === 'COMPLETED' || remote.estado === 'COMPLETED') ? 'COMPLETED' : 'IN_PROGRESS';
+      
+      sessionMap.set(lSess.id, {
+        ...remote,
+        ...sinIndefinidos(lSess),
+        estado,
+        conteos: combinedConteos,
+        lastUpdated: new Date().toISOString(),
+        deviceId: lSess.deviceId || remote.deviceId || getOrCreateDeviceId(),
+        sincronizadoNube: true
+      });
     }
   }
 
   const mergedSessions = Array.from(sessionMap.values()).sort((a, b) => 
     new Date(b.fechaInicio || 0).getTime() - new Date(a.fechaInicio || 0).getTime()
   );
+
+  const finalDeletedSessionIds = Array.from(deletedSet);
 
   // 2. Fusionar Campañas
   const localCampaigns = localData.campaigns || [];
@@ -873,7 +851,8 @@ export function mergeCampaignsAndSessions(
     mergedCampaigns,
     mergedSessions,
     activeCampaignId,
-    newRemoteSessionsCount
+    newRemoteSessionsCount,
+    deletedSessionIds: finalDeletedSessionIds
   };
 }
 
