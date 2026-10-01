@@ -176,13 +176,16 @@ export function resolveItemPolicyAndRetiro(
   let daysSource: 'item_form' | 'policy_module' | 'product_catalog' | 'default' = 'default';
   let sourceDesc = '';
 
-  // 4a. If item/form has explicit days entered by user
+  // 4a. If item/form has explicit days entered by user (excluding parsed dates)
   if (rawItemDays !== undefined && rawItemDays !== null && String(rawItemDays).trim() !== '') {
-    const parsed = parseInt(String(rawItemDays), 10);
-    if (!isNaN(parsed) && parsed > 0 && parsed <= 365) {
-      resolvedDays = parsed;
-      daysSource = 'item_form';
-      sourceDesc = 'Ingresado directamente en formulario';
+    const isDateStr = parseAnyDate(rawItemDays) !== null;
+    if (!isDateStr) {
+      const parsed = parseInt(String(rawItemDays), 10);
+      if (!isNaN(parsed) && parsed > 0 && parsed <= 365) {
+        resolvedDays = parsed;
+        daysSource = 'item_form';
+        sourceDesc = 'Ingresado directamente en formulario';
+      }
     }
   }
 
@@ -248,9 +251,7 @@ export function resolveItemPolicyAndRetiro(
 
   // 5. Resolve Policy Name
   let resolvedPolicy = '';
-  if (rawItemPolicy && String(rawItemPolicy).trim() !== '') {
-    resolvedPolicy = String(rawItemPolicy).trim();
-  } else if (matchedPolicyEntry) {
+  if (matchedPolicyEntry) {
     const polName = matchedPolicyEntry['POLITICA'] || 
                     matchedPolicyEntry['ACCION'] || 
                     matchedPolicyEntry['CANJE'] || 
@@ -261,6 +262,8 @@ export function resolveItemPolicyAndRetiro(
     } else if (matchedPolicyEntry['FAMILIA']) {
       resolvedPolicy = `${matchedPolicyEntry['FAMILIA']} (${resolvedDays}d)`;
     }
+  } else if (rawItemPolicy && String(rawItemPolicy).trim() !== '') {
+    resolvedPolicy = String(rawItemPolicy).trim();
   } else if (prodPolicy) {
     resolvedPolicy = String(prodPolicy).trim();
   }
@@ -842,7 +845,7 @@ export function autoCalculateItemFormData(
   const fechaVcCol = findColumnBySemantic(headers, 'fecha_vc', customAliases) || 
                      headers.find(h => /vencimiento|caducidad|expiración|fecha_vc/i.test(h));
   const fechaRetiroCol = findColumnBySemantic(headers, 'fecha_retiro', customAliases) || 
-                         headers.find(h => /retiro|canje_retiro|fecha_canje/i.test(h));
+                         headers.find(h => /retiro|canje_retiro|fecha_canje/i.test(h) && !/dias|d[ií]as|cant/i.test(h));
 
   // 1. Lookup SKU in master catalog (products) if SKU is typed
   const skuVal = skuCol && newForm[skuCol] ? String(newForm[skuCol]).trim() : '';

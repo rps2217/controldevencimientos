@@ -128,7 +128,7 @@ export const ItemDetailFieldsGrid: React.FC<ItemDetailFieldsGridProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {shownKeys.map(key => {
           const rawVal = product[key];
-          const isDate = /fecha|vencimiento|retiro/i.test(key) && !/dias|días|cant/i.test(key);
+          const isDate = /fecha|vencimiento|retiro/i.test(key) && !/dias|d[ií]as|cant/i.test(key);
           const displayVal = (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') 
             ? '-' 
             : isDate 

@@ -251,7 +251,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                     findColumnBySemantic(headers, 'dias_anticipacion', sheetConfig?.customAliases) ||
                     headers.find(h => /dias(_|\s)?(retiro|anticipacion|canje|limite)|dias_retiro_vc/i.test(h));
     const fechaRetiroCol = findColumnBySemantic(headers, 'fecha_retiro', sheetConfig?.customAliases) ||
-                           headers.find(h => /retiro|canje_retiro|fecha_canje/i.test(h));
+                           headers.find(h => /retiro|canje_retiro|fecha_canje/i.test(h) && !/dias|d[ií]as|cant/i.test(h));
 
     if (policyCol && resolvedPolicyInfo.policy) {
       updates[policyCol] = resolvedPolicyInfo.policy;
