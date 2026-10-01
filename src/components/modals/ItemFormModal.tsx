@@ -371,10 +371,17 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             
             {/* Event Category Selector (Main or Events views) */}
             {isMainOrEvents && (
-              <ItemFormCategorySelector
-                selectedEventCategory={selectedEventCategory}
-                onSelectEventCategory={onSelectEventCategory}
-              />
+              <div className="space-y-1.5">
+                <ItemFormCategorySelector
+                  selectedEventCategory={selectedEventCategory}
+                  onSelectEventCategory={onSelectEventCategory}
+                />
+                {formErrors.__event_category && (
+                  <p className="text-xs font-bold text-rose-500 px-1">
+                    {formErrors.__event_category}
+                  </p>
+                )}
+              </div>
             )}
 
             {/* AppSheet Feature 1: Ref Active Banner (Linked Master Product) */}

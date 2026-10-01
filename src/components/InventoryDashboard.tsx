@@ -654,7 +654,8 @@ export const InventoryDashboard: React.FC = () => {
     enqueueMutation,
     fetchData,
     showToast,
-    confirm
+    confirm,
+    selectedEventCategory
   });
 
   useEffect(() => {

@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
-import { InventoryItem, SheetConfig, SheetRecord } from '../types';
+import { InventoryItem, SheetConfig, SheetRecord, EventCategory } from '../types';
 import { appendRow, updateRow, deleteRow, clearSheetsCache } from '../lib/sheets';
 import { rowToObject, getErrorMessage, parseLocaleNumber } from '../utils/pureCalculations';
+import { EVENT_CATEGORIES } from '../utils/dateCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { resolveItemIdentity } from '../utils/entityIdentityResolver';
 import { findExistingItemByCuVc } from '../utils/cuVcConsolidator';
@@ -34,6 +35,7 @@ export interface UseInventoryMutationsParams {
   fetchData: (config?: SheetConfig, targetView?: string, forceRefresh?: boolean) => Promise<any>;
   showToast: (message: string, type?: ToastType, title?: string) => void;
   confirm: (options: ConfirmOptions) => Promise<boolean>;
+  selectedEventCategory: EventCategory;
 }
 
 export function useInventoryMutations({
@@ -58,7 +60,8 @@ export function useInventoryMutations({
   enqueueMutation,
   fetchData,
   showToast,
-  confirm
+  confirm,
+  selectedEventCategory
 }: UseInventoryMutationsParams) {
   const [isSaving, setIsSaving] = useState(false);
 
@@ -105,6 +108,19 @@ export function useInventoryMutations({
           const currentQty = parseLocaleNumber(targetExistingItem[qtyCol]);
           const addQty = parseLocaleNumber(formData[qtyCol]);
           mergedFormData[qtyCol] = String(currentQty + addQty);
+        }
+      }
+
+      const eventCol = findColumnBySemantic(headers, 'tipo_evento') || headers.find(h => /^frc(_|\s)?even/i.test(h.trim()) || /tipo.*evento|evento|tipo.*registro/i.test(h));
+      if (eventCol && selectedEventCategory && EVENT_CATEGORIES[selectedEventCategory]) {
+        mergedFormData[eventCol] = EVENT_CATEGORIES[selectedEventCategory].rawCode || EVENT_CATEGORIES[selectedEventCategory].name;
+      }
+
+      // Auto-generate ID_FRC for FRC sheets if empty
+      if (activeSheet.title === 'FRC') {
+        const idCol = findColumnBySemantic(headers, 'id');
+        if (idCol && !mergedFormData[idCol]) {
+          mergedFormData[idCol] = crypto.randomUUID();
         }
       }
 

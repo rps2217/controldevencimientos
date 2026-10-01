@@ -50,6 +50,10 @@ const CATEGORY_FIELD_PATTERNS: Record<EventCategory, { relevant: RegExp[]; secon
   VENCIMIENTO: {
     relevant: [/vencimiento|caducidad|expiraci[oó]n|retiro|pol[ií]tica|d[ií]as|mm|yyyy|mes|a[ñn]o/i],
     secondaryExcluded: [/cami[oó]n|patente|chofer|flete|cuarentena/i]
+  },
+  MERMAS: {
+    relevant: [/merma|p[eé]rdida|deterioro|inventario|ajuste|conteo/i],
+    secondaryExcluded: [/cami[oó]n|patente|chofer|temperatura/i]
   }
 };
 

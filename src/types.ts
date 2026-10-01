@@ -115,7 +115,8 @@ export type EventCategory =
   | 'CAL_EXTERNA'
   | 'AVERIA' 
   | 'DEVOLUCION' 
-  | 'CANJES';
+  | 'CANJES'
+  | 'MERMAS';
 
 export interface EventTypeDefinition {
   id: EventCategory;

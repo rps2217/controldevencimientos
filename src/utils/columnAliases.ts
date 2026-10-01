@@ -95,6 +95,8 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
   ],
   id: [
     /^id_frc$/i,
+    /^n°(_|\s)?frc$/i,
+    /^numero(_|\s)?frc$/i,
     /^cu(_|\s)?(vc|calculado)?$/i,
     /^codigo(_|\s)?unico$/i,
     /^clave(_|\s)?unica$/i,
@@ -128,7 +130,8 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^clave(_|\s)?(prod|producto)?(_|\s)?(vc|calculado)?$/i,
     /^cod_art$/i,
     /^codigo_articulo$/i,
-    /^nro(_|\s)?(de)?(_|\s)?(articulo|prod)$/i
+    /^nro(_|\s)?(de)?(_|\s)?(articulo|prod)$/i,
+    /^evsku_ev$/i
   ],
   descripcion: [
     /^descripci[oó]n(_|\s)?(de|del)?(_|\s)?(producto|articulo|item|material)?(_|\s)?(vc|calculado)?$/i,
@@ -140,7 +143,8 @@ export const FIELD_PATTERNS: Record<KnownFieldSemantic, RegExp[]> = {
     /^nombre(_|\s)?(de|del)?(_|\s)?(producto|articulo|item)?(_|\s)?(vc|calculado)?$/i,
     /^detalle(_|\s)?(producto)?(_|\s)?(vc|calculado)?$/i,
     /^denominaci[oó]n(_|\s)?(vc|calculado)?$/i,
-    /^descripci[oó]n$/i
+    /^descripci[oó]n$/i,
+    /^producto_ev$/i
   ],
   fecha_vc: [
     /^fecha(_|\s)?(vc|vencimiento|caducidad|exp|expiracion|expiraci[oó]n|vto|vcto)$/i,

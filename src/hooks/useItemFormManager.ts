@@ -170,6 +170,10 @@ export function useItemFormManager({
     const errors: Record<string, string> = {};
     if (!activeSheet) return errors;
 
+    if (!selectedEventCategory) {
+      errors.__event_category = 'Debe definir obligatoriamente el tipo de registro / evento.';
+    }
+
     const currentSchema = sheetConfig.schema?.[activeSheet.title] || {};
     const isEventsSheet = canLogEvents || /frc|evento|incidenc|averia|merma|diferencia|transporte/i.test(activeSheet.title);
     

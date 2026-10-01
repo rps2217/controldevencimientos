@@ -172,6 +172,19 @@ export const EVENT_CATEGORIES: Record<EventCategory, EventTypeDefinition> = {
     cardBorder: 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/50 dark:bg-rose-950/30',
     cardBg: 'bg-rose-600 text-white',
     iconBg: 'bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300'
+  },
+  MERMAS: {
+    id: 'MERMAS',
+    rawCode: 'MERMAS',
+    name: 'Mermas',
+    shortLabel: 'Mermas',
+    description: 'Pérdidas, mermas o deterioros de inventario registrados',
+    badgeBg: 'bg-orange-50 dark:bg-orange-950/60',
+    badgeText: 'text-orange-800 dark:text-orange-300',
+    badgeBorder: 'border-orange-200 dark:border-orange-800',
+    cardBorder: 'border-orange-500 ring-2 ring-orange-500/20 bg-orange-50/50 dark:bg-orange-950/30',
+    cardBg: 'bg-orange-600 text-white',
+    iconBg: 'bg-orange-100 dark:bg-orange-900/60 text-orange-800 dark:text-orange-300'
   }
 };
 
