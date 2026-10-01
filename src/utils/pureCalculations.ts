@@ -652,3 +652,69 @@ export function rowToObject(headers: ReadonlyArray<unknown>, row: ReadonlyArray<
 export function getErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
+
+export interface GroupAggregates {
+  totalQuantity: number;
+  hasQuantity: boolean;
+  formattedQuantity: string;
+  earliestDate: Date | null;
+  formattedEarliestDate: string;
+  criticalCount: number;
+  totalCount: number;
+}
+
+export function computeGroupAggregates(
+  items: ReadonlyArray<InventoryItem>,
+  headers: ReadonlyArray<string>,
+  customAliases?: Record<string, string[]>
+): GroupAggregates {
+  let totalQuantity = 0;
+  let hasQuantity = false;
+  let earliestDate: Date | null = null;
+  let criticalCount = 0;
+
+  const headersArr = headers as string[];
+  const qtyCol = findColumnBySemantic(headersArr, 'cantidad', customAliases);
+  const dateCol = findColumnBySemantic(headersArr, 'fecha_vc', customAliases) || findColumnBySemantic(headersArr, 'fecha_retiro', customAliases);
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  for (const item of items) {
+    if (qtyCol && item[qtyCol] !== undefined && item[qtyCol] !== null && String(item[qtyCol]).trim() !== '') {
+      const num = parseLocaleNumber(item[qtyCol]);
+      if (!isNaN(num)) {
+        totalQuantity += num;
+        hasQuantity = true;
+      }
+    }
+
+    if (dateCol && item[dateCol]) {
+      const dt = parseAnyDate(item[dateCol]);
+      if (dt && !isNaN(dt.getTime())) {
+        if (!earliestDate || dt.getTime() < earliestDate.getTime()) {
+          earliestDate = dt;
+        }
+        const diffDays = Math.ceil((dt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 30) {
+          criticalCount++;
+        }
+      }
+    }
+  }
+
+  const formattedQuantity = hasQuantity ? formatLocaleNumber(totalQuantity) : '';
+  const formattedEarliestDate = earliestDate
+    ? `${String(earliestDate.getDate()).padStart(2, '0')}/${String(earliestDate.getMonth() + 1).padStart(2, '0')}/${earliestDate.getFullYear()}`
+    : '';
+
+  return {
+    totalQuantity,
+    hasQuantity,
+    formattedQuantity,
+    earliestDate,
+    formattedEarliestDate,
+    criticalCount,
+    totalCount: items.length
+  };
+}

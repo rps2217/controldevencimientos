@@ -524,6 +524,7 @@ export const InventoryTable: React.FC = () => {
                     isEmailEnabled={isEmailEnabled}
                     isStickyEnabled={isSticky}
                     tableDensity={tableDensity}
+                    searchTerm={dashboard.searchTerm}
                   />
                 );
               })}
