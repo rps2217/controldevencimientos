@@ -124,7 +124,11 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       data-index={virtualIndex} 
       ref={measureElementRef} 
       onClick={() => onClickItem(item)}
-      className={`transition-colors group cursor-pointer ${rowBgClass} md:border-b border-transparent md:border-slate-100 dark:md:border-slate-800 block md:table-row w-full bg-transparent md:bg-white dark:md:bg-slate-900`}
+      className={`transition-all duration-150 group cursor-pointer ${
+        isActiveDetail 
+          ? 'bg-blue-50/60 dark:bg-blue-900/20 ring-1 ring-inset ring-blue-500/50' 
+          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+      } ${isSelected ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''} md:border-b border-transparent md:border-slate-100 dark:md:border-slate-800 block md:table-row w-full bg-transparent md:bg-white dark:md:bg-slate-900`}
       title="Haz clic para ver detalles del registro"
     >
       {/* 📱 TRUE MOBILE CARD VIEW (iOS Inset Grouped Card with Generous Touch Targets) */}
