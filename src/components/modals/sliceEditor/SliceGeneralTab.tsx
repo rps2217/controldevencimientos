@@ -1,6 +1,6 @@
 import React from 'react';
 import { SliceColor } from '../../../types';
-import { Tag, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { SliceIcon } from '../../slices/SliceSelectorBar';
 
 interface SliceGeneralTabProps {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StockCountEntry } from '../../../types';
 import { formatLocaleNumber } from '../../../utils/pureCalculations';
-import { Trash2, Edit2, Check, Search, Calendar, Hash, Layers } from 'lucide-react';
+import { Trash2, Edit2, Check, Search, Hash } from 'lucide-react';
 
 interface StockCountAuditsTableProps {
   entries: StockCountEntry[];

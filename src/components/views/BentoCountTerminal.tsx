@@ -2,12 +2,9 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Barcode, 
   Camera, 
-  Zap, 
   RotateCcw, 
   CheckCircle2, 
   AlertTriangle, 
-  Plus, 
-  Minus, 
   Layers, 
   MapPin, 
   Volume2, 
@@ -17,19 +14,16 @@ import {
   X,
   PackageCheck,
   Search,
-  ListTodo,
-  Trash2,
   Lock,
   Unlock,
-  Calendar,
   Sparkles,
   ArrowRight,
   HelpCircle,
   Info
 } from 'lucide-react';
-import type { StockCountEntry, StockCountSession, SheetRecord } from '../../types';
+import type { StockCountEntry, StockCountSession } from '../../types';
 import type { MasterCatalogIndex, MasterProductSummary } from '../../utils/referenceResolver';
-import { formatLocaleNumber, parseLocaleNumber } from '../../utils/pureCalculations';
+import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { playBeep } from '../../utils/stockCountUtils';
 import { MobileExpiryPrompt } from './MobileExpiryPrompt';
 import { CampaignSkuErpBadge } from '../campaign/CampaignSkuBadges';
@@ -95,8 +89,8 @@ export const BentoCountTerminal: React.FC<BentoCountTerminalProps> = ({
   onCommitScan,
   onIncrementSku,
   onDecrementSku,
-  onRemoveSkuAllEntries,
-  onRemoveEntry,
+  onRemoveSkuAllEntries: _onRemoveSkuAllEntries,
+  onRemoveEntry: _onRemoveEntry,
   onUndoLastEntry,
   groupedSkuEntries,
   pendingItems,

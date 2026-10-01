@@ -7,11 +7,7 @@ import {
   CheckCircle2, 
   Store, 
   ArrowRight, 
-  HelpCircle,
-  FileSpreadsheet,
-  Scan,
-  RotateCcw,
-  Sparkles
+  HelpCircle
 } from 'lucide-react';
 
 interface StockCountWorkflowGuideModalProps {
@@ -118,7 +114,7 @@ export const StockCountWorkflowGuideModal: React.FC<StockCountWorkflowGuideModal
 
         {/* Steps List */}
         <div className="p-5 flex-1 overflow-y-auto space-y-3.5">
-          {steps.map((s, idx) => {
+          {steps.map((s) => {
             const Icon = s.icon;
             return (
               <div 

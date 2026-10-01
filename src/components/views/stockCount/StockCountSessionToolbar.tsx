@@ -1,6 +1,6 @@
 import React from 'react';
 import { StockCountSession } from '../../../types';
-import { CheckCircle2, FileSpreadsheet, UploadCloud, Copy, Share2, Lock, Unlock } from 'lucide-react';
+import { CheckCircle2, FileSpreadsheet, UploadCloud, Copy, Share2 } from 'lucide-react';
 
 interface StockCountSessionToolbarProps {
   currentSession: StockCountSession;

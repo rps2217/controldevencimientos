@@ -183,7 +183,7 @@ export function computeReconciliationMetrics(reconciliation: StockCountReconcili
 export function getPendingItems(
   currentSession: StockCountSession | null,
   reconciliation: StockCountReconciliationItem[],
-  search: string
+  search: string = ''
 ): StockCountReconciliationItem[] {
   if (!currentSession) return [];
   const items = reconciliation.filter(r => r.contado === 0 && r.teorico > 0);

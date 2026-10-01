@@ -1,48 +1,39 @@
 import React from 'react';
 import { InventoryCampaign, StockCountSession } from '../../../types';
-import { Store, Plus, FileSpreadsheet, RefreshCw, UploadCloud, Layers } from 'lucide-react';
-import { formatLocaleNumber } from '../../../utils/pureCalculations';
+import { Store, Plus, FileSpreadsheet, UploadCloud, Layers } from 'lucide-react';
 
 interface CampaignHeaderProps {
   campaigns: InventoryCampaign[];
   activeCampaignId: string | null;
-  activeCampaign: InventoryCampaign | null;
-  sessions: StockCountSession[];
+  activeCampaign?: InventoryCampaign | null;
+  sessions?: StockCountSession[];
   activeTab: 'MATRIX' | 'SNAPSHOT_UPLOAD';
   setActiveTab: (tab: 'MATRIX' | 'SNAPSHOT_UPLOAD') => void;
   onSelectCampaign: (id: string) => void;
   onOpenNewCampaignModal: () => void;
   onOpenUploadErpModal: () => void;
-  onOpenQuickScanModal: () => void;
-  onOpenBulkSalesModal: () => void;
-  isSyncingCloud: boolean;
-  lastCloudSyncDate: string | null;
-  onSyncCloud: () => Promise<void>;
+  onOpenQuickScanModal?: () => void;
+  onOpenBulkSalesModal?: () => void;
+  isSyncingCloud?: boolean;
+  lastCloudSyncDate?: string | null;
+  onSyncCloud?: () => Promise<void>;
   isSavingToAuditSheet: boolean;
   onSaveToAuditSheet: () => Promise<void>;
   onExportExcel: () => void;
-  onExportRecountSheet: () => void;
+  onExportRecountSheet?: () => void;
 }
 
 export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   campaigns,
   activeCampaignId,
-  activeCampaign,
-  sessions,
   activeTab,
   setActiveTab,
   onSelectCampaign,
   onOpenNewCampaignModal,
   onOpenUploadErpModal,
-  onOpenQuickScanModal,
-  onOpenBulkSalesModal,
-  isSyncingCloud,
-  lastCloudSyncDate,
-  onSyncCloud,
   isSavingToAuditSheet,
   onSaveToAuditSheet,
   onExportExcel,
-  onExportRecountSheet
 }) => {
   return (
     <div className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 p-4 space-y-3 shrink-0">

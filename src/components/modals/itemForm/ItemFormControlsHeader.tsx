@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Sparkles, Sliders, Eye, EyeOff, Check, RotateCcw } from 'lucide-react';
+import { Search, Sparkles, Sliders, Eye, EyeOff } from 'lucide-react';
 import { MasterProductSummary } from '../../../utils/referenceResolver';
 
 interface ItemFormControlsHeaderProps {

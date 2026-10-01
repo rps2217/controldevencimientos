@@ -1,7 +1,7 @@
 import React from 'react';
 import { InventoryItem, EventCategory } from '../../../types';
 import { findColumnBySemantic } from '../../../utils/columnAliases';
-import { formatDisplayDate, formatLocaleNumber, renderEventIcon, EVENT_CATEGORIES } from '../../../utils/dateCalculations';
+import { formatDisplayDate, formatLocaleNumber } from '../../../utils/dateCalculations';
 import { Plus, Calendar, AlertTriangle } from 'lucide-react';
 
 interface ItemDetailSkuTraceProps {

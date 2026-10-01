@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { 
-  Play, 
   Check, 
   FileSpreadsheet, 
   EyeOff, 
   Calendar, 
-  MapPin, 
   Database, 
   Loader2, 
   Cloud, 
@@ -18,9 +16,7 @@ import {
   CheckCircle2, 
   Sparkles, 
   HelpCircle,
-  UploadCloud,
-  ArrowRight,
-  PackageCheck
+  UploadCloud
 } from 'lucide-react';
 import { StockCountSession, StockCountMode, InventoryItem } from '../../types';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
@@ -70,8 +66,8 @@ export const StockCountSessionsListView: React.FC<StockCountSessionsListViewProp
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionMode, setNewSessionMode] = useState<StockCountMode>('DOCUMENT');
   const [newSessionRequireExpiry, setNewSessionRequireExpiry] = useState<boolean>(false);
-  const [newSessionYearFrom, setNewSessionYearFrom] = useState<number>(CURRENT_YEAR);
-  const [newSessionYearTo, setNewSessionYearTo] = useState<number>(CURRENT_YEAR + 3);
+  const [newSessionYearFrom] = useState<number>(CURRENT_YEAR);
+  const [newSessionYearTo] = useState<number>(CURRENT_YEAR + 3);
   const [newSessionLocation, setNewSessionLocation] = useState('');
 
   // Enhanced provider directed audit mode

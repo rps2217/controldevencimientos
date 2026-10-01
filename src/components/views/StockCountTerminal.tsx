@@ -1,26 +1,20 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, Minus, Trash2, CheckCircle2, Calendar, Search, Layers, FileSpreadsheet, Barcode, Hash, MapPin, Lock, Unlock, ListTodo, Zap, Store, Camera, Cloud, Loader2, Undo2, HelpCircle, UploadCloud } from 'lucide-react';
-import { StockCountSession, StockCountEntry, InventoryItem, InventoryCampaign, SheetRecord } from '../../types';
+import { CheckCircle2, Layers, FileSpreadsheet, Zap } from 'lucide-react';
+import { StockCountSession, StockCountEntry, InventoryItem, SheetRecord } from '../../types';
 import { generateCuVc, calculateLastDayOfMonthDateString, reconcileStockCountSession, buildVencimientosRowFromCount, buildAuditRowsFromSession, loadStockCountSessionsFromStorage, saveStockCountSessionsToStorageDebounced, flushStockCountSessionsToStorage, exportStockCountToExcel, generateShortVcId, playBeep, getOrCreateDeviceId } from '../../utils/stockCountUtils';
-import { loadCampaignsFromStorage, saveCampaignsToStorage, getActiveCampaignId, setActiveCampaignId } from '../../utils/campaignUtils';
+import { saveCampaignsToStorage } from '../../utils/campaignUtils';
 import { saveAuditRowsToDedicatedSheet, syncCampaignsWithCloud } from '../../lib/sheets';
 import { LazyFallback } from '../common/LazyFallback';
 import { MobileCameraBarcodeScanner } from './MobileCameraBarcodeScanner';
 import { MobileErpSnapshotView } from './MobileErpSnapshotView';
 import { StockCountReconciliationView } from './StockCountReconciliationView';
 import { StockCountSessionsListView, NewSessionConfig } from './StockCountSessionsListView';
-import { CountNumpad } from './CountNumpad';
-import { CampaignSkuErpBadge } from '../campaign/CampaignSkuBadges';
 import { BentoCountTerminal } from './BentoCountTerminal';
-import { MobileReadingsList } from './MobileReadingsList';
-import { LastScannedHeroCard } from './LastScannedHeroCard';
-import { OpticonTerminalView } from './OpticonTerminalView';
-import { MobileExpiryPrompt, MONTHS_LIST } from './MobileExpiryPrompt';
-import { buildMasterCatalogIndex, MasterProductSummary } from '../../utils/referenceResolver';
+import { buildMasterCatalogIndex } from '../../utils/referenceResolver';
 import { formatLocaleNumber, parseLocaleNumber } from '../../utils/pureCalculations';
-import { groupSkuEntries, getLastScannedItem, filterGroupedEntries, filterChronoEntries, getReconciliationProviders, filterReconciliation, computeReconciliationMetrics, getPendingItems } from '../../utils/countAggregation';
+import { groupSkuEntries, getLastScannedItem, getReconciliationProviders, filterReconciliation, computeReconciliationMetrics, getPendingItems } from '../../utils/countAggregation';
 import { copyTextToClipboard } from '../../utils/exportUtils';
 import { executeThermalPrint } from '../../utils/ticketUtils';
 import { TicketPrintView } from './TicketPrintView';
@@ -29,7 +23,6 @@ import { useConfirm } from '../common/ConfirmDialog';
 import { useHardwareBarcodeScanner } from '../../hooks/useHardwareBarcodeScanner';
 import { ScopedErrorBoundary } from '../common/ScopedErrorBoundary';
 
-import { STORAGE_KEYS } from '../../utils/appStorage';
 import { ErpSnapshotUploadModal } from '../modals/ErpSnapshotUploadModal';
 import { StockCountWorkflowGuideModal } from '../modals/StockCountWorkflowGuideModal';
 import { useStockCountSessions } from '../../hooks/useStockCountSessions';
@@ -67,7 +60,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     campaigns,
     setCampaigns,
     activeCampaignIdState,
-    setActiveCampaignIdState,
     activeCampaign,
     sessions,
     setSessions,
@@ -75,7 +67,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     setDeletedSessionIds,
     activeSessionId,
     setActiveSessionId,
-    activeSession,
     isSyncingCloud,
     lastCloudSyncDate,
     erpSnapshotCount,
@@ -213,7 +204,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   const [countQuantity, setCountQuantity] = useState<number>(1);
   const [countLocation, setCountLocation] = useState<string>('');
   const [isLocationLocked, setIsLocationLocked] = useState<boolean>(false);
-  const [isBurstScanMode, setIsBurstScanMode] = useState<boolean>(true); // Fast burst scanning (+1 auto)
   const [isSummaryCopied, setIsSummaryCopied] = useState<boolean>(false);
 
   // Expiry prompt states for sequential 2-step flow
@@ -221,14 +211,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   const [tempMm, setTempMm] = useState<string>('');
   const [tempYyyy, setTempYyyy] = useState<string>('');
   
-  // Right panel view & anti-bounce scanner ref
-  const [rightTab, setRightTab] = useState<'READINGS' | 'PENDING'>('READINGS');
-  const [pendingSearch, setPendingSearch] = useState<string>('');
-  const lastScanRef = useRef<{ sku: string; timestamp: number } | null>(null);
-
-  // Autocomplete / Search dropdown
-  const [catalogSearchResults, setCatalogSearchResults] = useState<MasterProductSummary[]>([]);
-  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const skuInputRef = useRef<HTMLInputElement>(null);
 
   // Mobile / PDA camera scanner state
@@ -263,13 +245,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     };
   }, [scannedSku, activeCampaign, sessions]);
 
-  // Readings view mode: 'GROUPED' (consolidated by SKU) vs 'CHRONO' (chronological individual log)
-  const [readingsViewMode, setReadingsViewMode] = useState<'GROUPED' | 'CHRONO'>('GROUPED');
-  
-  // Mobile dedicated tab when in active counting session: 'OPTICON' (Industrial Collector) | 'SCAN' (Scanner / Keypad) | 'READINGS' (Full-screen readings list)
-  const [mobileCountingTab, setMobileCountingTab] = useState<'OPTICON' | 'SCAN' | 'READINGS'>('OPTICON');
-  const [readingsSearch, setReadingsSearch] = useState<string>('');
-
   // Reconciliation filter & Supplier audit filter
   const [reconciliationFilter, setReconciliationFilter] = useState<'ALL' | 'DIF' | 'CUADRADO' | 'FALTANTE' | 'SOBRANTE' | 'NO_CATALOGADO'>('ALL');
   const [selectedProviderFilter, setSelectedProviderFilter] = useState<string>('ALL');
@@ -289,60 +264,10 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     }, type === 'ERROR' ? 300 : 180);
   };
 
-  // Mobile Numpad & Packaging Multiplier mode: 'NUMPAD' | 'CHIPS'
-  const [mobileEntryMode, setMobileEntryMode] = useState<'NUMPAD' | 'CHIPS'>('NUMPAD');
-  const [packMultiplierCategory, setPackMultiplierCategory] = useState<'UNITS' | 'PACKS'>('UNITS');
-
   // Master catalog pre-indexed for lightning-fast O(1) lookups on low-end PDAs
   const masterCatalogIndex = useMemo(() => {
     return buildMasterCatalogIndex(masterProducts);
   }, [masterProducts]);
-
-  // Industrial Numpad Digit Input
-  const handleNumpadDigit = (digit: string) => {
-    playBeep('skip');
-    setCountQuantity(prev => {
-      if (digit === '00') {
-        const next = prev * 100;
-        return next > 99999 ? prev : next;
-      }
-      if (prev === 1 || prev === 0) {
-        return parseInt(digit, 10) || 1;
-      }
-      const str = `${prev}${digit}`;
-      const parsed = parseInt(str, 10);
-      return isNaN(parsed) || parsed > 99999 ? prev : parsed;
-    });
-  };
-
-  // Industrial Numpad Backspace
-  const handleNumpadBackspace = () => {
-    playBeep('skip');
-    setCountQuantity(prev => {
-      const str = prev.toString();
-      if (str.length <= 1) return 1;
-      return parseInt(str.slice(0, -1), 10) || 1;
-    });
-  };
-
-  // Industrial Numpad Clear
-  const handleNumpadClear = () => {
-    playBeep('skip');
-    setCountQuantity(1);
-  };
-
-  // Presentation Multipliers (e.g. x6, x10, x20, x30, x50, x100)
-  const handleApplyPackagingMultiplier = (factor: number) => {
-    playBeep('success');
-    triggerVisualFlash('SUCCESS');
-    setCountQuantity(prev => {
-      if (prev === 1) return factor;
-      return prev * factor;
-    });
-    showToast(`Empaque ×${factor} aplicado`, 'info');
-  };
-
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Save sessions to storage with debouncing to keep the main thread responsive
   useEffect(() => {
@@ -393,41 +318,20 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     return Array.from({ length: 5 }, (_, i) => String(CURRENT_YEAR + i));
   }, [currentSession]);
 
-  // Handle master product search / SKU matching with O(1) exact lookup & debounced multi-match
+  // Handle master product search / SKU matching with O(1) exact lookup
   const handleSkuChange = (val: string) => {
     setScannedSku(val);
     const clean = val.trim();
     if (!clean) {
       setSelectedProductDesc('');
-      setCatalogSearchResults([]);
-      setIsSearchDropdownOpen(false);
-      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
       return;
     }
 
-    // 1. Instant O(1) exact match check
+    // Instant O(1) exact match check
     const exact = masterCatalogIndex.getBySku(clean);
     if (exact) {
       setSelectedProductDesc(exact.name);
-      setIsSearchDropdownOpen(false);
-      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-      return;
     }
-
-    // 2. Debounced multi-match search (200ms) to avoid CPU lockup during fast typing / scanning
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      const results = masterCatalogIndex.search(clean, 6);
-      setCatalogSearchResults(results);
-      setIsSearchDropdownOpen(results.length > 0);
-    }, 200);
-  };
-
-  const handleSelectProductFromCatalog = (product: MasterProductSummary) => {
-    setScannedSku(product.sku);
-    setSelectedProductDesc(product.name);
-    setIsSearchDropdownOpen(false);
-    skuInputRef.current?.focus();
   };
 
   // Start new session
@@ -644,7 +548,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     setExpiryPromptSku(null);
     setTempMm('');
     setTempYyyy('');
-    setIsSearchDropdownOpen(false);
 
     // Dynamic beep and toast confirmation. El orden de las ramas importa: "fuera de alcance"
     // va primero porque es el motivo más específico: un SKU ajeno al proveedor puede no estar
@@ -721,58 +624,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     interceptInputFocus: true,
   });
 
-  const handleSkuScannedOrEntered = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!currentSession) return;
-
-    const cleanSku = scannedSku.trim();
-    if (!cleanSku) {
-      playBeep('error');
-      showToast('Ingresa o escanea un SKU válido', 'warning');
-      skuInputRef.current?.focus();
-      return;
-    }
-
-    if (countQuantity <= 0) {
-      playBeep('error');
-      showToast('La cantidad debe ser mayor a 0', 'warning');
-      return;
-    }
-
-    // Anti-rebounce (debouncing) scanner check (800ms threshold)
-    const now = Date.now();
-    if (lastScanRef.current && lastScanRef.current.sku === cleanSku && (now - lastScanRef.current.timestamp) < 800) {
-      playBeep('error');
-      showToast(`Escaneo duplicado por rebote de pistola ignorado (${cleanSku})`, 'warning');
-      setScannedSku('');
-      return;
-    }
-    lastScanRef.current = { sku: cleanSku, timestamp: now };
-
-    // Fetch product name in O(1)
-    const summary = masterCatalogIndex.getBySku(cleanSku);
-    const finalDesc = selectedProductDesc || (summary ? summary.name : 'Producto sin descripción');
-    setSelectedProductDesc(finalDesc);
-
-    // Validate requirement for expiry date
-    if (currentSession.requiereVencimiento) {
-      // PER-PRODUCT MEMORY: Check if SKU has already been scanned in this active session with an associated date
-      const previousMatch = currentSession.conteos.find(c => c.sku === cleanSku && c.mm && c.yyyy);
-      if (previousMatch) {
-        // Auto-apply this pre-associated date and commit instantly!
-        commitCountEntry(cleanSku, previousMatch.mm, previousMatch.yyyy, false);
-      } else {
-        // No previous date found, trigger sequential prompt
-        setExpiryPromptSku(cleanSku);
-        setTempMm('');
-        setTempYyyy('');
-      }
-    } else {
-      // Expiry not required, save immediately
-      commitCountEntry(cleanSku, undefined, undefined, false);
-    }
-  };
-
   // Remove individual count entry
   const handleRemoveEntry = (entryId: string) => {
     if (!currentSession) return;
@@ -838,16 +689,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
 
   // Last scanned item with cumulative quantity for instant visual feedback on mobile
   const lastScannedItem = useMemo(() => getLastScannedItem(currentSession), [currentSession]);
-
-  // Filtered grouped entries for search
-  const filteredGroupedSkuEntries = useMemo(
-    () => filterGroupedEntries(groupedSkuEntries, readingsSearch),
-    [groupedSkuEntries, readingsSearch]);
-
-  // Filtered chronological entries for search
-  const filteredChronoEntries = useMemo(
-    () => filterChronoEntries(currentSession, readingsSearch),
-    [currentSession, readingsSearch]);
 
   // Increment quantity for a specific SKU (+1) directly from the grouped card
   const handleIncrementSkuQuantity = (sku: string) => {
@@ -966,10 +807,6 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
     }
   };
 
-  const handleOpticonScan = (sku: string, qty: number = 1) => {
-    handleCommitBentoScan(sku, qty);
-  };
-
   // Reconciled items for the active session (computed lazily in RECONCILIATION & COUNTING views to optimize scan performance)
   const reconciliation = useMemo(() => {
     if (!currentSession) return [];
@@ -1020,7 +857,7 @@ export const StockCountTerminal: React.FC<StockCountTerminalProps> = ({
   const metrics = useMemo(() => computeReconciliationMetrics(reconciliation), [reconciliation]);
 
   // Pending items list for operational checklist
-  const pendingItems = useMemo(() => getPendingItems(currentSession, reconciliation, pendingSearch), [currentSession, reconciliation, pendingSearch]);
+  const pendingItems = useMemo(() => getPendingItems(currentSession, reconciliation), [currentSession, reconciliation]);
 
   // Export reconciliation report to Excel
   const handleExportExcel = async (exportScope: 'FILTERED' | 'COUNTED_ONLY' | 'ALL' = 'FILTERED') => {

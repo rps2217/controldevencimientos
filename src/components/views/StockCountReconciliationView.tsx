@@ -76,7 +76,6 @@ export const StockCountReconciliationView: React.FC<StockCountReconciliationView
 
   // Manejador de pegado masivo de ventas del turno en la sesión
   const handleApplySessionBulkSales = (adjustments: Record<string, number>, mode: 'ADD' | 'REPLACE') => {
-    let appliedCount = 0;
     for (const [sku, qty] of Object.entries(adjustments)) {
       if (qty > 0) {
         const match = reconciliation.find(r => r.sku === sku || r.itemKey === sku);
@@ -86,7 +85,6 @@ export const StockCountReconciliationView: React.FC<StockCountReconciliationView
         // Para descontar ventas, el ajuste debe ser negativo (-qty)
         const newAdj = mode === 'REPLACE' ? -qty : currentAdj - qty;
         handleUpdateAdjustment(targetKey, newAdj);
-        appliedCount++;
       }
     }
   };

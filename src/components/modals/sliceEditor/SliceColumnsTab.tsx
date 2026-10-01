@@ -1,5 +1,5 @@
 import React from 'react';
-import { Columns, Search, ArrowUpDown, ArrowUpAZ, ArrowDownZA } from 'lucide-react';
+import { Columns, Search, ArrowUpAZ, ArrowDownZA } from 'lucide-react';
 
 interface SliceColumnsTabProps {
   headers: string[];
@@ -21,7 +21,7 @@ interface SliceColumnsTabProps {
 
 export const SliceColumnsTab: React.FC<SliceColumnsTabProps> = ({
   headers,
-  useCustomColumns,
+  useCustomColumns: _useCustomColumns,
   setUseCustomColumns,
   selectedColumns,
   columnSearch,

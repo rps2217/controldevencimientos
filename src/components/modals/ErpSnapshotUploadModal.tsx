@@ -5,13 +5,9 @@ import {
   FileSpreadsheet, 
   Clipboard, 
   CheckCircle2, 
-  AlertCircle, 
   Sparkles, 
   Loader2, 
-  ArrowRight,
-  Database,
-  Building2,
-  PackageCheck
+  Database
 } from 'lucide-react';
 import { InventoryCampaign, StockCountSession } from '../../types';
 import { 
@@ -40,7 +36,7 @@ export const ErpSnapshotUploadModal: React.FC<ErpSnapshotUploadModalProps> = ({
   onClose,
   campaigns,
   activeCampaignId,
-  sessions,
+  sessions: _sessions,
   onUpdateCampaigns,
   onSelectCampaign,
   onAutoSyncCloud,

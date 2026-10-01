@@ -2,26 +2,21 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Barcode, 
   Camera, 
-  Zap, 
   RotateCcw, 
   CheckCircle2, 
   AlertTriangle, 
   Plus, 
   Minus, 
-  Layers, 
   MapPin, 
   Volume2, 
   VolumeX, 
-  Flame, 
-  Hash, 
   Edit3, 
   Check, 
   X,
-  PackageCheck,
-  Smartphone
+  PackageCheck
 } from 'lucide-react';
-import type { StockCountEntry, StockCountSession, SheetRecord } from '../../types';
-import type { MasterCatalogIndex, MasterProductSummary } from '../../utils/referenceResolver';
+import type { StockCountEntry, StockCountSession } from '../../types';
+import type { MasterCatalogIndex } from '../../utils/referenceResolver';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 import { playBeep } from '../../utils/stockCountUtils';
 
@@ -51,7 +46,7 @@ export const OpticonTerminalView: React.FC<OpticonTerminalViewProps> = ({
   onUndoLastReading,
   onOpenLiveCamera,
   theoreticalItemsMap,
-  masterCatalogIndex,
+  masterCatalogIndex: _masterCatalogIndex,
   showToast
 }) => {
   // Input buffer for direct typing via Industrial Numpad or Bluetooth Laser gun

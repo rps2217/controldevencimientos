@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { saveCloudConfig, saveScriptPropertiesConfig } from '../lib/sheets';
 import { InventoryItem, SheetConfig, EventCategory, VIEW_KEYS } from '../types';
 import { useItemFormManager } from '../hooks/useItemFormManager';
@@ -33,9 +33,6 @@ import { Sidebar } from './navigation/Sidebar';
 import { DashboardTopNav } from './navigation/DashboardTopNav';
 import { DashboardPageHeader } from './navigation/DashboardPageHeader';
 import { DashboardFilterPanels } from './views/DashboardFilterPanels';
-import { SchemaEditorView } from './views/SchemaEditorView';
-import { OperationalCalendarView } from './views/OperationalCalendarView';
-import { LazyFallback } from './common/LazyFallback';
 import { FloatingBulkActionBar } from './dashboard/FloatingBulkActionBar';
 import { DashboardModalsManager } from './dashboard/DashboardModalsManager';
 import { DashboardViewRouter } from './dashboard/DashboardViewRouter';
@@ -55,12 +52,10 @@ import { useTableGrouping } from '../hooks/useTableGrouping';
 import { useInventoryIngestion } from '../hooks/useInventoryIngestion';
 import { useInventoryBulkActions } from '../hooks/useInventoryBulkActions';
 
-const AnalyticsDashboard = lazy(() => import('./views/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
-
 export const InventoryDashboard: React.FC = () => {
   // Acciones de modales: identidad estable, no suscriben al estado.
   const {
-    setIsConfigOpen, setIsScriptModalOpen, setIsTicketConfigOpen,
+    setIsConfigOpen, setIsTicketConfigOpen,
     openQuickTraspaso: handleOpenQuickTraspaso,
     openWhatsApp: handleOpenWhatsApp,
     openEmail: handleOpenEmail,
@@ -164,9 +159,9 @@ export const InventoryDashboard: React.FC = () => {
   const {
     metadata,
     activeSheet,
-    setActiveSheet,
+    setActiveSheet: _setActiveSheet,
     headers,
-    setHeaders,
+    setHeaders: _setHeaders,
     items,
     setItems,
     allMainItems,
@@ -529,8 +524,7 @@ export const InventoryDashboard: React.FC = () => {
     virtualRows,
     paddingTop,
     paddingBottom,
-    measureElement,
-    rowVirtualizer
+    measureElement
   } = useTableVirtualization(paginatedDisplayRows);
 
   // Critical items for PM drainage report

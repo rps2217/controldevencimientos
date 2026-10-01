@@ -1,7 +1,7 @@
 import React from 'react';
 import { StockCountSession } from '../../../types';
 import { formatLocaleNumber } from '../../../utils/pureCalculations';
-import { Hash, Layers, Lock, Unlock, Cloud, Trash2, MapPin } from 'lucide-react';
+import { Lock, Unlock, Cloud, Trash2, MapPin } from 'lucide-react';
 
 interface StockCountKpiBarProps {
   currentSession: StockCountSession;

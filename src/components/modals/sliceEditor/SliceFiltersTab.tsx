@@ -1,6 +1,6 @@
 import React from 'react';
 import { SliceFilterConfig } from '../../../types';
-import { Clock, CheckCircle2, RotateCcw, ShieldCheck, Scale, Truck, PlusCircle, MinusCircle, Flame, AlertTriangle } from 'lucide-react';
+import { Clock, CheckCircle2 } from 'lucide-react';
 import { getOffsetMonthName } from '../SliceEditorModal';
 
 interface SliceFiltersTabProps {
@@ -21,13 +21,13 @@ interface SliceFiltersTabProps {
 export const SliceFiltersTab: React.FC<SliceFiltersTabProps> = ({
   filterConfig,
   setFilterConfig,
-  headers,
+  headers: _headers,
   tableKey,
   handleTogglePmStatus,
   handleSetDynamicRange,
   handleClearDynamicRange,
   handleToggleEventCategory,
-  handleToggleEventResolution,
+  handleToggleEventResolution: _handleToggleEventResolution,
   dynamicRangePresets,
   pmStatusOptions,
   eventCategoryOptions

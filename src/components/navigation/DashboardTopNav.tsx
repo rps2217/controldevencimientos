@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
-import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Activity, Upload, AlertTriangle, Settings2, Calendar, Truck } from 'lucide-react';
-import { PWAInstallButton } from '../pwa/PWAInstallButton';
+import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Settings2, Calendar, Truck } from 'lucide-react';
 import { ThemeSelector } from './ThemeSelector';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
@@ -34,26 +33,19 @@ export const DashboardTopNav: React.FC = () => {
   const filteredItems = dashboard.filteredItems ?? [];
   const sheetConfig = dashboard.sheetConfig;
   const isOffline = dashboard.isOffline ?? false;
-  const lastCachedAt = dashboard.lastCachedAt;
   const isSyncing = dashboard.isSyncing;
-  const offlineQueue = dashboard.offlineQueue ?? [];
-  const handleSyncOfflineQueue = dashboard.handleSyncOfflineQueue ?? (() => {});
   const fetchData = dashboard.fetchData;
   const loading = dashboard.loading ?? false;
   const latencyMs = dashboard.latencyMs;
   const onOpenSyncAudit = () => modalsActions.setIsSyncAuditOpen?.(true);
-  const failedCount = dashboard.failedCount ?? 0;
   const isRelationalActive = dashboard.isRelationalActive ?? false;
   const activeSheet = dashboard.activeSheet;
   const isModalOpen = dashboard.isModalOpen ?? false;
   const handleOpenModal = dashboard.handleOpenModal;
-  const setIsBulkImportOpen = modalsActions.setIsBulkImportOpen;
-  const setIsScriptModalOpen = modalsActions.setIsScriptModalOpen;
   const onOpenViewConfig = () => rightDrawer.setIsRightDrawerOpen(true);
   const onOpenStockCount = () => modalsActions.setIsStockCountOpen?.(true);
 
   const canCount = dashboard.tableCapabilities?.has('conteo') ?? false;
-  const canLogEvents = dashboard.tableCapabilities?.has('incidencia') ?? false;
 
   // Global Keyboard shortcut for search (Cmd+K / Ctrl+K)
   useEffect(() => {

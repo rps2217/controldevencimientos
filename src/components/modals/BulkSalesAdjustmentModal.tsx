@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, ReceiptText, CheckCircle2, AlertCircle, ClipboardPaste, ArrowRight } from 'lucide-react';
+import { X, ReceiptText, CheckCircle2, AlertCircle, ClipboardPaste } from 'lucide-react';
 import { parseSalesAdjustmentsText, ParsedSalesAdjustmentResult } from '../../utils/stockCountUtils';
 import { formatLocaleNumber } from '../../utils/pureCalculations';
 

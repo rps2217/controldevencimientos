@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  SlidersHorizontal, ChevronDown, Barcode as BarcodeIcon, FileText 
+  ChevronDown, Barcode as BarcodeIcon 
 } from 'lucide-react';
 import { InventoryItem, EventCategory, SheetRecord } from '../../types';
 import { 
@@ -60,8 +60,6 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   
   // States that reset per-item
   const [showBarcode, setShowBarcode] = useState(false);
-  const [showMaster, setShowMaster] = useState(false);
-  const [showMasterRef, setShowMasterRef] = useState(false);
   const [showAllFields, setShowAllFields] = useState(false);
   const [showSkuTrace, setShowSkuTrace] = useState(false);
   
@@ -121,10 +119,8 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   useEffect(() => {
     if (!product) return;
     scrollRef.current?.scrollTo({ top: 0 });
-    setShowMaster(detailMode === 'incidencia' || detailMode === 'politica');
     setShowSkuTrace(false);
     setShowBarcode(false);
-    setShowMasterRef(false);
   }, [identityKey, detailMode, product]);
 
   // Keyboard listener: Escape to close, Arrow keys for prev/next
