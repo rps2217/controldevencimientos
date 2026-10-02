@@ -74,6 +74,22 @@ export function useModuleViewState({
     groupByDirection,
   };
 
+  const pendingSearchTermRef = useRef<{ viewKey: string; term: string } | null>(null);
+
+  const setSearchTermForView = (targetViewKey: string, term: string) => {
+    pendingSearchTermRef.current = { viewKey: targetViewKey, term };
+    setModuleStates(prev => ({
+      ...prev,
+      [targetViewKey]: {
+        ...(prev[targetViewKey] || DEFAULT_MODULE_STATE),
+        searchTerm: term
+      }
+    }));
+    if (targetViewKey === activeView) {
+      setSearchTerm(term);
+    }
+  };
+
   // 1. Tab switch transition: save previous view's state and restore target view's state
   useEffect(() => {
     const prevView = lastViewRef.current;
@@ -96,7 +112,11 @@ export function useModuleViewState({
     });
 
     // Load target view state
-    const targetState = moduleStatesRef.current[activeView] || DEFAULT_MODULE_STATE;
+    let targetState = moduleStatesRef.current[activeView] || DEFAULT_MODULE_STATE;
+    if (pendingSearchTermRef.current && pendingSearchTermRef.current.viewKey === activeView) {
+      targetState = { ...targetState, searchTerm: pendingSearchTermRef.current.term };
+      pendingSearchTermRef.current = null;
+    }
 
     // Batch apply target view state
     setActiveSliceId(targetState.activeSliceId ?? null);
@@ -190,6 +210,7 @@ export function useModuleViewState({
     setModuleStates,
     searchTerm,
     setSearchTerm,
+    setSearchTermForView,
     activeQuickChip,
     setActiveQuickChip,
     activeSliceId,

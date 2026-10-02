@@ -76,6 +76,7 @@ export const InventoryDashboard: React.FC = () => {
   const {
     searchTerm,
     setSearchTerm,
+    setSearchTermForView,
     activeQuickChip,
     setActiveQuickChip,
     activeSliceId,
@@ -709,6 +710,13 @@ export const InventoryDashboard: React.FC = () => {
     .map(s => s.properties.title)
     .filter((t: string) => !mappedSheets.includes(t) && !/^_/i.test(t.trim())) || [];
 
+  const handleSetActiveView = useCallback((newView: string, searchOverride?: string) => {
+    if (searchOverride !== undefined) {
+      setSearchTermForView(newView, searchOverride);
+    }
+    setActiveView(newView);
+  }, [setSearchTermForView]);
+
   const dashboardContextValue: DashboardContextType = {
     sheetConfig,
     setSheetConfig,
@@ -716,7 +724,7 @@ export const InventoryDashboard: React.FC = () => {
     metadata,
     activeSheet,
     activeView,
-    setActiveView,
+    setActiveView: handleSetActiveView,
     headers,
     visibleHeaders,
     products,

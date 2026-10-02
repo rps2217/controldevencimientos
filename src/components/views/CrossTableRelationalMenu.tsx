@@ -29,6 +29,7 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
 }) => {
   const dashboard = useDashboard();
   const { 
+    items,
     allMainItems, 
     products, 
     policies, 
@@ -46,9 +47,20 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
   const counts = useMemo(() => {
     const valLower = cleanValue.toLowerCase();
 
+    // Tabla actual
+    const currentViewMatches = (items || []).filter(item => {
+      return Object.values(item).some(v => v && String(v).toLowerCase().includes(valLower));
+    }).length;
+
     // Vencimientos (main)
     const mainMatches = (allMainItems || []).filter(item => {
       return Object.values(item).some(v => v && String(v).toLowerCase().includes(valLower));
+    }).length;
+
+    // Incidencias & FRC (events)
+    const eventMatches = (allMainItems || []).filter(item => {
+      const isEvent = item.TIPO_EVENTO || item.FECHA_EVENTO || item.OBSERVACIONES || item.FRC_N;
+      return isEvent && Object.values(item).some(v => v && String(v).toLowerCase().includes(valLower));
     }).length;
 
     // Catálogo Maestro (products)
@@ -62,15 +74,22 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
     }).length;
 
     return {
+      currentView: currentViewMatches,
       main: mainMatches,
+      events: eventMatches,
       products: productMatches,
       policies: policyMatches
     };
-  }, [allMainItems, products, policies, cleanValue]);
+  }, [items, allMainItems, products, policies, cleanValue]);
+
+  const handleFilterCurrentTable = () => {
+    setSearchTerm(cleanValue);
+    showToast(`Filtrando en la tabla actual por "${cleanValue}"`, 'info', 'Filtro Relacional');
+    onClose();
+  };
 
   const handleNavigateToView = (viewKey: string, viewTitle: string) => {
-    setActiveView(viewKey);
-    setSearchTerm(cleanValue);
+    setActiveView(viewKey, cleanValue);
     showToast(`Navegando a ${viewTitle} filtrado por "${cleanValue}"`, 'info', 'Navegación Relacional');
     onClose();
   };
@@ -125,10 +144,48 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
         {/* Relational Options List */}
         <div className="p-4 space-y-2.5 max-h-[60vh] overflow-y-auto">
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium px-1">
-            Selecciona la tabla para realizar el cruce relacional de datos en tiempo real:
+            Selecciona la acción o tabla para realizar el cruce relacional de datos en tiempo real:
           </p>
 
-          {/* Option 1: Radar de Vencimientos */}
+          {/* Option 1 (PRIMERA OPCIÓN): Filtrar en esta misma tabla */}
+          <button
+            onClick={handleFilterCurrentTable}
+            className="w-full p-3.5 rounded-xl border-2 border-indigo-500/30 dark:border-indigo-500/40 bg-indigo-50/60 dark:bg-indigo-950/40 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/60 hover:border-indigo-500 transition-all cursor-pointer flex items-center justify-between group text-left shadow-2xs"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-indigo-600 text-white group-hover:scale-105 transition-transform shadow-xs">
+                <Search className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-black text-indigo-900 dark:text-indigo-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">
+                    Filtrar en esta misma tabla
+                  </h4>
+                  <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-indigo-200 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200">
+                    Vista actual
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Aplica "{cleanValue}" como filtro directo en la tabla activa
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-200/80 dark:bg-indigo-800/80 text-indigo-900 dark:text-indigo-100">
+                {counts.currentView} registros
+              </span>
+              <ArrowRight className="w-4 h-4 text-indigo-500 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </button>
+
+          <div className="relative my-2">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200 dark:border-slate-800" /></div>
+            <div className="relative flex justify-center text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900 px-2">
+              Navegación Cruzada entre Tablas
+            </div>
+          </div>
+
+          {/* Option 2: Radar de Vencimientos */}
           <button
             onClick={() => handleNavigateToView('main', 'Radar de Vencimientos')}
             className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-blue-50/80 dark:hover:bg-blue-950/40 hover:border-blue-300 dark:hover:border-blue-700/60 transition-all cursor-pointer flex items-center justify-between group text-left"
@@ -154,7 +211,7 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
             </div>
           </button>
 
-          {/* Option 2: Registro de Incidencias & FRC */}
+          {/* Option 3: Registro de Incidencias & FRC */}
           <button
             onClick={() => handleNavigateToView('events', 'Incidencias & FRC')}
             className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-amber-50/80 dark:hover:bg-amber-950/40 hover:border-amber-300 dark:hover:border-amber-700/60 transition-all cursor-pointer flex items-center justify-between group text-left"
@@ -174,13 +231,13 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
-                Relacionados
+                {counts.events} coincidencia(s)
               </span>
               <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
             </div>
           </button>
 
-          {/* Option 3: Catálogo Maestro de Productos */}
+          {/* Option 4: Catálogo Maestro de Productos */}
           <button
             onClick={() => handleNavigateToView('products', 'Catálogo Maestro')}
             className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/40 hover:border-indigo-300 dark:hover:border-indigo-700/60 transition-all cursor-pointer flex items-center justify-between group text-left"
@@ -206,7 +263,7 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
             </div>
           </button>
 
-          {/* Option 4: Políticas comerciales */}
+          {/* Option 5: Políticas comerciales */}
           <button
             onClick={() => handleNavigateToView('policies', 'Políticas de Retiro')}
             className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/40 hover:border-emerald-300 dark:hover:border-emerald-700/60 transition-all cursor-pointer flex items-center justify-between group text-left"

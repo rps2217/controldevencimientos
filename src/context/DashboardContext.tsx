@@ -18,7 +18,7 @@ export interface DashboardContextType {
   metadata: SpreadsheetMetadata | null;
   activeSheet: SheetProperties | null;
   activeView: string;
-  setActiveView: (view: string) => void;
+  setActiveView: (view: string, searchTermOverride?: string) => void;
   headers: string[];
   visibleHeaders: string[];
   products: SheetRecord[];
