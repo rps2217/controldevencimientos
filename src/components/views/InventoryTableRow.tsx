@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { 
-  CheckCircle2, Clock3, Edit2, Plus, Trash2, Building2, MessageSquare, Mail, Copy 
+  CheckCircle2, Clock3, Edit2, Plus, Trash2, Building2, MessageSquare, Mail, Copy, ExternalLink 
 } from 'lucide-react';
+import { useModalsActions } from '../../context/ModalsContext';
 import { InventoryItem, EventCategory } from '../../types';
 import { 
   getItemStatus, 
@@ -78,6 +79,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   isStickyEnabled = false,
   tableDensity = 'compact',
 }) => {
+  const modalsActions = useModalsActions();
   const eventCategory = getEventCategory(item, headers);
   const status = getItemStatus(item, headers);
   const isEventView = showResolutionCol;
@@ -401,6 +403,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
         const val = item[header];
         const eventCat = isEventCol && val ? getCategoryFromEventValue(val) : null;
         const colWidth = getColWidth(header, header);
+        const isProveedorCol = /proveedor|vendor|supplier/i.test(header) || findColumnBySemantic(headers, 'proveedor') === header;
 
         return (
           <td 
@@ -422,9 +425,16 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                 </button>
               ) : isSku && val ? (
                 <div className="flex items-center gap-1.5 truncate">
-                  <span className="font-mono font-semibold text-slate-800 dark:text-slate-100 truncate block text-left">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      modalsActions.openRelationalMenu?.('sku', String(val));
+                    }}
+                    className="font-mono font-semibold text-slate-800 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block text-left cursor-pointer"
+                    title={`SKU: ${String(val)}. Clic para exploración relacional cruzada.`}
+                  >
                     {String(val)}
-                  </span>
+                  </button>
                   {item._isOrphan && (
                     <span 
                       className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800 shrink-0 shadow-2xs"
@@ -434,6 +444,19 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                     </span>
                   )}
                 </div>
+              ) : isProveedorCol && val !== undefined && val !== null && String(val).trim() !== '' ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    modalsActions.openRelationalMenu?.('proveedor', String(val));
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all cursor-pointer shadow-2xs group/prov truncate"
+                  title={`Proveedor: ${String(val)}. Clic para exploración relacional cruzada entre tablas.`}
+                >
+                  <Building2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0 group-hover/prov:scale-110 transition-transform" />
+                  <span className="truncate">{String(val)}</span>
+                  <ExternalLink className="w-3 h-3 text-indigo-400 opacity-60 group-hover/prov:opacity-100 transition-opacity shrink-0" />
+                </button>
               ) : eventCat ? (
                 <button
                   onClick={(e) => { 

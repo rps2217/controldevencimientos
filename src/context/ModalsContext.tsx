@@ -43,6 +43,8 @@ interface ModalsState {
   isSliceManagerOpen: boolean;
   isSliceModalOpen: boolean;
   editingSliceModalItem: TableSlice | null;
+  isRelationalMenuOpen: boolean;
+  relationalEntity: { type: 'proveedor' | 'bodega' | 'sku' | 'categoria'; value: string } | null;
 }
 
 interface ModalsActions {
@@ -76,6 +78,8 @@ interface ModalsActions {
   openQuickTraspaso: (item: InventoryItem) => void;
   openWhatsApp: (item: InventoryItem) => void;
   openEmail: (item: InventoryItem) => void;
+  openRelationalMenu: (type: 'proveedor' | 'bodega' | 'sku' | 'categoria', value: string) => void;
+  closeRelationalMenu: () => void;
 }
 
 const ModalsStateContext = createContext<ModalsState | null>(null);
@@ -89,7 +93,7 @@ const NOOP_STATE: ModalsState = {
   quickTraspasoItem: null, isTicketConfigOpen: false, isBulkImportOpen: false,
   isBulkActionsConfigOpen: false, isStockCountOpen: false, isSyncAuditOpen: false,
   isMobileMenuOpen: false, isSliceManagerOpen: false, isSliceModalOpen: false,
-  editingSliceModalItem: null,
+  editingSliceModalItem: null, isRelationalMenuOpen: false, relationalEntity: null
 };
 
 export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -115,6 +119,18 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isSliceManagerOpen, setIsSliceManagerOpen] = useState(false);
   const [isSliceModalOpen, setIsSliceModalOpen] = useState(false);
   const [editingSliceModalItem, setEditingSliceModalItem] = useState<TableSlice | null>(null);
+  const [isRelationalMenuOpen, setIsRelationalMenuOpen] = useState(false);
+  const [relationalEntity, setRelationalEntity] = useState<{ type: 'proveedor' | 'bodega' | 'sku' | 'categoria'; value: string } | null>(null);
+
+  const openRelationalMenu = useCallback((type: 'proveedor' | 'bodega' | 'sku' | 'categoria', value: string) => {
+    setRelationalEntity({ type, value });
+    setIsRelationalMenuOpen(true);
+  }, []);
+
+  const closeRelationalMenu = useCallback(() => {
+    setIsRelationalMenuOpen(false);
+    setRelationalEntity(null);
+  }, []);
 
   const state = useMemo<ModalsState>(() => ({
     isPmReportOpen, isScriptModalOpen, isConfigOpen, isScannerOpen,
@@ -123,6 +139,7 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isQuickTraspasoOpen, quickTraspasoItem, isTicketConfigOpen, isBulkImportOpen,
     isBulkActionsConfigOpen, isStockCountOpen, isSyncAuditOpen, isMobileMenuOpen,
     isSliceManagerOpen, isSliceModalOpen, editingSliceModalItem,
+    isRelationalMenuOpen, relationalEntity,
   }), [
     isPmReportOpen, isScriptModalOpen, isConfigOpen, isScannerOpen,
     isMobilePistoleoOpen, isBulkEditOpen, isGmailModalOpen, gmailModalItems,
@@ -130,6 +147,7 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isQuickTraspasoOpen, quickTraspasoItem, isTicketConfigOpen, isBulkImportOpen,
     isBulkActionsConfigOpen, isStockCountOpen, isSyncAuditOpen, isMobileMenuOpen,
     isSliceManagerOpen, isSliceModalOpen, editingSliceModalItem,
+    isRelationalMenuOpen, relationalEntity,
   ]);
 
   const openSliceEditor = useCallback((slice: TableSlice | null) => {
@@ -163,7 +181,8 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsSyncAuditOpen, setIsMobileMenuOpen,
     setIsSliceManagerOpen, setIsSliceModalOpen, setEditingSliceModalItem,
     openSliceEditor, openQuickTraspaso, openWhatsApp, openEmail,
-  }), [openSliceEditor, openQuickTraspaso, openWhatsApp, openEmail]);
+    openRelationalMenu, closeRelationalMenu,
+  }), [openSliceEditor, openQuickTraspaso, openWhatsApp, openEmail, openRelationalMenu, closeRelationalMenu]);
 
   return (
     <ModalsActionsContext.Provider value={actions}>
@@ -194,4 +213,5 @@ const NOOP_ACTIONS: ModalsActions = {
   setIsMobileMenuOpen: noop, setIsSliceManagerOpen: noop, setIsSliceModalOpen: noop,
   setEditingSliceModalItem: noop, openSliceEditor: noop,
   openQuickTraspaso: noop, openWhatsApp: noop, openEmail: noop,
+  openRelationalMenu: noop, closeRelationalMenu: noop,
 };

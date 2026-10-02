@@ -27,6 +27,7 @@ const SliceManagerModal = lazy(() => import('../modals/SliceManagerModal').then(
 const SliceEditorModal = lazy(() => import('../modals/SliceEditorModal').then(m => ({ default: m.SliceEditorModal })));
 const SyncAuditModal = lazy(() => import('../modals/SyncAuditModal').then(m => ({ default: m.SyncAuditModal })));
 const StockCountTerminal = lazy(() => import('../views/StockCountTerminal').then(m => ({ default: m.StockCountTerminal })));
+const CrossTableRelationalMenu = lazy(() => import('../views/CrossTableRelationalMenu').then(m => ({ default: m.CrossTableRelationalMenu })));
 
 export interface DashboardModalsManagerProps {
   handleOpenModal: (item?: InventoryItem, prefillSku?: string, initialCategory?: EventCategory) => void;
@@ -621,6 +622,17 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
             clearQueue={clearQueue}
             clearAuditLog={clearAuditLog}
             showToast={showToast}
+          />
+        </Suspense>
+      )}
+      {/* CROSS-TABLE RELATIONAL DRILLDOWN MENU */}
+      {modalsState.isRelationalMenuOpen && modalsState.relationalEntity && (
+        <Suspense fallback={<LazyFallback />}>
+          <CrossTableRelationalMenu
+            isOpen={modalsState.isRelationalMenuOpen}
+            onClose={() => modalsActions.closeRelationalMenu?.()}
+            entityType={modalsState.relationalEntity.type}
+            entityValue={modalsState.relationalEntity.value}
           />
         </Suspense>
       )}
