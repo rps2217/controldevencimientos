@@ -364,7 +364,7 @@ export const SliceEditorModal: React.FC<SliceEditorModalProps> = ({
       }}
     >
       <div 
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[92vh]"
+        className="max-w-2xl w-full app-panel overflow-hidden flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

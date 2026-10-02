@@ -21,7 +21,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, active, onClick,
     <button
       onClick={onClick}
       title={collapsed ? label : undefined}
-      className={`w-full flex items-center ${collapsed ? 'justify-center px-0' : 'gap-3 px-3.5'} min-h-[44px] py-2.5 rounded-2xl text-sm font-bold transition-all relative cursor-pointer active:scale-[0.98] ${
+      className={`app-button w-full flex items-center ${collapsed ? 'justify-center px-0' : 'gap-3 px-3.5'} min-h-[44px] transition-all relative ${
         active 
           ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/25 dark:shadow-none' 
           : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-100'
@@ -203,7 +203,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ forceExpanded = false, onNavig
         <button 
           onClick={onOpenConfig} 
           title={isSidebarCollapsed ? "Configuración" : undefined}
-          className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 hover:shadow-sm transition-all`}
+          className="app-button w-full flex items-center justify-start gap-3 px-4 py-3 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 hover:shadow-sm"
         >
           <Settings className="w-5 h-5 text-slate-400 dark:text-slate-500" />
           {!isSidebarCollapsed && "Configuración"}

@@ -67,6 +67,14 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
   const hasError = !!formErrors[header];
   const errorMsg = formErrors[header];
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    if (isCant && !isNaN(Number(value)) && Number(value) < 0) {
+        return;
+    }
+    onChange(e);
+  };
+
   return (
     <div 
       className={`flex flex-col gap-1.5 ${
@@ -105,11 +113,11 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
         <select
           name={header}
           value={formData[header] || ''}
-          onChange={onChange}
-          className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-100 outline-none transition-all ${
+          onChange={handleChange}
+          className={`w-full app-input px-3.5 py-2.5 text-sm font-medium ${
             hasError 
-              ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-              : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+              ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10' 
+              : ''
           }`}
         >
           <option value="">-- Seleccionar registro de {colSchema.refTable || 'tabla relacionada'} --</option>
@@ -128,12 +136,12 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             name={header}
             rows={2}
             value={formData[header] || ''}
-            onChange={onChange}
+            onChange={handleChange}
             placeholder={`Detalles de ${header.toLowerCase()}...`}
-            className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none transition-all resize-none ${
+            className={`w-full app-input px-3.5 py-2 text-sm resize-none ${
               hasError 
-                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+                ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10' 
+                : ''
             }`}
           />
           {/* Quick Operational Suggestions (Valid_If) */}
@@ -196,7 +204,7 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             min={0}
             step="any"
             value={formData[header] !== undefined ? formData[header] : ''}
-            onChange={onChange}
+            onChange={handleChange}
             placeholder="0"
             className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-slate-800 dark:text-slate-100 outline-none transition-all ${
               hasError 
@@ -223,7 +231,7 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
           type="date"
           name={header}
           value={formatInputDate(formData[header])}
-          onChange={onChange}
+          onChange={handleChange}
           className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 outline-none transition-all ${
             hasError 
               ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
@@ -235,7 +243,7 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
           type="datetime-local"
           name={header}
           value={formatInputDateTime(formData[header])}
-          onChange={onChange}
+          onChange={handleChange}
           className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 outline-none transition-all ${
             hasError 
               ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
@@ -247,7 +255,7 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
           type="text"
           name={header}
           value={formData[header] !== undefined ? formData[header] : (header === 'FECHA_RETIRO_CALC' ? (resolvedRetiroDisplay || '') : '')}
-          onChange={onChange}
+          onChange={handleChange}
           readOnly={isAutoCalc}
           placeholder={isAutoCalc ? 'Calculado automáticamente' : `Ingresar ${header.toLowerCase()}...`}
           className={`w-full border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none transition-all ${

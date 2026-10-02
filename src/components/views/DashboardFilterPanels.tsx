@@ -99,7 +99,7 @@ export const DashboardFilterPanels: React.FC = () => {
               {onOpenBulkImport && (
                 <button
                   onClick={onOpenBulkImport}
-                  className="px-3.5 py-1.5 text-xs font-bold rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all flex items-center gap-2 shadow-2xs cursor-pointer active:scale-98"
+                  className="app-button border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 flex items-center gap-2"
                   title="Importar masivamente Incidencias FRC desde Excel o Portapapeles"
                 >
                   <Upload className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
@@ -109,7 +109,7 @@ export const DashboardFilterPanels: React.FC = () => {
               {onOpenNewItemModal && (
                 <button
                   onClick={onOpenNewItemModal}
-                  className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-98 text-white transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  className="app-button bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5"
                   title="Registrar una nueva incidencia individual"
                 >
                   <Plus className="w-3.5 h-3.5" />

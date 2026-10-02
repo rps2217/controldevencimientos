@@ -285,7 +285,7 @@ export const SliceManagerModal: React.FC<SliceManagerModalProps> = ({
       }}
     >
       <div 
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[90vh]"
+        className="max-w-3xl w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[90vh] transition-all"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

@@ -399,7 +399,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
     <div 
       ref={drawerRef}
       style={{ width: `${panelWidth}px` }}
-      className={`h-full shrink-0 flex relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm animate-in slide-in-from-right duration-200 overflow-hidden transform-gpu will-change-[width] [contain:layout_style] ${
+      className={`h-full shrink-0 flex relative app-panel !rounded-3xl animate-in slide-in-from-right duration-200 overflow-hidden transform-gpu will-change-[width] [contain:layout_style] ${
         isResizing ? 'select-none transition-none' : 'transition-[width] duration-150'
       }`}
     >

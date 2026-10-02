@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { SLICE_COLOR_CLASSES } from '../../utils/sliceRegistry';
 import { SliceIcon } from '../slices/SliceSelectorBar';
+import { SyncStatusIndicator } from './SyncStatusIndicator';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
@@ -120,6 +121,7 @@ export const DashboardPageHeader: React.FC = () => {
 
       {/* RIGHT ZONE: Minimal Unified Tools */}
       <div className="flex items-center gap-2 shrink-0">
+        <SyncStatusIndicator />
         {/* Bulk Import FRC Quick Access (por capacidad de incidencia) */}
         {canLogEvents && setIsBulkImportOpen && (
           <button

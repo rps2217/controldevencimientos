@@ -165,6 +165,7 @@ export const DashboardTopNav: React.FC = () => {
               <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 ml-3 shrink-0" />
               
               <input
+                key={`search-desk-${activeView}`}
                 ref={searchInputRef}
                 type="text"
                 defaultValue={searchTerm}
@@ -230,7 +231,7 @@ export const DashboardTopNav: React.FC = () => {
             <button 
               disabled={!activeSheet || isModalOpen}
               onClick={() => handleOpenModal()}
-              className="flex h-10 items-center gap-1.5 px-3 sm:px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold shadow-xs shadow-blue-500/20 disabled:opacity-50 transition-all cursor-pointer shrink-0"
+              className="app-button bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20 flex items-center gap-1.5 px-3 sm:px-4"
               title={`Crear ${viewMeta.actionLabel}`}
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -241,7 +242,7 @@ export const DashboardTopNav: React.FC = () => {
           {/* Camera Scan Trigger on Mobile & Tablet */}
           <button
             onClick={() => setIsScannerOpen(true)}
-            className="lg:hidden h-10 w-10 flex items-center justify-center text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all cursor-pointer shrink-0 active:scale-95"
+            className="app-button bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 w-10 h-10 flex items-center justify-center shrink-0"
             title="Escanear con cámara"
           >
             <Scan className="w-4 h-4" />
@@ -251,7 +252,7 @@ export const DashboardTopNav: React.FC = () => {
           {canCount && (
             <button
               onClick={onOpenStockCount}
-              className="hidden md:flex h-10 items-center gap-1.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-2xs shrink-0 cursor-pointer active:scale-95"
+              className="app-button hidden md:flex border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 items-center gap-1.5 px-3"
               title="Módulo de conteo masivo de existencias físicas"
             >
               <Barcode className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
@@ -325,6 +326,7 @@ export const DashboardTopNav: React.FC = () => {
             <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 ml-3 shrink-0" />
             
             <input
+              key={`search-mob-${activeView}`}
               ref={searchInputRef}
               type="text"
               value={typedSearch}

@@ -335,11 +335,27 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
     );
   }, [catalogSearchOpen, catalogSearchQuery, products, sheetConfig.customAliases]);
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    let hasError = false;
+    visibleFields.forEach(field => {
+      if (field.isRequired && (!formData[field.header] || String(formData[field.header]).trim() === '')) {
+         hasError = true;
+      }
+    });
+    
+    if (hasError) {
+      alert("Por favor completa los campos obligatorios.");
+      return;
+    }
+    await onSave(e);
+  };
+
   if (!isOpen || !activeSheet) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm md:p-4">
-      <div className="w-full h-full md:h-auto max-w-2xl bg-white dark:bg-slate-900 md:rounded-3xl shadow-2xl border-0 md:border border-slate-200 dark:border-slate-800 flex flex-col md:max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-150">
+      <div className="w-full h-full md:h-auto max-w-2xl app-panel flex flex-col md:max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-150">
         
         {/* Header */}
         <div className="px-6 py-4.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
@@ -366,7 +382,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={onSave} className="flex flex-col flex-1 overflow-hidden">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="p-6 overflow-y-auto space-y-5 flex-1">
             
             {/* Event Category Selector (Main or Events views) */}
@@ -474,14 +490,14 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                 type="button"
                 onClick={onClose}
                 disabled={isSaving}
-                className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                className="app-button bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-6 py-2.5 bg-blue-600 text-white font-bold text-xs rounded-xl hover:bg-blue-700 shadow-sm shadow-blue-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer"
+                className="app-button bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-200 dark:shadow-none flex items-center gap-2"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 <span>{isSaving ? 'Guardando...' : editingItem ? 'Actualizar Fila' : 'Guardar en Sheet'}</span>

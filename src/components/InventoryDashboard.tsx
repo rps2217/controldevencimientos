@@ -701,7 +701,7 @@ export const InventoryDashboard: React.FC = () => {
   }, [setFrcBodFilter]);
 
   if (loading && !metadata) {
-    return <SkeletonLoader />;
+    return <SkeletonLoader type="card" count={3} />;
   }
 
   const mappedSheets = VIEW_KEYS.map(k => sheetConfig[k]).filter(Boolean);

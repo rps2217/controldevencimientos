@@ -106,16 +106,29 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
     return 'p-2.5 text-xs'; // default is 'compact'
   }, [tableDensity]);
 
-  let rowBgClass = 'hover:bg-slate-50/80 dark:hover:bg-slate-800/60';
+  // Zebra Striping calculation
+  const isOdd = virtualIndex % 2 === 1;
+  const zebraBgClass = isOdd 
+    ? 'bg-slate-50/70 dark:bg-slate-800/40' 
+    : 'bg-white dark:bg-slate-900';
+
+  const stickyBg = isActiveDetail
+    ? 'bg-blue-50 dark:bg-blue-950'
+    : isSelected
+      ? 'bg-blue-100/80 dark:bg-blue-900/80'
+      : isOdd
+        ? 'bg-slate-100/90 dark:bg-slate-800'
+        : 'bg-white dark:bg-slate-900';
+
+  let rowBgClass = zebraBgClass + ' hover:bg-slate-100/80 dark:hover:bg-slate-800/70';
   if (isActiveDetail) {
-    // La fila que alimenta el panel de detalle: se marca para saber que registro se ve.
-    rowBgClass = 'bg-blue-50/70 dark:bg-blue-950/50 ring-1 ring-inset ring-blue-300 dark:ring-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/60';
+    rowBgClass = 'bg-blue-50/80 dark:bg-blue-950/60 ring-1 ring-inset ring-blue-500/50 hover:bg-blue-100/80 dark:hover:bg-blue-900/60';
   } else if (isSelected) {
-    rowBgClass = 'bg-blue-50/50 dark:bg-blue-950/40 hover:bg-blue-50 dark:hover:bg-blue-950/60';
+    rowBgClass = 'bg-blue-50/60 dark:bg-blue-950/50 hover:bg-blue-100/80 dark:hover:bg-blue-900/60';
   } else if (isEventView) {
     rowBgClass = eventResStatus?.isResolved
-      ? 'bg-emerald-50/25 dark:bg-emerald-950/20 border-l-4 border-l-emerald-500 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/35'
-      : 'bg-amber-50/30 dark:bg-amber-950/25 border-l-4 border-l-amber-500 hover:bg-amber-50/60 dark:hover:bg-amber-950/40';
+      ? (isOdd ? 'bg-emerald-50/40 dark:bg-emerald-950/30' : 'bg-emerald-50/20 dark:bg-emerald-950/15') + ' border-l-4 border-l-emerald-500 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40'
+      : (isOdd ? 'bg-amber-50/50 dark:bg-amber-950/35' : 'bg-amber-50/25 dark:bg-amber-950/20') + ' border-l-4 border-l-amber-500 hover:bg-amber-100/60 dark:hover:bg-amber-950/45';
   }
 
   return (
@@ -124,15 +137,11 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       data-index={virtualIndex} 
       ref={measureElementRef} 
       onClick={() => onClickItem(item)}
-      className={`transition-all duration-150 group cursor-pointer ${
-        isActiveDetail 
-          ? 'bg-blue-50/60 dark:bg-blue-900/20 ring-1 ring-inset ring-blue-500/50' 
-          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
-      } ${isSelected ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''} md:border-b border-transparent md:border-slate-100 dark:md:border-slate-800 block md:table-row w-full bg-transparent md:bg-white dark:md:bg-slate-900`}
+      className={`transition-all duration-150 group cursor-pointer ${rowBgClass} md:border-b border-transparent md:border-slate-100 dark:md:border-slate-800 block md:table-row w-full`}
       title="Haz clic para ver detalles del registro"
     >
       {/* 📱 TRUE MOBILE CARD VIEW (iOS Inset Grouped Card with Generous Touch Targets) */}
-      <td className="md:hidden p-3 sm:p-4 relative block w-full bg-white dark:bg-slate-900 rounded-3xl mb-3.5 shadow-sm border border-slate-200/90 dark:border-slate-800 transition-all active:scale-[0.99]" colSpan={visibleColumnMeta.length + 4} onClick={(e) => { e.stopPropagation(); onClickItem(item); }}>
+      <td className="md:hidden p-3 sm:p-4 relative block w-full app-panel mb-3.5 transition-all active:scale-[0.99]" colSpan={visibleColumnMeta.length + 4} onClick={(e) => { e.stopPropagation(); onClickItem(item); }}>
         <div className="flex flex-col gap-2.5 relative">
           
           {/* Header Row: Badges + Checkbox */}
@@ -271,7 +280,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       <td 
         className={`hidden md:table-cell ${paddingClass} text-center transition-colors ${
           isStickyEnabled
-            ? 'sticky left-0 z-10 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]'
+            ? `sticky left-0 z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]`
             : ''
         }`} 
         style={{ width: '48px', minWidth: '48px', maxWidth: '48px', ...(isStickyEnabled ? { left: 0 } : {}) }} 
@@ -293,7 +302,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
         style={{ width: `${getColWidth('_row', '#')}px`, minWidth: `${getColWidth('_row', '#')}px`, maxWidth: `${getColWidth('_row', '#')}px`, ...(isStickyEnabled ? { left: '48px' } : {}) }}
         className={`hidden md:table-cell ${paddingClass} text-center font-mono text-xs text-slate-400 dark:text-slate-500 truncate transition-colors ${
           isStickyEnabled
-            ? 'sticky left-[48px] z-10 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]'
+            ? `sticky left-[48px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]`
             : ''
         }`}
       >

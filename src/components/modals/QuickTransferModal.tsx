@@ -63,7 +63,7 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+      <div className="w-full max-w-lg app-panel flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
         
         {/* Modal Header */}
         <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-850/50">
@@ -140,7 +140,7 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
               value={traspasoInput}
               onChange={(e) => setTraspasoInput(e.target.value)}
               placeholder="Ej. TR-884920, TRAS-10294..."
-              className="w-full bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 focus:border-indigo-500 dark:focus:border-indigo-400 rounded-2xl px-4 py-3 text-base font-mono font-bold text-slate-900 dark:text-slate-100 outline-none transition-all shadow-sm"
+              className="w-full app-input text-base font-mono font-bold"
             />
             
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -161,17 +161,17 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="app-button bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs flex items-center gap-2 transition-all shadow-sm ${
+              className={`app-button text-white flex items-center gap-2 ${
                 isMarkingAsCompleted 
-                  ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 dark:shadow-none' 
-                  : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 dark:shadow-none'
+                  ? 'bg-emerald-600 hover:bg-emerald-700' 
+                  : 'bg-indigo-600 hover:bg-indigo-700'
               }`}
             >
               {isSaving ? (

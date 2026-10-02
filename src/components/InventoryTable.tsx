@@ -91,6 +91,44 @@ export const InventoryTable: React.FC = () => {
 
   const selectedRowIdSet = useMemo(() => new Set(selectedRowIds.map(Number)), [selectedRowIds]);
 
+  // Keyboard Arrow Navigation
+  const [focusedRowIndex, setFocusedRowIndex] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!filteredItems || filteredItems.length === 0) return;
+      const target = e.target as HTMLElement;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName)) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocusedRowIndex(prev => {
+          const next = prev === null ? 0 : Math.min(prev + 1, filteredItems.length - 1);
+          const item = filteredItems[next];
+          if (item) onClickItem(item);
+          return next;
+        });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocusedRowIndex(prev => {
+          const next = prev === null ? 0 : Math.max(prev - 1, 0);
+          const item = filteredItems[next];
+          if (item) onClickItem(item);
+          return next;
+        });
+      } else if (e.key === ' ' || e.key === 'Enter') {
+        if (focusedRowIndex !== null && filteredItems[focusedRowIndex]) {
+          const item = filteredItems[focusedRowIndex];
+          const rowIdx = Number(item._rowIndex);
+          onSelectRow(rowIdx, !selectedRowIdSet.has(rowIdx));
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [filteredItems, focusedRowIndex, onClickItem, onSelectRow, selectedRowIdSet]);
+
   // Calculate padding class based on table density
   const paddingClass = useMemo(() => {
     if (tableDensity === 'comfortable') return 'p-4';
@@ -98,7 +136,7 @@ export const InventoryTable: React.FC = () => {
     return 'p-2.5 text-xs'; // default is 'compact'
   }, [tableDensity]);
 
-  // Dynamic width calculation for '#' column to house group expand/collapse actions comfortably
+  // Dynamic width calculation for '#' column
   const rowColWidth = useMemo(() => {
     const defaultWidth = getColWidth('_row', '#');
     if (groupByColumn && groupByColumn !== 'none') {
@@ -106,6 +144,14 @@ export const InventoryTable: React.FC = () => {
     }
     return defaultWidth;
   }, [getColWidth, groupByColumn]);
+
+  // Offset for freezing first data column (SKU / Key)
+  const firstDataColOffset = useMemo(() => {
+    let offset = 48 + rowColWidth;
+    if (showExpiryCol) offset += getColWidth('_status', 'Estado / Radar PM');
+    if (showResolutionCol) offset += getColWidth('_res_status', 'Estado Gestión');
+    return offset;
+  }, [rowColWidth, showExpiryCol, showResolutionCol, getColWidth]);
 
   return (
     <div className="bg-slate-50 dark:bg-slate-950 md:bg-white md:dark:bg-slate-900 rounded-2xl md:shadow-sm md:border md:border-slate-200 md:dark:border-slate-800 overflow-hidden flex flex-col h-full [contain:layout_style]">
