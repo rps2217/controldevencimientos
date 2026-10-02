@@ -409,10 +409,14 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
                       {/* Options / Ref Config */}
                       <td className="px-5 py-4">
                         {isRef ? (
-                          <div>
+                          <div className="space-y-1.5 min-w-[200px]">
                             <select
                               value={schema.refTable || ''}
-                              onChange={(e) => updateCol('refTable', e.target.value)}
+                              onChange={(e) => {
+                                const newTable = e.target.value;
+                                updateCol('refTable', newTable);
+                                updateCol('refTargetTable', newTable);
+                              }}
                               className="w-full border border-blue-200 dark:border-blue-800 rounded-lg px-2.5 py-1.5 text-xs bg-blue-50/50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 focus:border-blue-500 outline-none font-medium"
                             >
                               <option value="">-- Tabla Destino (Ref) --</option>
@@ -422,7 +426,30 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
                                 </option>
                               ))}
                             </select>
-                            <span className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 block flex items-center gap-1">
+                            {schema.refTable && (
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <input
+                                  type="text"
+                                  placeholder="Clave (ej: SKU)"
+                                  value={schema.refKeyCol || ''}
+                                  onChange={(e) => {
+                                    updateCol('refKeyCol', e.target.value);
+                                    updateCol('refTargetColumn', e.target.value);
+                                  }}
+                                  className="w-full border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-[11px] bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
+                                  title="Columna Clave de la tabla destino (ej: SKU)"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Etiqueta visible"
+                                  value={schema.refLabelCol || ''}
+                                  onChange={(e) => updateCol('refLabelCol', e.target.value)}
+                                  className="w-full border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-[11px] bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
+                                  title="Columna visible al usuario (ej: DESCRIPCION)"
+                                />
+                              </div>
+                            )}
+                            <span className="text-[10px] text-blue-600 dark:text-blue-400 block flex items-center gap-1">
                               <Link2 className="w-3 h-3" /> Relacionada por clave ID
                             </span>
                           </div>

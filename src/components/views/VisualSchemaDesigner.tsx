@@ -225,9 +225,39 @@ export const VisualSchemaDesigner: React.FC<VisualSchemaDesignerProps> = ({
     newSchema[prop.fromTable][prop.fromColumn] = {
       ...existingColSchema,
       type: 'ref',
-      refTable: prop.toTable
+      refTable: prop.toTable,
+      refKeyCol: prop.fromColumn.toUpperCase() === 'SKU' ? 'SKU' : 'PROVEEDOR',
+      refTargetTable: prop.toTable,
+      refTargetColumn: prop.fromColumn.toUpperCase() === 'SKU' ? 'SKU' : 'PROVEEDOR'
     };
 
+    saveConfig({
+      ...sheetConfig,
+      schema: newSchema
+    });
+  };
+
+  // Handle applying all smart proposals in 1 click
+  const handleApplyAllProposals = () => {
+    if (proposals.length === 0) return;
+    const newSchema = { ...sheetConfig.schema };
+    proposals.forEach(prop => {
+      if (!newSchema[prop.fromTable]) newSchema[prop.fromTable] = {};
+      const existing = newSchema[prop.fromTable][prop.fromColumn] || {
+        visible: true,
+        searchable: true,
+        type: 'text',
+        behavior: 'none'
+      };
+      newSchema[prop.fromTable][prop.fromColumn] = {
+        ...existing,
+        type: 'ref',
+        refTable: prop.toTable,
+        refKeyCol: prop.fromColumn.toUpperCase() === 'SKU' ? 'SKU' : 'PROVEEDOR',
+        refTargetTable: prop.toTable,
+        refTargetColumn: prop.fromColumn.toUpperCase() === 'SKU' ? 'SKU' : 'PROVEEDOR'
+      };
+    });
     saveConfig({
       ...sheetConfig,
       schema: newSchema
@@ -402,20 +432,32 @@ export const VisualSchemaDesigner: React.FC<VisualSchemaDesignerProps> = ({
             </p>
           </div>
           
-          <button
-            onClick={() => {
-              // Pre-fill defaults
-              setFromTable(tables[0]?.title || '');
-              const fromColList = tables[0]?.columns || [];
-              setFromColumn(fromColList[0]?.name || '');
-              setToTable(tables[1]?.title || '');
-              setIsCreatingRelation(true);
-            }}
-            className="px-3.5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-200 dark:shadow-none flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nueva Relación</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {proposals.length > 0 && (
+              <button
+                onClick={handleApplyAllProposals}
+                className="px-3.5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md shadow-indigo-200 dark:shadow-none flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                title="Vincular automáticamente todas las relaciones semánticas detectadas (SKU, Proveedor, Políticas)"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Auto-Vincular ({proposals.length})</span>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                // Pre-fill defaults
+                setFromTable(tables[0]?.title || '');
+                const fromColList = tables[0]?.columns || [];
+                setFromColumn(fromColList[0]?.name || '');
+                setToTable(tables[1]?.title || '');
+                setIsCreatingRelation(true);
+              }}
+              className="px-3.5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-200 dark:shadow-none flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nueva Relación</span>
+            </button>
+          </div>
         </div>
 
         {/* Diagram Area */}
@@ -678,26 +720,67 @@ export const VisualSchemaDesigner: React.FC<VisualSchemaDesignerProps> = ({
                       </select>
                     </div>
 
-                    {/* Property: Reference Table (Only visible when type is ref) */}
+                    {/* Property: Reference Table & Keys (Only visible when type is ref) */}
                     {colSchema.type === 'ref' && (
-                      <div className="bg-blue-50/30 dark:bg-blue-950/25 border border-blue-100/50 dark:border-blue-900/40 rounded-xl p-3 space-y-2">
-                        <label className="block text-[10px] font-bold text-blue-900 dark:text-blue-300 uppercase">Tabla de Destino</label>
-                        <select
-                          value={colSchema.refTable || ''}
-                          onChange={(e) => {
-                            handleUpdateColumnProperty(selectedColumn.table, selectedColumn.column, { refTable: e.target.value });
-                          }}
-                          className="w-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800/80 rounded-lg px-2.5 py-1.5 text-xs font-bold text-blue-900 dark:text-blue-200 outline-none focus:ring-2 focus:ring-blue-500/20"
-                        >
-                          <option value="">-- Seleccionar Tabla Destino --</option>
-                          {tables
-                            .filter(t => t.title !== selectedColumn.table)
-                            .map(t => (
-                              <option key={t.title} value={t.title}>{t.title}</option>
-                            ))}
-                        </select>
+                      <div className="bg-blue-50/40 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/80 rounded-xl p-3 space-y-2.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-blue-900 dark:text-blue-300 uppercase mb-1">Tabla Destino</label>
+                          <select
+                            value={colSchema.refTable || colSchema.refTargetTable || ''}
+                            onChange={(e) => {
+                              const targetT = e.target.value;
+                              const targetNode = tables.find(t => t.title === targetT);
+                              const defaultKey = targetNode?.columns.find(c => c.schema?.isKey)?.name || 'SKU';
+                              const defaultLabel = targetNode?.columns.find(c => c.schema?.isLabel)?.name || 'DESCRIPCION';
+                              handleUpdateColumnProperty(selectedColumn.table, selectedColumn.column, { 
+                                refTable: targetT,
+                                refTargetTable: targetT,
+                                refKeyCol: defaultKey,
+                                refTargetColumn: defaultKey,
+                                refLabelCol: defaultLabel
+                              });
+                            }}
+                            className="w-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 rounded-lg px-2.5 py-1.5 text-xs font-bold text-blue-900 dark:text-blue-200 outline-none focus:ring-2 focus:ring-blue-500/20"
+                          >
+                            <option value="">-- Seleccionar Tabla Destino --</option>
+                            {tables
+                              .filter(t => t.title !== selectedColumn.table)
+                              .map(t => (
+                                <option key={t.title} value={t.title}>{t.title}</option>
+                              ))}
+                          </select>
+                        </div>
+
+                        {colSchema.refTable && (
+                          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-blue-100 dark:border-blue-900/40">
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-0.5">Columna Clave (ID)</label>
+                              <select
+                                value={colSchema.refKeyCol || colSchema.refTargetColumn || 'SKU'}
+                                onChange={(e) => handleUpdateColumnProperty(selectedColumn.table, selectedColumn.column, { refKeyCol: e.target.value, refTargetColumn: e.target.value })}
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-[11px] text-slate-800 dark:text-slate-200 outline-none"
+                              >
+                                {tables.find(t => t.title === colSchema.refTable)?.columns.map(c => (
+                                  <option key={c.name} value={c.name}>{c.name}</option>
+                                )) || <option value="SKU">SKU</option>}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-0.5">Etiqueta Visible</label>
+                              <select
+                                value={colSchema.refLabelCol || 'DESCRIPCION'}
+                                onChange={(e) => handleUpdateColumnProperty(selectedColumn.table, selectedColumn.column, { refLabelCol: e.target.value })}
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-[11px] text-slate-800 dark:text-slate-200 outline-none"
+                              >
+                                {tables.find(t => t.title === colSchema.refTable)?.columns.map(c => (
+                                  <option key={c.name} value={c.name}>{c.name}</option>
+                                )) || <option value="DESCRIPCION">DESCRIPCION</option>}
+                              </select>
+                            </div>
+                          </div>
+                        )}
                         <p className="text-[10px] text-blue-600/80 dark:text-blue-400/80 leading-relaxed">
-                          La columna actuará como un selector dinámico apuntando a la tabla seleccionada.
+                          La columna actuará como selector dinámico vinculando la clave seleccionada con el catálogo maestro.
                         </p>
                       </div>
                     )}
