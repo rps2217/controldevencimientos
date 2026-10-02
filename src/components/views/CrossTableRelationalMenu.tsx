@@ -39,12 +39,13 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
     sheetConfig
   } = dashboard;
 
-  if (!isOpen || !entityValue || !entityValue.trim()) return null;
-
-  const cleanValue = entityValue.trim();
+  const cleanValue = (entityValue || '').trim();
 
   // Compute counts across all tables for this entity
   const counts = useMemo(() => {
+    if (!cleanValue) {
+      return { currentView: 0, main: 0, events: 0, products: 0, policies: 0 };
+    }
     const valLower = cleanValue.toLowerCase();
 
     // Tabla actual
@@ -81,6 +82,8 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
       policies: policyMatches
     };
   }, [items, allMainItems, products, policies, cleanValue]);
+
+  if (!isOpen || !cleanValue) return null;
 
   const handleFilterCurrentTable = () => {
     setSearchTerm(cleanValue);
