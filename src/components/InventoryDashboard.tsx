@@ -701,21 +701,17 @@ export const InventoryDashboard: React.FC = () => {
     setFrcBodFilter(prev => handleFilterToggle(prev, bodVal, isMulti));
   }, [setFrcBodFilter]);
 
-  if (loading && !metadata) {
-    return <SkeletonLoader type="card" count={3} />;
-  }
-
-  const mappedSheets = VIEW_KEYS.map(k => sheetConfig[k]).filter(Boolean);
-  const otherSheets = metadata?.sheets
-    .map(s => s.properties.title)
-    .filter((t: string) => !mappedSheets.includes(t) && !/^_/i.test(t.trim())) || [];
-
   const handleSetActiveView = useCallback((newView: string, searchOverride?: string) => {
     if (searchOverride !== undefined) {
       setSearchTermForView(newView, searchOverride);
     }
     setActiveView(newView);
   }, [setSearchTermForView]);
+
+  const mappedSheets = VIEW_KEYS.map(k => sheetConfig[k]).filter(Boolean);
+  const otherSheets = metadata?.sheets
+    .map(s => s.properties.title)
+    .filter((t: string) => !mappedSheets.includes(t) && !/^_/i.test(t.trim())) || [];
 
   const dashboardContextValue: DashboardContextType = {
     sheetConfig,
@@ -979,17 +975,23 @@ export const InventoryDashboard: React.FC = () => {
         </div>
 
         {/* Content Body & Active View Routing (Modularized - Ponytail Protocol) */}
-        <DashboardViewRouter
-          configStorageMode={configStorageMode}
-          hasCloudConfigSheet={hasCloudConfigSheet}
-          cloudConfigSheetName={cloudConfigSheetName}
-          syncSuccessMessage={syncSuccessMessage}
-          isSyncingCloud={isSyncingCloud}
-          isSchemaLoading={isSchemaLoading}
-          setIsSchemaLoading={setIsSchemaLoading}
-          handlePushPropertiesConfig={handlePushPropertiesConfig}
-          handlePushCloudConfig={handlePushCloudConfig}
-        />
+        {loading && !metadata ? (
+          <div className="flex-1 p-6 flex flex-col justify-center">
+            <SkeletonLoader type="card" count={3} />
+          </div>
+        ) : (
+          <DashboardViewRouter
+            configStorageMode={configStorageMode}
+            hasCloudConfigSheet={hasCloudConfigSheet}
+            cloudConfigSheetName={cloudConfigSheetName}
+            syncSuccessMessage={syncSuccessMessage}
+            isSyncingCloud={isSyncingCloud}
+            isSchemaLoading={isSchemaLoading}
+            setIsSchemaLoading={setIsSchemaLoading}
+            handlePushPropertiesConfig={handlePushPropertiesConfig}
+            handlePushCloudConfig={handlePushCloudConfig}
+          />
+        )}
 
         {/* FLOATING ACTION BAR (BULK ACTIONS) */}
         <FloatingBulkActionBar />
