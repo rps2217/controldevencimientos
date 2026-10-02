@@ -252,15 +252,42 @@ export function resolveItemPolicyAndRetiro(
   // 5. Resolve Policy Name
   let resolvedPolicy = '';
   if (matchedPolicyEntry) {
-    const polName = matchedPolicyEntry['POLITICA'] || 
-                    matchedPolicyEntry['ACCION'] || 
-                    matchedPolicyEntry['CANJE'] || 
-                    matchedPolicyEntry['CANJE SOLO POR VENCIMIENTO'] || 
-                    matchedPolicyEntry['CONDICION'];
+    const matchedKeys = Object.keys(matchedPolicyEntry);
+    
+    // Check semantic politica column or common policy/action text columns
+    const polKey = findColumnBySemantic(matchedKeys, 'politica', customAliases) ||
+                   matchedKeys.find(k => /pol[ií]tica|acc[ió]n|accion|canje|condici[oó]n|regla|nombre|descripci[oó]n|descripcion/i.test(k));
+                   
+    const polName = polKey ? matchedPolicyEntry[polKey] : undefined;
     if (polName) {
       resolvedPolicy = String(polName).trim();
-    } else if (matchedPolicyEntry['FAMILIA']) {
-      resolvedPolicy = `${matchedPolicyEntry['FAMILIA']} (${resolvedDays}d)`;
+    } else {
+      // Fallback: search for first non-numeric, non-RUT string that isn't the provider or family
+      const provColName = findColumnBySemantic(matchedKeys, 'proveedor', customAliases) || 
+                          matchedKeys.find(k => /proveedor|lab|fabricante/i.test(k));
+      const famColName = findColumnBySemantic(matchedKeys, 'categoria', customAliases) || 
+                         matchedKeys.find(k => /familia|categor/i.test(k));
+      const rutColName = matchedKeys.find(k => /rut/i.test(k));
+      
+      for (const k of matchedKeys) {
+        if (k === provColName || k === famColName || k === rutColName || /_row|index/i.test(k)) continue;
+        const val = String(matchedPolicyEntry[k]).trim();
+        // If it's a non-numeric text string of reasonable length, use it as policy description
+        if (val && isNaN(Number(val)) && val.length > 3 && !parseAnyDate(val)) {
+          resolvedPolicy = val;
+          break;
+        }
+      }
+    }
+    
+    // If we still don't have resolvedPolicy but have a FAMILIA, construct a nice policy name
+    if (!resolvedPolicy) {
+      const famColName = findColumnBySemantic(matchedKeys, 'categoria', customAliases) || 
+                         matchedKeys.find(k => /familia|categor/i.test(k));
+      const pFam = famColName ? matchedPolicyEntry[famColName] : (matchedPolicyEntry['FAMILIA'] || matchedPolicyEntry['CATEGORIA']);
+      if (pFam) {
+        resolvedPolicy = `${pFam} (${resolvedDays}d)`;
+      }
     }
   } else if (rawItemPolicy && String(rawItemPolicy).trim() !== '') {
     resolvedPolicy = String(rawItemPolicy).trim();
@@ -270,6 +297,29 @@ export function resolveItemPolicyAndRetiro(
 
   if (!resolvedPolicy) {
     resolvedPolicy = `Canje Estándar (${resolvedDays} días)`;
+  }
+
+  // 5.5 Detect if the resolved policy is a "no-canje" (merma directa) policy.
+  // If it is, force retirement days to 0, because there is no canje/withdrawal window!
+  const polStrLower = resolvedPolicy.toLowerCase();
+  const isNoCanjePolicy = 
+    polStrLower.includes('sin canje') || 
+    polStrLower.includes('no canje') || 
+    polStrLower.includes('sin politica') ||
+    polStrLower.includes('sin retorno') ||
+    polStrLower.includes('merma') || 
+    polStrLower.includes('destruc') ||
+    polStrLower.includes('perdida') ||
+    polStrLower.includes('baja') ||
+    polStrLower === 'no' ||
+    polStrLower === 'false' ||
+    polStrLower === '-' ||
+    polStrLower === '0';
+
+  if (isNoCanjePolicy) {
+    resolvedDays = 0;
+    daysSource = matchedPolicyEntry ? 'policy_module' : (prodPolicy ? 'product_catalog' : 'default');
+    sourceDesc = `Política de retiro inmediato / baja directa (0 días de canje)`;
   }
 
   // 6. Resolve Expiry Date and calculate Withdrawal Date
@@ -925,7 +975,13 @@ export function autoCalculateItemFormData(
   // 6. Auto-fill DIAS_RETIRO
   if (diasRetiroCol) {
     const currentDaysVal = String(newForm[diasRetiroCol] || '').trim();
-    if (currentDaysVal === '' || isNaN(parseInt(currentDaysVal, 10)) || currentDaysVal.includes('-')) {
+    if (
+      currentDaysVal === '' || 
+      isNaN(parseInt(currentDaysVal, 10)) || 
+      currentDaysVal.includes('-') || 
+      policyRes.source === 'policy_module' || 
+      policyRes.source === 'product_catalog'
+    ) {
       newForm[diasRetiroCol] = String(policyRes.diasRetiro);
     }
   }

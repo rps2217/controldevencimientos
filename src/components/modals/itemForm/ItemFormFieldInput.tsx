@@ -15,6 +15,8 @@ interface ItemFormFieldInputProps {
   masterSummaries: MasterProductSummary[];
   selectedEventCategory: string;
   resolvedRetiroDisplay?: string;
+  policySuggestions?: string[];
+  providerSuggestions?: string[];
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onApplySuggestion: (header: string, suggestion: string) => void;
   onAdjustQuantity: (header: string, delta: number) => void;
@@ -32,6 +34,8 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
   masterSummaries,
   selectedEventCategory,
   resolvedRetiroDisplay,
+  policySuggestions = [],
+  providerSuggestions = [],
   onChange,
   onApplySuggestion,
   onAdjustQuantity,
@@ -63,6 +67,9 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
   const isTraspasoCol = /traspaso/i.test(header);
   const traspasoVal = String(formData[header] || '').trim();
   const isTraspasoFilled = traspasoVal !== '' && traspasoVal !== '-' && traspasoVal !== '0';
+
+  const isPolicyCol = /pol[ií]tica|politica|regla/i.test(header);
+  const isProviderCol = /proveedor|lab|fabricante/i.test(header);
   
   const hasError = !!formErrors[header];
   const errorMsg = formErrors[header];
@@ -250,22 +257,55 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
               : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
           }`}
         />
-      ) : (
-        <input
-          type="text"
+      ) : isPolicyCol && policySuggestions.length > 0 && !isAutoCalc ? (
+        <select
           name={header}
-          value={formData[header] !== undefined ? formData[header] : (header === 'FECHA_RETIRO_CALC' ? (resolvedRetiroDisplay || '') : '')}
+          value={formData[header] || ''}
           onChange={handleChange}
-          readOnly={isAutoCalc}
-          placeholder={isAutoCalc ? 'Calculado automáticamente' : `Ingresar ${header.toLowerCase()}...`}
-          className={`w-full border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none transition-all ${
-            isAutoCalc 
-              ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700' 
-              : hasError 
-                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800' 
-                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800'
+          className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 outline-none transition-all ${
+            hasError 
+              ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
+              : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
           }`}
-        />
+        >
+          <option value="">-- Seleccionar Política Comercial --</option>
+          {policySuggestions.map((sugg, idx) => (
+            <option key={idx} value={sugg}>
+              {sugg}
+            </option>
+          ))}
+          {formData[header] && !policySuggestions.includes(formData[header]) && (
+            <option value={formData[header]}>
+              {formData[header]} (Personalizada)
+            </option>
+          )}
+        </select>
+      ) : (
+        <>
+          <input
+            type="text"
+            name={header}
+            list={isProviderCol && providerSuggestions.length > 0 ? `datalist-provider` : undefined}
+            value={formData[header] !== undefined ? formData[header] : (header === 'FECHA_RETIRO_CALC' ? (resolvedRetiroDisplay || '') : '')}
+            onChange={handleChange}
+            readOnly={isAutoCalc}
+            placeholder={isAutoCalc ? 'Calculado automáticamente' : `Ingresar ${header.toLowerCase()}...`}
+            className={`w-full border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none transition-all ${
+              isAutoCalc 
+                ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700' 
+                : hasError 
+                  ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800' 
+                  : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800'
+            }`}
+          />
+          {isProviderCol && providerSuggestions.length > 0 && (
+            <datalist id="datalist-provider">
+              {providerSuggestions.map((sugg, idx) => (
+                <option key={idx} value={sugg} />
+              ))}
+            </datalist>
+          )}
+        </>
       )}
 
       {hasError && (

@@ -182,6 +182,56 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
     return resolveItemPolicyAndRetiro(formData, headers, products, policies, sheetConfig.customAliases);
   }, [formData, headers, products, policies, sheetConfig.customAliases]);
 
+  const policySuggestions = useMemo(() => {
+    if (!policies || policies.length === 0) return [];
+    const set = new Set<string>();
+    
+    // Find the policy column name from policies keys once
+    const firstRow = policies[0];
+    const keys = firstRow ? Object.keys(firstRow) : [];
+    const polColName = findColumnBySemantic(keys, 'politica', sheetConfig.customAliases) ||
+                       keys.find(k => /pol[ií]tica|acc[ió]n|accion|canje|condici[oó]n|nombre/i.test(k));
+                       
+    policies.forEach(p => {
+      const val = polColName ? p[polColName] : (p['POLITICA'] || p['ACCION'] || p['CANJE'] || p['CONDICION'] || p['NOMBRE']);
+      if (val && String(val).trim()) {
+        set.add(String(val).trim());
+      }
+    });
+    return Array.from(set);
+  }, [policies, sheetConfig.customAliases]);
+
+  const providerSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    
+    // Find supplier column in products once
+    const firstProd = products[0];
+    const prodKeys = firstProd ? Object.keys(firstProd) : [];
+    const prodProvCol = findColumnBySemantic(prodKeys, 'proveedor', sheetConfig.customAliases) ||
+                        prodKeys.find(k => /proveedor|lab|fabricante|rut_prov/i.test(k));
+                        
+    products.forEach(p => {
+      const val = prodProvCol ? p[prodProvCol] : (p['PROVEEDOR'] || p['LABORATORIO'] || p['FABRICANTE'] || p['B']);
+      if (val && String(val).trim()) {
+        set.add(String(val).trim());
+      }
+    });
+    
+    // Find supplier column in policies once
+    const firstPol = policies[0];
+    const polKeys = firstPol ? Object.keys(firstPol) : [];
+    const polProvCol = findColumnBySemantic(polKeys, 'proveedor', sheetConfig.customAliases) ||
+                       polKeys.find(k => /proveedor|lab|fabricante|rut_prov|nombre|razon(_|\s)?social/i.test(k));
+                       
+    policies.forEach(p => {
+      const val = polProvCol ? p[polProvCol] : (p['PROVEEDOR'] || p['NOMBRE'] || p['RAZON SOCIAL'] || p['LABORATORIO'] || p['B']);
+      if (val && String(val).trim()) {
+        set.add(String(val).trim());
+      }
+    });
+    return Array.from(set);
+  }, [products, policies, sheetConfig.customAliases]);
+
   // Evaluate Show_If for all headers
   const evaluatedFields: Array<{ header: string; colSchema?: ColumnSchema; isKey?: boolean; isRequired?: boolean; isVisible: boolean; isCoreField: boolean; reason?: string }> = headers.map(header => {
     const colSchema = activeSheet?.title ? sheetConfig.schema?.[activeSheet.title]?.[header] : undefined;
@@ -455,6 +505,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                   masterSummaries={masterSummaries}
                   selectedEventCategory={selectedEventCategory}
                   resolvedRetiroDisplay={resolvedPolicyInfo.fechaRetiroDisplay}
+                  policySuggestions={policySuggestions}
+                  providerSuggestions={providerSuggestions}
                   onChange={onChange}
                   onApplySuggestion={handleApplySuggestion}
                   onAdjustQuantity={handleAdjustQuantity}
