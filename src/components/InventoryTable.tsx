@@ -13,6 +13,7 @@ export const InventoryTable: React.FC = () => {
   const filteredItems = dashboard.filteredItems ?? [];
   const selectedRowIds = dashboard.selectedRowIds ?? [];
   const setSelectedRowIds = dashboard.setSelectedRowIds ?? (() => {});
+  const selectedRowIdSet = useMemo(() => new Set(selectedRowIds.map(Number)), [selectedRowIds]);
   const headers = dashboard.headers ?? [];
   const visibleHeaders = dashboard.effectiveVisibleHeaders ?? dashboard.visibleHeaders ?? [];
   const visibleColumnMeta = dashboard.visibleColumnMeta ?? [];
@@ -89,8 +90,6 @@ export const InventoryTable: React.FC = () => {
   const collapseAllGroups = dashboard.collapseAllGroups;
   const isSticky = sheetConfig?.enableStickyColumns === true;
 
-  const selectedRowIdSet = useMemo(() => new Set(selectedRowIds.map(Number)), [selectedRowIds]);
-
   // Keyboard Arrow Navigation
   const [focusedRowIndex, setFocusedRowIndex] = React.useState<number | null>(null);
 
@@ -102,20 +101,10 @@ export const InventoryTable: React.FC = () => {
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setFocusedRowIndex(prev => {
-          const next = prev === null ? 0 : Math.min(prev + 1, filteredItems.length - 1);
-          const item = filteredItems[next];
-          if (item) onClickItem(item);
-          return next;
-        });
+        setFocusedRowIndex(prev => (prev === null ? 0 : Math.min(prev + 1, filteredItems.length - 1)));
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setFocusedRowIndex(prev => {
-          const next = prev === null ? 0 : Math.max(prev - 1, 0);
-          const item = filteredItems[next];
-          if (item) onClickItem(item);
-          return next;
-        });
+        setFocusedRowIndex(prev => (prev === null ? 0 : Math.max(prev - 1, 0)));
       } else if (e.key === ' ' || e.key === 'Enter') {
         if (focusedRowIndex !== null && filteredItems[focusedRowIndex]) {
           const item = filteredItems[focusedRowIndex];
@@ -127,7 +116,13 @@ export const InventoryTable: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [filteredItems, focusedRowIndex, onClickItem, onSelectRow, selectedRowIdSet]);
+  }, [filteredItems, focusedRowIndex, onSelectRow, selectedRowIdSet]);
+
+  React.useEffect(() => {
+    if (focusedRowIndex !== null && filteredItems[focusedRowIndex]) {
+      onClickItem(filteredItems[focusedRowIndex]);
+    }
+  }, [focusedRowIndex, filteredItems, onClickItem]);
 
   // Calculate padding class based on table density
   const paddingClass = useMemo(() => {

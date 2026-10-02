@@ -1,4 +1,4 @@
-import { useRef, RefObject } from 'react';
+import { useRef, useCallback, RefObject } from 'react';
 import { useVirtualizer, VirtualItem } from '@tanstack/react-virtual';
 import { DisplayRow } from './useInventoryFiltering';
 
@@ -32,12 +32,20 @@ export function useTableVirtualization(paginatedDisplayRows: DisplayRow[]): UseT
     ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end 
     : 0;
 
+  const measureElement = useCallback((node: Element | null) => {
+    if (node) {
+      requestAnimationFrame(() => {
+        rowVirtualizer.measureElement(node);
+      });
+    }
+  }, [rowVirtualizer]);
+
   return {
     tableContainerRef,
     virtualRows,
     paddingTop,
     paddingBottom,
-    measureElement: rowVirtualizer.measureElement,
+    measureElement,
     rowVirtualizer
   };
 }
