@@ -212,6 +212,41 @@ export const ExpressionAssistantModal: React.FC<ExpressionAssistantModalProps> =
       desc: 'Accede a los datos del registro maestro vinculado por una columna tipo Ref.'
     },
     {
+      category: 'Números & Matemáticas',
+      name: 'NUMBER',
+      syntax: 'NUMBER(valor)',
+      example: 'NUMBER([DIAS RETIRO_VC]/30)',
+      desc: 'Convierte cualquier valor a su equivalente entero (Integer). Si está vacío devuelve blanco (""), y si no es reconocible devuelve 0.'
+    },
+    {
+      category: 'Números & Matemáticas',
+      name: 'DECIMAL',
+      syntax: 'DECIMAL(valor)',
+      example: 'DECIMAL([PRECIO])',
+      desc: 'Convierte un valor o texto a número decimal. Devuelve blanco ("") si está vacío o 0 si no es numérico.'
+    },
+    {
+      category: 'Números & Matemáticas',
+      name: 'ROUND',
+      syntax: 'ROUND(valor, decimales)',
+      example: 'ROUND([CANTIDAD] / 12, 2)',
+      desc: 'Redondea un número a la cantidad de decimales indicada.'
+    },
+    {
+      category: 'Números & Matemáticas',
+      name: 'ABS',
+      syntax: 'ABS(valor)',
+      example: 'ABS([DIFERENCIA])',
+      desc: 'Devuelve el valor absoluto de un número o expresión.'
+    },
+    {
+      category: 'Texto & Concatenación',
+      name: 'TEXT',
+      syntax: 'TEXT(valor)',
+      example: 'TEXT([SKU])',
+      desc: 'Convierte cualquier valor a cadena de texto.'
+    },
+    {
       category: 'Texto & Concatenación',
       name: 'Concatenación (&)',
       syntax: '[COL1] & [COL2] & [COL3]',

@@ -284,7 +284,7 @@ function splitConcatenationParts(str: string): string[] {
 
 /**
  * Safely evaluates arithmetic expressions with +, -, *, /, unary -, parentheses,
- * numbers, and column references [COL_NAME] without using dangerous eval().
+ * numbers, function calls, and column references [COL_NAME] without using dangerous eval().
  */
 export function evaluateArithmeticExpression(
   exprStr: string,
@@ -294,19 +294,26 @@ export function evaluateArithmeticExpression(
 
   const trimmed = exprStr.trim();
 
-  // If it's a date or text function (e.g. TODAY(), NOW(), DATE(...)), don't treat as pure math
-  if (/^(TODAY|NOW|DATE|EOMONTH|LOOKUP|CONCATENATE|IF|ISBLANK|UPPER|LOWER)\s*\(/i.test(trimmed)) {
+  // If it's a date or text function (e.g. TODAY(), NOW(), DATE(...)), don't treat as pure math unless it's a numeric conversion
+  if (/^(TODAY|NOW|DATE|EOMONTH|LOOKUP|CONCATENATE|IF|ISBLANK|ISNOTBLANK|UPPER|LOWER|TEXT)\s*\(/i.test(trimmed)) {
     return null;
   }
 
-  // 1. Substitute all [COL_NAME] references with their numeric values
-  const substituted = trimmed.replace(/\[(?:_THISROW\.)?([^\]]+)\]/gi, (_, colName) => {
+  // 1. Substitute function calls like NUMBER(...), DECIMAL(...), INT(...), ROUND(...), ABS(...) with their evaluated values
+  const substitutedFunctions = trimmed.replace(/\b(NUMBER|DECIMAL|INT|ROUND|ABS)\s*\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)/gi, (funcExpr) => {
+    const res = evaluateSingleTokenOrExpression(funcExpr, context);
+    const num = parseLocaleNumber(res.value, NaN);
+    return isNaN(num) ? '0' : String(num);
+  });
+
+  // 2. Substitute all [COL_NAME] references with their numeric values
+  const substituted = substitutedFunctions.replace(/\[(?:_THISROW\.)?([^\]]+)\]/gi, (_, colName) => {
     const val = resolveRowValue(context.row, colName.trim());
     const num = parseLocaleNumber(val, NaN);
     return isNaN(num) ? '0' : String(num);
   });
 
-  // 2. Tokenize: numbers, +, -, *, /, (, )
+  // 3. Tokenize: numbers, +, -, *, /, (, )
   const tokens: string[] = [];
   let i = 0;
   while (i < substituted.length) {
@@ -345,7 +352,7 @@ export function evaluateArithmeticExpression(
 
   if (tokens.length === 0) return null;
 
-  // 3. Recursive Descent Parser for safe arithmetic
+  // 4. Recursive Descent Parser for safe arithmetic
   let pos = 0;
 
   function parseExpression(): number {
@@ -433,7 +440,40 @@ function evaluateSingleTokenOrExpression(
   if (/^true$/i.test(trimmed)) return { value: true, stringValue: 'true', success: true };
   if (/^false$/i.test(trimmed)) return { value: false, stringValue: 'false', success: true };
 
-  // D. De-referencing: [COL].[PROP] or [_THISROW].[COL].[PROP]
+  // D. Parenthesized expressions ( ... )
+  if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+    let depth = 0;
+    let isEnclosed = true;
+    for (let i = 0; i < trimmed.length - 1; i++) {
+      if (trimmed[i] === '(') depth++;
+      if (trimmed[i] === ')') depth--;
+      if (depth === 0) {
+        isEnclosed = false;
+        break;
+      }
+    }
+    if (isEnclosed) {
+      return evaluateSingleTokenOrExpression(trimmed.slice(1, -1), context);
+    }
+  }
+
+  // E. Unary minus on sub-expressions/functions e.g. -NUMBER([DIAS]/30) or -([DIAS]/30)
+  if (trimmed.startsWith('-') && trimmed.length > 1) {
+    const rest = trimmed.slice(1).trim();
+    // If it's a function call or bracketed expression
+    if (/^[A-Za-z_]\w*\s*\(|^\[|^\(/.test(rest)) {
+      const innerRes = evaluateSingleTokenOrExpression(rest, context);
+      if (innerRes.success) {
+        const n = parseLocaleNumber(innerRes.value, NaN);
+        if (!isNaN(n)) {
+          const negN = -n;
+          return { value: negN, stringValue: String(negN), success: true };
+        }
+      }
+    }
+  }
+
+  // F. De-referencing: [COL].[PROP] or [_THISROW].[COL].[PROP]
   const derefMatch = trimmed.match(/^\[(?:_THISROW\.)?([^\]]+)\]\.\[?([^\]\s]+)\]?$/i);
   if (derefMatch) {
     const refCol = derefMatch[1].trim();
@@ -442,7 +482,7 @@ function evaluateSingleTokenOrExpression(
     return { value: val, stringValue: val, success: true };
   }
 
-  // E. Column Reference: [COL] or [_THISROW].[COL]
+  // G. Column Reference: [COL] or [_THISROW].[COL]
   const colMatch = trimmed.match(/^\[(?:_THISROW\.)?([^\]]+)\]$/i);
   if (colMatch) {
     const colName = colMatch[1].trim();
@@ -451,7 +491,109 @@ function evaluateSingleTokenOrExpression(
     return { value: val, stringValue: strVal, success: true };
   }
 
-  // F. LOOKUP function: LOOKUP(needle, table, searchCol, returnCol)
+  // H. NUMBER(val) - AppSheet Standard
+  // Returns the Integer equivalent of a value if a recognizable number, or 0 if not.
+  // If blank (that is, ""), returns a blank Number value ("").
+  const numberMatch = trimmed.match(/^NUMBER\s*\((.*)\)$/i);
+  if (numberMatch) {
+    const args = parseFunctionArguments(numberMatch[1]);
+    if (args.length >= 1) {
+      const inner = evaluateSingleTokenOrExpression(args[0], context);
+      const rawVal = inner.value;
+      const strVal = String(inner.stringValue ?? '').trim();
+      if (strVal === '' || rawVal === null || rawVal === undefined) {
+        return { value: '', stringValue: '', success: true };
+      }
+      const num = parseLocaleNumber(strVal, NaN);
+      if (isNaN(num)) {
+        return { value: 0, stringValue: '0', success: true };
+      }
+      const intVal = Math.trunc(num);
+      return { value: intVal, stringValue: String(intVal), success: true };
+    }
+    return { value: '', stringValue: '', success: true };
+  }
+
+  // I. DECIMAL(val)
+  // Returns the Decimal equivalent of a value if a recognizable number, or 0 if not.
+  // If blank, returns a blank value ("").
+  const decimalMatch = trimmed.match(/^DECIMAL\s*\((.*)\)$/i);
+  if (decimalMatch) {
+    const args = parseFunctionArguments(decimalMatch[1]);
+    if (args.length >= 1) {
+      const inner = evaluateSingleTokenOrExpression(args[0], context);
+      const rawVal = inner.value;
+      const strVal = String(inner.stringValue ?? '').trim();
+      if (strVal === '' || rawVal === null || rawVal === undefined) {
+        return { value: '', stringValue: '', success: true };
+      }
+      const num = parseLocaleNumber(strVal, NaN);
+      if (isNaN(num)) {
+        return { value: 0, stringValue: '0', success: true };
+      }
+      return { value: num, stringValue: String(num), success: true };
+    }
+    return { value: '', stringValue: '', success: true };
+  }
+
+  // J. INT(val)
+  const intMatch = trimmed.match(/^INT\s*\((.*)\)$/i);
+  if (intMatch) {
+    const args = parseFunctionArguments(intMatch[1]);
+    if (args.length >= 1) {
+      const inner = evaluateSingleTokenOrExpression(args[0], context);
+      const strVal = String(inner.stringValue ?? '').trim();
+      if (strVal === '' || inner.value === null || inner.value === undefined) {
+        return { value: '', stringValue: '', success: true };
+      }
+      const num = parseLocaleNumber(strVal, NaN);
+      if (isNaN(num)) {
+        return { value: 0, stringValue: '0', success: true };
+      }
+      const intVal = Math.floor(num);
+      return { value: intVal, stringValue: String(intVal), success: true };
+    }
+    return { value: '', stringValue: '', success: true };
+  }
+
+  // K. ROUND(val, digits?)
+  const roundMatch = trimmed.match(/^ROUND\s*\((.*)\)$/i);
+  if (roundMatch) {
+    const args = parseFunctionArguments(roundMatch[1]);
+    if (args.length >= 1) {
+      const inner = evaluateSingleTokenOrExpression(args[0], context);
+      const digits = args[1] ? Math.max(0, parseInt(evaluateSingleTokenOrExpression(args[1], context).stringValue, 10) || 0) : 0;
+      const num = parseLocaleNumber(inner.value, NaN);
+      if (isNaN(num)) return { value: 0, stringValue: '0', success: true };
+      const factor = Math.pow(10, digits);
+      const rounded = Math.round(num * factor) / factor;
+      return { value: rounded, stringValue: String(rounded), success: true };
+    }
+  }
+
+  // L. ABS(val)
+  const absMatch = trimmed.match(/^ABS\s*\((.*)\)$/i);
+  if (absMatch) {
+    const args = parseFunctionArguments(absMatch[1]);
+    if (args.length >= 1) {
+      const inner = evaluateSingleTokenOrExpression(args[0], context);
+      const num = parseLocaleNumber(inner.value, NaN);
+      const absVal = isNaN(num) ? 0 : Math.abs(num);
+      return { value: absVal, stringValue: String(absVal), success: true };
+    }
+  }
+
+  // M. TEXT(val)
+  const textMatch = trimmed.match(/^TEXT\s*\((.*)\)$/i);
+  if (textMatch) {
+    const args = parseFunctionArguments(textMatch[1]);
+    if (args.length >= 1) {
+      const inner = evaluateSingleTokenOrExpression(args[0], context);
+      return { value: inner.stringValue, stringValue: inner.stringValue, success: true };
+    }
+  }
+
+  // N. LOOKUP function: LOOKUP(needle, table, searchCol, returnCol)
   const lookupMatch = trimmed.match(/^LOOKUP\s*\((.*)\)$/i);
   if (lookupMatch) {
     const args = parseFunctionArguments(lookupMatch[1]);
@@ -465,7 +607,7 @@ function evaluateSingleTokenOrExpression(
     }
   }
 
-  // G. CONCATENATE(a, b, c, ...)
+  // O. CONCATENATE(a, b, c, ...)
   const concatMatch = trimmed.match(/^CONCATENATE\s*\((.*)\)$/i);
   if (concatMatch) {
     const args = parseFunctionArguments(concatMatch[1]);
@@ -473,7 +615,7 @@ function evaluateSingleTokenOrExpression(
     return { value: str, stringValue: str, success: true };
   }
 
-  // H. TODAY() and NOW()
+  // P. TODAY() and NOW()
   if (/^TODAY\s*\(\s*\)$/i.test(trimmed)) {
     const today = new Date();
     const formatted = formatInputDate(today);
@@ -485,7 +627,7 @@ function evaluateSingleTokenOrExpression(
     return { value: now, stringValue: formatted, success: true };
   }
 
-  // I. EOMONTH(date, offsetMonths)
+  // Q. EOMONTH(date, offsetMonths)
   const eomonthMatch = trimmed.match(/^EOMONTH\s*\((.*)\)$/i);
   if (eomonthMatch) {
     const args = parseFunctionArguments(eomonthMatch[1]);
@@ -495,7 +637,7 @@ function evaluateSingleTokenOrExpression(
       let offset = 0;
       if (args[1]) {
         const mathOffset = evaluateArithmeticExpression(args[1], context);
-        if (mathOffset !== null) {
+        if (mathOffset !== null && !isNaN(mathOffset)) {
           offset = Math.round(mathOffset);
         } else {
           const evalRes = evaluateSingleTokenOrExpression(args[1], context);
