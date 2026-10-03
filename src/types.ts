@@ -151,6 +151,9 @@ export interface ColumnSchema {
   showIfRule?: string; // Conditional visibility expression (e.g., "FRC_EVEN = 'TRANSPORTE'")
   validIfRule?: string; // Custom validation expression (e.g., "CANTIDAD > 0")
   validIfMessage?: string; // Custom validation error message
+  formula?: string; // App formula expression (e.g. "=[SKU] & [YYYY] & [MM]" or "[RUT_PROVEEDOR].[POLITICA]")
+  initialValue?: string; // Initial value expression or default
+  editable?: boolean; // Whether input can be manually edited (defaults to false when formula is present)
 }
 
 export type ResolutionStatus = 'PENDIENTE' | 'REALIZADO';

@@ -2,6 +2,7 @@ import { findColumnBySemantic, KnownFieldSemantic } from './columnAliases';
 import { parseAnyDate, calculateWithdrawalDate, formatDisplayDate, formatInputDate, getEndOfMonthDateForYm } from './dateCalculations';
 import { extractCuVcFromRow } from './cuVcConsolidator';
 import { SheetConfig, SheetRecord } from '../types';
+import { applyTableSchemaFormulas } from './appSheetFormulaEngine';
 
 export interface MasterProductSummary {
   sku: string;
@@ -1020,6 +1021,22 @@ export function autoCalculateItemFormData(
     });
     if (cuVcCol) {
       newForm[cuVcCol] = derivedCuInfo.cuVc;
+    }
+  }
+
+  // 9. Evaluate Custom Configured Column Formulas (AppSheet-Style Declarative Engine)
+  if (sheetConfig?.schema) {
+    for (const [_, colSchemas] of Object.entries(sheetConfig.schema)) {
+      if (!colSchemas) continue;
+      const hasFormulasForHeaders = Object.keys(colSchemas).some(h => headers.includes(h) && colSchemas[h]?.formula);
+      if (hasFormulasForHeaders) {
+        const computed = applyTableSchemaFormulas(newForm, headers, colSchemas, {
+          products,
+          policies,
+          customAliases
+        });
+        Object.assign(newForm, computed);
+      }
     }
   }
 

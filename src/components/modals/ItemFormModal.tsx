@@ -237,7 +237,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
     const colSchema = activeSheet?.title ? sheetConfig.schema?.[activeSheet.title]?.[header] : undefined;
     const isKey = colSchema?.isKey;
     const isRequired = colSchema?.required;
-    const evaluation = evaluateShowIf(header, selectedEventCategory, formData, isKey, showAllFields, isRequired);
+    const showIfRule = colSchema?.showIfRule;
+    const evaluation = evaluateShowIf(header, selectedEventCategory, formData, isKey, showAllFields, isRequired, showIfRule);
     return {
       header,
       colSchema,

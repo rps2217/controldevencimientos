@@ -42,7 +42,11 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
   onGenerateTraspaso,
   onClearTraspaso
 }) => {
-  const isAutoCalc = (colSchema?.behavior === 'calc_fecha_vc' && canExpire) || 
+  const hasFormula = Boolean(colSchema?.formula && colSchema.formula.trim());
+  const isEditableLocked = colSchema?.editable === false;
+  const isAutoCalc = hasFormula ||
+                     isEditableLocked ||
+                     (colSchema?.behavior === 'calc_fecha_vc' && canExpire) || 
                      (colSchema?.behavior === 'calc_retiro' && canExpire) || 
                      colSchema?.behavior === 'auto_id' || 
                      colSchema?.type === 'calculated' || 
@@ -96,9 +100,17 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
               KEY
             </span>
           )}
-          {isAutoCalc && (
-            <span className="text-[10px] bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 px-1.5 py-0.2 rounded font-mono font-bold">
-              auto
+          {hasFormula && (
+            <span 
+              className="text-[9px] bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-1.5 py-0.2 rounded font-mono font-bold flex items-center gap-1"
+              title={`Fórmula AppSheet: =${colSchema?.formula}`}
+            >
+              ✨ App Formula
+            </span>
+          )}
+          {!hasFormula && isAutoCalc && (
+            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.2 rounded font-mono font-bold">
+              {isEditableLocked ? '🔒 Bloqueado' : 'auto'}
             </span>
           )}
         </label>

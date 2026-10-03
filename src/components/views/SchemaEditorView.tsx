@@ -3,10 +3,10 @@ import { VIRTUAL_COLUMNS } from '../../utils/virtualColumns';
 import { 
   Sparkles, Code2, UploadCloud, Cloud, Sliders, CheckCircle2, Loader2, Key, Eye, EyeOff, Search, Link2, CheckSquare, Square, TableProperties, Layers
 } from 'lucide-react';
-import { SheetConfig, SpreadsheetMetadata, SheetProperties, ColumnSchema, ColumnType, ColumnBehavior, UserVirtualColumn } from '../../types';
-import { getSheetData } from '../../lib/sheets';
+import { SheetConfig, SpreadsheetMetadata, SheetProperties, ColumnSchema, ColumnType, ColumnBehavior, UserVirtualColumn, SheetRecord } from '../../types';
 import { VisualSchemaDesigner } from './VisualSchemaDesigner';
 import { SchemaHealthAudit } from './SchemaHealthAudit';
+import { AppSheetColumnStudio } from './AppSheetColumnStudio';
 
 interface SchemaEditorViewProps {
   configStorageMode: 'properties' | 'sheet' | 'local';
@@ -27,6 +27,9 @@ interface SchemaEditorViewProps {
   handlePushPropertiesConfig: () => Promise<void>;
   handlePushCloudConfig: () => Promise<void>;
   activeView: string;
+  products?: SheetRecord[];
+  policies?: SheetRecord[];
+  sampleItems?: any[];
 }
 
 export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
@@ -47,9 +50,12 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
   setIsScriptModalOpen,
   handlePushPropertiesConfig,
   handlePushCloudConfig,
-  activeView
+  activeView,
+  products = [],
+  policies = [],
+  sampleItems = []
 }) => {
-  const [schemaSubView, setSchemaSubView] = useState<'visual' | 'table'>('visual');
+  const [schemaSubView, setSchemaSubView] = useState<'visual' | 'table'>('table');
 
   return (
     <div className="w-full bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 max-w-6xl mx-auto transition-colors overflow-y-auto">
@@ -197,6 +203,17 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
       {/* Sub-view Toggle */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6">
         <button
+          onClick={() => setSchemaSubView('table')}
+          className={`px-5 py-3 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+            schemaSubView === 'table'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-black'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+          }`}
+        >
+          <TableProperties className="w-4 h-4" />
+          <span>Configuración de Columnas (AppSheet Studio)</span>
+        </button>
+        <button
           onClick={() => setSchemaSubView('visual')}
           className={`px-5 py-3 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
             schemaSubView === 'visual'
@@ -206,17 +223,6 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
         >
           <Layers className="w-4 h-4" />
           <span>Diseñador Relacional (Visual)</span>
-        </button>
-        <button
-          onClick={() => setSchemaSubView('table')}
-          className={`px-5 py-3 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
-            schemaSubView === 'table'
-              ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-black'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-          }`}
-        >
-          <TableProperties className="w-4 h-4" />
-          <span>Configuración de Columnas (Pestaña)</span>
         </button>
       </div>
 
@@ -229,268 +235,22 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
           activeSheetHeaders={headers}
         />
       ) : (
-        <>
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">Selecciona una pestaña para configurar:</label>
-            <select 
-              className="w-full max-w-sm border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-blue-500 outline-none focus:ring-4 focus:ring-blue-500/10 shadow-sm bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 disabled:opacity-50"
-              disabled={isSchemaLoading}
-              onChange={async (e) => {
-                const sheetTitle = e.target.value;
-                if (sheetTitle) {
-                  const sheetProp = metadata?.sheets.find(s => s.properties.title === sheetTitle)?.properties || null;
-                  setActiveSheet(sheetProp);
-                  
-                  if (sheetProp) {
-                    setIsSchemaLoading(true);
-                    try {
-                      const rows = await getSheetData(sheetProp.title);
-                      if (rows.length > 0) {
-                        setHeaders(rows[0].map(String));
-                      } else {
-                        setHeaders([]);
-                      }
-                    } catch (err) {
-                      console.error(err);
-                      setHeaders([]);
-                    } finally {
-                      setIsSchemaLoading(false);
-                    }
-                  }
-                } else {
-                  setActiveSheet(null);
-                  setHeaders([]);
-                }
-              }}
-              value={activeSheet?.title || ''}
-            >
-              <option value="">-- Seleccionar Pestaña --</option>
-              {metadata?.sheets
-                .filter(s => !/^_/i.test(s.properties.title || ''))
-                .map(s => (
-                  <option key={s.properties.sheetId} value={s.properties.title}>{s.properties.title}</option>
-                ))}
-            </select>
-          </div>
-
-      {isSchemaLoading && (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
-        </div>
-      )}
-      
-      {!isSchemaLoading && activeSheet && headers.length === 0 && (
-        <div className="py-8 text-center text-slate-500 dark:text-slate-400">
-          La pestaña seleccionada está vacía. Necesita al menos una fila de encabezados.
-        </div>
-      )}
-
-      {!isSchemaLoading && activeSheet && headers.length > 0 && (
-        <>
-          <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-x-auto shadow-sm mb-6">
-            <table className="w-full text-left border-collapse min-w-[850px]">
-              <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                <tr>
-                  <th className="px-5 py-4 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">Columna</th>
-                  <th className="px-4 py-4 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase text-center w-24">ID Key</th>
-                  <th className="px-4 py-4 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase text-center w-24">Visible</th>
-                  <th className="px-4 py-4 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase text-center w-28">Indexable</th>
-                  <th className="px-5 py-4 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase w-48">Tipo de Dato</th>
-                  <th className="px-5 py-4 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">Opciones / Referencia</th>
-                  <th className="px-5 py-4 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase w-56">Automatización</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-200">
-                {headers.map((header) => {
-                  const isNaturalKey = /^ID_VC$|^ID_EVENTO$|^ID$|^SKU$/i.test(header.trim());
-                  const schema: ColumnSchema = sheetConfig.schema?.[activeSheet.title]?.[header] || { 
-                    visible: true, 
-                    searchable: true, 
-                    type: (/fecha|vencimiento|retiro/i.test(header) ? 'date' : (/sku/i.test(header) && activeView === 'main' ? 'ref' : 'text')), 
-                    behavior: (isNaturalKey && /^ID_VC$/i.test(header.trim()) ? 'auto_id' : 'none'),
-                    isKey: isNaturalKey,
-                    options: '',
-                    refTable: sheetConfig.products || ''
-                  };
-                  
-                  const updateCol = <K extends keyof ColumnSchema>(key: K, value: ColumnSchema[K]) => {
-                    const newSchema = { ...sheetConfig.schema };
-                    if (!newSchema[activeSheet.title]) newSchema[activeSheet.title] = {};
-                    
-                    // Al marcar como clave primaria, desmarcar isKey en otras columnas de la misma tabla
-                    if (key === 'isKey' && value === true) {
-                      Object.keys(newSchema[activeSheet.title]).forEach(colName => {
-                        if (colName !== header) {
-                          newSchema[activeSheet.title][colName] = {
-                            ...newSchema[activeSheet.title][colName],
-                            isKey: false
-                          };
-                        }
-                      });
-                    }
-
-                    newSchema[activeSheet.title][header] = { ...schema, [key]: value };
-                    saveConfig({ ...sheetConfig, schema: newSchema });
-                  };
-
-                  const isEnum = schema.type === 'enum' || schema.type === 'enumlist';
-                  const isRef = schema.type === 'ref';
-
-                  return (
-                    <tr key={header} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
-                      <td className="px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span>{header}</span>
-                          {schema.isKey && (
-                            <span className="text-[10px] bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded font-mono font-bold flex items-center gap-1">
-                              <Key className="w-3 h-3 text-amber-600 dark:text-amber-400" /> KEY
-                            </span>
-                          )}
-                          {schema.behavior !== 'none' && (
-                            <span className="text-[10px] bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded font-mono font-bold">
-                              {schema.behavior}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      
-                      {/* Key Toggle */}
-                      <td className="px-4 py-4 text-center">
-                        <button 
-                          onClick={() => updateCol('isKey', !schema.isKey)}
-                          title={schema.isKey ? "Columna clave primaria (ID)" : "Marcar como clave primaria"}
-                          className={`p-2 rounded-lg transition-colors ${schema.isKey ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50 bg-amber-50/60 dark:bg-amber-900/30' : 'text-slate-300 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                        >
-                          <Key className="w-4 h-4" />
-                        </button>
-                      </td>
-
-                      {/* Visible Toggle */}
-                      <td className="px-4 py-4 text-center">
-                        <button 
-                          onClick={() => updateCol('visible', schema.visible === false ? true : false)}
-                          title={schema.visible !== false ? "Visible en la tabla principal" : "Oculto en la tabla principal"}
-                          className={`p-2 rounded-lg transition-colors ${schema.visible !== false ? 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50' : 'text-slate-300 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                        >
-                          {schema.visible !== false ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-                        </button>
-                      </td>
-
-                      {/* Searchable Toggle */}
-                      <td className="px-4 py-4 text-center">
-                        <button 
-                          onClick={() => updateCol('searchable', schema.searchable === false ? true : false)}
-                          title={schema.searchable !== false ? "Indexado en el buscador universal" : "Ignorado en el buscador"}
-                          className={`p-2 rounded-lg transition-colors ${schema.searchable !== false ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 bg-emerald-50/50 dark:bg-emerald-900/30' : 'text-slate-300 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                        >
-                          <Search className="w-4 h-4 inline" />
-                        </button>
-                      </td>
-
-                      {/* Data Type */}
-                      <td className="px-5 py-4">
-                        <select 
-                          value={schema.type || 'text'}
-                          onChange={(e) => updateCol('type', e.target.value as ColumnType)}
-                          className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-blue-500 outline-none font-medium"
-                        >
-                          <option value="text">Texto (Text)</option>
-                          <option value="longtext">Texto Largo (LongText)</option>
-                          <option value="number">Número (Number)</option>
-                          <option value="date">Fecha (Date)</option>
-                          <option value="datetime">Fecha y Hora (DateTime)</option>
-                          <option value="enum">Selección Única (Enum)</option>
-                          <option value="enumlist">Selección Múltiple (EnumList)</option>
-                          <option value="ref">Referencia / Relación (Ref)</option>
-                          <option value="calculated">Calculada (Calculated)</option>
-                        </select>
-                      </td>
-
-                      {/* Options / Ref Config */}
-                      <td className="px-5 py-4">
-                        {isRef ? (
-                          <div className="space-y-1.5 min-w-[200px]">
-                            <select
-                              value={schema.refTable || ''}
-                              onChange={(e) => {
-                                const newTable = e.target.value;
-                                updateCol('refTable', newTable);
-                                updateCol('refTargetTable', newTable);
-                              }}
-                              className="w-full border border-blue-200 dark:border-blue-800 rounded-lg px-2.5 py-1.5 text-xs bg-blue-50/50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 focus:border-blue-500 outline-none font-medium"
-                            >
-                              <option value="">-- Tabla Destino (Ref) --</option>
-                              {metadata?.sheets.map(s => (
-                                <option key={s.properties.sheetId} value={s.properties.title}>
-                                  {s.properties.title}
-                                </option>
-                              ))}
-                            </select>
-                            {schema.refTable && (
-                              <div className="grid grid-cols-2 gap-1.5">
-                                <input
-                                  type="text"
-                                  placeholder="Clave (ej: SKU)"
-                                  value={schema.refKeyCol || ''}
-                                  onChange={(e) => {
-                                    updateCol('refKeyCol', e.target.value);
-                                    updateCol('refTargetColumn', e.target.value);
-                                  }}
-                                  className="w-full border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-[11px] bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
-                                  title="Columna Clave de la tabla destino (ej: SKU)"
-                                />
-                                <input
-                                  type="text"
-                                  placeholder="Etiqueta visible"
-                                  value={schema.refLabelCol || ''}
-                                  onChange={(e) => updateCol('refLabelCol', e.target.value)}
-                                  className="w-full border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-[11px] bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
-                                  title="Columna visible al usuario (ej: DESCRIPCION)"
-                                />
-                              </div>
-                            )}
-                            <span className="text-[10px] text-blue-600 dark:text-blue-400 block flex items-center gap-1">
-                              <Link2 className="w-3 h-3" /> Relacionada por clave ID
-                            </span>
-                          </div>
-                        ) : isEnum ? (
-                          <div>
-                            <input 
-                              type="text"
-                              placeholder="Ej: Activo, Pendiente, Cancelado"
-                              value={schema.options || ''}
-                              onChange={(e) => updateCol('options', e.target.value)}
-                              className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-blue-500 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                            />
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">Separadas por coma</span>
-                          </div>
-                        ) : schema.type === 'calculated' ? (
-                          <span className="text-xs text-slate-400 dark:text-slate-500 italic">Definida por automatización</span>
-                        ) : (
-                          <span className="text-xs text-slate-300 dark:text-slate-600 font-mono">-</span>
-                        )}
-                      </td>
-
-                      {/* Behavior */}
-                      <td className="px-5 py-4">
-                        <select 
-                          value={schema.behavior || 'none'}
-                          onChange={(e) => updateCol('behavior', e.target.value as ColumnBehavior)}
-                          className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:border-blue-500 outline-none"
-                        >
-                          <option value="none">-- Sin automatización --</option>
-                          <option value="auto_id">Generar ID Único (auto_id)</option>
-                          <option value="calc_fecha_vc">Calcular Fecha VC (MM/YYYY)</option>
-                          <option value="calc_retiro">Calcular Retiro (Política)</option>
-                          <option value="sku_lookup">Autocompletar Relacional</option>
-                        </select>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="space-y-6">
+          <AppSheetColumnStudio
+            metadata={metadata}
+            activeSheet={activeSheet}
+            setActiveSheet={setActiveSheet}
+            headers={headers}
+            setHeaders={setHeaders}
+            isSchemaLoading={isSchemaLoading}
+            setIsSchemaLoading={setIsSchemaLoading}
+            sheetConfig={sheetConfig}
+            saveConfig={saveConfig}
+            activeView={activeView}
+            products={products}
+            policies={policies}
+            sampleItems={sampleItems}
+          />
 
           {/* Virtual Columns Configuration */}
           <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-6 mb-6">
@@ -618,10 +378,8 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
               ))}
             </div>
           </div>
-        </>
+        </div>
       )}
-    </>
-  )}
     </div>
   );
 };

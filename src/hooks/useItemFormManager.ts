@@ -4,6 +4,7 @@ import { InventoryItem, SheetConfig, SheetProperties, EventCategory, SheetRecord
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { getEventCategory, formatInputDate, formatInputDateTime, parseLocaleNumber, parseAnyDate, EVENT_CATEGORIES } from '../utils/dateCalculations';
 import { autoCalculateItemFormData } from '../utils/referenceResolver';
+import { evaluateAppSheetFormula, evaluateBooleanCondition } from '../utils/appSheetFormulaEngine';
 
 interface UseItemFormManagerParams {
   headers: string[];
@@ -82,7 +83,15 @@ export function useItemFormManager({
       
       headers.forEach(h => {
         const colSchema = activeSheet ? sheetConfig.schema?.[activeSheet.title]?.[h] : undefined;
-        if (colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro|fecha_ingreso/i.test(h)) {
+        if (colSchema?.initialValue && colSchema.initialValue.trim()) {
+          const initRes = evaluateAppSheetFormula(colSchema.initialValue, {
+            row: initialData,
+            headers,
+            products,
+            policies
+          });
+          initialData[h] = initRes.stringValue || colSchema.initialValue;
+        } else if (colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro|fecha_ingreso/i.test(h)) {
           const now = new Date();
           const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
           initialData[h] = localISO;
@@ -184,7 +193,8 @@ export function useItemFormManager({
       const colSchema = currentSchema[header];
       const isDateName = /fecha|vencimiento|vence|retiro/i.test(header) && !/dias|días|cant|stock|unidades|num/i.test(header);
       const effectiveType = colSchema?.type || (isDateName ? 'date' : 'text');
-      const isAutoCalculated = colSchema?.behavior === 'auto_id' || 
+      const isAutoCalculated = Boolean(colSchema?.formula && colSchema.formula.trim()) ||
+                               colSchema?.behavior === 'auto_id' || 
                                colSchema?.behavior === 'calc_fecha_vc' || 
                                colSchema?.behavior === 'calc_retiro' || 
                                effectiveType === 'calculated' || 
@@ -248,6 +258,21 @@ export function useItemFormManager({
             return !isNaN(num) && num >= 1990 && num <= 2100;
           }, 'El año debe ser válido (ej. 2026).');
         }
+      }
+
+      // AppSheet Valid_If custom validation rule
+      if (colSchema?.validIfRule && colSchema.validIfRule.trim()) {
+        const ruleExpr = colSchema.validIfRule.trim();
+        const customMsg = colSchema.validIfMessage || `El valor no cumple con la regla de validación: ${ruleExpr}`;
+        fieldSchema = fieldSchema.refine((val: unknown) => {
+          const rowSnapshot = { ...formData, [header]: String(val ?? '') };
+          return evaluateBooleanCondition(ruleExpr, {
+            row: rowSnapshot,
+            headers,
+            products,
+            policies
+          });
+        }, customMsg);
       }
 
       zSchemaShape[header] = fieldSchema;

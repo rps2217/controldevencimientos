@@ -1,4 +1,5 @@
 import { EventCategory } from '../types';
+import { evaluateBooleanCondition } from './appSheetFormulaEngine';
 
 export interface ShowIfEvaluation {
   isVisible: boolean;
@@ -66,19 +67,30 @@ export function evaluateShowIf(
   formData: Record<string, string>,
   isKey?: boolean,
   showAllFields?: boolean,
-  isRequired?: boolean
+  isRequired?: boolean,
+  showIfRule?: string
 ): ShowIfEvaluation {
   // 1. If explicit "show all" is active
   if (showAllFields) {
     return { isVisible: true, isCoreField: true, reason: 'Modo expandido' };
   }
 
-  // 2. Primary keys and required fields are never hidden
+  // 2. Custom AppSheet Show_If rule takes top priority if configured
+  if (showIfRule && showIfRule.trim()) {
+    const isSatisfied = evaluateBooleanCondition(showIfRule, { row: formData });
+    return {
+      isVisible: isSatisfied,
+      isCoreField: isKey || isRequired || false,
+      reason: isSatisfied ? 'Visible por regla Show_If' : 'Oculto por regla Show_If'
+    };
+  }
+
+  // 3. Primary keys and required fields are never hidden
   if (isKey || isRequired) {
     return { isVisible: true, isCoreField: true, reason: isKey ? 'Identificador Clave' : 'Campo Requerido' };
   }
 
-  // 3. If field already contains user data, never hide it
+  // 4. If field already contains user data, never hide it
   const val = String(formData[header] || '').trim();
   if (val !== '') {
     return { isVisible: true, isCoreField: false, reason: 'Contiene datos ingresados' };

@@ -106,6 +106,9 @@ export const DashboardViewRouter: React.FC<DashboardViewRouterProps> = ({
           handlePushPropertiesConfig={handlePushPropertiesConfig}
           handlePushCloudConfig={handlePushCloudConfig}
           activeView={activeView}
+          products={products}
+          policies={policies}
+          sampleItems={items}
         />
       ) : activeView === 'analytics' ? (
         <Suspense fallback={<LazyFallback />}>
