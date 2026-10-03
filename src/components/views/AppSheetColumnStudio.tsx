@@ -1,16 +1,22 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   Database, Key, Tag, Edit3, Search, Sparkles, RefreshCw, 
   CheckSquare, Square, X, ChevronRight, Hash, Type, FileText, 
   Eye, EyeOff, Link2, Code2, Info, Lock, ExternalLink, Calendar,
   Clock, Check, SlidersHorizontal, Layers, CheckCircle, AlertTriangle,
-  Play, Copy, HelpCircle
+  Play, Copy, HelpCircle, Plus
 } from 'lucide-react';
 import { 
   SheetConfig, SpreadsheetMetadata, SheetProperties, 
   ColumnSchema, ColumnType, ColumnBehavior, SheetRecord
 } from '../../types';
 import { getSheetData } from '../../lib/sheets';
+import { 
+  SAMPLE_HEADERS, 
+  SAMPLE_EVENTS_HEADERS, 
+  SAMPLE_PRODUCTS, 
+  SAMPLE_POLICIES 
+} from '../../data/sampleInventory';
 import { 
   evaluateAppSheetFormula, 
   validateFormulaSyntax, 
@@ -21,9 +27,9 @@ import {
 interface AppSheetColumnStudioProps {
   metadata: SpreadsheetMetadata | null;
   activeSheet: SheetProperties | null;
-  setActiveSheet: (sheet: SheetProperties | null) => void;
+  setActiveSheet?: (sheet: SheetProperties | null) => void;
   headers: string[];
-  setHeaders: (headers: string[]) => void;
+  setHeaders?: (headers: string[]) => void;
   isSchemaLoading: boolean;
   setIsSchemaLoading: (loading: boolean) => void;
   sheetConfig: SheetConfig;
@@ -53,18 +59,148 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
   const [columnSearchQuery, setColumnSearchQuery] = useState('');
   const [editingColumnHeader, setEditingColumnHeader] = useState<string | null>(null);
   const [formulaAssistantCol, setFormulaAssistantCol] = useState<string | null>(null);
-  
-  // Custom test formula state in the assistant
   const [testFormulaInput, setTestFormulaInput] = useState('');
+  const [newColumnNameInput, setNewColumnNameInput] = useState('');
+  const [isAddingColumn, setIsAddingColumn] = useState(false);
 
-  // Sample row for live formula testing
+  // Available sheets list excluding internal hidden sheets
+  const availableSheets = useMemo(() => {
+    if (!metadata?.sheets || metadata.sheets.length === 0) {
+      // Default standard sheets if metadata is not yet populated
+      return [
+        { properties: { sheetId: 1, title: sheetConfig.main || 'Vencimientos_Inventario', hidden: false } },
+        { properties: { sheetId: 2, title: sheetConfig.events || 'FRC', hidden: false } },
+        { properties: { sheetId: 3, title: sheetConfig.products || 'Catalogo_Productos', hidden: false } },
+        { properties: { sheetId: 4, title: sheetConfig.policies || 'Politicas_Canje', hidden: false } }
+      ] as any[];
+    }
+    return metadata.sheets.filter(s => !/^_/i.test(s.properties.title || ''));
+  }, [metadata, sheetConfig.main, sheetConfig.events, sheetConfig.products, sheetConfig.policies]);
+
+  // Resolves fallback headers for a given sheet title
+  const resolveFallbackHeaders = useCallback((title: string): string[] => {
+    if (!title) return [];
+
+    // 1. If table has configured columns in sheetConfig.schema
+    if (sheetConfig.schema?.[title]) {
+      const schemaKeys = Object.keys(sheetConfig.schema[title]);
+      if (schemaKeys.length > 0) return schemaKeys;
+    }
+
+    // 2. Active headers if title matches current activeSheet
+    if (activeSheet?.title === title && headers.length > 0) {
+      return headers;
+    }
+
+    // 3. Products / Catalogo
+    if (title === sheetConfig.products || /catalogo|product/i.test(title)) {
+      if (products && products.length > 0) {
+        return Object.keys(products[0]).filter(k => !k.startsWith('_'));
+      }
+      return Object.keys(SAMPLE_PRODUCTS[0]);
+    }
+
+    // 4. Policies / Politicas
+    if (title === sheetConfig.policies || /pol[ií]tic|canje/i.test(title)) {
+      if (policies && policies.length > 0) {
+        return Object.keys(policies[0]).filter(k => !k.startsWith('_'));
+      }
+      return Object.keys(SAMPLE_POLICIES[0]);
+    }
+
+    // 5. Events / FRC
+    if (title === sheetConfig.events || /frc|evento|incidenc/i.test(title)) {
+      return SAMPLE_EVENTS_HEADERS;
+    }
+
+    // 6. Recep Bultos
+    if (title === sheetConfig.recepBultos || /bulto/i.test(title)) {
+      return ['TIMESTAMP', 'CODIGO_BULTO', 'ESTADO', 'OPERADOR'];
+    }
+
+    // 7. Main Vencimientos
+    if (title === sheetConfig.main || /vencimiento/i.test(title)) {
+      return headers.length > 0 ? headers : SAMPLE_HEADERS;
+    }
+
+    return [];
+  }, [sheetConfig, activeSheet, headers, products, policies]);
+
+  // Internal reactive selection of table in studio
+  const [selectedSheet, setSelectedSheet] = useState<SheetProperties>(() => {
+    if (activeSheet) return activeSheet;
+    const pref = availableSheets.find(s => 
+      s.properties.title === sheetConfig.main || /vencimiento/i.test(s.properties.title)
+    ) || availableSheets[0];
+    return pref ? pref.properties : { sheetId: 1, title: sheetConfig.main || 'Vencimientos_Inventario', hidden: false };
+  });
+
+  // Internal table headers for the currently selected table
+  const [tableHeaders, setTableHeaders] = useState<string[]>(() => {
+    const initTitle = activeSheet?.title || sheetConfig.main || 'Vencimientos_Inventario';
+    const resolved = resolveFallbackHeaders(initTitle);
+    if (resolved.length > 0) return resolved;
+    if (headers && headers.length > 0) return headers;
+    return SAMPLE_HEADERS;
+  });
+
+  // Switch active table and load headers with immediate local response
+  const handleSelectTable = async (sheetProp: SheetProperties) => {
+    setSelectedSheet(sheetProp);
+    setEditingColumnHeader(null);
+    setFormulaAssistantCol(null);
+    setIsAddingColumn(false);
+    
+    // Notify parent if available
+    setActiveSheet?.(sheetProp);
+
+    // 1. Immediately update tableHeaders with fallback/cached/schema headers
+    const immediate = resolveFallbackHeaders(sheetProp.title);
+    if (immediate.length > 0) {
+      setTableHeaders(immediate);
+      setHeaders?.(immediate);
+    }
+
+    // 2. Fetch live headers from Google Sheets in the background
+    setIsSchemaLoading(true);
+    try {
+      const rows = await getSheetData(sheetProp.title);
+      if (rows && rows.length > 0 && Array.isArray(rows[0]) && rows[0].length > 0) {
+        const liveHeaders = rows[0].map(String).map(s => s.trim()).filter(Boolean);
+        if (liveHeaders.length > 0) {
+          setTableHeaders(liveHeaders);
+          setHeaders?.(liveHeaders);
+        }
+      }
+    } catch (err) {
+      // In demo mode or if offline, the immediate fallback headers are already preserved
+      console.warn('[AppSheetStudio] Usando encabezados locales/caché para:', sheetProp.title);
+      if (immediate.length > 0) {
+        setTableHeaders(immediate);
+        setHeaders?.(immediate);
+      }
+    } finally {
+      setIsSchemaLoading(false);
+    }
+  };
+
+  // Sample row for live formula testing contextual to the selected sheet
   const sampleRow = useMemo(() => {
+    const title = selectedSheet.title;
+    if (title === sheetConfig.products || /catalogo|product/i.test(title)) {
+      if (products && products.length > 0) return products[0];
+      return SAMPLE_PRODUCTS[0];
+    }
+    if (title === sheetConfig.policies || /pol[ií]tic|canje/i.test(title)) {
+      if (policies && policies.length > 0) return policies[0];
+      return SAMPLE_POLICIES[0];
+    }
     if (sampleItems && sampleItems.length > 0) {
       return sampleItems[0];
     }
-    // Create a mock sample row from headers
+    // Create a mock sample row from current tableHeaders
     const mock: Record<string, any> = {};
-    headers.forEach(h => {
+    tableHeaders.forEach(h => {
       if (/sku/i.test(h)) mock[h] = '2000210';
       else if (/mm|mes/i.test(h)) mock[h] = '12';
       else if (/yyyy|a[nñ]o/i.test(h)) mock[h] = '2026';
@@ -76,23 +212,17 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
       else mock[h] = 'Ejemplo';
     });
     return mock;
-  }, [sampleItems, headers]);
+  }, [selectedSheet.title, sheetConfig, products, policies, sampleItems, tableHeaders]);
 
   // Context for formula evaluation
   const formulaEvalContext: FormulaEvaluationContext = useMemo(() => ({
     row: sampleRow,
-    headers,
-    tableName: activeSheet?.title || '',
+    headers: tableHeaders,
+    tableName: selectedSheet.title,
     products,
     policies,
     customAliases: sheetConfig.customAliases
-  }), [sampleRow, headers, activeSheet, products, policies, sheetConfig.customAliases]);
-
-  // Available sheets list excluding internal hidden sheets
-  const availableSheets = useMemo(() => {
-    if (!metadata?.sheets) return [];
-    return metadata.sheets.filter(s => !/^_/i.test(s.properties.title || ''));
-  }, [metadata]);
+  }), [sampleRow, tableHeaders, selectedSheet.title, products, policies, sheetConfig.customAliases]);
 
   // Filtered sheets based on search
   const filteredSheets = useMemo(() => {
@@ -103,10 +233,10 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
 
   // Filtered headers based on column search
   const filteredHeaders = useMemo(() => {
-    if (!columnSearchQuery.trim()) return headers;
+    if (!columnSearchQuery.trim()) return tableHeaders;
     const q = columnSearchQuery.toLowerCase().trim();
-    return headers.filter(h => {
-      const schema = sheetConfig.schema?.[activeSheet?.title || '']?.[h];
+    return tableHeaders.filter(h => {
+      const schema = sheetConfig.schema?.[selectedSheet.title]?.[h];
       const typeStr = schema?.type || '';
       const formulaStr = schema?.formula || '';
       return (
@@ -115,48 +245,12 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
         formulaStr.toLowerCase().includes(q)
       );
     });
-  }, [headers, columnSearchQuery, sheetConfig.schema, activeSheet]);
-
-  // Switch active table and load headers
-  const handleSelectTable = async (sheetProp: SheetProperties) => {
-    if (activeSheet?.title === sheetProp.title && headers.length > 0) return;
-    setActiveSheet(sheetProp);
-    setIsSchemaLoading(true);
-    setEditingColumnHeader(null);
-    setFormulaAssistantCol(null);
-    try {
-      const rows = await getSheetData(sheetProp.title);
-      if (rows && rows.length > 0) {
-        setHeaders(rows[0].map(String));
-      } else {
-        setHeaders([]);
-      }
-    } catch (err) {
-      console.error('[AppSheetStudio] Error al cargar hoja:', err);
-      setHeaders([]);
-    } finally {
-      setIsSchemaLoading(false);
-    }
-  };
-
-  // Auto-select initial table if none selected
-  useEffect(() => {
-    if (!activeSheet && availableSheets.length > 0) {
-      const preferred = availableSheets.find(s => 
-        s.properties.title === sheetConfig.main || /vencimiento/i.test(s.properties.title)
-      ) || availableSheets[0];
-      if (preferred) {
-        handleSelectTable(preferred.properties);
-      }
-    }
-  }, [activeSheet, availableSheets, sheetConfig.main]);
+  }, [tableHeaders, columnSearchQuery, sheetConfig.schema, selectedSheet.title]);
 
   // Helper to get schema for a column with defaults
   const getColSchema = (header: string): ColumnSchema => {
-    if (!activeSheet) {
-      return { visible: true, searchable: true, type: 'text', behavior: 'none' };
-    }
-    const current = sheetConfig.schema?.[activeSheet.title]?.[header];
+    const currentTable = selectedSheet.title;
+    const current = sheetConfig.schema?.[currentTable]?.[header];
     if (current) return current;
 
     const isNaturalKey = /^ID_VC$|^ID_EVENTO$|^ID$|^SKU$/i.test(header.trim());
@@ -184,8 +278,7 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
     key: K, 
     value: ColumnSchema[K]
   ) => {
-    if (!activeSheet) return;
-    const currentTable = activeSheet.title;
+    const currentTable = selectedSheet.title;
     const currentSchema = getColSchema(colName);
     
     const newSchema = { ...sheetConfig.schema };
@@ -223,16 +316,32 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
     saveConfig({ ...sheetConfig, schema: newSchema });
   };
 
-  // Helper formula suggestions contextual to headers
+  // Add a new column to the current table
+  const handleAddNewColumn = () => {
+    const trimmed = newColumnNameInput.trim().toUpperCase().replace(/\s+/g, '_');
+    if (!trimmed) return;
+    if (tableHeaders.includes(trimmed)) {
+      alert(`La columna ${trimmed} ya existe en esta tabla.`);
+      return;
+    }
+    const updated = [...tableHeaders, trimmed];
+    setTableHeaders(updated);
+    setHeaders?.(updated);
+    updateColumnProperty(trimmed, 'visible', true);
+    setNewColumnNameInput('');
+    setIsAddingColumn(false);
+  };
+
+  // Helper formula suggestions contextual to tableHeaders
   const formulaPresets = useMemo(() => {
     const list: Array<{ label: string; formula: string; desc: string; category: string }> = [];
     
-    const skuCol = headers.find(h => /sku|c[oó]digo/i.test(h)) || 'SKU';
-    const mmCol = headers.find(h => /^mm$/i.test(h.trim()) || /^mes$/i.test(h.trim())) || 'MM';
-    const yyyyCol = headers.find(h => /^yyyy$/i.test(h.trim()) || /^a[nñ]o$/i.test(h.trim())) || 'YYYY';
-    const provCol = headers.find(h => /proveedor|rut/i.test(h)) || 'RUT_PROVEEDOR';
-    const vcCol = headers.find(h => /fecha_vc|vencimiento/i.test(h)) || 'FECHA_VC';
-    const diasCol = headers.find(h => /dias_retiro|dias/i.test(h)) || 'DIAS_RETIRO';
+    const skuCol = tableHeaders.find(h => /sku|c[oó]digo/i.test(h)) || 'SKU';
+    const mmCol = tableHeaders.find(h => /^mm$/i.test(h.trim()) || /^mes$/i.test(h.trim())) || 'MM';
+    const yyyyCol = tableHeaders.find(h => /^yyyy$/i.test(h.trim()) || /^a[nñ]o$/i.test(h.trim())) || 'YYYY';
+    const provCol = tableHeaders.find(h => /proveedor|rut/i.test(h)) || 'RUT_PROVEEDOR';
+    const vcCol = tableHeaders.find(h => /fecha_vc|vencimiento/i.test(h)) || 'FECHA_VC';
+    const diasCol = tableHeaders.find(h => /dias_retiro|dias/i.test(h)) || 'DIAS_RETIRO';
 
     // 1. Unique code (CU_VC)
     list.push({
@@ -272,13 +381,6 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
       desc: 'Asocia el proveedor o laboratorio del producto por su SKU.'
     });
 
-    list.push({
-      category: 'Catálogo Maestro',
-      label: 'Familia / Categoría desde Catálogo',
-      formula: `=LOOKUP([_THISROW].[${skuCol}], "CATALOGO", "SKU", "FAMILIA")`,
-      desc: 'Categoriza el SKU según el maestro de productos.'
-    });
-
     // 4. Date calculations
     list.push({
       category: 'Fechas & Vencimientos',
@@ -310,20 +412,20 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
     });
 
     return list;
-  }, [headers]);
+  }, [tableHeaders]);
 
   // Live test result for formula assistant
   const liveAssistantTestResult = useMemo(() => {
     if (!testFormulaInput || !testFormulaInput.trim()) {
       return null;
     }
-    const syntax = validateFormulaSyntax(testFormulaInput, headers);
+    const syntax = validateFormulaSyntax(testFormulaInput, tableHeaders);
     const evalResult = evaluateAppSheetFormula(testFormulaInput, formulaEvalContext);
     return {
       syntax,
       evalResult
     };
-  }, [testFormulaInput, headers, formulaEvalContext]);
+  }, [testFormulaInput, tableHeaders, formulaEvalContext]);
 
   const currentlyInspectedSchema = editingColumnHeader ? getColSchema(editingColumnHeader) : null;
 
@@ -363,14 +465,14 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
         {/* Tables list */}
         <div className="space-y-1 overflow-y-auto flex-1 max-h-[220px] md:max-h-[520px] pr-1">
           {filteredSheets.map((sheet) => {
-            const isSelected = activeSheet?.title === sheet.properties.title;
+            const isSelected = selectedSheet.title === sheet.properties.title;
             const tableSchema = sheetConfig.schema?.[sheet.properties.title] || {};
             const colCount = Object.keys(tableSchema).length;
             const keyCol = Object.keys(tableSchema).find(k => tableSchema[k]?.isKey);
 
             return (
               <button
-                key={sheet.properties.sheetId}
+                key={sheet.properties.sheetId || sheet.properties.title}
                 onClick={() => handleSelectTable(sheet.properties)}
                 className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-medium transition-all flex items-center justify-between group cursor-pointer ${
                   isSelected
@@ -418,71 +520,101 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
       <div className="flex-1 p-5 md:p-6 flex flex-col min-w-0 bg-white dark:bg-slate-900 overflow-x-auto">
         
         {/* Table Canvas Header (Matching AppSheet table banner) */}
-        {activeSheet ? (
-          <div className="mb-5 pb-4 border-b border-slate-200 dark:border-slate-800">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-slate-50">
-                    Table: <span className="text-blue-600 dark:text-blue-400 font-mono">{activeSheet.title}</span>
-                  </h3>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs text-slate-400 mt-1 flex-wrap font-mono">
-                  <span>Source: <strong className="text-slate-700 dark:text-slate-300">LOCAL</strong></span>
-                  <span>·</span>
-                  <span>Qualifier: <strong className="text-slate-700 dark:text-slate-300">{activeSheet.title}</strong></span>
-                  <span>·</span>
-                  <span>Data Source: <strong className="text-slate-700 dark:text-slate-300">google</strong></span>
-                  <span>·</span>
-                  <span>Source Type: <strong className="text-slate-700 dark:text-slate-300">Sheets</strong></span>
-                  <span>·</span>
-                  <span>Columns: <strong className="text-blue-600 dark:text-blue-400">{headers.length}</strong></span>
-                </div>
+        <div className="mb-5 pb-4 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-slate-50">
+                  Table: <span className="text-blue-600 dark:text-blue-400 font-mono">{selectedSheet.title}</span>
+                </h3>
               </div>
 
-              {/* Action buttons & Column Filter */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Filtrar columnas..."
-                    value={columnSearchQuery}
-                    onChange={(e) => setColumnSearchQuery(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 text-slate-800 dark:text-slate-100 placeholder-slate-400 w-44 sm:w-56 transition-all"
-                  />
-                  {columnSearchQuery && (
-                    <button
-                      onClick={() => setColumnSearchQuery('')}
-                      className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => handleSelectTable(activeSheet)}
-                  disabled={isSchemaLoading}
-                  className="px-3 py-1.5 text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  title="Recargar columnas de la hoja"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSchemaLoading ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">Recargar</span>
-                </button>
+              <div className="flex items-center gap-3 text-xs text-slate-400 mt-1 flex-wrap font-mono">
+                <span>Source: <strong className="text-slate-700 dark:text-slate-300">LOCAL</strong></span>
+                <span>·</span>
+                <span>Qualifier: <strong className="text-slate-700 dark:text-slate-300">{selectedSheet.title}</strong></span>
+                <span>·</span>
+                <span>Data Source: <strong className="text-slate-700 dark:text-slate-300">google</strong></span>
+                <span>·</span>
+                <span>Source Type: <strong className="text-slate-700 dark:text-slate-300">Sheets</strong></span>
+                <span>·</span>
+                <span>Columns: <strong className="text-blue-600 dark:text-blue-400">{tableHeaders.length}</strong></span>
               </div>
             </div>
+
+            {/* Action buttons & Column Filter */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Filtrar columnas..."
+                  value={columnSearchQuery}
+                  onChange={(e) => setColumnSearchQuery(e.target.value)}
+                  className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 text-slate-800 dark:text-slate-100 placeholder-slate-400 w-44 sm:w-56 transition-all"
+                />
+                {columnSearchQuery && (
+                  <button
+                    onClick={() => setColumnSearchQuery('')}
+                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Add Column Button */}
+              <button
+                type="button"
+                onClick={() => setIsAddingColumn(!isAddingColumn)}
+                className="px-3 py-1.5 text-xs font-bold bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Agregar nueva columna a la tabla"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Nueva Columna</span>
+              </button>
+
+              <button
+                onClick={() => handleSelectTable(selectedSheet)}
+                disabled={isSchemaLoading}
+                className="px-3 py-1.5 text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Recargar columnas de la hoja"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSchemaLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Recargar</span>
+              </button>
+            </div>
           </div>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center py-16 text-center text-slate-400">
-            <Layers className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
-            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Selecciona una tabla en el panel izquierdo</h4>
-            <p className="text-xs text-slate-400 max-w-sm mt-1">
-              Podrás configurar tipos de datos, claves primarias, fórmulas automáticas de de-referenciación y reglas de visibilidad.
-            </p>
-          </div>
-        )}
+
+          {/* New Column Inline Form */}
+          {isAddingColumn && (
+            <div className="mt-3 p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl flex items-center gap-2">
+              <input
+                type="text"
+                value={newColumnNameInput}
+                onChange={(e) => setNewColumnNameInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddNewColumn()}
+                placeholder="Nombre de la nueva columna (ej. ESTADO_AUDITORIA)..."
+                className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleAddNewColumn}
+                className="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer"
+              >
+                Guardar
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsAddingColumn(false); setNewColumnNameInput(''); }}
+                className="px-3 py-1.5 text-xs font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Loading Spinner */}
         {isSchemaLoading && (
@@ -492,16 +624,16 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
         )}
 
         {/* Empty Headers Alert */}
-        {!isSchemaLoading && activeSheet && headers.length === 0 && (
+        {!isSchemaLoading && tableHeaders.length === 0 && (
           <div className="p-8 text-center bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl text-amber-800 dark:text-amber-300 text-xs">
-            Esta hoja no contiene encabezados en la fila 1 o está vacía.
+            Esta hoja no contiene columnas configuradas. Puedes agregar una con el botón "+ Nueva Columna".
           </div>
         )}
 
         {/* ========================================================================= */}
         {/* 📋 LA GRILLA MAESTRA DE COLUMNAS (AppSheet Column Grid)                  */}
         {/* ========================================================================= */}
-        {!isSchemaLoading && activeSheet && headers.length > 0 && (
+        {!isSchemaLoading && tableHeaders.length > 0 && (
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
             <table className="w-full text-left border-collapse min-w-[960px]">
               <thead className="bg-slate-100/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
@@ -522,7 +654,7 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                 {filteredHeaders.map((header, idx) => {
                   const schema = getColSchema(header);
                   const isFormulaPreset = Boolean(schema.formula && schema.formula.trim());
-                  const hasSyntaxWarning = isFormulaPreset ? validateFormulaSyntax(schema.formula || '', headers).error : undefined;
+                  const hasSyntaxWarning = isFormulaPreset ? validateFormulaSyntax(schema.formula || '', tableHeaders).error : undefined;
 
                   return (
                     <tr 
@@ -756,7 +888,7 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                   Probador en Vivo (Tiempo Real)
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  Evaluado con datos reales
+                  Evaluado con datos de {selectedSheet.title}
                 </span>
               </div>
 
@@ -813,7 +945,7 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                 Insertar Columna con un Clic:
               </span>
               <div className="flex items-center gap-1.5 flex-wrap max-h-16 overflow-y-auto">
-                {headers.map(h => (
+                {tableHeaders.map(h => (
                   <button
                     key={h}
                     type="button"
@@ -889,7 +1021,7 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                     Configuración de Columna: <span className="font-mono text-blue-600">{editingColumnHeader}</span>
                   </h4>
                   <span className="text-[11px] text-slate-400">
-                    Tabla: {activeSheet?.title}
+                    Tabla: {selectedSheet.title}
                   </span>
                 </div>
               </div>
@@ -959,7 +1091,7 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                       >
                         <option value="">-- Seleccionar Tabla --</option>
                         {availableSheets.map(s => (
-                          <option key={s.properties.sheetId} value={s.properties.title}>
+                          <option key={s.properties.sheetId || s.properties.title} value={s.properties.title}>
                             {s.properties.title}
                           </option>
                         ))}

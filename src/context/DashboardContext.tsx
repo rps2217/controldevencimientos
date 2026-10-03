@@ -17,9 +17,11 @@ export interface DashboardContextType {
   saveConfig: (c: SheetConfig) => void;
   metadata: SpreadsheetMetadata | null;
   activeSheet: SheetProperties | null;
+  setActiveSheet?: React.Dispatch<React.SetStateAction<SheetProperties | null>>;
   activeView: string;
   setActiveView: (view: string, searchTermOverride?: string) => void;
   headers: string[];
+  setHeaders?: React.Dispatch<React.SetStateAction<string[]>>;
   visibleHeaders: string[];
   products: SheetRecord[];
   policies: SheetRecord[];
