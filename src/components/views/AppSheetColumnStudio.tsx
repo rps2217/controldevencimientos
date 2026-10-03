@@ -412,9 +412,9 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
 
     list.push({
       category: 'Fechas & Vencimientos',
-      label: 'Fecha de Retiro Preventivo',
-      formula: `=[${vcCol}] - [${diasCol}]`,
-      desc: 'Resta los días de anticipación de la fecha de vencimiento.'
+      label: 'Fecha de Retiro Preventivo (EOMONTH)',
+      formula: `=EOMONTH([${vcCol}], -([${diasCol}]/30))`,
+      desc: 'Calcula el fin de mes de retiro según los días de política comercial: EOMONTH([FECHA_VC], -([DIAS_RETIRO]/30)).'
     });
 
     // 5. System stamps
