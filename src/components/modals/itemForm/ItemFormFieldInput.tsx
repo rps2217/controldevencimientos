@@ -93,8 +93,14 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
       } ${isTraspasoCol ? 'sm:col-span-2 bg-slate-50/80 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700' : ''}`}
     >
       <div className="flex items-center justify-between">
-        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-          <span>{header}</span>
+        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 flex-wrap">
+          <span>{colSchema?.label || header}</span>
+          {colSchema?.label && colSchema.label !== header && (
+            <span className="text-[10px] text-slate-400 font-mono font-normal">({header})</span>
+          )}
+          {(colSchema?.required || isKey) && (
+            <span className="text-rose-500 font-bold" title="Campo obligatorio">*</span>
+          )}
           {isKey && (
             <span className="text-[9px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-1 py-0.2 rounded font-mono font-bold">
               KEY
@@ -111,6 +117,14 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
           {!hasFormula && isAutoCalc && (
             <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.2 rounded font-mono font-bold">
               {isEditableLocked ? '🔒 Bloqueado' : 'auto'}
+            </span>
+          )}
+          {colSchema?.scannable && (
+            <span 
+              className="text-[9px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.2 rounded font-mono font-semibold"
+              title="Campo habilitado para escaneo con pistola / cámara"
+            >
+              📷 SCAN
             </span>
           )}
         </label>
@@ -318,6 +332,12 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             </datalist>
           )}
         </>
+      )}
+
+      {colSchema?.description && (
+        <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+          {colSchema.description}
+        </span>
       )}
 
       {hasError && (

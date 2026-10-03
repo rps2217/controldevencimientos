@@ -4,7 +4,7 @@ import {
   CheckSquare, Square, X, ChevronRight, Hash, Type, FileText, 
   Eye, EyeOff, Link2, Code2, Info, Lock, ExternalLink, Calendar,
   Clock, Check, SlidersHorizontal, Layers, CheckCircle, AlertTriangle,
-  Play, Copy, HelpCircle, Plus
+  Play, Copy, HelpCircle, Plus, QrCode, ScanLine
 } from 'lucide-react';
 import { 
   SheetConfig, SpreadsheetMetadata, SheetProperties, 
@@ -23,6 +23,7 @@ import {
   evaluateBooleanCondition,
   FormulaEvaluationContext 
 } from '../../utils/appSheetFormulaEngine';
+import { EnumValuesEditor } from './schema/EnumValuesEditor';
 
 interface AppSheetColumnStudioProps {
   metadata: SpreadsheetMetadata | null;
@@ -261,6 +262,8 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
       visible: true,
       searchable: true,
       editable: true,
+      required: isNaturalKey,
+      scannable: /sku|codigo|c[oó]digo|ean|qr|barcode/i.test(header),
       type: isNaturalDate ? 'date' : isNaturalNum ? 'number' : 'text',
       behavior: isNaturalKey && /^ID_VC$/i.test(header.trim()) ? 'auto_id' : 'none',
       isKey: isNaturalKey,
@@ -271,6 +274,24 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
       refTable: /sku/i.test(header) ? (sheetConfig.products || '') : ''
     };
   };
+
+  // Table schema metrics summary (AppSheet stats)
+  const schemaStats = useMemo(() => {
+    let requiredCount = 0;
+    let searchableCount = 0;
+    let formulaCount = 0;
+    let scannableCount = 0;
+
+    tableHeaders.forEach(h => {
+      const s = getColSchema(h);
+      if (s.required || s.isKey) requiredCount++;
+      if (s.searchable !== false) searchableCount++;
+      if (s.formula && s.formula.trim()) formulaCount++;
+      if (s.scannable) scannableCount++;
+    });
+
+    return { requiredCount, searchableCount, formulaCount, scannableCount };
+  }, [tableHeaders, sheetConfig.schema, selectedSheet.title]);
 
   // Update a single property on a column
   const updateColumnProperty = <K extends keyof ColumnSchema>(
@@ -534,11 +555,15 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                 <span>·</span>
                 <span>Qualifier: <strong className="text-slate-700 dark:text-slate-300">{selectedSheet.title}</strong></span>
                 <span>·</span>
-                <span>Data Source: <strong className="text-slate-700 dark:text-slate-300">google</strong></span>
-                <span>·</span>
-                <span>Source Type: <strong className="text-slate-700 dark:text-slate-300">Sheets</strong></span>
-                <span>·</span>
                 <span>Columns: <strong className="text-blue-600 dark:text-blue-400">{tableHeaders.length}</strong></span>
+                <span>·</span>
+                <span title="Columnas requeridas obligatorias">Required: <strong className="text-rose-600 dark:text-rose-400">{schemaStats.requiredCount}</strong></span>
+                <span>·</span>
+                <span title="Columnas indexables en el buscador general">Searchable: <strong className="text-indigo-600 dark:text-indigo-400">{schemaStats.searchableCount}</strong></span>
+                <span>·</span>
+                <span title="Columnas con fórmulas AppSheet activas">Formulas: <strong className="text-purple-600 dark:text-purple-400">{schemaStats.formulaCount}</strong></span>
+                <span>·</span>
+                <span title="Columnas con escaneo de código de barras / QR">Scan: <strong className="text-emerald-600 dark:text-emerald-400">{schemaStats.scannableCount}</strong></span>
               </div>
             </div>
 
@@ -635,19 +660,21 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
         {/* ========================================================================= */}
         {!isSchemaLoading && tableHeaders.length > 0 && (
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
-            <table className="w-full text-left border-collapse min-w-[960px]">
+            <table className="w-full text-left border-collapse min-w-[1120px]">
               <thead className="bg-slate-100/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                 <tr>
                   <th className="py-3 px-3 w-14 text-center">#</th>
                   <th className="py-3 px-3 w-40">NAME</th>
                   <th className="py-3 px-3 w-36">TYPE</th>
-                  <th className="py-3 px-2 w-12 text-center" title="Clave Primaria">KEY?</th>
-                  <th className="py-3 px-2 w-12 text-center" title="Etiqueta de Visualización">LABEL?</th>
-                  <th className="py-3 px-3 min-w-[200px]" title="Cálculo Automático">FORMULA (App Formula)</th>
-                  <th className="py-3 px-2 w-14 text-center" title="Visible en Formularios">SHOW?</th>
-                  <th className="py-3 px-2 w-14 text-center" title="Editable por el Usuario">EDITABLE?</th>
-                  <th className="py-3 px-2 w-14 text-center" title="Campo Requerido">REQUIRED?</th>
-                  <th className="py-3 px-3 w-36" title="Valor Inicial al Crear">INITIAL VALUE</th>
+                  <th className="py-3 px-2 w-12 text-center" title="Clave Primaria (Key)">KEY?</th>
+                  <th className="py-3 px-2 w-12 text-center" title="Etiqueta de Visualización (Label)">LABEL?</th>
+                  <th className="py-3 px-3 min-w-[200px]" title="Cálculo Automático (App Formula)">FORMULA (App Formula)</th>
+                  <th className="py-3 px-2 w-12 text-center" title="Visible en Formularios y Vistas">SHOW?</th>
+                  <th className="py-3 px-2 w-12 text-center" title="Editable por el Usuario">EDIT?</th>
+                  <th className="py-3 px-2 w-14 text-center" title="Campo Requerido / Obligatorio">REQUIRE?</th>
+                  <th className="py-3 px-2 w-14 text-center" title="Indexable en el Buscador General de la App">SEARCH?</th>
+                  <th className="py-3 px-2 w-12 text-center" title="Habilita Escaneo con Cámara / Pistola de Código de Barras">SCAN?</th>
+                  <th className="py-3 px-3 w-36" title="Valor Inicial al Crear Registro">INITIAL VALUE</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs text-slate-800 dark:text-slate-100">
@@ -821,16 +848,48 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                         </button>
                       </td>
 
-                      {/* REQUIRED? Checkbox */}
+                      {/* REQUIRE? Checkbox */}
                       <td className="py-2.5 px-2 text-center whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => updateColumnProperty(header, 'required', !schema.required)}
-                          className="cursor-pointer inline-flex items-center justify-center p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-600 transition-colors"
-                          title={schema.required ? 'Obligatorio' : 'Opcional'}
+                          className="cursor-pointer inline-flex items-center justify-center p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-rose-600 transition-colors"
+                          title={schema.required ? 'Campo obligatorio / requerido' : 'Campo opcional'}
                         >
                           {schema.required ? (
                             <CheckSquare className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-300 dark:text-slate-600" />
+                          )}
+                        </button>
+                      </td>
+
+                      {/* SEARCH? Checkbox (Indexable en buscador general) */}
+                      <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => updateColumnProperty(header, 'searchable', schema.searchable === false ? true : false)}
+                          className="cursor-pointer inline-flex items-center justify-center p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-indigo-600 transition-colors"
+                          title={schema.searchable !== false ? 'Indexable en el buscador general de la app' : 'No indexable en el buscador'}
+                        >
+                          {schema.searchable !== false ? (
+                            <CheckSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-300 dark:text-slate-600" />
+                          )}
+                        </button>
+                      </td>
+
+                      {/* SCAN? Checkbox (Habilita escáner de código de barras) */}
+                      <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => updateColumnProperty(header, 'scannable', !schema.scannable)}
+                          className="cursor-pointer inline-flex items-center justify-center p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-600 transition-colors"
+                          title={schema.scannable ? 'Habilitado para escáner / cámara de código de barras' : 'Escáner deshabilitado'}
+                        >
+                          {schema.scannable ? (
+                            <CheckSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                           ) : (
                             <Square className="w-4 h-4 text-slate-300 dark:text-slate-600" />
                           )}
@@ -1099,18 +1158,13 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                     </div>
                   )}
 
-                  {/* Enum Options */}
+                  {/* Enum & EnumList Options Editor */}
                   {(currentlyInspectedSchema.type === 'enum' || currentlyInspectedSchema.type === 'enumlist') && (
-                    <div className="sm:col-span-2">
-                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                        Opciones de selección (separadas por comas)
-                      </label>
-                      <input
-                        type="text"
-                        value={currentlyInspectedSchema.options || ''}
-                        onChange={(e) => updateColumnProperty(editingColumnHeader, 'options', e.target.value)}
-                        placeholder="Ej: Pendiente, En Tránsito, Recibido, Rechazado"
-                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500"
+                    <div className="sm:col-span-2 pt-1">
+                      <EnumValuesEditor
+                        options={currentlyInspectedSchema.options || ''}
+                        onChange={(newVal) => updateColumnProperty(editingColumnHeader, 'options', newVal)}
+                        isEnumList={currentlyInspectedSchema.type === 'enumlist'}
                       />
                     </div>
                   )}
@@ -1164,65 +1218,124 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                   Comportamiento y Reglas Lógicas
                 </span>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {/* Key? */}
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-400 transition-colors">
                     <input
                       type="checkbox"
                       checked={currentlyInspectedSchema.isKey || false}
                       onChange={(e) => updateColumnProperty(editingColumnHeader, 'isKey', e.target.checked)}
-                      className="rounded text-blue-600"
+                      className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Key?</span>
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                        <Key className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Key? (Clave Primaria)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Identificador unívoco del registro en la tabla</p>
+                    </div>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                  {/* Label? */}
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-400 transition-colors">
                     <input
                       type="checkbox"
                       checked={currentlyInspectedSchema.isLabel || false}
                       onChange={(e) => updateColumnProperty(editingColumnHeader, 'isLabel', e.target.checked)}
-                      className="rounded text-blue-600"
+                      className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Label?</span>
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>Label? (Etiqueta Display)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Texto representativo en búsquedas y referencias</p>
+                    </div>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                  {/* Required? */}
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-400 transition-colors">
                     <input
                       type="checkbox"
                       checked={currentlyInspectedSchema.required || false}
                       onChange={(e) => updateColumnProperty(editingColumnHeader, 'required', e.target.checked)}
-                      className="rounded text-blue-600"
+                      className="mt-0.5 rounded text-rose-600 focus:ring-rose-500"
                     />
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Required?</span>
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Require? (Obligatorio)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">No se puede guardar el registro si el campo está vacío</p>
+                    </div>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                  {/* Editable? */}
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-400 transition-colors">
                     <input
                       type="checkbox"
                       checked={currentlyInspectedSchema.editable !== false}
                       onChange={(e) => updateColumnProperty(editingColumnHeader, 'editable', e.target.checked)}
-                      className="rounded text-blue-600"
+                      className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Editable?</span>
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                        <Edit3 className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Editable?</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Permite modificación manual (desactivar para sólo lectura)</p>
+                    </div>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                  {/* Show? */}
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-400 transition-colors">
                     <input
                       type="checkbox"
                       checked={currentlyInspectedSchema.visible !== false}
                       onChange={(e) => updateColumnProperty(editingColumnHeader, 'visible', e.target.checked)}
-                      className="rounded text-blue-600"
+                      className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Show?</span>
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                        <Eye className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>Show? (Visible)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Muestra la columna en formularios y vistas</p>
+                    </div>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                  {/* Searchable */}
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-400 transition-colors">
                     <input
                       type="checkbox"
                       checked={currentlyInspectedSchema.searchable !== false}
                       onChange={(e) => updateColumnProperty(editingColumnHeader, 'searchable', e.target.checked)}
-                      className="rounded text-blue-600"
+                      className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Searchable</span>
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                        <Search className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>Searchable (Buscador)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Indexa y busca coincidencias en la barra de búsqueda general</p>
+                    </div>
+                  </label>
+
+                  {/* Scannable */}
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-400 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={currentlyInspectedSchema.scannable || false}
+                      onChange={(e) => updateColumnProperty(editingColumnHeader, 'scannable', e.target.checked)}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                        <ScanLine className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>Scan? (Código de Barras)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Habilita lectura rápida por cámara o lector óptico</p>
+                    </div>
                   </label>
                 </div>
 

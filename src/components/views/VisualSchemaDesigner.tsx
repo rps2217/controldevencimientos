@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Database, Key, Link2, Trash2, Plus, HelpCircle, ChevronRight, Sparkles, X, Info, Settings, Layers, Tag } from 'lucide-react';
 import { SheetConfig, SpreadsheetMetadata, ColumnSchema, ColumnType, ColumnBehavior } from '../../types';
+import { EnumValuesEditor } from './schema/EnumValuesEditor';
 
 interface VisualSchemaDesignerProps {
   sheetConfig: SheetConfig;
@@ -782,6 +783,17 @@ export const VisualSchemaDesigner: React.FC<VisualSchemaDesignerProps> = ({
                         <p className="text-[10px] text-blue-600/80 dark:text-blue-400/80 leading-relaxed">
                           La columna actuará como selector dinámico vinculando la clave seleccionada con el catálogo maestro.
                         </p>
+                      </div>
+                    )}
+
+                    {/* Property: Enum Values Editor */}
+                    {(colSchema.type === 'enum' || colSchema.type === 'enumlist') && (
+                      <div className="pt-1">
+                        <EnumValuesEditor
+                          options={colSchema.options || ''}
+                          onChange={(newVal) => handleUpdateColumnProperty(selectedColumn.table, selectedColumn.column, { options: newVal })}
+                          isEnumList={colSchema.type === 'enumlist'}
+                        />
                       </div>
                     )}
 
