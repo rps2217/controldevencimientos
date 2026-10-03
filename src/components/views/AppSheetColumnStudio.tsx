@@ -4,7 +4,7 @@ import {
   CheckSquare, Square, X, ChevronRight, Hash, Type, FileText, 
   Eye, EyeOff, Link2, Code2, Info, Lock, ExternalLink, Calendar,
   Clock, Check, SlidersHorizontal, Layers, CheckCircle, AlertTriangle,
-  Play, Copy, HelpCircle, Plus, QrCode, ScanLine
+  Play, Copy, HelpCircle, Plus, QrCode, ScanLine, Zap, Trash2
 } from 'lucide-react';
 import { 
   SheetConfig, SpreadsheetMetadata, SheetProperties, 
@@ -64,6 +64,7 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
   const [testFormulaInput, setTestFormulaInput] = useState('');
   const [newColumnNameInput, setNewColumnNameInput] = useState('');
   const [isAddingColumn, setIsAddingColumn] = useState(false);
+  const [isAddingVirtualColumn, setIsAddingVirtualColumn] = useState(false);
 
   // Available sheets list excluding internal hidden sheets
   const availableSheets = useMemo(() => {
@@ -354,6 +355,55 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
     setIsAddingColumn(false);
   };
 
+  // Add a new AppSheet Virtual Column (computed dynamically in memory)
+  const handleAddNewVirtualColumn = () => {
+    const trimmed = newColumnNameInput.trim().toUpperCase().replace(/\s+/g, '_');
+    if (!trimmed) return;
+    if (tableHeaders.includes(trimmed)) {
+      alert(`La columna ${trimmed} ya existe en esta tabla.`);
+      return;
+    }
+    const updated = [...tableHeaders, trimmed];
+    setTableHeaders(updated);
+    setHeaders?.(updated);
+    
+    // Configure as virtual calculated column
+    const currentTable = selectedSheet.title;
+    const newSchema = { ...sheetConfig.schema };
+    if (!newSchema[currentTable]) newSchema[currentTable] = {};
+    newSchema[currentTable][trimmed] = {
+      visible: true,
+      searchable: false,
+      type: 'calculated',
+      behavior: 'none',
+      isVirtual: true,
+      editable: false,
+      formula: ''
+    };
+    saveConfig({ ...sheetConfig, schema: newSchema });
+    setNewColumnNameInput('');
+    setIsAddingVirtualColumn(false);
+    // Open Formula Assistant immediately so user can define formula easily
+    setFormulaAssistantCol(trimmed);
+  };
+
+  // Delete a column configuration from the current table
+  const handleDeleteColumn = (colName: string) => {
+    if (!confirm(`¿Eliminar la columna "${colName}" de la configuración de la tabla?`)) return;
+    const updated = tableHeaders.filter(h => h !== colName);
+    setTableHeaders(updated);
+    setHeaders?.(updated);
+    
+    const currentTable = selectedSheet.title;
+    if (sheetConfig.schema?.[currentTable]?.[colName]) {
+      const newSchema = { ...sheetConfig.schema };
+      const tableCopy = { ...newSchema[currentTable] };
+      delete tableCopy[colName];
+      newSchema[currentTable] = tableCopy;
+      saveConfig({ ...sheetConfig, schema: newSchema });
+    }
+  };
+
   // Helper formula suggestions contextual to tableHeaders
   const formulaPresets = useMemo(() => {
     const list: Array<{ label: string; formula: string; desc: string; category: string }> = [];
@@ -589,12 +639,29 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                 )}
               </div>
 
+              {/* Add Virtual Column Button (AppSheet Add Virtual Column) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingVirtualColumn(!isAddingVirtualColumn);
+                  setIsAddingColumn(false);
+                }}
+                className="px-3 py-1.5 text-xs font-bold bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Crear nueva Columna Virtual calculada en memoria mediante App Formula"
+              >
+                <Zap className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                <span className="hidden sm:inline">Columna Virtual</span>
+              </button>
+
               {/* Add Column Button */}
               <button
                 type="button"
-                onClick={() => setIsAddingColumn(!isAddingColumn)}
-                className="px-3 py-1.5 text-xs font-bold bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="Agregar nueva columna a la tabla"
+                onClick={() => {
+                  setIsAddingColumn(!isAddingColumn);
+                  setIsAddingVirtualColumn(false);
+                }}
+                className="px-3 py-1.5 text-xs font-bold bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Agregar nueva columna física a la tabla"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Nueva Columna</span>
@@ -612,9 +679,44 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
             </div>
           </div>
 
-          {/* New Column Inline Form */}
+          {/* New Virtual Column Inline Form */}
+          {isAddingVirtualColumn && (
+            <div className="mt-3 p-3 bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2 flex-1">
+                <Zap className="w-4 h-4 text-purple-600 shrink-0" />
+                <input
+                  type="text"
+                  value={newColumnNameInput}
+                  onChange={(e) => setNewColumnNameInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddNewVirtualColumn()}
+                  placeholder="Nombre de la Columna Virtual (ej. CU_VC, DIAS_VENCIMIENTO, TOTAL_COSTO)..."
+                  className="flex-1 bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 dark:text-slate-100 outline-none focus:border-purple-500"
+                  autoFocus
+                />
+              </div>
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={handleAddNewVirtualColumn}
+                  className="px-4 py-1.5 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Crear y Formular
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsAddingVirtualColumn(false); setNewColumnNameInput(''); }}
+                  className="px-3 py-1.5 text-xs font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* New Regular Column Inline Form */}
           {isAddingColumn && (
-            <div className="mt-3 p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl flex items-center gap-2">
+            <div className="mt-3 p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl flex items-center gap-2 animate-in fade-in duration-200">
               <input
                 type="text"
                 value={newColumnNameInput}
@@ -689,7 +791,7 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                       key={header} 
                       className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
                     >
-                      {/* Row Index + Edit Pencil (AppSheet Pencil Icon) */}
+                      {/* Row Index + Edit Pencil + Delete (AppSheet Pencil Icon) */}
                       <td className="py-2.5 px-3 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1">
                           <span className="text-[11px] font-mono text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
@@ -703,13 +805,28 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
+                          {(schema.isVirtual || isFormulaPreset) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteColumn(header)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                              title={`Eliminar columna virtual ${header}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
 
                       {/* NAME */}
                       <td className="py-2.5 px-3 font-mono font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="truncate max-w-[130px]" title={header}>{header}</span>
+                          {schema.isVirtual && (
+                            <span className="text-[8px] bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-700 px-1 py-0.2 rounded font-bold font-mono flex items-center gap-0.5" title="Columna Virtual calculada en memoria">
+                              <Zap className="w-2.5 h-2.5" /> VIRTUAL
+                            </span>
+                          )}
                           {schema.isKey && (
                             <span className="text-[8px] bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 px-1 py-0.2 rounded font-bold font-mono">
                               KEY
@@ -1193,6 +1310,23 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
                         <span>Searchable (Buscador)</span>
                       </div>
                       <p className="text-[10px] text-slate-400 mt-0.5">Indexa y busca coincidencias en la barra de búsqueda general</p>
+                    </div>
+                  </label>
+
+                  {/* Virtual Column? */}
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-950/20 cursor-pointer hover:border-purple-400 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={currentlyInspectedSchema.isVirtual || false}
+                      onChange={(e) => updateColumnProperty(editingColumnHeader, 'isVirtual', e.target.checked)}
+                      className="mt-0.5 rounded text-purple-600 focus:ring-purple-500"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Virtual? (Columna Virtual)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Calculada en memoria mediante App Formula, no requiere columna en Sheets</p>
                     </div>
                   </label>
 

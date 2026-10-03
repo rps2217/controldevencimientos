@@ -156,6 +156,7 @@ export interface ColumnSchema {
   editable?: boolean; // Whether input can be manually edited (defaults to false when formula is present)
   description?: string; // AppSheet column description / tooltip documentation
   scannable?: boolean; // Whether input can be scanned via barcode / QR camera
+  isVirtual?: boolean; // Whether this is an AppSheet virtual calculated column (in-memory computed)
 }
 
 export type ResolutionStatus = 'PENDIENTE' | 'REALIZADO';

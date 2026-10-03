@@ -1,10 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Sparkles, Code2, UploadCloud, Cloud, Sliders, CheckCircle2, Loader2, 
-  TableProperties, Layers, ShieldCheck, AlertTriangle, Database
+  TableProperties, ShieldCheck, AlertTriangle, Database
 } from 'lucide-react';
 import { SheetConfig, SpreadsheetMetadata, SheetProperties, SheetRecord } from '../../types';
-import { VisualSchemaDesigner } from './VisualSchemaDesigner';
 import { SchemaHealthAudit } from './SchemaHealthAudit';
 import { AppSheetColumnStudio } from './AppSheetColumnStudio';
 
@@ -49,14 +48,12 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
   saveConfig,
   setIsScriptModalOpen,
   handlePushPropertiesConfig,
-  handlePushCloudConfig,
+  handlePushCloudConfig: _handlePushCloudConfig,
   activeView,
   products = [],
   policies = [],
   sampleItems = []
 }) => {
-  // Main view mode: default is AppSheet Columns Studio ('table')
-  const [schemaSubView, setSchemaSubView] = useState<'table' | 'visual'>('table');
   const [showAuditPanel, setShowAuditPanel] = useState<boolean>(false);
 
   // Quick audit calculation for the header badge
@@ -85,7 +82,7 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
       {/* ========================================================================= */}
       {/* 🧭 BARRA SUPERIOR EJECUTIVA (Full Width Toolbar)                         */}
       {/* ========================================================================= */}
-      <div className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         
         {/* Left: Module Title & Status Badges */}
         <div className="flex items-center gap-3 min-w-0">
@@ -119,38 +116,9 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-              Gestor de columnas, claves primarias, tipos, fórmulas AppSheet y reglas de validación.
+              Gestor de columnas físicas y virtuales, claves primarias, fórmulas AppSheet y restricciones.
             </p>
           </div>
-        </div>
-
-        {/* Center: Segmented Sub-view Switch */}
-        <div className="flex items-center bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shrink-0 self-start lg:self-auto">
-          <button
-            type="button"
-            onClick={() => setSchemaSubView('table')}
-            className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-              schemaSubView === 'table'
-                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-          >
-            <TableProperties className="w-3.5 h-3.5" />
-            <span>Configuración de Columnas</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSchemaSubView('visual')}
-            className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-              schemaSubView === 'visual'
-                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Diagrama Relacional</span>
-          </button>
         </div>
 
         {/* Right: Actions Toolbar */}
@@ -233,33 +201,21 @@ export const SchemaEditorView: React.FC<SchemaEditorViewProps> = ({
       {/* 🚀 CONTENIDO PRINCIPAL A TODO EL ANCHO (100% Full Width Protagonism)      */}
       {/* ========================================================================= */}
       <div className="w-full flex-1 min-w-0">
-        {schemaSubView === 'table' ? (
-          <AppSheetColumnStudio
-            metadata={metadata}
-            activeSheet={activeSheet}
-            setActiveSheet={setActiveSheet}
-            headers={headers}
-            setHeaders={setHeaders}
-            isSchemaLoading={isSchemaLoading}
-            setIsSchemaLoading={setIsSchemaLoading}
-            sheetConfig={sheetConfig}
-            saveConfig={saveConfig}
-            activeView={activeView}
-            products={products}
-            policies={policies}
-            sampleItems={sampleItems}
-          />
-        ) : (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs">
-            <VisualSchemaDesigner
-              sheetConfig={sheetConfig}
-              saveConfig={saveConfig}
-              metadata={metadata}
-              activeSheetTitle={activeSheet?.title}
-              activeSheetHeaders={headers}
-            />
-          </div>
-        )}
+        <AppSheetColumnStudio
+          metadata={metadata}
+          activeSheet={activeSheet}
+          setActiveSheet={setActiveSheet}
+          headers={headers}
+          setHeaders={setHeaders}
+          isSchemaLoading={isSchemaLoading}
+          setIsSchemaLoading={setIsSchemaLoading}
+          sheetConfig={sheetConfig}
+          saveConfig={saveConfig}
+          activeView={activeView}
+          products={products}
+          policies={policies}
+          sampleItems={sampleItems}
+        />
       </div>
 
     </div>
