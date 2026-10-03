@@ -24,6 +24,7 @@ import {
   FormulaEvaluationContext 
 } from '../../utils/appSheetFormulaEngine';
 import { EnumValuesEditor } from './schema/EnumValuesEditor';
+import { ExpressionAssistantModal } from './schema/ExpressionAssistantModal';
 
 interface AppSheetColumnStudioProps {
   metadata: SpreadsheetMetadata | null;
@@ -916,150 +917,24 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 🪄 MODAL: ASISTENTE DE FÓRMULAS & PROBADOR INTERACTIVO EN VIVO             */}
+      {/* 🪄 MODAL: EXPRESSION ASSISTANT (AppSheet Style with Data Explorer)         */}
       {/* ========================================================================= */}
       {formulaAssistantCol && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full p-6 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-blue-600" />
-                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-50">
-                  Asistente de Fórmulas para <code className="text-blue-600 dark:text-blue-400 font-mono">[{formulaAssistantCol}]</code>
-                </h4>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFormulaAssistantCol(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Formula Live Tester Section */}
-            <div className="p-4 my-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-300 tracking-wider flex items-center gap-1.5">
-                  <Play className="w-3.5 h-3.5 text-blue-600" />
-                  Probador en Vivo (Tiempo Real)
-                </span>
-                <span className="text-[10px] text-slate-400">
-                  Evaluado con datos de {selectedSheet.title}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono font-bold text-slate-400">=</span>
-                <input
-                  type="text"
-                  value={testFormulaInput}
-                  onChange={(e) => setTestFormulaInput(e.target.value)}
-                  placeholder="Escribe o selecciona una fórmula para probar..."
-                  className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-blue-700 dark:text-blue-300 outline-none focus:border-blue-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    updateColumnProperty(formulaAssistantCol, 'formula', testFormulaInput);
-                    setFormulaAssistantCol(null);
-                  }}
-                  className="px-3 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer shrink-0"
-                >
-                  Aplicar
-                </button>
-              </div>
-
-              {/* Evaluation Result */}
-              {liveAssistantTestResult && (
-                <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700/80 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5">
-                    {liveAssistantTestResult.evalResult.success ? (
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    ) : (
-                      <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                    )}
-                    <span className="font-mono text-slate-500 dark:text-slate-400">
-                      Resultado:
-                    </span>
-                    <strong className="font-mono text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
-                      {liveAssistantTestResult.evalResult.stringValue || '"" (vacío)'}
-                    </strong>
-                  </div>
-
-                  {liveAssistantTestResult.syntax.error && (
-                    <span className="text-[10px] text-amber-600 dark:text-amber-400">
-                      {liveAssistantTestResult.syntax.error}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Quick Column Insert Chips */}
-            <div className="mb-3">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Insertar Columna con un Clic:
-              </span>
-              <div className="flex items-center gap-1.5 flex-wrap max-h-16 overflow-y-auto">
-                {tableHeaders.map(h => (
-                  <button
-                    key={h}
-                    type="button"
-                    onClick={() => setTestFormulaInput(prev => `${prev}[${h}]`)}
-                    className="text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-slate-700 dark:text-slate-300 hover:text-blue-600 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
-                  >
-                    [{h}]
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Presets List */}
-            <div className="space-y-2 overflow-y-auto flex-1 pr-1">
-              {formulaPresets.map((preset, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => {
-                    setTestFormulaInput(preset.formula);
-                  }}
-                  className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-blue-50/40 dark:hover:bg-blue-950/30 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-blue-600">
-                      {preset.category}
-                    </span>
-                    <span className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Cargar en probador <ChevronRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                  <h5 className="text-xs font-bold text-slate-800 dark:text-slate-100 mt-0.5">
-                    {preset.label}
-                  </h5>
-                  <div className="mt-1.5 p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono text-xs text-blue-700 dark:text-blue-300">
-                    {preset.formula}
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    {preset.desc}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setFormulaAssistantCol(null)}
-                className="px-4 py-2 text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-xl cursor-pointer"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <ExpressionAssistantModal
+          isOpen={Boolean(formulaAssistantCol)}
+          onClose={() => setFormulaAssistantCol(null)}
+          columnHeader={formulaAssistantCol}
+          columnType={getColSchema(formulaAssistantCol).type}
+          tableName={selectedSheet.title}
+          initialFormula={getColSchema(formulaAssistantCol).formula || ''}
+          onSave={(newFormula) => updateColumnProperty(formulaAssistantCol, 'formula', newFormula)}
+          availableSheets={availableSheets}
+          sheetConfig={sheetConfig}
+          tableHeaders={tableHeaders}
+          products={products}
+          policies={policies}
+          sampleItems={sampleItems}
+        />
       )}
 
       {/* ========================================================================= */}

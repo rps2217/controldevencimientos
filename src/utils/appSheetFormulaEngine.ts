@@ -741,6 +741,29 @@ export function evaluateBooleanCondition(
 }
 
 /**
+ * Detailed column verification entry
+ */
+export interface ColumnVerification {
+  name: string;
+  isSpecial: boolean;
+  exists: boolean;
+  type?: string;
+  table?: string;
+}
+
+/**
+ * Result of detailed AppSheet formula semantic validation
+ */
+export interface DetailedFormulaValidation {
+  isValid: boolean;
+  status: 'valid' | 'invalid' | 'warning' | 'empty';
+  message: string;
+  referencedColumns: ColumnVerification[];
+  evaluatedSample?: string;
+  sampleSuccess?: boolean;
+}
+
+/**
  * Validates syntax of an AppSheet formula and checks column references
  */
 export function validateFormulaSyntax(
@@ -792,6 +815,158 @@ export function validateFormulaSyntax(
   }
 
   return { isValid: true, referencedColumns };
+}
+
+/**
+ * Performs comprehensive semantic validation of AppSheet formula:
+ * 1. Checks balanced parentheses and brackets
+ * 2. Verifies that all referenced columns exist in the active table or related tables
+ * 3. Checks function syntax and arguments
+ * 4. Runs live evaluation on sample context row
+ */
+export function validateFormulaDetailed(
+  formula: string,
+  availableHeaders: string[] = [],
+  context?: FormulaEvaluationContext
+): DetailedFormulaValidation {
+  if (!formula || !formula.trim()) {
+    return {
+      isValid: true,
+      status: 'empty',
+      message: 'Expresión vacía.',
+      referencedColumns: []
+    };
+  }
+
+  const raw = formula.trim();
+  const trimmed = raw.startsWith('=') ? raw.slice(1).trim() : raw;
+
+  // 1. Parentheses balance check
+  let paren = 0;
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+    if (ch === '(') paren++;
+    if (ch === ')') paren--;
+    if (paren < 0) {
+      return {
+        isValid: false,
+        status: 'invalid',
+        message: 'Error de sintaxis: Se encontró un paréntesis de cierre ")" sin su apertura "(" correspondiente.',
+        referencedColumns: []
+      };
+    }
+  }
+  if (paren > 0) {
+    return {
+      isValid: false,
+      status: 'invalid',
+      message: `Error de sintaxis: Hay ${paren} paréntesis "(" sin cerrar.`,
+      referencedColumns: []
+    };
+  }
+
+  // 2. Bracket balance check
+  let bracket = 0;
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+    if (ch === '[') bracket++;
+    if (ch === ']') bracket--;
+    if (bracket < 0) {
+      return {
+        isValid: false,
+        status: 'invalid',
+        message: 'Error de sintaxis: Se encontró un corchete de cierre "]" sin su apertura "[".',
+        referencedColumns: []
+      };
+    }
+  }
+  if (bracket > 0) {
+    return {
+      isValid: false,
+      status: 'invalid',
+      message: `Error de sintaxis: Hay ${bracket} corchete(s) "[" de nombre de columna sin cerrar.`,
+      referencedColumns: []
+    };
+  }
+
+  // 3. Extract and verify referenced columns
+  const colMatches = trimmed.matchAll(/\[(?:_THISROW\.)?([^\]]+)\]/g);
+  const referencedColumns: ColumnVerification[] = [];
+  const normHeaders = availableHeaders.map(h => normalizeToken(h));
+  const missingCols: string[] = [];
+
+  for (const m of colMatches) {
+    const rawColName = m[1].trim();
+    if (rawColName.includes('.')) {
+      // Dereferenced column: [REF].[PROP]
+      const parts = rawColName.split('.');
+      const refCol = parts[0].trim();
+      const propCol = parts[1].trim();
+      const refExists = normHeaders.includes(normalizeToken(refCol)) || availableHeaders.some(h => normalizeToken(h) === normalizeToken(refCol));
+      referencedColumns.push({
+        name: rawColName,
+        isSpecial: false,
+        exists: refExists,
+        table: refCol
+      });
+      if (!refExists && availableHeaders.length > 0) {
+        missingCols.push(refCol);
+      }
+    } else {
+      const isSpecial = /^(_RowNumber|_THISROW|_ROWNUM)$/i.test(rawColName);
+      const exists = isSpecial || (availableHeaders.length === 0) || normHeaders.includes(normalizeToken(rawColName)) || availableHeaders.some(h => normalizeToken(h) === normalizeToken(rawColName));
+      
+      referencedColumns.push({
+        name: rawColName,
+        isSpecial,
+        exists
+      });
+
+      if (!exists && !isSpecial && availableHeaders.length > 0) {
+        missingCols.push(rawColName);
+      }
+    }
+  }
+
+  // If there are missing columns in the active table
+  if (missingCols.length > 0) {
+    return {
+      isValid: false,
+      status: 'invalid',
+      message: `La columna [${missingCols.join(', ')}] no existe en la tabla "${context?.tableName || 'activa'}". Verifica el nombre de la variable o selecciónala desde el Explorador de Datos.`,
+      referencedColumns
+    };
+  }
+
+  // 4. Try live evaluation on context sample row if available
+  if (context && context.row) {
+    const testResult = evaluateAppSheetFormula(trimmed, context);
+    if (!testResult.success && testResult.error) {
+      return {
+        isValid: false,
+        status: 'invalid',
+        message: testResult.error,
+        referencedColumns,
+        evaluatedSample: testResult.stringValue,
+        sampleSuccess: false
+      };
+    }
+    return {
+      isValid: true,
+      status: 'valid',
+      message: 'Expresión válida y verificada.',
+      referencedColumns,
+      evaluatedSample: testResult.stringValue,
+      sampleSuccess: true
+    };
+  }
+
+  return {
+    isValid: true,
+    status: 'valid',
+    message: 'Expresión sintácticamente válida.',
+    referencedColumns
+  };
 }
 
 /**
