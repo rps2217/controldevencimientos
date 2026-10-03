@@ -230,19 +230,19 @@ export function evaluateAppSheetFormula(
   }
 
   try {
-    // 1. Literal Concatenations using '&' operator
+    // 1. Literal Concatenations using '&' operator at top level
     // E.g.: [SKU] & [YYYY] & [MM] or [SKU] & "-" & [LOTE]
-    if (formula.includes('&') && !/^(AND|OR|IF|LOOKUP|CONCATENATE)\s*\(/i.test(formula)) {
-      const parts = splitConcatenationParts(formula);
+    const parts = splitConcatenationParts(formula);
+    if (parts.length > 1) {
       const evaluatedParts = parts.map(p => {
-        const evalRes = evaluateSingleTokenOrExpression(p.trim(), context);
+        const evalRes = evaluateAppSheetFormula(p.trim(), context);
         return evalRes.stringValue;
       });
       const resultStr = evaluatedParts.join('');
       return { value: resultStr, stringValue: resultStr, success: true };
     }
 
-    // 2. Evaluate Single Token or Function Call
+    // 2. Evaluate Single Token, Binary Expression, or Function Call
     return evaluateSingleTokenOrExpression(formula, context);
   } catch (err: any) {
     return {
@@ -255,7 +255,7 @@ export function evaluateAppSheetFormula(
 }
 
 /**
- * Splits formula by '&' respecting quotes
+ * Splits formula by '&' respecting quotes and parentheses
  */
 function splitConcatenationParts(str: string): string[] {
   const parts: string[] = [];
@@ -263,6 +263,7 @@ function splitConcatenationParts(str: string): string[] {
   let inDoubleQuote = false;
   let inSingleQuote = false;
   let inBracket = false;
+  let parenDepth = 0;
 
   for (let i = 0; i < str.length; i++) {
     const ch = str[i];
@@ -270,8 +271,10 @@ function splitConcatenationParts(str: string): string[] {
     else if (ch === "'" && !inDoubleQuote) inSingleQuote = !inSingleQuote;
     else if (ch === '[' && !inDoubleQuote && !inSingleQuote) inBracket = true;
     else if (ch === ']' && !inDoubleQuote && !inSingleQuote) inBracket = false;
+    else if (ch === '(' && !inDoubleQuote && !inSingleQuote) parenDepth++;
+    else if (ch === ')' && !inDoubleQuote && !inSingleQuote && parenDepth > 0) parenDepth--;
 
-    if (ch === '&' && !inDoubleQuote && !inSingleQuote && !inBracket) {
+    if (ch === '&' && !inDoubleQuote && !inSingleQuote && !inBracket && parenDepth === 0) {
       parts.push(current);
       current = '';
     } else {
@@ -280,6 +283,39 @@ function splitConcatenationParts(str: string): string[] {
   }
   if (current) parts.push(current);
   return parts;
+}
+
+/**
+ * Finds the index of the rightmost top-level binary operator among candidates at depth 0
+ */
+function findTopLevelBinaryOperator(expr: string, ops: string[]): { index: number; op: string } | null {
+  let inDoubleQuote = false;
+  let inSingleQuote = false;
+  let inBracket = false;
+  let parenDepth = 0;
+
+  for (let i = expr.length - 1; i >= 0; i--) {
+    const ch = expr[i];
+    if (ch === '"' && !inSingleQuote) inDoubleQuote = !inDoubleQuote;
+    else if (ch === "'" && !inDoubleQuote) inSingleQuote = !inSingleQuote;
+    else if (ch === ']' && !inDoubleQuote && !inSingleQuote) inBracket = true;
+    else if (ch === '[' && !inDoubleQuote && !inSingleQuote) inBracket = false;
+    else if (ch === ')' && !inDoubleQuote && !inSingleQuote) parenDepth++;
+    else if (ch === '(' && !inDoubleQuote && !inSingleQuote && parenDepth > 0) parenDepth--;
+
+    if (!inDoubleQuote && !inSingleQuote && !inBracket && parenDepth === 0) {
+      for (const op of ops) {
+        if (expr.slice(i, i + op.length) === op) {
+          // Check that it's binary, not a leading unary sign at start of string or right after an operator
+          const before = expr.slice(0, i).trim();
+          if (before.length > 0 && !/[+\-*/,(]$/.test(before)) {
+            return { index: i, op };
+          }
+        }
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -632,17 +668,12 @@ function evaluateSingleTokenOrExpression(
   if (eomonthMatch) {
     const args = parseFunctionArguments(eomonthMatch[1]);
     if (args.length >= 1) {
-      const dateVal = evaluateSingleTokenOrExpression(args[0], context).value;
-      const parsedDate = parseAnyDate(dateVal);
+      const dateRes = evaluateAppSheetFormula(args[0], context);
+      const parsedDate = parseAnyDate(dateRes.value || dateRes.stringValue);
       let offset = 0;
       if (args[1]) {
-        const mathOffset = evaluateArithmeticExpression(args[1], context);
-        if (mathOffset !== null && !isNaN(mathOffset)) {
-          offset = Math.round(mathOffset);
-        } else {
-          const evalRes = evaluateSingleTokenOrExpression(args[1], context);
-          offset = Math.round(parseLocaleNumber(evalRes.value, 0));
-        }
+        const offsetRes = evaluateAppSheetFormula(args[1], context);
+        offset = Math.round(parseLocaleNumber(offsetRes.value || offsetRes.stringValue, 0));
       }
       if (parsedDate) {
         const lastDay = new Date(parsedDate.getFullYear(), parsedDate.getMonth() + 1 + offset, 0);
@@ -653,44 +684,85 @@ function evaluateSingleTokenOrExpression(
     return { value: '', stringValue: '', success: false, error: 'Fecha inválida en EOMONTH' };
   }
 
-  // J. DATE(year, month, day)
+  // J. DATE(year, month, day) OR DATE(date_or_text)
   const dateMatch = trimmed.match(/^DATE\s*\((.*)\)$/i);
   if (dateMatch) {
     const args = parseFunctionArguments(dateMatch[1]);
     if (args.length === 3) {
-      const y = parseInt(evaluateSingleTokenOrExpression(args[0], context).stringValue, 10);
-      const m = parseInt(evaluateSingleTokenOrExpression(args[1], context).stringValue, 10);
-      const d = parseInt(evaluateSingleTokenOrExpression(args[2], context).stringValue, 10);
+      const y = parseInt(evaluateAppSheetFormula(args[0], context).stringValue, 10);
+      const m = parseInt(evaluateAppSheetFormula(args[1], context).stringValue, 10);
+      const d = parseInt(evaluateAppSheetFormula(args[2], context).stringValue, 10);
       if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
         const dateObj = new Date(y, m - 1, d);
         const formatted = formatInputDate(dateObj);
         return { value: dateObj, stringValue: formatted, success: true };
       }
+    } else if (args.length === 1) {
+      const innerRes = evaluateAppSheetFormula(args[0], context);
+      const parsedDate = parseAnyDate(innerRes.value || innerRes.stringValue);
+      if (parsedDate) {
+        const formatted = formatInputDate(parsedDate);
+        return { value: parsedDate, stringValue: formatted, success: true };
+      }
     }
   }
 
-  // K. Date Arithmetic: [FECHA_VC] - [DIAS_RETIRO] or [FECHA] + 15
-  const dateArithMatch = trimmed.match(/^(\[[^\]]+\]|\w+\(.*?\))\s*([+-])\s*(\[[^\]]+\]|\d+|\w+\(.*?\))$/);
-  if (dateArithMatch) {
-    const leftRes = evaluateSingleTokenOrExpression(dateArithMatch[1], context);
-    const op = dateArithMatch[2];
-    const rightRes = evaluateSingleTokenOrExpression(dateArithMatch[3], context);
+  // K. Top-Level Binary Operators (+, -)
+  const addSubOp = findTopLevelBinaryOperator(trimmed, ['+', '-']);
+  if (addSubOp) {
+    const leftStr = trimmed.slice(0, addSubOp.index).trim();
+    const rightStr = trimmed.slice(addSubOp.index + 1).trim();
+    const leftRes = evaluateSingleTokenOrExpression(leftStr, context);
+    const rightRes = evaluateSingleTokenOrExpression(rightStr, context);
 
     const leftDate = parseAnyDate(leftRes.value);
+    const rightDate = parseAnyDate(rightRes.value);
+    const leftNum = parseLocaleNumber(leftRes.value, NaN);
     const rightNum = parseLocaleNumber(rightRes.value, NaN);
 
+    // Date + Days or Date - Days
     if (leftDate && !isNaN(rightNum)) {
-      const days = op === '-' ? -rightNum : rightNum;
+      const days = addSubOp.op === '-' ? -rightNum : rightNum;
       const targetTime = leftDate.getTime() + days * 86400 * 1000;
       const resDate = new Date(targetTime);
       const formatted = formatInputDate(resDate);
       return { value: resDate, stringValue: formatted, success: true };
     }
 
-    // Standard numeric arithmetic
-    const leftNum = parseLocaleNumber(leftRes.value, NaN);
+    // Days + Date
+    if (rightDate && !isNaN(leftNum) && addSubOp.op === '+') {
+      const targetTime = rightDate.getTime() + leftNum * 86400 * 1000;
+      const resDate = new Date(targetTime);
+      const formatted = formatInputDate(resDate);
+      return { value: resDate, stringValue: formatted, success: true };
+    }
+
+    // Date - Date (difference in days)
+    if (leftDate && rightDate && addSubOp.op === '-') {
+      const diffDays = Math.round((leftDate.getTime() - rightDate.getTime()) / (86400 * 1000));
+      return { value: diffDays, stringValue: String(diffDays), success: true };
+    }
+
+    // Standard numeric addition / subtraction
     if (!isNaN(leftNum) && !isNaN(rightNum)) {
-      const resNum = op === '+' ? leftNum + rightNum : leftNum - rightNum;
+      const resNum = addSubOp.op === '+' ? leftNum + rightNum : leftNum - rightNum;
+      return { value: resNum, stringValue: String(resNum), success: true };
+    }
+  }
+
+  // K2. Top-Level Binary Operators (*, /)
+  const mulDivOp = findTopLevelBinaryOperator(trimmed, ['*', '/']);
+  if (mulDivOp) {
+    const leftStr = trimmed.slice(0, mulDivOp.index).trim();
+    const rightStr = trimmed.slice(mulDivOp.index + 1).trim();
+    const leftRes = evaluateSingleTokenOrExpression(leftStr, context);
+    const rightRes = evaluateSingleTokenOrExpression(rightStr, context);
+
+    const leftNum = parseLocaleNumber(leftRes.value, NaN);
+    const rightNum = parseLocaleNumber(rightRes.value, NaN);
+
+    if (!isNaN(leftNum) && !isNaN(rightNum)) {
+      const resNum = mulDivOp.op === '*' ? leftNum * rightNum : (rightNum !== 0 ? leftNum / rightNum : 0);
       return { value: resNum, stringValue: String(resNum), success: true };
     }
   }
