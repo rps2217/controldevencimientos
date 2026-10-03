@@ -124,9 +124,16 @@ export function useInventoryMutations({
         }
       }
 
-      const rowValues = headers.map(h => {
+      // Ponytail Protocol: Filter out virtual columns (computed dynamically, never written to physical sheet)
+      const tableSchema = sheetConfig.schema?.[activeSheet.title] || {};
+      const physicalHeaders = headers.filter(h => {
+        const colDef = tableSchema[h];
+        return !colDef?.isVirtual && colDef?.type !== 'calculated';
+      });
+
+      const rowValues = physicalHeaders.map(h => {
         const val = mergedFormData[h] !== undefined && mergedFormData[h] !== null ? String(mergedFormData[h]) : '';
-        const colSchema = sheetConfig.schema?.[activeSheet.title]?.[h];
+        const colSchema = tableSchema[h];
         if (!val && (colSchema?.type === 'datetime' || /timestamp|created_at|fecha_creaci[oó]n|fecha_registro/i.test(h))) {
           return currentFormattedDateTime;
         }
@@ -142,9 +149,9 @@ export function useInventoryMutations({
         : (validRowIndexes.length ? Math.max(...validRowIndexes) + 1 : 2);
 
       // Optimistic update
-      const newItem: InventoryItem = { ...rowToObject(headers, rowValues), _rowIndex: nextRowIndex };
+      const newItem: InventoryItem = { ...rowToObject(physicalHeaders, rowValues), ...mergedFormData, _rowIndex: nextRowIndex };
 
-      const identityInfo = resolveItemIdentity(newItem, headers, activeSheet.title);
+      const identityInfo = resolveItemIdentity(newItem, physicalHeaders, activeSheet.title);
       newItem._entityKey = identityInfo.keyValue;
       newItem._entityKeyCol = identityInfo.keyColumn || undefined;
       newItem._isSyntheticKey = identityInfo.isSynthetic;
@@ -167,8 +174,8 @@ export function useInventoryMutations({
       // Save to IndexedDB cached sheet
       try {
         const cachedRows = [
-          headers,
-          ...nextItems.map(it => headers.map(h => (it[h] !== undefined && it[h] !== null ? String(it[h]) : '')))
+          physicalHeaders,
+          ...nextItems.map(it => physicalHeaders.map(h => (it[h] !== undefined && it[h] !== null ? String(it[h]) : '')))
         ];
         await indexedDbService.saveCachedSheet(activeSheet.title, cachedRows);
       } catch (cacheErr) {

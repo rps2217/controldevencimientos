@@ -10,6 +10,7 @@ import { getEventCategory, getItemStatus } from '../utils/dateCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { resolveTableCapabilities } from '../utils/sliceRegistry';
 import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
+import { applyTableSchemaFormulas } from '../utils/appSheetFormulaEngine';
 import { useColumnResize } from '../hooks/useColumnResize';
 import { useColumnManager } from '../hooks/useColumnManager';
 import { useInventoryFiltering, handleFilterToggle } from '../hooks/useInventoryFiltering';
@@ -310,6 +311,20 @@ export const InventoryDashboard: React.FC = () => {
     closeTicketConfig: () => setIsTicketConfigOpen(false)
   });
 
+  // Fusiona encabezados físicos con columnas virtuales declaradas en el esquema de la tabla activa
+  const allTableHeaders = useMemo(() => {
+    if (!activeSheet?.title) return headers;
+    const tableSchema = sheetConfig.schema?.[activeSheet.title];
+    if (!tableSchema) return headers;
+    const virtualKeys = Object.keys(tableSchema).filter(k => tableSchema[k]?.isVirtual || tableSchema[k]?.type === 'calculated');
+    if (virtualKeys.length === 0) return headers;
+    const combined = [...headers];
+    virtualKeys.forEach(vk => {
+      if (!combined.includes(vk)) combined.push(vk);
+    });
+    return combined;
+  }, [headers, activeSheet?.title, sheetConfig.schema]);
+
   // Centralized Column Manager Hook
   const {
     visibleHeaders,
@@ -322,7 +337,7 @@ export const InventoryDashboard: React.FC = () => {
     setVisibleColumns,
     hiddenColumns
   } = useColumnManager({
-    headers,
+    headers: allTableHeaders,
     activeSheetTitle: activeSheet?.title,
     activeView,
     tableCapabilities,
@@ -368,16 +383,33 @@ export const InventoryDashboard: React.FC = () => {
     showToast
   });
 
+  // Evaluación en memoria de fórmulas de columnas virtuales sobre cada registro cargado
+  const enrichedItems = useMemo(() => {
+    if (!activeSheet?.title || items.length === 0) return items;
+    const tableSchema = sheetConfig.schema?.[activeSheet.title];
+    if (!tableSchema) return items;
+    const hasFormulas = Object.values(tableSchema).some(col => col.formula && col.formula.trim());
+    if (!hasFormulas) return items;
+
+    return items.map(item => {
+      return applyTableSchemaFormulas(item, allTableHeaders, tableSchema, {
+        products,
+        policies,
+        customAliases: sheetConfig.customAliases
+      }) as InventoryItem;
+    });
+  }, [items, activeSheet?.title, sheetConfig.schema, allTableHeaders, products, policies, sheetConfig.customAliases]);
+
   const searchableHeaders = useMemo(() => {
-    if (!activeSheet) return headers;
+    if (!activeSheet) return allTableHeaders;
     const currentSchema = sheetConfig.schema?.[activeSheet.title];
-    return headers.filter(h => {
+    return allTableHeaders.filter(h => {
       if (currentSchema && currentSchema[h] !== undefined) {
         return currentSchema[h].searchable !== false;
       }
       return true;
     });
-  }, [headers, activeSheet, sheetConfig.schema]);
+  }, [allTableHeaders, activeSheet, sheetConfig.schema]);
 
   // Unified filtering, metrics aggregation, virtual columns, and grouping hook
   const {
@@ -400,8 +432,9 @@ export const InventoryDashboard: React.FC = () => {
     groupedItems,
     paginatedDisplayRows
   } = useInventoryFiltering({
-    items,
-    headers,
+    items: enrichedItems,
+    headers: allTableHeaders,
+    activeSheetTitle: activeSheet?.title,
     tableCapabilities,
     frcBodCol,
     sheetConfig,
@@ -441,7 +474,7 @@ export const InventoryDashboard: React.FC = () => {
     effectiveVisibleHeaders
   } = useTableGrouping({
     activeSheetKey,
-    headers,
+    headers: allTableHeaders,
     visibleHeaders,
     sheetConfig,
     saveConfig,
@@ -451,7 +484,7 @@ export const InventoryDashboard: React.FC = () => {
   });
 
   // Precomputed metadata for visible columns to prevent per-cell regex in 60fps virtualization
-  const { visibleColumnMeta } = usePrecomputedColumns(headers, effectiveVisibleHeaders, frcBodCol);
+  const { visibleColumnMeta } = usePrecomputedColumns(allTableHeaders, effectiveVisibleHeaders, frcBodCol);
 
   const hasActiveFilters = 
     searchTerm !== '' || 

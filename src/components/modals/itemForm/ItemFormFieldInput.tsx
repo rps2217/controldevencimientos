@@ -46,6 +46,7 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
   const isEditableLocked = colSchema?.editable === false;
   const isAutoCalc = hasFormula ||
                      isEditableLocked ||
+                     Boolean(colSchema?.isVirtual) ||
                      (colSchema?.behavior === 'calc_fecha_vc' && canExpire) || 
                      (colSchema?.behavior === 'calc_retiro' && canExpire) || 
                      colSchema?.behavior === 'auto_id' || 
@@ -112,6 +113,14 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
               title={`Fórmula AppSheet: =${colSchema?.formula}`}
             >
               ✨ App Formula
+            </span>
+          )}
+          {colSchema?.isVirtual && (
+            <span 
+              className="text-[9px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-1.5 py-0.2 rounded font-mono font-bold flex items-center gap-1"
+              title="Columna Virtual Calculada (AppSheet)"
+            >
+              ⚡ Virtual
             </span>
           )}
           {!hasFormula && isAutoCalc && (

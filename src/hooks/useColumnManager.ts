@@ -67,7 +67,7 @@ export function useColumnManager({
     }
   }, [hiddenColumns]);
 
-  // Compute active virtual column IDs
+  // Compute active legacy virtual column IDs
   const activeVirtualCols = useMemo(() => {
     const activeVCs = sheetConfig.activeVirtualColumns || [];
     return VIRTUAL_COLUMNS.filter(
@@ -75,20 +75,41 @@ export function useColumnManager({
     );
   }, [sheetConfig.activeVirtualColumns, tableCapabilities]);
 
-  // Map of virtual column IDs -> labels
+  // Map of virtual column IDs -> labels (both from schema and legacy)
   const virtualMap = useMemo(() => {
     const map: Record<string, string> = {};
     activeVirtualCols.forEach(vc => {
       map[vc.id] = vc.label;
     });
+    const schemaForSheet = activeSheetTitle ? sheetConfig.schema?.[activeSheetTitle] : undefined;
+    if (schemaForSheet) {
+      Object.entries(schemaForSheet).forEach(([colId, colDef]) => {
+        if (colDef.isVirtual || colDef.type === 'calculated') {
+          map[colId] = colDef.label || colId;
+        }
+      });
+    }
     return map;
-  }, [activeVirtualCols]);
+  }, [activeVirtualCols, activeSheetTitle, sheetConfig.schema]);
 
-  // Combined list of base candidate column IDs: real headers + active virtual cols
+  // Combined list of base candidate column IDs: real headers + schema virtual cols + active legacy virtual cols
   const combinedCandidates = useMemo(() => {
-    const vcIds = activeVirtualCols.map(vc => vc.id);
-    return [...headers, ...vcIds];
-  }, [headers, activeVirtualCols]);
+    const result = [...headers];
+    const schemaForSheet = activeSheetTitle ? sheetConfig.schema?.[activeSheetTitle] : undefined;
+    if (schemaForSheet) {
+      Object.entries(schemaForSheet).forEach(([colId, colDef]) => {
+        if ((colDef.isVirtual || colDef.type === 'calculated') && !result.includes(colId)) {
+          result.push(colId);
+        }
+      });
+    }
+    activeVirtualCols.forEach(vc => {
+      if (!result.includes(vc.id)) {
+        result.push(vc.id);
+      }
+    });
+    return result;
+  }, [headers, activeSheetTitle, sheetConfig.schema, activeVirtualCols]);
 
   // Ordered list of all candidate columns for activeView
   const orderedColumnIds = useMemo(() => {
@@ -117,9 +138,9 @@ export function useColumnManager({
     const schemaForSheet = activeSheetTitle ? sheetConfig.schema?.[activeSheetTitle] : undefined;
 
     return orderedColumnIds.map(id => {
-      const isVirtual = Boolean(virtualMap[id]);
-      const label = isVirtual ? virtualMap[id] : id;
-      const isSchemaHidden = !isVirtual && schemaForSheet?.[id]?.visible === false;
+      const isVirtual = Boolean(virtualMap[id]) || schemaForSheet?.[id]?.isVirtual === true || schemaForSheet?.[id]?.type === 'calculated';
+      const label = schemaForSheet?.[id]?.label || virtualMap[id] || id;
+      const isSchemaHidden = schemaForSheet?.[id]?.visible === false;
       const isUserHidden = viewHidden.includes(id);
       const isVisible = !isSchemaHidden && !isUserHidden;
 

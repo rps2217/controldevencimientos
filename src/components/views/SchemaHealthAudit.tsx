@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { AlertTriangle, CheckCircle2, Wand2, Download, Upload, Activity } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Wand2, Download, Upload, Activity, ShieldAlert, RefreshCw, Trash2, Key } from 'lucide-react';
 import { SheetConfig, SpreadsheetMetadata, ColumnSchema } from '../../types';
+import { validateFormulaDetailed, normalizeToken } from '../../utils/appSheetFormulaEngine';
 
 interface SchemaHealthAuditProps {
   sheetConfig: SheetConfig;
@@ -52,8 +53,8 @@ export const SchemaHealthAudit: React.FC<SchemaHealthAuditProps> = ({
       totalChecks += 3;
 
       // 1. Primary Key check
-      const hasKey = Object.values(schemaMap).some(col => col.isKey);
-      if (!hasKey) {
+      const keyCols = Object.entries(schemaMap).filter(([_, col]) => col.isKey).map(([name]) => name);
+      if (keyCols.length === 0) {
         // Auto fix candidate: find SKU, ID, or first column
         const candidateKey = columns.find(c => /sku|id|codigo|folio|cu_vc/i.test(c)) || columns[0];
         issuesList.push({
@@ -76,6 +77,25 @@ export const SchemaHealthAudit: React.FC<SchemaHealthAuditProps> = ({
             showToast?.(`Clave primaria fijada en "${candidateKey}" para ${sheetName}`, 'success');
           } : undefined
         });
+      } else if (keyCols.length > 1) {
+        issuesList.push({
+          id: `multi-key-${sheetName}-${index}`,
+          severity: 'info',
+          sheetName,
+          message: `La tabla "${sheetName}" tiene ${keyCols.length} claves primarias marcadas (${keyCols.join(', ')}). Recomendamos una sola clave o clave compuesta única.`,
+          autoFixLabel: `Dejar solo "${keyCols[0]}"`,
+          autoFix: () => {
+            const updatedSchema = { ...(sheetConfig.schema || {}) };
+            const currentSheetSchema = { ...(updatedSchema[sheetName] || {}) };
+            Object.keys(currentSheetSchema).forEach(k => {
+              currentSheetSchema[k] = { ...currentSheetSchema[k], isKey: k === keyCols[0] };
+            });
+            updatedSchema[sheetName] = currentSheetSchema;
+            saveConfig({ ...sheetConfig, schema: updatedSchema });
+            showToast?.(`Clave única fijada en "${keyCols[0]}"`, 'success');
+          }
+        });
+        passedChecks++;
       } else {
         passedChecks++;
       }
@@ -111,6 +131,110 @@ export const SchemaHealthAudit: React.FC<SchemaHealthAuditProps> = ({
       } else {
         passedChecks++;
       }
+
+      // 3. Virtual Columns & Formulas Check
+      const virtualCols = Object.entries(schemaMap).filter(([_, col]) => col.isVirtual || col.type === 'calculated');
+      
+      // Map for circular dependency check: colName -> referencedCols[]
+      const formulaRefs: Record<string, string[]> = {};
+
+      virtualCols.forEach(([colName, col]) => {
+        totalChecks++;
+        const rawFormula = col.formula?.trim() || '';
+
+        if (!rawFormula) {
+          issuesList.push({
+            id: `empty-formula-${sheetName}-${colName}`,
+            severity: 'warning',
+            sheetName,
+            message: `La columna virtual "${colName}" en "${sheetName}" no tiene una fórmula AppSheet definida.`,
+          });
+        } else {
+          // Perform deep syntax and reference validation
+          const valResult = validateFormulaDetailed(rawFormula, columns);
+          
+          // Record references for circular check
+          formulaRefs[colName] = valResult.referencedColumns.map(r => r.name);
+
+          if (!valResult.isValid) {
+            issuesList.push({
+              id: `syntax-error-${sheetName}-${colName}`,
+              severity: 'critical',
+              sheetName,
+              message: `Error de sintaxis en columna "${colName}": ${valResult.message}`,
+            });
+          } else {
+            // Check missing columns in current sheet
+            const missing = valResult.referencedColumns.filter(r => !r.exists && !r.isSpecial && !r.name.includes('.'));
+            if (missing.length > 0) {
+              issuesList.push({
+                id: `missing-col-ref-${sheetName}-${colName}`,
+                severity: 'warning',
+                sheetName,
+                message: `La fórmula de "${colName}" referencia columnas no encontradas en "${sheetName}": ${missing.map(m => `[${m.name}]`).join(', ')}.`,
+              });
+            } else {
+              passedChecks++;
+            }
+          }
+        }
+      });
+
+      // 3b. Circular Dependency Check across virtual columns
+      Object.entries(formulaRefs).forEach(([colA, refsA]) => {
+        refsA.forEach(refCol => {
+          const normRef = normalizeToken(refCol);
+          // If refCol is another virtual column that references colA
+          const matchingColB = Object.keys(formulaRefs).find(b => normalizeToken(b) === normRef && b !== colA);
+          if (matchingColB) {
+            const refsB = formulaRefs[matchingColB] || [];
+            const normColA = normalizeToken(colA);
+            if (refsB.some(r => normalizeToken(r) === normColA)) {
+              issuesList.push({
+                id: `circular-ref-${sheetName}-${colA}-${matchingColB}`,
+                severity: 'critical',
+                sheetName,
+                message: `Referencia circular detectada entre columnas virtuales: "${colA}" y "${matchingColB}".`,
+              });
+            }
+          }
+        });
+      });
+
+      // 4. Relational Ref Integrity Check
+      const refCols = Object.entries(schemaMap).filter(([_, col]) => col.type === 'ref');
+      refCols.forEach(([colName, col]) => {
+        totalChecks++;
+        const targetTable = col.refTable?.trim();
+        if (!targetTable) {
+          issuesList.push({
+            id: `missing-ref-table-${sheetName}-${colName}`,
+            severity: 'warning',
+            sheetName,
+            message: `La columna Ref "${colName}" en "${sheetName}" no tiene especificada la tabla relacionada.`,
+          });
+        } else if (!sheetNames.includes(targetTable)) {
+          issuesList.push({
+            id: `broken-ref-${sheetName}-${colName}`,
+            severity: 'warning',
+            sheetName,
+            message: `La columna "${colName}" apunta a una tabla referenciada inexistente ("${targetTable}").`,
+          });
+        } else {
+          // Check if target table has a primary key
+          const targetSchema = sheetConfig.schema?.[targetTable] || {};
+          const targetHasKey = Object.values(targetSchema).some(c => c.isKey);
+          if (!targetHasKey && Object.keys(targetSchema).length > 0) {
+            issuesList.push({
+              id: `ref-target-no-key-${sheetName}-${colName}`,
+              severity: 'info',
+              sheetName,
+              message: `La tabla destino "${targetTable}" de la relación Ref en "${colName}" no tiene una clave primaria definida.`,
+            });
+          }
+          passedChecks++;
+        }
+      });
     });
 
     const calculatedScore = totalChecks > 0 ? Math.round((passedChecks / totalChecks) * 100) : 100;

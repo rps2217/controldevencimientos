@@ -50,6 +50,8 @@ export const ExpressionAssistantModal: React.FC<ExpressionAssistantModalProps> =
   const [showTestModal, setShowTestModal] = useState<boolean>(false);
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({});
   const [columnFilterQuery, setColumnFilterQuery] = useState<string>('');
+  const [selectedFunctionCategory, setSelectedFunctionCategory] = useState<string>('Todas');
+  const [functionSearchQuery, setFunctionSearchQuery] = useState<string>('');
   
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -259,8 +261,105 @@ export const ExpressionAssistantModal: React.FC<ExpressionAssistantModalProps> =
       syntax: 'IF(condicion, valor_verdadero, valor_falso)',
       example: 'IF([CANTIDAD] > 0, "CON DIFERENCIA", "CUADRADO")',
       desc: 'Evalúa una condición lógica y devuelve un resultado u otro.'
+    },
+    {
+      category: 'Lógica & Condicionales',
+      name: 'IFS',
+      syntax: 'IFS(cond1, val1, cond2, val2, ... [TRUE, val_default])',
+      example: 'IFS([CANTIDAD] <= 0, "SIN STOCK", [CANTIDAD] < 10, "STOCK CRÍTICO", TRUE, "EN REGLA")',
+      desc: 'Evalúa múltiples condiciones en cascada y devuelve el valor correspondiente a la primera que sea verdadera.'
+    },
+    {
+      category: 'Lógica & Condicionales',
+      name: 'SWITCH',
+      syntax: 'SWITCH(expresion, caso1, res1, caso2, res2, ... [default])',
+      example: 'SWITCH([ESTADO], "V", "VENCIDO", "R", "RETIRO", "OTRO")',
+      desc: 'Compara una expresión contra una lista de casos y devuelve el resultado coincidente.'
+    },
+    {
+      category: 'Lógica & Condicionales',
+      name: 'ISBLANK / ISNOTBLANK',
+      syntax: 'ISBLANK(valor) o ISNOTBLANK(valor)',
+      example: 'IF(ISBLANK([LOTE]), "SIN LOTE", [LOTE])',
+      desc: 'Comprueba si una celda o columna está vacía o si contiene algún dato.'
+    },
+    {
+      category: 'Lógica & Condicionales',
+      name: 'AND / OR / NOT',
+      syntax: 'AND(cond1, cond2) | OR(cond1, cond2) | NOT(cond)',
+      example: 'AND([CANTIDAD] > 0, [DIAS_RETIRO] <= 30)',
+      desc: 'Operadores lógicos para combinar múltiples condiciones.'
+    },
+    {
+      category: 'Texto & Concatenación',
+      name: 'CONCATENATE',
+      syntax: 'CONCATENATE(texto1, texto2, ...)',
+      example: 'CONCATENATE([SKU], " - ", [DESCRIPCION])',
+      desc: 'Concatena múltiples columnas o cadenas de texto en una sola.'
+    },
+    {
+      category: 'Texto & Concatenación',
+      name: 'TRIM / UPPER / LOWER',
+      syntax: 'TRIM(texto) | UPPER(texto) | LOWER(texto)',
+      example: 'UPPER(TRIM([PROVEEDOR]))',
+      desc: 'Limpia espacios en blanco al inicio y final, y transforma a mayúsculas o minúsculas.'
+    },
+    {
+      category: 'Números & Matemáticas',
+      name: 'SUM / AVERAGE / COUNT',
+      syntax: 'SUM(num1, num2) | AVERAGE(...) | COUNT(...)',
+      example: 'SUM([CANTIDAD], [CANTIDAD_EXTRA])',
+      desc: 'Operaciones numéricas de agregación y conteo.'
+    },
+    {
+      category: 'Números & Matemáticas',
+      name: 'MIN / MAX',
+      syntax: 'MIN(val1, val2) | MAX(val1, val2)',
+      example: 'MAX(0, [CANTIDAD] - [STOCK_MINIMO])',
+      desc: 'Devuelve el menor o mayor valor de una lista de argumentos.'
+    },
+    {
+      category: 'Fechas & Vencimientos',
+      name: 'YEAR / MONTH / DAY',
+      syntax: 'YEAR(date) | MONTH(date) | DAY(date)',
+      example: 'YEAR([FECHA_VC])',
+      desc: 'Extrae el año, mes o día como número entero a partir de una fecha.'
+    },
+    {
+      category: 'Búsqueda & Catálogo',
+      name: 'INDEX',
+      syntax: 'INDEX(lista_o_valores, posicion)',
+      example: 'INDEX(SPLIT([CODIGO], "-"), 1)',
+      desc: 'Obtiene el elemento en la posición especificada de una lista o texto dividido.'
     }
   ];
+
+  const functionCategories = [
+    'Todas',
+    'Fechas & Vencimientos',
+    'Lógica & Condicionales',
+    'Texto & Concatenación',
+    'Números & Matemáticas',
+    'Búsqueda & Catálogo',
+    'De-referenciación (Relaciones Ref)'
+  ];
+
+  const filteredFunctions = useMemo(() => {
+    return FUNCTION_EXAMPLES.filter(fn => {
+      const matchCat = selectedFunctionCategory === 'Todas' || fn.category === selectedFunctionCategory;
+      if (!matchCat) return false;
+      if (!functionSearchQuery.trim()) return true;
+      const q = functionSearchQuery.toLowerCase();
+      return fn.name.toLowerCase().includes(q) || fn.syntax.toLowerCase().includes(q) || fn.desc.toLowerCase().includes(q);
+    });
+  }, [FUNCTION_EXAMPLES, selectedFunctionCategory, functionSearchQuery]);
+
+  const filteredActiveColumns = useMemo(() => {
+    const all = getTableColumns(tableName);
+    if (!columnFilterQuery.trim()) return all;
+    const q = columnFilterQuery.toLowerCase();
+    return all.filter(c => c.name.toLowerCase().includes(q) || c.type.toLowerCase().includes(q));
+  }, [tableName, columnFilterQuery, tableHeaders, sheetConfig.schema]);
 
   if (!isOpen) return null;
 
@@ -450,22 +549,36 @@ export const ExpressionAssistantModal: React.FC<ExpressionAssistantModalProps> =
                 </span>
               </div>
 
+              {/* Column Filter Input */}
+              <div className="relative mb-2 shrink-0">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={columnFilterQuery}
+                  onChange={(e) => setColumnFilterQuery(e.target.value)}
+                  placeholder="Filtrar columnas de la tabla..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500 shadow-2xs"
+                />
+              </div>
+
               {/* Active Table Column List */}
-              <div className="space-y-1.5 overflow-y-auto max-h-[320px] pr-1">
+              <div className="space-y-1.5 overflow-y-auto max-h-[280px] pr-1">
                 {/* Special _RowNumber field */}
-                <button
-                  type="button"
-                  onClick={() => insertToken('[_RowNumber]')}
-                  className="w-full text-left p-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/60 border border-slate-200/80 dark:border-slate-700/80 hover:border-blue-300 transition-all flex items-center justify-between group cursor-pointer shadow-2xs"
-                >
-                  <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600">
-                    _RowNumber
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-400">Number</span>
-                </button>
+                {(!columnFilterQuery.trim() || '_rownumber'.includes(columnFilterQuery.toLowerCase())) && (
+                  <button
+                    type="button"
+                    onClick={() => insertToken('[_RowNumber]')}
+                    className="w-full text-left p-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/60 border border-slate-200/80 dark:border-slate-700/80 hover:border-blue-300 transition-all flex items-center justify-between group cursor-pointer shadow-2xs"
+                  >
+                    <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600">
+                      _RowNumber
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">Number</span>
+                  </button>
+                )}
 
                 {/* Table Schema Columns */}
-                {getTableColumns(tableName).map((col) => (
+                {filteredActiveColumns.map((col) => (
                   <button
                     key={col.name}
                     type="button"
@@ -497,6 +610,11 @@ export const ExpressionAssistantModal: React.FC<ExpressionAssistantModalProps> =
                     </span>
                   </button>
                 ))}
+                {filteredActiveColumns.length === 0 && (
+                  <div className="text-center py-4 text-xs text-slate-400">
+                    No se encontraron columnas para "{columnFilterQuery}"
+                  </div>
+                )}
               </div>
             </div>
 
@@ -578,36 +696,77 @@ export const ExpressionAssistantModal: React.FC<ExpressionAssistantModalProps> =
         {/* 5. TAB 2: EXAMPLES & FUNCTION REFERENCE                                  */}
         {/* ========================================================================= */}
         {activeTab === 'examples' && (
-          <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-2.5">
-            {FUNCTION_EXAMPLES.map((ex, i) => (
-              <div
-                key={i}
-                onClick={() => insertToken(ex.example)}
-                className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-600 rounded-xl transition-all cursor-pointer group shadow-2xs"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-blue-600 dark:text-blue-400 font-mono">
-                      {ex.name}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      ({ex.category})
+          <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-3 flex flex-col">
+            
+            {/* Top Toolbar: Search + Category Filter */}
+            <div className="space-y-2 shrink-0">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={functionSearchQuery}
+                  onChange={(e) => setFunctionSearchQuery(e.target.value)}
+                  placeholder="Buscar función por nombre o sintaxis (ej: IF, EOMONTH, SUM, LOOKUP)..."
+                  className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500 shadow-2xs"
+                />
+              </div>
+
+              {/* Category Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                {functionCategories.map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedFunctionCategory(cat)}
+                    className={`px-2.5 py-1 text-[11px] rounded-lg font-bold shrink-0 transition-all cursor-pointer ${
+                      selectedFunctionCategory === cat
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Functions List */}
+            <div className="space-y-2.5 flex-1 overflow-y-auto pr-1">
+              {filteredFunctions.map((ex, i) => (
+                <div
+                  key={i}
+                  onClick={() => insertToken(ex.example)}
+                  className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-600 rounded-xl transition-all cursor-pointer group shadow-2xs"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-blue-600 dark:text-blue-400 font-mono">
+                        {ex.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        ({ex.category})
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity font-bold">
+                      Insertar fórmula ↵
                     </span>
                   </div>
-                  <span className="text-[10px] text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity font-bold">
-                    Insertar fórmula ↵
-                  </span>
-                </div>
 
-                <div className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-800 dark:text-slate-200">
-                  {ex.example}
-                </div>
+                  <div className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-800 dark:text-slate-200">
+                    {ex.example}
+                  </div>
 
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  {ex.desc}
-                </p>
-              </div>
-            ))}
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    {ex.desc}
+                  </p>
+                </div>
+              ))}
+              {filteredFunctions.length === 0 && (
+                <div className="text-center py-8 text-xs text-slate-400">
+                  No se encontraron funciones para "{functionSearchQuery}"
+                </div>
+              )}
+            </div>
           </div>
         )}
 

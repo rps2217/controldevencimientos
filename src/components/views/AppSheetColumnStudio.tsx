@@ -84,49 +84,37 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
   const resolveFallbackHeaders = useCallback((title: string): string[] => {
     if (!title) return [];
 
-    // 1. If table has configured columns in sheetConfig.schema
+    let baseHeaders: string[] = [];
+    if (activeSheet?.title === title && headers.length > 0) {
+      baseHeaders = [...headers];
+    } else if (title === sheetConfig.products || /catalogo|product/i.test(title)) {
+      baseHeaders = (products && products.length > 0) 
+        ? Object.keys(products[0]).filter(k => !k.startsWith('_')) 
+        : Object.keys(SAMPLE_PRODUCTS[0]);
+    } else if (title === sheetConfig.policies || /pol[ií]tic|canje/i.test(title)) {
+      baseHeaders = (policies && policies.length > 0) 
+        ? Object.keys(policies[0]).filter(k => !k.startsWith('_')) 
+        : Object.keys(SAMPLE_POLICIES[0]);
+    } else if (title === sheetConfig.events || /frc|evento|incidenc/i.test(title)) {
+      baseHeaders = [...SAMPLE_EVENTS_HEADERS];
+    } else if (title === sheetConfig.recepBultos || /bulto/i.test(title)) {
+      baseHeaders = ['TIMESTAMP', 'CODIGO_BULTO', 'ESTADO', 'OPERADOR'];
+    } else if (title === sheetConfig.main || /vencimiento/i.test(title)) {
+      baseHeaders = headers.length > 0 ? [...headers] : [...SAMPLE_HEADERS];
+    }
+
+    // Merge any schema-defined columns (including virtual columns)
     if (sheetConfig.schema?.[title]) {
       const schemaKeys = Object.keys(sheetConfig.schema[title]);
-      if (schemaKeys.length > 0) return schemaKeys;
-    }
-
-    // 2. Active headers if title matches current activeSheet
-    if (activeSheet?.title === title && headers.length > 0) {
-      return headers;
-    }
-
-    // 3. Products / Catalogo
-    if (title === sheetConfig.products || /catalogo|product/i.test(title)) {
-      if (products && products.length > 0) {
-        return Object.keys(products[0]).filter(k => !k.startsWith('_'));
+      schemaKeys.forEach(k => {
+        if (!baseHeaders.includes(k)) baseHeaders.push(k);
+      });
+      if (baseHeaders.length === 0) {
+        return schemaKeys;
       }
-      return Object.keys(SAMPLE_PRODUCTS[0]);
     }
 
-    // 4. Policies / Politicas
-    if (title === sheetConfig.policies || /pol[ií]tic|canje/i.test(title)) {
-      if (policies && policies.length > 0) {
-        return Object.keys(policies[0]).filter(k => !k.startsWith('_'));
-      }
-      return Object.keys(SAMPLE_POLICIES[0]);
-    }
-
-    // 5. Events / FRC
-    if (title === sheetConfig.events || /frc|evento|incidenc/i.test(title)) {
-      return SAMPLE_EVENTS_HEADERS;
-    }
-
-    // 6. Recep Bultos
-    if (title === sheetConfig.recepBultos || /bulto/i.test(title)) {
-      return ['TIMESTAMP', 'CODIGO_BULTO', 'ESTADO', 'OPERADOR'];
-    }
-
-    // 7. Main Vencimientos
-    if (title === sheetConfig.main || /vencimiento/i.test(title)) {
-      return headers.length > 0 ? headers : SAMPLE_HEADERS;
-    }
-
-    return [];
+    return baseHeaders;
   }, [sheetConfig, activeSheet, headers, products, policies]);
 
   // Internal reactive selection of table in studio
@@ -171,8 +159,16 @@ export const AppSheetColumnStudio: React.FC<AppSheetColumnStudioProps> = ({
       if (rows && rows.length > 0 && Array.isArray(rows[0]) && rows[0].length > 0) {
         const liveHeaders = rows[0].map(String).map(s => s.trim()).filter(Boolean);
         if (liveHeaders.length > 0) {
-          setTableHeaders(liveHeaders);
-          setHeaders?.(liveHeaders);
+          const schemaForTable = sheetConfig.schema?.[sheetProp.title];
+          const virtualCols = schemaForTable 
+            ? Object.keys(schemaForTable).filter(k => schemaForTable[k]?.isVirtual || schemaForTable[k]?.type === 'calculated')
+            : [];
+          const combined = [...liveHeaders];
+          virtualCols.forEach(vk => {
+            if (!combined.includes(vk)) combined.push(vk);
+          });
+          setTableHeaders(combined);
+          setHeaders?.(combined);
         }
       }
     } catch (err) {

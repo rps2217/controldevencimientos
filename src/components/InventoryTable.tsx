@@ -347,6 +347,11 @@ export const InventoryTable: React.FC = () => {
                             REF
                           </span>
                         )}
+                        {(colSchema?.isVirtual || colSchema?.type === 'calculated') && (
+                          <span className="text-[9px] bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 px-1 py-0.2 rounded font-mono font-bold shrink-0" title="Columna Virtual Calculada (AppSheet)">
+                            fx
+                          </span>
+                        )}
                       </div>
 
                       {isEventCol ? (

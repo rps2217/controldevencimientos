@@ -9,6 +9,7 @@ import {
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { parseAnyDate, formatDisplayDate, createMetricsAccumulator } from '../utils/pureCalculations';
 import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
+import { augmentItemsWithVirtualColumns, getSchemaVirtualColumns } from '../utils/virtualColumnsEvaluator';
 import { detectTableCapabilities } from '../utils/sliceRegistry';
 import { sortInventoryItems, compareItemValues } from '../utils/sortUtils';
 import { useInventoryWorker } from './useInventoryWorker';
@@ -33,6 +34,7 @@ export type DisplayRow = DisplayRowItem | DisplayRowHeader;
 export interface UseInventoryFilteringProps {
   items: InventoryItem[];
   headers: string[];
+  activeSheetTitle?: string;
   /** Capacidades EFECTIVAS ya resueltas por el dashboard. Si faltan, se derivan de `headers`. */
   tableCapabilities?: Set<TableCapability>;
   frcBodCol: string | null;
@@ -81,6 +83,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
   const {
     items,
     headers,
+    activeSheetTitle,
     tableCapabilities,
     frcBodCol,
     sheetConfig,
@@ -195,19 +198,20 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
 
   // Virtual columns augmentation & master catalog orphan detection
   const augmentedItems = useMemo<InventoryItem[]>(() => {
-    const activeVCs = sheetConfig.activeVirtualColumns || [];
-    const targetVCs = activeVCs.length > 0 ? VIRTUAL_COLUMNS.filter(col => activeVCs.includes(col.id)) : [];
+    // 1. Augment with virtual columns (both schema formulas and legacy systems)
+    const baseAugmented = augmentItemsWithVirtualColumns({
+      items,
+      headers,
+      sheetTitle: activeSheetTitle,
+      sheetConfig,
+      products,
+      policies
+    });
+
     const skuCol = findColumnBySemantic(headers, 'sku', sheetConfig?.customAliases) || headers.find(h => /sku|código|codigo/i.test(h));
     const hasCatalog = catalogSkuSet !== null && catalogSkuSet.size > 0;
 
-    return items.map(item => {
-      const virtualData: Record<string, string | number> = {};
-      if (targetVCs.length > 0) {
-        targetVCs.forEach(col => {
-          virtualData[col.id] = col.calculate(item, headers, { products, policies });
-        });
-      }
-
+    return baseAugmented.map(item => {
       let isOrphan = false;
       if (hasCatalog && skuCol) {
         const rawSku = item[skuCol] || item.SKU || item.sku;
@@ -220,11 +224,10 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
 
       return {
         ...item,
-        ...virtualData,
         _isOrphan: isOrphan
       } as InventoryItem;
     });
-  }, [items, headers, sheetConfig.activeVirtualColumns, products, policies, catalogSkuSet, sheetConfig?.customAliases]);
+  }, [items, headers, activeSheetTitle, sheetConfig, products, policies, catalogSkuSet]);
 
   // Web Worker for non-blocking background calculations
   const { metrics, matchingIndices, isProcessing, isWorkerReady } = useInventoryWorker({
@@ -307,13 +310,15 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
       });
     }
 
-    // Always ensure active virtual columns are included in columnOptionsMap
+    // Always ensure active virtual columns and schema virtual columns are included in columnOptionsMap
+    const schemaVCs = getSchemaVirtualColumns(activeSheetTitle, sheetConfig).map(vc => vc.colKey);
     const activeVCs = sheetConfig.activeVirtualColumns || [];
     const activeViewVCs = VIRTUAL_COLUMNS
       .filter(vc => activeVCs.includes(vc.id) && (!vc.supportedCapabilities || vc.supportedCapabilities.some(c => tableCaps.has(c))))
       .map(vc => vc.id);
 
-    activeViewVCs.forEach(h => {
+    const allVirtualCols = Array.from(new Set([...schemaVCs, ...activeViewVCs]));
+    allVirtualCols.forEach(h => {
       const uniqueVals = new Set<string>();
       augmentedItems.forEach(item => {
         const val = item[h];
@@ -330,7 +335,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     });
 
     return map;
-  }, [augmentedItems, headers, sheetConfig.activeVirtualColumns, metrics, tableCaps]);
+  }, [augmentedItems, headers, activeSheetTitle, sheetConfig, metrics, tableCaps]);
 
   // Fast filtering using Worker matching indices when available
   const filteredItems = useMemo(() => {

@@ -41,11 +41,18 @@ export function mergeCloudConfigs(local: SheetConfig, remote: SheetConfig): Shee
     if (s && s.id) sliceMap.set(s.id, s);
   });
 
-  // Non-destructive Merge for Schema
-  const mergedSchema = {
-    ...(secondary.schema || {}),
-    ...(primary.schema || {})
-  };
+  // Non-destructive Deep Merge for Schema per table
+  const allTables = new Set([
+    ...Object.keys(secondary.schema || {}),
+    ...Object.keys(primary.schema || {})
+  ]);
+  const mergedSchema: Record<string, Record<string, any>> = {};
+  allTables.forEach(tableName => {
+    mergedSchema[tableName] = {
+      ...(secondary.schema?.[tableName] || {}),
+      ...(primary.schema?.[tableName] || {})
+    };
+  });
 
   // Non-destructive Merge for Bulk Actions
   const mergedBulk = {

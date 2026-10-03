@@ -767,7 +767,45 @@ function evaluateSingleTokenOrExpression(
     }
   }
 
-  // L. IF(condition, trueVal, falseVal)
+  // L1. IFS(cond1, val1, cond2, val2, ...)
+  const ifsMatch = trimmed.match(/^IFS\s*\((.*)\)$/i);
+  if (ifsMatch) {
+    const args = parseFunctionArguments(ifsMatch[1]);
+    for (let i = 0; i < args.length; i += 2) {
+      if (i + 1 < args.length) {
+        const condStr = args[i].trim();
+        const isTrue = evaluateBooleanCondition(condStr, context);
+        if (isTrue) {
+          return evaluateSingleTokenOrExpression(args[i + 1], context);
+        }
+      }
+    }
+    return { value: '', stringValue: '', success: true };
+  }
+
+  // L2. SWITCH(expr, val1, res1, val2, res2, ... [default])
+  const switchMatch = trimmed.match(/^SWITCH\s*\((.*)\)$/i);
+  if (switchMatch) {
+    const args = parseFunctionArguments(switchMatch[1]);
+    if (args.length >= 3) {
+      const targetVal = evaluateSingleTokenOrExpression(args[0], context).stringValue.trim().toUpperCase();
+      const hasDefault = (args.length - 1) % 2 === 1;
+      const casesEnd = hasDefault ? args.length - 1 : args.length;
+      
+      for (let i = 1; i < casesEnd; i += 2) {
+        const caseVal = evaluateSingleTokenOrExpression(args[i], context).stringValue.trim().toUpperCase();
+        if (targetVal === caseVal) {
+          return evaluateSingleTokenOrExpression(args[i + 1], context);
+        }
+      }
+      if (hasDefault) {
+        return evaluateSingleTokenOrExpression(args[args.length - 1], context);
+      }
+    }
+    return { value: '', stringValue: '', success: true };
+  }
+
+  // L3. IF(condition, trueVal, falseVal)
   const ifMatch = trimmed.match(/^IF\s*\((.*)\)$/i);
   if (ifMatch) {
     const args = parseFunctionArguments(ifMatch[1]);
@@ -885,6 +923,9 @@ export function evaluateBooleanCondition(
   if (!expression || !expression.trim()) return true;
 
   const expr = expression.trim();
+  const upperExpr = expr.toUpperCase();
+  if (upperExpr === 'TRUE' || upperExpr === '1') return true;
+  if (upperExpr === 'FALSE' || upperExpr === '0') return false;
 
   // 1. ISBLANK / ISNOTBLANK
   if (/^ISBLANK\s*\(/i.test(expr)) {
@@ -1186,6 +1227,78 @@ export function validateFormulaDetailed(
 /**
  * Applies all configured formulas in table schema to a record
  */
+/**
+ * Sorts columns topologically based on formula dependencies so that columns
+ * referenced by other formulas are computed first.
+ */
+export function sortColumnsByDependency(
+  cols: string[],
+  tableSchema: Record<string, ColumnSchema> | undefined
+): string[] {
+  if (!tableSchema) return cols;
+
+  const adj = new Map<string, Set<string>>();
+  const inDegree = new Map<string, number>();
+
+  cols.forEach(col => {
+    adj.set(col, new Set());
+    inDegree.set(col, 0);
+  });
+
+  cols.forEach(col => {
+    const colConfig = tableSchema[col];
+    if (colConfig?.formula && colConfig.formula.trim()) {
+      const matches = Array.from(colConfig.formula.matchAll(/\[(?:_THISROW\.)?([^\]]+)\]/gi));
+      matches.forEach(m => {
+        const rawDep = m[1].trim();
+        // Ignore dereference subfields or special system fields
+        const depCol = rawDep.split('.')[0].trim();
+        const found = cols.find(c => normalizeToken(c) === normalizeToken(depCol));
+        if (found && found !== col) {
+          if (!adj.get(found)?.has(col)) {
+            adj.get(found)?.add(col);
+            inDegree.set(col, (inDegree.get(col) || 0) + 1);
+          }
+        }
+      });
+    }
+  });
+
+  const queue: string[] = [];
+  cols.forEach(col => {
+    if ((inDegree.get(col) || 0) === 0) {
+      queue.push(col);
+    }
+  });
+
+  const sorted: string[] = [];
+  while (queue.length > 0) {
+    const curr = queue.shift()!;
+    sorted.push(curr);
+    adj.get(curr)?.forEach(neighbor => {
+      const newDeg = (inDegree.get(neighbor) || 1) - 1;
+      inDegree.set(neighbor, newDeg);
+      if (newDeg === 0) {
+        queue.push(neighbor);
+      }
+    });
+  }
+
+  // If there are cycles, append remaining unvisited columns in original order
+  if (sorted.length < cols.length) {
+    cols.forEach(col => {
+      if (!sorted.includes(col)) {
+        sorted.push(col);
+      }
+    });
+  }
+
+  return sorted;
+}
+
+/**
+ * Applies all configured formulas in table schema to a record in topological dependency order
+ */
 export function applyTableSchemaFormulas(
   row: Record<string, any>,
   headers: string[],
@@ -1195,13 +1308,16 @@ export function applyTableSchemaFormulas(
   if (!tableSchema) return row;
 
   const updated = { ...row };
+  const allCols = Array.from(new Set([...headers, ...Object.keys(tableSchema)]));
+  const sortedCols = sortColumnsByDependency(allCols, tableSchema);
+
   const evalContext: FormulaEvaluationContext = {
     ...context,
     row: updated,
-    headers
+    headers: sortedCols
   };
 
-  for (const header of headers) {
+  for (const header of sortedCols) {
     const colConfig = tableSchema[header];
     if (colConfig?.formula && colConfig.formula.trim()) {
       const res = evaluateAppSheetFormula(colConfig.formula, evalContext);

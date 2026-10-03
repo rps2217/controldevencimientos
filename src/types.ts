@@ -89,7 +89,21 @@ export interface SheetConfig {
   updatedAt?: string;
 }
 
-export type ColumnType = 'text' | 'longtext' | 'number' | 'date' | 'datetime' | 'enum' | 'enumlist' | 'ref' | 'calculated' | 'virtual';
+export type ColumnType = 
+  | 'text' 
+  | 'longtext' 
+  | 'number' 
+  | 'price' 
+  | 'percentage' 
+  | 'yes_no' 
+  | 'color' 
+  | 'date' 
+  | 'datetime' 
+  | 'enum' 
+  | 'enumlist' 
+  | 'ref' 
+  | 'calculated' 
+  | 'virtual';
 
 export interface VirtualColumnDataContext {
   products?: SheetRecord[];
