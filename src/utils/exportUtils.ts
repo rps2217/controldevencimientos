@@ -1,6 +1,5 @@
 import { formatDisplayDate } from './pureCalculations';
-import { calculateVirtualColumnValue } from './virtualColumns';
-import { SheetRecord, VirtualColumn, UserVirtualColumn, VirtualColumnDataContext } from '../types';
+import { SheetRecord, VirtualColumnDataContext } from '../types';
 
 /**
  * Universal, clean Excel exporter with automatic column width calculation
@@ -11,38 +10,15 @@ export async function exportToExcel(
   headers: string[], 
   items: SheetRecord[], 
   sheetName = 'Inventario',
-  virtualColumns?: (VirtualColumn | UserVirtualColumn)[],
-  allData?: VirtualColumnDataContext,
+  _virtualColumns?: any[],
+  _allData?: VirtualColumnDataContext,
   columnLabelsMap?: Record<string, string>
 ) {
   if (!items || !items.length) return;
 
   const XLSX = await import('xlsx');
 
-  // Enhance items with virtual column data (store under both id and label)
-  const enhancedItems = items.map(item => {
-    const newItem = { ...item };
-    if (virtualColumns) {
-      virtualColumns.forEach(vc => {
-        const val = calculateVirtualColumnValue(vc, item, headers, allData);
-        if (vc.id) newItem[vc.id] = val;
-        if (vc.label) newItem[vc.label] = val;
-      });
-    }
-    return newItem;
-  });
-
-  // Build final headers list: keep exact order of passed headers (visibleHeaders),
-  // and append any virtual column only if not already present.
   const exportHeaders = [...headers];
-  if (virtualColumns && virtualColumns.length > 0) {
-    virtualColumns.forEach(vc => {
-      const isIncluded = exportHeaders.some(h => h === vc.id || h === vc.label);
-      if (!isIncluded) {
-        exportHeaders.push(vc.id || vc.label);
-      }
-    });
-  }
 
   // Display labels for Excel header row (Row 1)
   const displayHeaderNames = exportHeaders.map(colId => {
@@ -55,7 +31,7 @@ export async function exportToExcel(
   // Format headers and rows according to exact visible column order
   const worksheetData = [
     displayHeaderNames,
-    ...enhancedItems.map(item => exportHeaders.map(colId => {
+    ...items.map(item => exportHeaders.map(colId => {
       let val: unknown = item[colId];
       if ((val === undefined || val === null) && columnLabelsMap && columnLabelsMap[colId]) {
         val = item[columnLabelsMap[colId]];

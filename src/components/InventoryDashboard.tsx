@@ -9,7 +9,6 @@ import { DashboardProvider, DashboardContextType } from '../context/DashboardCon
 import { getEventCategory, getItemStatus } from '../utils/dateCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { resolveTableCapabilities } from '../utils/sliceRegistry';
-import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
 import { applyTableSchemaFormulas } from '../utils/appSheetFormulaEngine';
 import { useColumnResize } from '../hooks/useColumnResize';
 import { useColumnManager } from '../hooks/useColumnManager';
@@ -346,12 +345,6 @@ export const InventoryDashboard: React.FC = () => {
 
   const columnLabelsMap = useMemo(() => {
     const map: Record<string, string> = {};
-    VIRTUAL_COLUMNS.forEach(vc => {
-      map[vc.id] = vc.label;
-    });
-    (sheetConfig.userVirtualColumns || []).forEach(uvc => {
-      map[uvc.id] = uvc.label;
-    });
     const schemaForSheet = activeSheet?.title ? sheetConfig.schema?.[activeSheet.title] : undefined;
     if (schemaForSheet) {
       Object.keys(schemaForSheet).forEach(colId => {
@@ -361,7 +354,7 @@ export const InventoryDashboard: React.FC = () => {
       });
     }
     return map;
-  }, [activeSheet?.title, sheetConfig.schema, sheetConfig.userVirtualColumns]);
+  }, [activeSheet?.title, sheetConfig.schema]);
 
   const {
     isSidebarCollapsed,

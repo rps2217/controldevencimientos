@@ -1,6 +1,5 @@
 import { InventoryItem, SheetConfig, SheetRecord, ColumnSchema } from '../types';
 import { evaluateAppSheetFormula, FormulaEvaluationContext } from './appSheetFormulaEngine';
-import { VIRTUAL_COLUMNS } from './virtualColumns';
 
 export interface EvaluateVirtualColumnsOptions {
   items: InventoryItem[];
@@ -11,6 +10,62 @@ export interface EvaluateVirtualColumnsOptions {
   policies?: SheetRecord[];
   allSheetsData?: Record<string, SheetRecord[]>;
 }
+
+/**
+ * Standard Presets for AppSheet Virtual Columns
+ */
+export const STANDARD_VIRTUAL_PRESETS: Record<string, ColumnSchema> = {
+  FECHA_RETIRO_CALC: {
+    label: 'Fecha Retiro Sugerida',
+    type: 'date',
+    isVirtual: true,
+    visible: true,
+    searchable: true,
+    behavior: 'none',
+    formula: 'EOMONTH([FECHA_VC], -([DIAS_RETIRO]/30))',
+    description: 'Fecha límite de retiro en góndola según política comercial'
+  },
+  CU_VC: {
+    label: 'Código Único (CU_VC)',
+    type: 'text',
+    isVirtual: true,
+    visible: true,
+    searchable: true,
+    behavior: 'none',
+    formula: '[SKU] & [YYYY] & [MM]',
+    description: 'Identificador compuesto unívoco de vencimiento'
+  },
+  PROVEEDOR_CATALOGO: {
+    label: 'Proveedor (Catálogo)',
+    type: 'text',
+    isVirtual: true,
+    visible: true,
+    searchable: true,
+    behavior: 'none',
+    formula: '[SKU].[PROVEEDOR]',
+    description: 'Nombre del laboratorio o proveedor en el Catálogo Maestro'
+  },
+  POLITICA_CANJE_RELAC: {
+    label: 'Política de Canje',
+    type: 'text',
+    isVirtual: true,
+    visible: true,
+    searchable: true,
+    behavior: 'none',
+    formula: '[RUT_PROVEEDOR].[POLITICA]',
+    description: 'Acuerdo comercial de retorno o destrucción'
+  },
+  DIAS_RETIRO_RELAC: {
+    label: 'Días de Retiro',
+    type: 'number',
+    isVirtual: true,
+    visible: true,
+    searchable: true,
+    behavior: 'none',
+    formula: '[RUT_PROVEEDOR].[DIAS_RETIRO]',
+    description: 'Días de antelación para el retiro'
+  }
+};
 
 /**
  * Returns a list of all virtual columns defined for a given table in SheetConfig.schema
@@ -33,8 +88,7 @@ export function getSchemaVirtualColumns(
 }
 
 /**
- * Evaluates all virtual columns (both custom formula-based from AppSheet schema
- * and active system virtual columns) for a single item.
+ * Evaluates all virtual columns defined in the AppSheet schema for a single item.
  */
 export function evaluateItemVirtualColumns(
   item: InventoryItem,
@@ -48,7 +102,6 @@ export function evaluateItemVirtualColumns(
   const computedValues: Record<string, any> = {};
   const schemaVirtualCols = getSchemaVirtualColumns(sheetTitle, sheetConfig);
 
-  // 1. Evaluate custom schema virtual columns with AppSheet formulas
   if (schemaVirtualCols.length > 0) {
     const evalCtx: FormulaEvaluationContext = {
       row: item,
@@ -70,15 +123,6 @@ export function evaluateItemVirtualColumns(
     });
   }
 
-  // 2. Evaluate active legacy system virtual columns
-  const activeVCs = sheetConfig.activeVirtualColumns || [];
-  if (activeVCs.length > 0) {
-    const legacyVCs = VIRTUAL_COLUMNS.filter(col => activeVCs.includes(col.id));
-    legacyVCs.forEach(col => {
-      computedValues[col.id] = col.calculate(item, headers, { products, policies });
-    });
-  }
-
   return computedValues;
 }
 
@@ -92,47 +136,33 @@ export function augmentItemsWithVirtualColumns(
   if (!items || items.length === 0) return [];
 
   const schemaVirtualCols = getSchemaVirtualColumns(sheetTitle, sheetConfig);
-  const activeVCs = sheetConfig.activeVirtualColumns || [];
-  const legacyVCs = activeVCs.length > 0
-    ? VIRTUAL_COLUMNS.filter(col => activeVCs.includes(col.id))
-    : [];
 
-  // If no virtual columns are defined at all, return original items immediately
-  if (schemaVirtualCols.length === 0 && legacyVCs.length === 0) {
+  // If no virtual columns are defined in schema, return original items immediately
+  if (schemaVirtualCols.length === 0) {
     return items;
   }
 
+  const evalCtx: FormulaEvaluationContext = {
+    row: {},
+    headers,
+    tableName: sheetTitle,
+    products,
+    policies,
+    allSheetsData,
+    customAliases: sheetConfig.customAliases
+  };
+
   return items.map(item => {
     const computedValues: Record<string, any> = {};
+    evalCtx.row = item;
 
-    // 1. Evaluate custom schema virtual columns with AppSheet formulas
-    if (schemaVirtualCols.length > 0) {
-      const evalCtx: FormulaEvaluationContext = {
-        row: item,
-        headers,
-        tableName: sheetTitle,
-        products,
-        policies,
-        allSheetsData,
-        customAliases: sheetConfig.customAliases
-      };
-
-      for (let i = 0; i < schemaVirtualCols.length; i++) {
-        const { colKey, schema } = schemaVirtualCols[i];
-        if (schema.formula && schema.formula.trim()) {
-          const res = evaluateAppSheetFormula(schema.formula, evalCtx);
-          computedValues[colKey] = res.value !== undefined ? res.value : '';
-        } else {
-          computedValues[colKey] = '';
-        }
-      }
-    }
-
-    // 2. Evaluate active legacy system virtual columns
-    if (legacyVCs.length > 0) {
-      for (let i = 0; i < legacyVCs.length; i++) {
-        const col = legacyVCs[i];
-        computedValues[col.id] = col.calculate(item, headers, { products, policies });
+    for (let i = 0; i < schemaVirtualCols.length; i++) {
+      const { colKey, schema } = schemaVirtualCols[i];
+      if (schema.formula && schema.formula.trim()) {
+        const res = evaluateAppSheetFormula(schema.formula, evalCtx);
+        computedValues[colKey] = res.value !== undefined ? res.value : '';
+      } else {
+        computedValues[colKey] = '';
       }
     }
 
@@ -142,3 +172,4 @@ export function augmentItemsWithVirtualColumns(
     };
   });
 }
+

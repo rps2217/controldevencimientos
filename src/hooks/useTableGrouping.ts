@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import type { SheetConfig } from '../types';
-import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
 
 /**
  * Agrupación contextual de filas por columna, persistida por tabla en
@@ -60,7 +59,7 @@ export const useTableGrouping = ({
     if (savedGroupByColumn) {
       const col = savedGroupByColumn;
       const dir = savedGroupByDirection || 'asc';
-      const isVirtual = VIRTUAL_COLUMNS.some(v => v.label === col || v.id === col);
+      const isVirtual = Boolean(sheetConfig.schema?.[activeSheetKey]?.[col]);
       const isHeader = headers.includes(col);
       if (col === 'none' || isHeader || isVirtual) {
         setGroupByColumn(col);
@@ -73,7 +72,7 @@ export const useTableGrouping = ({
       setGroupByColumn('none');
       setGroupByDirection('asc');
     }
-  }, [activeSheetKey, headers, savedGroupByColumn, savedGroupByDirection, setGroupByColumn, setGroupByDirection]);
+  }, [activeSheetKey, headers, savedGroupByColumn, savedGroupByDirection, setGroupByColumn, setGroupByDirection, sheetConfig.schema]);
 
   // La columna de agrupación se oculta del cuerpo de la tabla: ya aparece en la
   // cabecera del grupo, repetirla añade ruido.

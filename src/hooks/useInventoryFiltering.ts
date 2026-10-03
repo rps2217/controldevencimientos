@@ -8,7 +8,6 @@ import {
 } from '../utils/dateCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { parseAnyDate, formatDisplayDate, createMetricsAccumulator } from '../utils/pureCalculations';
-import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
 import { augmentItemsWithVirtualColumns, getSchemaVirtualColumns } from '../utils/virtualColumnsEvaluator';
 import { detectTableCapabilities } from '../utils/sliceRegistry';
 import { sortInventoryItems, compareItemValues } from '../utils/sortUtils';
@@ -310,15 +309,10 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
       });
     }
 
-    // Always ensure active virtual columns and schema virtual columns are included in columnOptionsMap
+    // Always ensure schema virtual columns are included in columnOptionsMap
     const schemaVCs = getSchemaVirtualColumns(activeSheetTitle, sheetConfig).map(vc => vc.colKey);
-    const activeVCs = sheetConfig.activeVirtualColumns || [];
-    const activeViewVCs = VIRTUAL_COLUMNS
-      .filter(vc => activeVCs.includes(vc.id) && (!vc.supportedCapabilities || vc.supportedCapabilities.some(c => tableCaps.has(c))))
-      .map(vc => vc.id);
 
-    const allVirtualCols = Array.from(new Set([...schemaVCs, ...activeViewVCs]));
-    allVirtualCols.forEach(h => {
+    schemaVCs.forEach(h => {
       const uniqueVals = new Set<string>();
       augmentedItems.forEach(item => {
         const val = item[h];

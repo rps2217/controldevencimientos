@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import { TableSlice } from '../../types';
 import { getSlicesForTable } from '../../utils/sliceRegistry';
-import { VIRTUAL_COLUMNS, resolveActiveVirtualColumns } from '../../utils/virtualColumns';
 import { exportToExcel } from '../../utils/exportUtils';
 import { buildBulkActionContext, isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
 import { useDashboard } from '../../context/DashboardContext';
@@ -756,13 +755,10 @@ export const ViewConfigControlDrawer: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const activeVirtual = resolveActiveVirtualColumns(sheetConfig);
                         const allData = { products: products || [], policies: policies || [], events: [] };
                         const exportHeaders = (visibleHeaders && visibleHeaders.length > 0) ? visibleHeaders : allHeaders;
                         
                         const columnLabelsMap: Record<string, string> = {};
-                        VIRTUAL_COLUMNS.forEach(vc => { columnLabelsMap[vc.id] = vc.label; });
-                        (sheetConfig.userVirtualColumns || []).forEach(uvc => { columnLabelsMap[uvc.id] = uvc.label; });
                         const schemaForSheet = activeSheetTitle ? sheetConfig.schema?.[activeSheetTitle] : undefined;
                         if (schemaForSheet) {
                           Object.keys(schemaForSheet).forEach(colId => {
@@ -777,7 +773,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
                           exportHeaders, 
                           filteredItems, 
                           'Inventario', 
-                          activeVirtual, 
+                          undefined, 
                           allData, 
                           columnLabelsMap
                         );

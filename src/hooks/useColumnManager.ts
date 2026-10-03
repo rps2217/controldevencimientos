@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { SheetConfig, TableCapability } from '../types';
-import { VIRTUAL_COLUMNS } from '../utils/virtualColumns';
-
 import { STORAGE_KEYS, readStorage, writeStorage, stringArrayMapSchema, type StringArrayMap } from '../utils/appStorage';
+
 export interface ManageableColumn {
   id: string;
   label: string;
@@ -15,8 +14,8 @@ export interface UseColumnManagerOptions {
   headers: string[];
   activeSheetTitle?: string;
   activeView: string;
-  /** Capacidades de dominio de la hoja: habilitan las columnas virtuales de retiro. */
-  tableCapabilities: Set<TableCapability>;
+  /** Capacidades de dominio de la hoja */
+  tableCapabilities?: Set<TableCapability>;
   sheetConfig: SheetConfig;
 }
 
@@ -38,7 +37,6 @@ export function useColumnManager({
   headers,
   activeSheetTitle,
   activeView,
-  tableCapabilities,
   sheetConfig
 }: UseColumnManagerOptions): UseColumnManagerReturn {
   // Load column orders and hidden columns from localStorage
@@ -67,20 +65,9 @@ export function useColumnManager({
     }
   }, [hiddenColumns]);
 
-  // Compute active legacy virtual column IDs
-  const activeVirtualCols = useMemo(() => {
-    const activeVCs = sheetConfig.activeVirtualColumns || [];
-    return VIRTUAL_COLUMNS.filter(
-      vc => activeVCs.includes(vc.id) && (!vc.supportedCapabilities || vc.supportedCapabilities.some(c => tableCapabilities.has(c)))
-    );
-  }, [sheetConfig.activeVirtualColumns, tableCapabilities]);
-
-  // Map of virtual column IDs -> labels (both from schema and legacy)
+  // Map of virtual column IDs -> labels from schema
   const virtualMap = useMemo(() => {
     const map: Record<string, string> = {};
-    activeVirtualCols.forEach(vc => {
-      map[vc.id] = vc.label;
-    });
     const schemaForSheet = activeSheetTitle ? sheetConfig.schema?.[activeSheetTitle] : undefined;
     if (schemaForSheet) {
       Object.entries(schemaForSheet).forEach(([colId, colDef]) => {
@@ -90,9 +77,9 @@ export function useColumnManager({
       });
     }
     return map;
-  }, [activeVirtualCols, activeSheetTitle, sheetConfig.schema]);
+  }, [activeSheetTitle, sheetConfig.schema]);
 
-  // Combined list of base candidate column IDs: real headers + schema virtual cols + active legacy virtual cols
+  // Combined list of base candidate column IDs: real headers + schema virtual cols
   const combinedCandidates = useMemo(() => {
     const result = [...headers];
     const schemaForSheet = activeSheetTitle ? sheetConfig.schema?.[activeSheetTitle] : undefined;
@@ -103,13 +90,8 @@ export function useColumnManager({
         }
       });
     }
-    activeVirtualCols.forEach(vc => {
-      if (!result.includes(vc.id)) {
-        result.push(vc.id);
-      }
-    });
     return result;
-  }, [headers, activeSheetTitle, sheetConfig.schema, activeVirtualCols]);
+  }, [headers, activeSheetTitle, sheetConfig.schema]);
 
   // Ordered list of all candidate columns for activeView
   const orderedColumnIds = useMemo(() => {

@@ -31,13 +31,6 @@ export const VIEW_KEYS = ['main', 'events', 'products', 'policies', 'recepBultos
 
 export type ViewKey = (typeof VIEW_KEYS)[number];
 
-export interface UserVirtualColumn {
-  id: string;
-  label: string;
-  operation: 'concatenate' | 'sum' | 'diff_days';
-  sourceColumns: string[];
-}
-
 export interface TableBulkActionSetting {
   enabled?: string[];
   disabled?: string[];
@@ -74,8 +67,6 @@ export interface SheetConfig {
   policies?: string;
   recepBultos?: string;
   schema?: Record<string, Record<string, ColumnSchema>>;
-  activeVirtualColumns?: string[];
-  userVirtualColumns?: UserVirtualColumn[];
   customAliases?: Record<string, string[]>;
   tableBulkActions?: Record<string, TableBulkActionSetting>;
   tableGroupings?: Record<string, TableGroupingSetting>;
@@ -111,13 +102,6 @@ export interface VirtualColumnDataContext {
   events?: SheetRecord[];
 }
 
-export interface VirtualColumn {
-  id: string;
-  label: string;
-  /** Capacidades de dominio que habilitan la columna (p. ej. `vencimiento`). */
-  supportedCapabilities?: TableCapability[];
-  calculate: (item: SheetRecord, headers: string[], allData?: VirtualColumnDataContext) => string | number;
-}
 export type ColumnBehavior = 'none' | 'auto_id' | 'calc_fecha_vc' | 'calc_retiro' | 'sku_lookup';
 
 export type EventCategory = 

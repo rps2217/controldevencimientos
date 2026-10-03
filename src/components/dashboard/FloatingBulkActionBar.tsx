@@ -3,7 +3,6 @@ import {
   Printer, Settings, Barcode, Mail, MessageSquare, Download, Flame, Edit2, Trash2, Sliders, X, Copy, RefreshCw 
 } from 'lucide-react';
 import { isActionEnabledForTable, buildBulkActionContext } from '../../utils/bulkActionsRegistry';
-import { resolveActiveVirtualColumns } from '../../utils/virtualColumns';
 import { exportToExcel } from '../../utils/exportUtils';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
@@ -43,10 +42,9 @@ export const FloatingBulkActionBar: React.FC = () => {
   const selectedItems = filteredItems.filter(i => selectedSet.has(Number(i._rowIndex)));
 
   const handleExportSelectedExcel = () => {
-    const activeVirtual = resolveActiveVirtualColumns(sheetConfig);
     const allData = { products, policies, events: [] };
     const exportHeaders = (visibleHeaders && visibleHeaders.length > 0) ? visibleHeaders : headers;
-    exportToExcel(`Seleccion_${new Date().toISOString().split('T')[0]}`, exportHeaders, selectedItems, 'Selección', activeVirtual, allData, columnLabelsMap);
+    exportToExcel(`Seleccion_${new Date().toISOString().split('T')[0]}`, exportHeaders, selectedItems, 'Selección', undefined, allData, columnLabelsMap);
   };
 
   return (
