@@ -41,9 +41,10 @@ export const STORAGE_KEYS = {
   ACTIVE_CAMPAIGN_ID: 'app_active_campaign_id_v1',
   LAST_CAMPAIGN_CLOUD_SYNC: 'app_last_campaign_cloud_sync',
 
-  // Slices personalizados
+  // Slices personalizados y control de visibilidad / eliminados
   CUSTOM_SLICES: 'appsheet_custom_slices',
   HIDDEN_SLICE_IDS: 'appsheet_hidden_slice_ids',
+  DELETED_SLICE_IDS: 'appsheet_deleted_slice_ids',
 
   // Varios
   DEVICE_ID: 'app_device_id',

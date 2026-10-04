@@ -73,6 +73,7 @@ export interface SheetConfig {
   tableCapabilities?: Record<string, TableCapabilitySetting>;
   slices?: TableSlice[];
   hiddenSliceIds?: string[];
+  deletedSliceIds?: string[];
   ticketPrintConfig?: GlobalTicketConfig;
   backendMirror?: BackendMirrorConfig;
   enableStickyColumns?: boolean;

@@ -135,11 +135,15 @@ export interface DashboardModalsManagerProps {
 
   // Slice Management
   currentTableSlices: TableSlice[];
+  deletedTableSlices?: TableSlice[];
   sliceCounts: Record<string, number>;
   activeSliceId: string | null;
   hiddenSliceIds: string[];
+  deletedSliceIds?: string[];
   handleSelectSlice: (slice: TableSlice | null) => void;
   handleDeleteSlice: (sliceId: string) => void;
+  handleRestoreSlice?: (sliceId: string) => void;
+  handleResetDefaultSlices?: () => void;
   handleToggleSliceVisibility: (sliceId: string) => void;
   handleSetBulkVisibility: (sliceIds: string[], visible: boolean) => void;
 
@@ -227,11 +231,15 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     handleSaveTicketConfig,
     handleUniversalImportConfirmed,
     currentTableSlices,
+    deletedTableSlices = [],
     sliceCounts,
     activeSliceId,
     hiddenSliceIds,
+    deletedSliceIds = [],
     handleSelectSlice,
     handleDeleteSlice,
+    handleRestoreSlice,
+    handleResetDefaultSlices,
     handleToggleSliceVisibility,
     handleSetBulkVisibility,
     currentFilters,
@@ -533,9 +541,11 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
             onClose={() => setIsSliceManagerOpen(false)}
             tableKey={activeView}
             slices={currentTableSlices}
+            deletedSlices={deletedTableSlices}
             sliceCounts={sliceCounts}
             activeSliceId={activeSliceId}
             hiddenSliceIds={hiddenSliceIds}
+            deletedSliceIds={deletedSliceIds}
             onSelectSlice={handleSelectSlice}
             onEditSlice={(slice) => {
               setEditingSliceModalItem(slice);
@@ -546,6 +556,8 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
               setIsSliceModalOpen(true);
             }}
             onDeleteSlice={handleDeleteSlice}
+            onRestoreSlice={handleRestoreSlice}
+            onResetDefaultSlices={handleResetDefaultSlices}
             onToggleSliceVisibility={handleToggleSliceVisibility}
             onSetBulkVisibility={handleSetBulkVisibility}
           />

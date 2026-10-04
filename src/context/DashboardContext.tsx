@@ -168,6 +168,10 @@ export interface DashboardContextType {
   activeSlice?: TableSlice | null;
   visibleTableSlices?: TableSlice[];
   customSlices?: TableSlice[];
+  deletedSliceIds?: string[];
+  deletedTableSlices?: TableSlice[];
+  handleRestoreSlice?: (sliceId: string) => void;
+  handleResetDefaultSlices?: () => void;
   isRelationalActive?: boolean;
   searchableHeaders?: string[];
   hasActiveFilters?: boolean;

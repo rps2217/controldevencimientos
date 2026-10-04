@@ -155,6 +155,11 @@ Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que co
   - El usuario puede capturar en un clic sus filtros, agrupaciones, columnas visibles y ordenamiento actual con el modal `SliceEditorModal.tsx`.
   - Personalización de color, icono, nombre y descripción explicativa.
   - Persistencia doble: en `localStorage` (`appsheet_custom_slices`) y en `sheetConfig.slices` para sincronización en la nube con Google Sheets/PropertiesService.
+- **Control Total de Ciclo de Vida y Persistencia Multi-Dispositivo**:
+  - **Eliminación y Papelera de Slices**: Tanto los slices creados por el usuario como los **slices predeterminados del sistema** pueden eliminarse a gusto. Los IDs de slices eliminados se registran en `deletedSliceIds`.
+  - **Restauración y Papelera**: Desde el `SliceManagerModal`, la pestaña de "Papelera" permite visualizar y restaurar cualquier slice (propio o del sistema) con un solo clic.
+  - **Restablecer a Fábrica**: Botón de un solo clic para reactivar y hacer visibles todos los slices nativos predeterminados.
+  - **Sincronización en la Nube (Cross-Device Persistence)**: Toda creación, edición, eliminación u ocultación de slices se persiste de forma automática en `SheetConfig` (`slices`, `deletedSliceIds`, `hiddenSliceIds`) y se sincroniza mediante `saveCloudConfig` y `saveScriptPropertiesConfig` en Google Sheets / PropertiesService. Al abrir la app en cualquier otro dispositivo, `mergeCloudConfigs` fusiona de forma no destructiva las definiciones y eliminaciones de todos los dispositivos.
 - **Barra Selectora de Slices (`SliceSelectorBar.tsx`)**:
   - Ubicada directamente sobre la tabla principal con navegación horizontal fluida.
   - Contadores de filas en tiempo real (`computeSliceCounts`) calculados en una sola pasada de alto rendimiento.

@@ -385,6 +385,35 @@ export function saveHiddenSliceIds(hiddenIds: string[]): void {
   } catch (err) {
     console.warn('Error saving hidden slice IDs to localStorage:', err);
   }
+  indexedDbService.saveSetting(STORAGE_KEYS.HIDDEN_SLICE_IDS, hiddenIds).catch((err) => {
+    console.warn('Error saving hidden slice IDs to IndexedDB:', err);
+  });
+}
+
+export function loadDeletedSliceIds(sheetConfigDeleted?: string[]): string[] {
+  try {
+    const localDeleted = readStorage<string[]>(
+      STORAGE_KEYS.DELETED_SLICE_IDS,
+      stringArraySchema,
+      []
+    );
+    const configDeleted = Array.isArray(sheetConfigDeleted) ? sheetConfigDeleted : [];
+    return Array.from(new Set([...localDeleted, ...configDeleted]));
+  } catch (err) {
+    console.warn('Error loading deleted slice IDs:', err);
+    return Array.isArray(sheetConfigDeleted) ? sheetConfigDeleted : [];
+  }
+}
+
+export function saveDeletedSliceIds(deletedIds: string[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.DELETED_SLICE_IDS, JSON.stringify(deletedIds));
+  } catch (err) {
+    console.warn('Error saving deleted slice IDs to localStorage:', err);
+  }
+  indexedDbService.saveSetting(STORAGE_KEYS.DELETED_SLICE_IDS, deletedIds).catch((err) => {
+    console.warn('Error saving deleted slice IDs to IndexedDB:', err);
+  });
 }
 
 export function getSlicesForTable(
@@ -393,28 +422,64 @@ export function getSlicesForTable(
   sheetConfigSlices?: TableSlice[],
   headers: string[] = [],
   customAliases?: Record<string, string[]>,
-  capabilityOverride?: TableCapabilitySetting
+  capabilityOverride?: TableCapabilitySetting,
+  deletedSliceIds: string[] = []
 ): TableSlice[] {
   const caps = resolveTableCapabilities(headers, customAliases, capabilityOverride);
+  const deletedSet = new Set(deletedSliceIds);
 
   // Los nativos entran por capacidad, no por nombre de pestana: asi una hoja no
   // canonica recibe lo que sus columnas permiten, y ninguna recibe lo que no.
-  const builtIns = BUILT_IN_SLICES.filter(s => sliceFitsCapabilities(s, caps));
+  const builtIns = BUILT_IN_SLICES
+    .filter(s => sliceFitsCapabilities(s, caps))
+    .filter(s => !deletedSet.has(s.id));
   
   // Merge custom slices from localStorage and sheetConfig, avoiding duplicates by id
   const customMap = new Map<string, TableSlice>();
   
   if (Array.isArray(sheetConfigSlices)) {
     sheetConfigSlices.forEach(s => {
-      if (s.tableKey === tableKey) customMap.set(s.id, s);
+      if (s.tableKey === tableKey && !deletedSet.has(s.id)) customMap.set(s.id, s);
     });
   }
 
   customSlices.forEach(s => {
-    if (s.tableKey === tableKey) customMap.set(s.id, s);
+    if (s.tableKey === tableKey && !deletedSet.has(s.id)) customMap.set(s.id, s);
   });
 
   return [...builtIns, ...Array.from(customMap.values())];
+}
+
+export function getDeletedSlicesForTable(
+  tableKey: string,
+  customSlices: TableSlice[] = [],
+  sheetConfigSlices?: TableSlice[],
+  deletedSliceIds: string[] = [],
+  headers: string[] = [],
+  customAliases?: Record<string, string[]>,
+  capabilityOverride?: TableCapabilitySetting
+): TableSlice[] {
+  if (!deletedSliceIds || deletedSliceIds.length === 0) return [];
+  const deletedSet = new Set(deletedSliceIds);
+  const caps = resolveTableCapabilities(headers, customAliases, capabilityOverride);
+
+  // Built-in slices that match table capability and are deleted
+  const deletedBuiltIns = BUILT_IN_SLICES
+    .filter(s => sliceFitsCapabilities(s, caps))
+    .filter(s => deletedSet.has(s.id));
+
+  // Custom slices that are deleted
+  const customMap = new Map<string, TableSlice>();
+  if (Array.isArray(sheetConfigSlices)) {
+    sheetConfigSlices.forEach(s => {
+      if (s.tableKey === tableKey && deletedSet.has(s.id)) customMap.set(s.id, s);
+    });
+  }
+  customSlices.forEach(s => {
+    if (s.tableKey === tableKey && deletedSet.has(s.id)) customMap.set(s.id, s);
+  });
+
+  return [...deletedBuiltIns, ...Array.from(customMap.values())];
 }
 
 export function getVisibleSlicesForTable(
@@ -424,9 +489,10 @@ export function getVisibleSlicesForTable(
   hiddenSliceIds: string[] = [],
   headers: string[] = [],
   customAliases?: Record<string, string[]>,
-  capabilityOverride?: TableCapabilitySetting
+  capabilityOverride?: TableCapabilitySetting,
+  deletedSliceIds: string[] = []
 ): TableSlice[] {
-  const allSlices = getSlicesForTable(tableKey, customSlices, sheetConfigSlices, headers, customAliases, capabilityOverride);
+  const allSlices = getSlicesForTable(tableKey, customSlices, sheetConfigSlices, headers, customAliases, capabilityOverride, deletedSliceIds);
   if (!hiddenSliceIds || hiddenSliceIds.length === 0) return allSlices;
   const hiddenSet = new Set(hiddenSliceIds);
   return allSlices.filter(slice => !hiddenSet.has(slice.id));

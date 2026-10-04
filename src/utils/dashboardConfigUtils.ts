@@ -29,17 +29,34 @@ export function mergeCloudConfigs(local: SheetConfig, remote: SheetConfig): Shee
   const primary = isRemoteNewer ? remote : local;
   const secondary = isRemoteNewer ? local : remote;
 
-  // Non-destructive Merge for Custom Slices
+  // Merge Deleted Slice IDs (Union of both devices)
+  const mergedDeletedIds = Array.from(
+    new Set([
+      ...(secondary.deletedSliceIds || []),
+      ...(primary.deletedSliceIds || [])
+    ])
+  );
+  const deletedSet = new Set(mergedDeletedIds);
+
+  // Non-destructive Merge for Custom Slices (excluding deleted ones)
   const primarySlices = primary.slices || [];
   const secondarySlices = secondary.slices || [];
   const sliceMap = new Map<string, TableSlice>();
 
   secondarySlices.forEach(s => {
-    if (s && s.id) sliceMap.set(s.id, s);
+    if (s && s.id && !deletedSet.has(s.id)) sliceMap.set(s.id, s);
   });
   primarySlices.forEach(s => {
-    if (s && s.id) sliceMap.set(s.id, s);
+    if (s && s.id && !deletedSet.has(s.id)) sliceMap.set(s.id, s);
   });
+
+  // Merge Hidden Slice IDs (Union, excluding deleted ones)
+  const mergedHiddenIds = Array.from(
+    new Set([
+      ...(secondary.hiddenSliceIds || []),
+      ...(primary.hiddenSliceIds || [])
+    ])
+  ).filter(id => !deletedSet.has(id));
 
   // Non-destructive Deep Merge for Schema per table
   const allTables = new Set([
@@ -64,6 +81,8 @@ export function mergeCloudConfigs(local: SheetConfig, remote: SheetConfig): Shee
     ...secondary,
     ...primary,
     slices: Array.from(sliceMap.values()),
+    hiddenSliceIds: mergedHiddenIds,
+    deletedSliceIds: mergedDeletedIds,
     schema: mergedSchema,
     tableBulkActions: mergedBulk,
     updatedAt: new Date(Math.max(localTime, remoteTime, Date.now())).toISOString()

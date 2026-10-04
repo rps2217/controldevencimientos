@@ -5,7 +5,10 @@ import {
   saveCustomSlices,
   loadHiddenSliceIds,
   saveHiddenSliceIds,
+  loadDeletedSliceIds,
+  saveDeletedSliceIds,
   getSlicesForTable,
+  getDeletedSlicesForTable,
   getVisibleSlicesForTable,
   computeSliceCounts
 } from '../utils/sliceRegistry';
@@ -69,6 +72,7 @@ export function useTableSlices({
 }: UseTableSlicesParams) {
   const [customSlices, setCustomSlices] = useState<TableSlice[]>(() => loadCustomSlices());
   const [hiddenSliceIds, setHiddenSliceIds] = useState<string[]>(() => loadHiddenSliceIds(sheetConfig.hiddenSliceIds));
+  const [deletedSliceIds, setDeletedSliceIds] = useState<string[]>(() => loadDeletedSliceIds(sheetConfig.deletedSliceIds));
 
   // Sync hidden slice IDs if sheetConfig updates from cloud
   useEffect(() => {
@@ -80,15 +84,69 @@ export function useTableSlices({
     }
   }, [sheetConfig.hiddenSliceIds]);
 
-  // Compute all slices available for current table (built-in + custom)
-  const currentTableSlices = useMemo(() => {
-    return getSlicesForTable(activeView, customSlices, sheetConfig.slices, headers, sheetConfig.customAliases, sheetConfig.tableCapabilities?.[activeView]);
-  }, [activeView, customSlices, sheetConfig.slices, headers, sheetConfig.customAliases, sheetConfig.tableCapabilities]);
+  // Sync deleted slice IDs if sheetConfig updates from cloud
+  useEffect(() => {
+    if (sheetConfig.deletedSliceIds) {
+      setDeletedSliceIds(prev => {
+        const merged = Array.from(new Set([...prev, ...(sheetConfig.deletedSliceIds || [])]));
+        return merged;
+      });
+    }
+  }, [sheetConfig.deletedSliceIds]);
 
-  // Filtered slices visible in the top bar (excluding hidden ones)
+  // Sync custom slices if sheetConfig updates from cloud
+  useEffect(() => {
+    if (sheetConfig.slices && Array.isArray(sheetConfig.slices)) {
+      setCustomSlices(prev => {
+        const map = new Map<string, TableSlice>();
+        prev.forEach(s => map.set(s.id, s));
+        sheetConfig.slices?.forEach(s => map.set(s.id, s));
+        const merged = Array.from(map.values());
+        saveCustomSlices(merged);
+        return merged;
+      });
+    }
+  }, [sheetConfig.slices]);
+
+  // Compute active slices available for current table (excluding deleted ones)
+  const currentTableSlices = useMemo(() => {
+    return getSlicesForTable(
+      activeView,
+      customSlices,
+      sheetConfig.slices,
+      headers,
+      sheetConfig.customAliases,
+      sheetConfig.tableCapabilities?.[activeView],
+      deletedSliceIds
+    );
+  }, [activeView, customSlices, sheetConfig.slices, headers, sheetConfig.customAliases, sheetConfig.tableCapabilities, deletedSliceIds]);
+
+  // Compute deleted/trash slices for current table
+  const deletedTableSlices = useMemo(() => {
+    return getDeletedSlicesForTable(
+      activeView,
+      customSlices,
+      sheetConfig.slices,
+      deletedSliceIds,
+      headers,
+      sheetConfig.customAliases,
+      sheetConfig.tableCapabilities?.[activeView]
+    );
+  }, [activeView, customSlices, sheetConfig.slices, deletedSliceIds, headers, sheetConfig.customAliases, sheetConfig.tableCapabilities]);
+
+  // Filtered slices visible in the top bar (excluding hidden & deleted ones)
   const visibleTableSlices = useMemo(() => {
-    return getVisibleSlicesForTable(activeView, customSlices, sheetConfig.slices, hiddenSliceIds, headers, sheetConfig.customAliases, sheetConfig.tableCapabilities?.[activeView]);
-  }, [activeView, customSlices, sheetConfig.slices, hiddenSliceIds, headers, sheetConfig.customAliases, sheetConfig.tableCapabilities]);
+    return getVisibleSlicesForTable(
+      activeView,
+      customSlices,
+      sheetConfig.slices,
+      hiddenSliceIds,
+      headers,
+      sheetConfig.customAliases,
+      sheetConfig.tableCapabilities?.[activeView],
+      deletedSliceIds
+    );
+  }, [activeView, customSlices, sheetConfig.slices, hiddenSliceIds, headers, sheetConfig.customAliases, sheetConfig.tableCapabilities, deletedSliceIds]);
 
   const activeSlice = useMemo(() => {
     if (!activeSliceId) return null;
@@ -146,6 +204,13 @@ export function useTableSlices({
   }, [clearAllFilters, showAllColumns, setVisibleColumns, setSortConfig, handleSetGroupByColumn, handleSetGroupByDirection, setSearchTerm, setActiveQuickChip, setActiveSliceId, setCurrentPage, setEventFilter, setPmRadarFilter, setEventResolutionFilter, setFrcBodFilter, setColumnFilters, setDynamicMonthFilter, setDynamicMonthRange]);
 
   const handleSaveSlice = useCallback((slice: TableSlice) => {
+    // If it was in deletedSliceIds, remove it
+    const nextDeletedIds = deletedSliceIds.filter(id => id !== slice.id);
+    if (nextDeletedIds.length !== deletedSliceIds.length) {
+      setDeletedSliceIds(nextDeletedIds);
+      saveDeletedSliceIds(nextDeletedIds);
+    }
+
     setCustomSlices(prev => {
       const exists = prev.some(s => s.id === slice.id);
       const updated = exists ? prev.map(s => s.id === slice.id ? slice : s) : [...prev, slice];
@@ -158,36 +223,81 @@ export function useTableSlices({
       slices: [
         ...(sheetConfig.slices || []).filter(s => s.id !== slice.id),
         slice
-      ]
+      ],
+      deletedSliceIds: nextDeletedIds
     };
     setSheetConfig(updatedConfig);
     saveConfig(updatedConfig);
 
-    showToast(`Vista personalizada "${slice.name}" guardada con éxito`, 'success');
+    showToast(`Vista personalizada "${slice.name}" guardada y sincronizada en la nube`, 'success');
     handleSelectSlice(slice);
-  }, [sheetConfig, saveConfig, showToast, handleSelectSlice, setSheetConfig]);
+  }, [sheetConfig, deletedSliceIds, saveConfig, showToast, handleSelectSlice, setSheetConfig]);
 
   const handleDeleteSlice = useCallback((sliceId: string) => {
+    // Mark as deleted for both built-in and custom slices
+    const nextDeletedIds = Array.from(new Set([...deletedSliceIds, sliceId]));
+    setDeletedSliceIds(nextDeletedIds);
+    saveDeletedSliceIds(nextDeletedIds);
+
+    // Remove from custom slices
     setCustomSlices(prev => {
       const updated = prev.filter(s => s.id !== sliceId);
       saveCustomSlices(updated);
       return updated;
     });
 
-    if (sheetConfig.slices) {
-      const updatedConfig: SheetConfig = {
-        ...sheetConfig,
-        slices: sheetConfig.slices.filter(s => s.id !== sliceId)
-      };
-      setSheetConfig(updatedConfig);
-      saveConfig(updatedConfig);
-    }
+    const updatedConfig: SheetConfig = {
+      ...sheetConfig,
+      slices: (sheetConfig.slices || []).filter(s => s.id !== sliceId),
+      deletedSliceIds: nextDeletedIds
+    };
+    setSheetConfig(updatedConfig);
+    saveConfig(updatedConfig);
 
     if (activeSliceId === sliceId) {
       handleSelectSlice(null);
     }
-    showToast('Slice eliminado', 'info');
-  }, [sheetConfig, saveConfig, activeSliceId, handleSelectSlice, showToast, setSheetConfig]);
+    showToast('Slice eliminado (puedes restaurarlo desde la papelera de slices)', 'info');
+  }, [sheetConfig, deletedSliceIds, saveConfig, activeSliceId, handleSelectSlice, showToast, setSheetConfig]);
+
+  const handleRestoreSlice = useCallback((sliceId: string) => {
+    const nextDeletedIds = deletedSliceIds.filter(id => id !== sliceId);
+    setDeletedSliceIds(nextDeletedIds);
+    saveDeletedSliceIds(nextDeletedIds);
+
+    const updatedConfig: SheetConfig = {
+      ...sheetConfig,
+      deletedSliceIds: nextDeletedIds
+    };
+    setSheetConfig(updatedConfig);
+    saveConfig(updatedConfig);
+
+    showToast('Slice restaurado con éxito', 'success');
+  }, [sheetConfig, deletedSliceIds, saveConfig, showToast, setSheetConfig]);
+
+  const handleResetDefaultSlices = useCallback(() => {
+    // Remove all built-in slice IDs from deletedSliceIds and hiddenSliceIds for current view
+    const allBuiltIns = getSlicesForTable(activeView, [], [], headers, sheetConfig.customAliases, sheetConfig.tableCapabilities?.[activeView], []);
+    const builtInIds = new Set(allBuiltIns.filter(s => s.isBuiltIn).map(s => s.id));
+
+    const nextDeletedIds = deletedSliceIds.filter(id => !builtInIds.has(id));
+    const nextHiddenIds = hiddenSliceIds.filter(id => !builtInIds.has(id));
+
+    setDeletedSliceIds(nextDeletedIds);
+    saveDeletedSliceIds(nextDeletedIds);
+    setHiddenSliceIds(nextHiddenIds);
+    saveHiddenSliceIds(nextHiddenIds);
+
+    const updatedConfig: SheetConfig = {
+      ...sheetConfig,
+      deletedSliceIds: nextDeletedIds,
+      hiddenSliceIds: nextHiddenIds
+    };
+    setSheetConfig(updatedConfig);
+    saveConfig(updatedConfig);
+
+    showToast('Slices predeterminados restaurados a los valores de fábrica', 'success');
+  }, [activeView, headers, sheetConfig, deletedSliceIds, hiddenSliceIds, saveConfig, showToast, setSheetConfig]);
 
   const handleToggleStickyColumns = useCallback(() => {
     const nextVal = !sheetConfig?.enableStickyColumns;
@@ -248,13 +358,17 @@ export function useTableSlices({
   return {
     customSlices,
     hiddenSliceIds,
+    deletedSliceIds,
     currentTableSlices,
+    deletedTableSlices,
     visibleTableSlices,
     activeSlice,
     sliceCounts,
     handleSelectSlice,
     handleSaveSlice,
     handleDeleteSlice,
+    handleRestoreSlice,
+    handleResetDefaultSlices,
     handleToggleStickyColumns,
     handleToggleSliceVisibility,
     handleSetBulkVisibility
