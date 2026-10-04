@@ -2631,6 +2631,36 @@ console.log('\n--- 27. Servicio del espejo: fallo persistido y drenado (ruta rea
   assert((augmented as any) === items, 'ssot: la aumentación O(1) omite re-evaluaciones redundantes si los valores ya existen');
 }
 
+// --- 31. Formula Engine Expansion & O(1) Lookups ---
+{
+  console.log('\n--- 31. Formula Engine Expansion & O(1) Lookups ---');
+  const { evaluateAppSheetFormula, buildFormulaIndexes, resolveDereference, executeLookup } = await import('./src/utils/appSheetFormulaEngine');
+
+  // Test expanded functions
+  assert(evaluateAppSheetFormula('ANY("A, B, C")', { row: {} }).stringValue === 'A', 'engine: ANY extrae el primer elemento');
+  assert(evaluateAppSheetFormula('IN("ALI", "ALI, MED, FAR")', { row: {} }).stringValue === 'true', 'engine: IN detecta presencia en lista');
+  assert(evaluateAppSheetFormula('IN("XYZ", "ALI, MED, FAR")', { row: {} }).stringValue === 'false', 'engine: IN detecta ausencia en lista');
+  assert(evaluateAppSheetFormula('INDEX("A, B, C", 2)', { row: {} }).stringValue === 'B', 'engine: INDEX recupera la posicion dada');
+  assert(evaluateAppSheetFormula('CEILING(12.3)', { row: {} }).stringValue === '13', 'engine: CEILING redondea hacia arriba');
+  assert(evaluateAppSheetFormula('FLOOR(12.8)', { row: {} }).stringValue === '12', 'engine: FLOOR redondea hacia abajo');
+  assert(evaluateAppSheetFormula('MOD(10, 3)', { row: {} }).stringValue === '1', 'engine: MOD calcula el residuo');
+  assert(evaluateAppSheetFormula('POWER(2, 3)', { row: {} }).stringValue === '8', 'engine: POWER calcula la potencia');
+  assert(evaluateAppSheetFormula('SQRT(16)', { row: {} }).stringValue === '4', 'engine: SQRT calcula la raiz cuadrada');
+  assert(evaluateAppSheetFormula('SUBSTITUTE("Hola Mundo", "Mundo", "Chile")', { row: {} }).stringValue === 'Hola Chile', 'engine: SUBSTITUTE reemplaza subcadenas');
+  assert(evaluateAppSheetFormula('REPLACE("ABCDE", 2, 2, "XX")', { row: {} }).stringValue === 'AXXDE', 'engine: REPLACE reemplaza rango');
+  assert(evaluateAppSheetFormula('ENCODEURL("SKU 123")', { row: {} }).stringValue === 'SKU%20123', 'engine: ENCODEURL codifica URLs');
+
+  // Test O(1) indexing
+  const products = [{ SKU: '1001', DESCRIPCION: 'Ibuprofeno 400mg' }];
+  const context = { products };
+  const indexes = buildFormulaIndexes(context);
+  assert(Boolean(indexes.productsBySku?.has('1001')), 'indexes: buildFormulaIndexes indexa productos por SKU');
+
+  const indexedContext = { row: { SKU: '1001' }, products, _indexes: indexes };
+  const derefRes = resolveDereference('SKU', 'DESCRIPCION', indexedContext);
+  assert(derefRes === 'Ibuprofeno 400mg', 'indexes: resolveDereference resuelve de-referencia via indice O(1)');
+}
+
 console.log(`\n========================================`);
 console.log(`RESULTADOS DE PRUEBAS: ${passed} PASADAS, ${failed} FALLADAS`);
 console.log(`========================================\n`);

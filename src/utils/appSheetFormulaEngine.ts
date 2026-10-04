@@ -13,6 +13,71 @@ export interface FormulaEvaluationContext {
   policies?: SheetRecord[];
   allSheetsData?: Record<string, SheetRecord[]>;
   customAliases?: Record<string, string[]>;
+  // Pre-computed index maps for O(1) lookups across large datasets
+  _indexes?: {
+    productsBySku?: Map<string, SheetRecord>;
+    policiesByProvider?: Map<string, SheetRecord>;
+    sheetsByTableAndColVal?: Map<string, SheetRecord>;
+  };
+}
+
+/**
+ * Builds O(1) index maps for products, policies, and sheets data to accelerate
+ * formula evaluation over large datasets.
+ */
+export function buildFormulaIndexes(
+  context: Omit<FormulaEvaluationContext, 'row'>
+): NonNullable<FormulaEvaluationContext['_indexes']> {
+  const productsBySku = new Map<string, SheetRecord>();
+  if (context.products) {
+    for (const p of context.products) {
+      const pSku = String(p['SKU'] || p['sku'] || p['CODIGO'] || p['codigo'] || '').trim();
+      if (pSku) {
+        productsBySku.set(normalizeToken(pSku), p);
+      }
+    }
+  }
+
+  const policiesByProvider = new Map<string, SheetRecord>();
+  if (context.policies) {
+    for (const p of context.policies) {
+      for (const [k, v] of Object.entries(p)) {
+        const nk = normalizeToken(k);
+        if (
+          nk.includes('prov') ||
+          nk.includes('rut') ||
+          nk.includes('laboratorio') ||
+          nk.includes('fam') ||
+          nk.includes('nombre')
+        ) {
+          const valStr = String(v || '').trim();
+          if (valStr) {
+            policiesByProvider.set(normalizeToken(valStr), p);
+          }
+        }
+      }
+    }
+  }
+
+  const sheetsByTableAndColVal = new Map<string, SheetRecord>();
+  if (context.allSheetsData) {
+    for (const [tableName, records] of Object.entries(context.allSheetsData)) {
+      const normT = normalizeToken(tableName);
+      for (const rec of records) {
+        for (const [k, v] of Object.entries(rec)) {
+          const valStr = String(v || '').trim();
+          if (valStr) {
+            const key = `${normT}:${normalizeToken(k)}:${normalizeToken(valStr)}`;
+            if (!sheetsByTableAndColVal.has(key)) {
+              sheetsByTableAndColVal.set(key, rec);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return { productsBySku, policiesByProvider, sheetsByTableAndColVal };
 }
 
 export interface FormulaResult {
@@ -20,6 +85,17 @@ export interface FormulaResult {
   stringValue: string;
   success: boolean;
   error?: string;
+}
+
+export type FormulaFunctionHandler = (
+  rawArgs: string[],
+  context: FormulaEvaluationContext
+) => FormulaResult;
+
+export const FUNCTION_REGISTRY = new Map<string, FormulaFunctionHandler>();
+
+export function registerFormulaFunction(name: string, handler: FormulaFunctionHandler) {
+  FUNCTION_REGISTRY.set(name.toUpperCase(), handler);
 }
 
 /**
@@ -65,7 +141,7 @@ export function resolveDereference(
   targetPropName: string,
   context: FormulaEvaluationContext
 ): string {
-  const { row, products = [], policies = [], allSheetsData = {}, customAliases } = context;
+  const { row, products = [], policies = [], allSheetsData = {} } = context;
   const refVal = String(resolveRowValue(row, refColName) || '').trim();
   if (!refVal) return '';
 
@@ -75,10 +151,15 @@ export function resolveDereference(
   // 1. Is refCol referring to SKU / Product?
   if (cleanRef.includes('sku') || cleanRef.includes('codigo') || cleanRef.includes('producto')) {
     const normRefVal = normalizeToken(refVal);
-    const prod = products.find(p => {
-      const pSku = String(p['SKU'] || p['sku'] || p['CODIGO'] || p['codigo'] || '').trim();
-      return normalizeToken(pSku) === normRefVal;
-    });
+    let prod: SheetRecord | undefined;
+    if (context._indexes?.productsBySku) {
+      prod = context._indexes.productsBySku.get(normRefVal);
+    } else {
+      prod = products.find(p => {
+        const pSku = String(p['SKU'] || p['sku'] || p['CODIGO'] || p['codigo'] || '').trim();
+        return normalizeToken(pSku) === normRefVal;
+      });
+    }
 
     if (prod) {
       // Find property in master product
@@ -110,17 +191,22 @@ export function resolveDereference(
   // 2. Is refCol referring to Provider / Policy?
   if (cleanRef.includes('prov') || cleanRef.includes('rut') || cleanRef.includes('laboratorio') || cleanRef.includes('pol') || cleanRef.includes('canje')) {
     const normRefVal = normalizeToken(refVal);
-    const pol = policies.find(p => {
-      for (const [k, v] of Object.entries(p)) {
-        const nk = normalizeToken(k);
-        if (nk.includes('prov') || nk.includes('rut') || nk.includes('laboratorio') || nk.includes('fam') || nk.includes('nombre')) {
-          if (normalizeToken(String(v || '')) === normRefVal || String(v || '').toLowerCase().includes(refVal.toLowerCase())) {
-            return true;
+    let pol: SheetRecord | undefined;
+    if (context._indexes?.policiesByProvider) {
+      pol = context._indexes.policiesByProvider.get(normRefVal);
+    } else {
+      pol = policies.find(p => {
+        for (const [k, v] of Object.entries(p)) {
+          const nk = normalizeToken(k);
+          if (nk.includes('prov') || nk.includes('rut') || nk.includes('laboratorio') || nk.includes('fam') || nk.includes('nombre')) {
+            if (normalizeToken(String(v || '')) === normRefVal || String(v || '').toLowerCase().includes(refVal.toLowerCase())) {
+              return true;
+            }
           }
         }
-      }
-      return false;
-    });
+        return false;
+      });
+    }
 
     if (pol) {
       for (const [pk, pv] of Object.entries(pol)) {
@@ -140,7 +226,7 @@ export function resolveDereference(
   }
 
   // 3. General search across all loaded sheets (if relation is between tables)
-  for (const [tableName, records] of Object.entries(allSheetsData)) {
+  for (const [_, records] of Object.entries(allSheetsData)) {
     const match = records.find(rec => {
       for (const v of Object.values(rec)) {
         if (String(v || '').trim() === refVal) return true;
@@ -174,6 +260,19 @@ export function executeLookup(
   const normTable = normalizeToken(tableName);
   const normLookup = normalizeToken(lookupCol);
   const normResult = normalizeToken(resultCol);
+
+  // O(1) Index Match
+  if (context._indexes?.sheetsByTableAndColVal) {
+    const indexKey = `${normTable}:${normLookup}:${normNeedle}`;
+    const indexedMatch = context._indexes.sheetsByTableAndColVal.get(indexKey);
+    if (indexedMatch) {
+      for (const [k, v] of Object.entries(indexedMatch)) {
+        if (normalizeToken(k) === normResult) {
+          return String(v || '').trim();
+        }
+      }
+    }
+  }
 
   let targetRecords: SheetRecord[] = [];
 
@@ -213,6 +312,52 @@ export function executeLookup(
 }
 
 /**
+ * LRU Formula AST / Structure Cache
+ */
+interface FormulaCacheEntry {
+  rawFormula: string;
+  concatenationParts: string[];
+  topLevelFunc?: { name: string; argsStr: string };
+}
+
+const FORMULA_CACHE_LIMIT = 1000;
+const formulaCache = new Map<string, FormulaCacheEntry>();
+
+export function getOrParseFormula(rawFormula: string): FormulaCacheEntry {
+  let cached = formulaCache.get(rawFormula);
+  if (cached) return cached;
+
+  let formula = rawFormula.trim();
+  if (formula.startsWith('=')) {
+    formula = formula.slice(1).trim();
+  }
+
+  const parts = splitConcatenationParts(formula);
+  let topLevelFunc: { name: string; argsStr: string } | undefined;
+  const funcMatch = formula.match(/^([A-Za-z_]\w*)\s*\(([\s\S]*)\)$/);
+  if (funcMatch) {
+    topLevelFunc = {
+      name: funcMatch[1].toUpperCase(),
+      argsStr: funcMatch[2]
+    };
+  }
+
+  cached = {
+    rawFormula,
+    concatenationParts: parts,
+    topLevelFunc
+  };
+
+  if (formulaCache.size >= FORMULA_CACHE_LIMIT) {
+    const firstKey = formulaCache.keys().next().value;
+    if (firstKey) formulaCache.delete(firstKey);
+  }
+  formulaCache.set(rawFormula, cached);
+
+  return cached;
+}
+
+/**
  * Evaluates an AppSheet formula expression string
  */
 export function evaluateAppSheetFormula(
@@ -223,18 +368,12 @@ export function evaluateAppSheetFormula(
     return { value: '', stringValue: '', success: true };
   }
 
-  let formula = rawFormula.trim();
-  // Strip leading '=' if entered like Excel
-  if (formula.startsWith('=')) {
-    formula = formula.slice(1).trim();
-  }
-
   try {
+    const cached = getOrParseFormula(rawFormula);
+
     // 1. Literal Concatenations using '&' operator at top level
-    // E.g.: [SKU] & [YYYY] & [MM] or [SKU] & "-" & [LOTE]
-    const parts = splitConcatenationParts(formula);
-    if (parts.length > 1) {
-      const evaluatedParts = parts.map(p => {
+    if (cached.concatenationParts.length > 1) {
+      const evaluatedParts = cached.concatenationParts.map(p => {
         const evalRes = evaluateAppSheetFormula(p.trim(), context);
         return evalRes.stringValue;
       });
@@ -243,7 +382,8 @@ export function evaluateAppSheetFormula(
     }
 
     // 2. Evaluate Single Token, Binary Expression, or Function Call
-    return evaluateSingleTokenOrExpression(formula, context);
+    const cleanFormula = rawFormula.trim().startsWith('=') ? rawFormula.trim().slice(1).trim() : rawFormula.trim();
+    return evaluateSingleTokenOrExpression(cleanFormula, context);
   } catch (err: any) {
     return {
       value: '',
@@ -331,12 +471,12 @@ export function evaluateArithmeticExpression(
   const trimmed = exprStr.trim();
 
   // If it's a date or text function (e.g. TODAY(), NOW(), DATE(...)), don't treat as pure math unless it's a numeric conversion
-  if (/^(TODAY|NOW|DATE|EOMONTH|LOOKUP|CONCATENATE|IF|ISBLANK|ISNOTBLANK|UPPER|LOWER|TEXT)\s*\(/i.test(trimmed)) {
+  if (/^(TODAY|NOW|DATE|EOMONTH|LOOKUP|CONCATENATE|IF|ISBLANK|ISNOTBLANK|UPPER|LOWER|TEXT|SELECT|FILTER)\s*\(/i.test(trimmed)) {
     return null;
   }
 
   // 1. Substitute function calls like NUMBER(...), DECIMAL(...), INT(...), ROUND(...), ABS(...) with their evaluated values
-  const substitutedFunctions = trimmed.replace(/\b(NUMBER|DECIMAL|INT|ROUND|ABS)\s*\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)/gi, (funcExpr) => {
+  const substitutedFunctions = trimmed.replace(/\b(NUMBER|DECIMAL|INT|ROUND|ABS|SUM|MAX|MIN|AVG|AVERAGE|COUNT)\s*\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)/gi, (funcExpr) => {
     const res = evaluateSingleTokenOrExpression(funcExpr, context);
     const num = parseLocaleNumber(res.value, NaN);
     return isNaN(num) ? '0' : String(num);
@@ -477,7 +617,7 @@ function evaluateSingleTokenOrExpression(
   if (/^false$/i.test(trimmed)) return { value: false, stringValue: 'false', success: true };
 
   // D. Parenthesized expressions ( ... )
-  if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+  if (trimmed.startsWith(' me') || (trimmed.startsWith('(') && trimmed.endsWith(')'))) {
     let depth = 0;
     let isEnclosed = true;
     for (let i = 0; i < trimmed.length - 1; i++) {
@@ -496,7 +636,6 @@ function evaluateSingleTokenOrExpression(
   // E. Unary minus on sub-expressions/functions e.g. -NUMBER([DIAS]/30) or -([DIAS]/30)
   if (trimmed.startsWith('-') && trimmed.length > 1) {
     const rest = trimmed.slice(1).trim();
-    // If it's a function call or bracketed expression
     if (/^[A-Za-z_]\w*\s*\(|^\[|^\(/.test(rest)) {
       const innerRes = evaluateSingleTokenOrExpression(rest, context);
       if (innerRes.success) {
@@ -527,187 +666,18 @@ function evaluateSingleTokenOrExpression(
     return { value: val, stringValue: strVal, success: true };
   }
 
-  // H. NUMBER(val) - AppSheet Standard
-  // Returns the Integer equivalent of a value if a recognizable number, or 0 if not.
-  // If blank (that is, ""), returns a blank Number value ("").
-  const numberMatch = trimmed.match(/^NUMBER\s*\(([\s\S]*)\)$/i);
-  if (numberMatch) {
-    const args = parseFunctionArguments(numberMatch[1]);
-    if (args.length >= 1) {
-      const inner = evaluateSingleTokenOrExpression(args[0], context);
-      const rawVal = inner.value;
-      const strVal = String(inner.stringValue ?? '').trim();
-      if (strVal === '' || rawVal === null || rawVal === undefined) {
-        return { value: '', stringValue: '', success: true };
-      }
-      const num = parseLocaleNumber(strVal, NaN);
-      if (isNaN(num)) {
-        return { value: 0, stringValue: '0', success: true };
-      }
-      const intVal = Math.trunc(num);
-      return { value: intVal, stringValue: String(intVal), success: true };
-    }
-    return { value: '', stringValue: '', success: true };
-  }
-
-  // I. DECIMAL(val)
-  // Returns the Decimal equivalent of a value if a recognizable number, or 0 if not.
-  // If blank, returns a blank value ("").
-  const decimalMatch = trimmed.match(/^DECIMAL\s*\(([\s\S]*)\)$/i);
-  if (decimalMatch) {
-    const args = parseFunctionArguments(decimalMatch[1]);
-    if (args.length >= 1) {
-      const inner = evaluateSingleTokenOrExpression(args[0], context);
-      const rawVal = inner.value;
-      const strVal = String(inner.stringValue ?? '').trim();
-      if (strVal === '' || rawVal === null || rawVal === undefined) {
-        return { value: '', stringValue: '', success: true };
-      }
-      const num = parseLocaleNumber(strVal, NaN);
-      if (isNaN(num)) {
-        return { value: 0, stringValue: '0', success: true };
-      }
-      return { value: num, stringValue: String(num), success: true };
-    }
-    return { value: '', stringValue: '', success: true };
-  }
-
-  // J. INT(val)
-  const intMatch = trimmed.match(/^INT\s*\(([\s\S]*)\)$/i);
-  if (intMatch) {
-    const args = parseFunctionArguments(intMatch[1]);
-    if (args.length >= 1) {
-      const inner = evaluateSingleTokenOrExpression(args[0], context);
-      const strVal = String(inner.stringValue ?? '').trim();
-      if (strVal === '' || inner.value === null || inner.value === undefined) {
-        return { value: '', stringValue: '', success: true };
-      }
-      const num = parseLocaleNumber(strVal, NaN);
-      if (isNaN(num)) {
-        return { value: 0, stringValue: '0', success: true };
-      }
-      const intVal = Math.floor(num);
-      return { value: intVal, stringValue: String(intVal), success: true };
-    }
-    return { value: '', stringValue: '', success: true };
-  }
-
-  // K. ROUND(val, digits?)
-  const roundMatch = trimmed.match(/^ROUND\s*\(([\s\S]*)\)$/i);
-  if (roundMatch) {
-    const args = parseFunctionArguments(roundMatch[1]);
-    if (args.length >= 1) {
-      const inner = evaluateSingleTokenOrExpression(args[0], context);
-      const digits = args[1] ? Math.max(0, parseInt(evaluateSingleTokenOrExpression(args[1], context).stringValue, 10) || 0) : 0;
-      const num = parseLocaleNumber(inner.value, NaN);
-      if (isNaN(num)) return { value: 0, stringValue: '0', success: true };
-      const factor = Math.pow(10, digits);
-      const rounded = Math.round(num * factor) / factor;
-      return { value: rounded, stringValue: String(rounded), success: true };
+  // H. Top-level Pluggable Function Registry Lookup O(1)
+  const funcCallMatch = trimmed.match(/^([A-Za-z_]\w*)\s*\(([\s\S]*)\)$/);
+  if (funcCallMatch) {
+    const funcName = funcCallMatch[1].toUpperCase();
+    const handler = FUNCTION_REGISTRY.get(funcName);
+    if (handler) {
+      const rawArgs = parseFunctionArguments(funcCallMatch[2]);
+      return handler(rawArgs, context);
     }
   }
 
-  // L. ABS(val)
-  const absMatch = trimmed.match(/^ABS\s*\(([\s\S]*)\)$/i);
-  if (absMatch) {
-    const args = parseFunctionArguments(absMatch[1]);
-    if (args.length >= 1) {
-      const inner = evaluateSingleTokenOrExpression(args[0], context);
-      const num = parseLocaleNumber(inner.value, NaN);
-      const absVal = isNaN(num) ? 0 : Math.abs(num);
-      return { value: absVal, stringValue: String(absVal), success: true };
-    }
-  }
-
-  // M. TEXT(val)
-  const textMatch = trimmed.match(/^TEXT\s*\(([\s\S]*)\)$/i);
-  if (textMatch) {
-    const args = parseFunctionArguments(textMatch[1]);
-    if (args.length >= 1) {
-      const inner = evaluateSingleTokenOrExpression(args[0], context);
-      return { value: inner.stringValue, stringValue: inner.stringValue, success: true };
-    }
-  }
-
-  // N. LOOKUP function: LOOKUP(needle, table, searchCol, returnCol)
-  const lookupMatch = trimmed.match(/^LOOKUP\s*\(([\s\S]*)\)$/i);
-  if (lookupMatch) {
-    const args = parseFunctionArguments(lookupMatch[1]);
-    if (args.length >= 4) {
-      const needle = evaluateSingleTokenOrExpression(args[0], context).stringValue;
-      const table = stripQuotes(args[1]);
-      const searchCol = stripQuotes(args[2]);
-      const returnCol = stripQuotes(args[3]);
-      const val = executeLookup(needle, table, searchCol, returnCol, context);
-      return { value: val, stringValue: val, success: true };
-    }
-  }
-
-  // O. CONCATENATE(a, b, c, ...)
-  const concatMatch = trimmed.match(/^CONCATENATE\s*\(([\s\S]*)\)$/i);
-  if (concatMatch) {
-    const args = parseFunctionArguments(concatMatch[1]);
-    const str = args.map(a => evaluateSingleTokenOrExpression(a, context).stringValue).join('');
-    return { value: str, stringValue: str, success: true };
-  }
-
-  // P. TODAY() and NOW()
-  if (/^TODAY\s*\(\s*\)$/i.test(trimmed)) {
-    const today = new Date();
-    const formatted = formatInputDate(today);
-    return { value: today, stringValue: formatted, success: true };
-  }
-  if (/^NOW\s*\(\s*\)$/i.test(trimmed)) {
-    const now = new Date();
-    const formatted = formatInputDateTime(now);
-    return { value: now, stringValue: formatted, success: true };
-  }
-
-  // Q. EOMONTH(date, offsetMonths)
-  const eomonthMatch = trimmed.match(/^EOMONTH\s*\(([\s\S]*)\)$/i);
-  if (eomonthMatch) {
-    const args = parseFunctionArguments(eomonthMatch[1]);
-    if (args.length >= 1) {
-      const dateRes = evaluateAppSheetFormula(args[0], context);
-      const parsedDate = parseAnyDate(dateRes.value || dateRes.stringValue);
-      let offset = 0;
-      if (args[1]) {
-        const offsetRes = evaluateAppSheetFormula(args[1], context);
-        offset = Math.round(parseLocaleNumber(offsetRes.value || offsetRes.stringValue, 0));
-      }
-      if (parsedDate) {
-        const lastDay = new Date(parsedDate.getFullYear(), parsedDate.getMonth() + 1 + offset, 0);
-        const formatted = formatInputDate(lastDay);
-        return { value: lastDay, stringValue: formatted, success: true };
-      }
-    }
-    return { value: '', stringValue: '', success: false, error: 'Fecha inválida en EOMONTH' };
-  }
-
-  // J. DATE(year, month, day) OR DATE(date_or_text)
-  const dateMatch = trimmed.match(/^DATE\s*\(([\s\S]*)\)$/i);
-  if (dateMatch) {
-    const args = parseFunctionArguments(dateMatch[1]);
-    if (args.length === 3) {
-      const y = parseInt(evaluateAppSheetFormula(args[0], context).stringValue, 10);
-      const m = parseInt(evaluateAppSheetFormula(args[1], context).stringValue, 10);
-      const d = parseInt(evaluateAppSheetFormula(args[2], context).stringValue, 10);
-      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-        const dateObj = new Date(y, m - 1, d);
-        const formatted = formatInputDate(dateObj);
-        return { value: dateObj, stringValue: formatted, success: true };
-      }
-    } else if (args.length === 1) {
-      const innerRes = evaluateAppSheetFormula(args[0], context);
-      const parsedDate = parseAnyDate(innerRes.value || innerRes.stringValue);
-      if (parsedDate) {
-        const formatted = formatInputDate(parsedDate);
-        return { value: parsedDate, stringValue: formatted, success: true };
-      }
-    }
-  }
-
-  // K. Top-Level Binary Operators (+, -)
+  // I. Top-Level Binary Operators (+, -)
   const addSubOp = findTopLevelBinaryOperator(trimmed, ['+', '-']);
   if (addSubOp) {
     const leftStr = trimmed.slice(0, addSubOp.index).trim();
@@ -750,7 +720,7 @@ function evaluateSingleTokenOrExpression(
     }
   }
 
-  // K2. Top-Level Binary Operators (*, /)
+  // I2. Top-Level Binary Operators (*, /)
   const mulDivOp = findTopLevelBinaryOperator(trimmed, ['*', '/']);
   if (mulDivOp) {
     const leftStr = trimmed.slice(0, mulDivOp.index).trim();
@@ -767,92 +737,7 @@ function evaluateSingleTokenOrExpression(
     }
   }
 
-  // L1. IFS(cond1, val1, cond2, val2, ...)
-  const ifsMatch = trimmed.match(/^IFS\s*\(([\s\S]*)\)$/i);
-  if (ifsMatch) {
-    const args = parseFunctionArguments(ifsMatch[1]);
-    for (let i = 0; i < args.length; i += 2) {
-      if (i + 1 < args.length) {
-        const condStr = args[i].trim();
-        const isTrue = evaluateBooleanCondition(condStr, context);
-        if (isTrue) {
-          return evaluateSingleTokenOrExpression(args[i + 1], context);
-        }
-      }
-    }
-    return { value: '', stringValue: '', success: true };
-  }
-
-  // L2. SWITCH(expr, val1, res1, val2, res2, ... [default])
-  const switchMatch = trimmed.match(/^SWITCH\s*\(([\s\S]*)\)$/i);
-  if (switchMatch) {
-    const args = parseFunctionArguments(switchMatch[1]);
-    if (args.length >= 3) {
-      const targetVal = evaluateSingleTokenOrExpression(args[0], context).stringValue.trim().toUpperCase();
-      const hasDefault = (args.length - 1) % 2 === 1;
-      const casesEnd = hasDefault ? args.length - 1 : args.length;
-      
-      for (let i = 1; i < casesEnd; i += 2) {
-        const caseVal = evaluateSingleTokenOrExpression(args[i], context).stringValue.trim().toUpperCase();
-        if (targetVal === caseVal) {
-          return evaluateSingleTokenOrExpression(args[i + 1], context);
-        }
-      }
-      if (hasDefault) {
-        return evaluateSingleTokenOrExpression(args[args.length - 1], context);
-      }
-    }
-    return { value: '', stringValue: '', success: true };
-  }
-
-  // L3. IF(condition, trueVal, falseVal)
-  const ifMatch = trimmed.match(/^IF\s*\(([\s\S]*)\)$/i);
-  if (ifMatch) {
-    const args = parseFunctionArguments(ifMatch[1]);
-    if (args.length >= 2) {
-      const condRes = evaluateBooleanCondition(args[0], context);
-      if (condRes) {
-        return evaluateSingleTokenOrExpression(args[1], context);
-      } else if (args[2]) {
-        return evaluateSingleTokenOrExpression(args[2], context);
-      } else {
-        return { value: '', stringValue: '', success: true };
-      }
-    }
-  }
-
-  // M. ISBLANK(val) and ISNOTBLANK(val)
-  const isBlankMatch = trimmed.match(/^ISBLANK\s*\(([\s\S]*)\)$/i);
-  if (isBlankMatch) {
-    const inner = evaluateSingleTokenOrExpression(isBlankMatch[1], context);
-    const isBlank = !inner.stringValue || inner.stringValue.trim() === '';
-    return { value: isBlank, stringValue: isBlank ? 'true' : 'false', success: true };
-  }
-  const isNotBlankMatch = trimmed.match(/^ISNOTBLANK\s*\(([\s\S]*)\)$/i);
-  if (isNotBlankMatch) {
-    const inner = evaluateSingleTokenOrExpression(isNotBlankMatch[1], context);
-    const isNotBlank = Boolean(inner.stringValue && inner.stringValue.trim() !== '');
-    return { value: isNotBlank, stringValue: isNotBlank ? 'true' : 'false', success: true };
-  }
-
-  // N. Text functions: UPPER, LOWER, TRIM
-  const upperMatch = trimmed.match(/^UPPER\s*\(([\s\S]*)\)$/i);
-  if (upperMatch) {
-    const inner = evaluateSingleTokenOrExpression(upperMatch[1], context).stringValue;
-    return { value: inner.toUpperCase(), stringValue: inner.toUpperCase(), success: true };
-  }
-  const lowerMatch = trimmed.match(/^LOWER\s*\(([\s\S]*)\)$/i);
-  if (lowerMatch) {
-    const inner = evaluateSingleTokenOrExpression(lowerMatch[1], context).stringValue;
-    return { value: inner.toLowerCase(), stringValue: inner.toLowerCase(), success: true };
-  }
-  const trimMatch = trimmed.match(/^TRIM\s*\(([\s\S]*)\)$/i);
-  if (trimMatch) {
-    const inner = evaluateSingleTokenOrExpression(trimMatch[1], context).stringValue;
-    return { value: inner.trim(), stringValue: inner.trim(), success: true };
-  }
-
-  // O. Arithmetic Expression Fallback: [DIAS RETIRO_VC]/30, -([DIAS]/30), [A] * [B], etc.
+  // J. Arithmetic Expression Fallback: [DIAS RETIRO_VC]/30, -([DIAS]/30), [A] * [B], etc.
   if (/[+\-*/]/.test(trimmed)) {
     const mathVal = evaluateArithmeticExpression(trimmed, context);
     if (mathVal !== null && !isNaN(mathVal)) {
@@ -994,6 +879,588 @@ export function evaluateBooleanCondition(
   const single = evaluateSingleTokenOrExpression(expr, context);
   return Boolean(single.value);
 }
+
+/* ========================================================================= */
+/* INITIALIZATION OF PLUGGABLE FORMULA FUNCTION REGISTRY                     */
+/* ========================================================================= */
+
+// --- Numeric Functions ---
+registerFormulaFunction('NUMBER', (rawArgs, context) => {
+  if (rawArgs.length >= 1) {
+    const inner = evaluateSingleTokenOrExpression(rawArgs[0], context);
+    const strVal = String(inner.stringValue ?? '').trim();
+    if (strVal === '' || inner.value === null || inner.value === undefined) {
+      return { value: '', stringValue: '', success: true };
+    }
+    const num = parseLocaleNumber(strVal, NaN);
+    if (isNaN(num)) return { value: 0, stringValue: '0', success: true };
+    const intVal = Math.trunc(num);
+    return { value: intVal, stringValue: String(intVal), success: true };
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('DECIMAL', (rawArgs, context) => {
+  if (rawArgs.length >= 1) {
+    const inner = evaluateSingleTokenOrExpression(rawArgs[0], context);
+    const strVal = String(inner.stringValue ?? '').trim();
+    if (strVal === '' || inner.value === null || inner.value === undefined) {
+      return { value: '', stringValue: '', success: true };
+    }
+    const num = parseLocaleNumber(strVal, NaN);
+    if (isNaN(num)) return { value: 0, stringValue: '0', success: true };
+    return { value: num, stringValue: String(num), success: true };
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('INT', (rawArgs, context) => {
+  if (rawArgs.length >= 1) {
+    const inner = evaluateSingleTokenOrExpression(rawArgs[0], context);
+    const strVal = String(inner.stringValue ?? '').trim();
+    if (strVal === '' || inner.value === null || inner.value === undefined) {
+      return { value: '', stringValue: '', success: true };
+    }
+    const num = parseLocaleNumber(strVal, NaN);
+    if (isNaN(num)) return { value: 0, stringValue: '0', success: true };
+    const intVal = Math.floor(num);
+    return { value: intVal, stringValue: String(intVal), success: true };
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('ROUND', (rawArgs, context) => {
+  if (rawArgs.length >= 1) {
+    const inner = evaluateSingleTokenOrExpression(rawArgs[0], context);
+    const digits = rawArgs[1] ? Math.max(0, parseInt(evaluateSingleTokenOrExpression(rawArgs[1], context).stringValue, 10) || 0) : 0;
+    const num = parseLocaleNumber(inner.value, NaN);
+    if (isNaN(num)) return { value: 0, stringValue: '0', success: true };
+    const factor = Math.pow(10, digits);
+    const rounded = Math.round(num * factor) / factor;
+    return { value: rounded, stringValue: String(rounded), success: true };
+  }
+  return { value: 0, stringValue: '0', success: true };
+});
+
+registerFormulaFunction('ABS', (rawArgs, context) => {
+  if (rawArgs.length >= 1) {
+    const inner = evaluateSingleTokenOrExpression(rawArgs[0], context);
+    const num = parseLocaleNumber(inner.value, NaN);
+    const absVal = isNaN(num) ? 0 : Math.abs(num);
+    return { value: absVal, stringValue: String(absVal), success: true };
+  }
+  return { value: 0, stringValue: '0', success: true };
+});
+
+registerFormulaFunction('MAX', (rawArgs, context) => {
+  const nums: number[] = [];
+  rawArgs.forEach(arg => {
+    const res = evaluateSingleTokenOrExpression(arg, context);
+    if (Array.isArray(res.value)) {
+      res.value.forEach(v => {
+        const n = parseLocaleNumber(v, NaN);
+        if (!isNaN(n)) nums.push(n);
+      });
+    } else {
+      const n = parseLocaleNumber(res.value, NaN);
+      if (!isNaN(n)) nums.push(n);
+    }
+  });
+  const max = nums.length > 0 ? Math.max(...nums) : 0;
+  return { value: max, stringValue: String(max), success: true };
+});
+
+registerFormulaFunction('MIN', (rawArgs, context) => {
+  const nums: number[] = [];
+  rawArgs.forEach(arg => {
+    const res = evaluateSingleTokenOrExpression(arg, context);
+    if (Array.isArray(res.value)) {
+      res.value.forEach(v => {
+        const n = parseLocaleNumber(v, NaN);
+        if (!isNaN(n)) nums.push(n);
+      });
+    } else {
+      const n = parseLocaleNumber(res.value, NaN);
+      if (!isNaN(n)) nums.push(n);
+    }
+  });
+  const min = nums.length > 0 ? Math.min(...nums) : 0;
+  return { value: min, stringValue: String(min), success: true };
+});
+
+registerFormulaFunction('SUM', (rawArgs, context) => {
+  const nums: number[] = [];
+  rawArgs.forEach(arg => {
+    const res = evaluateSingleTokenOrExpression(arg, context);
+    if (Array.isArray(res.value)) {
+      res.value.forEach(v => {
+        const n = parseLocaleNumber(v, NaN);
+        if (!isNaN(n)) nums.push(n);
+      });
+    } else {
+      const n = parseLocaleNumber(res.value, NaN);
+      if (!isNaN(n)) nums.push(n);
+    }
+  });
+  const sum = nums.reduce((a, b) => a + b, 0);
+  return { value: sum, stringValue: String(sum), success: true };
+});
+
+registerFormulaFunction('AVG', (rawArgs, context) => {
+  return FUNCTION_REGISTRY.get('AVERAGE')!(rawArgs, context);
+});
+
+registerFormulaFunction('AVERAGE', (rawArgs, context) => {
+  const nums: number[] = [];
+  rawArgs.forEach(arg => {
+    const res = evaluateSingleTokenOrExpression(arg, context);
+    if (Array.isArray(res.value)) {
+      res.value.forEach(v => {
+        const n = parseLocaleNumber(v, NaN);
+        if (!isNaN(n)) nums.push(n);
+      });
+    } else {
+      const n = parseLocaleNumber(res.value, NaN);
+      if (!isNaN(n)) nums.push(n);
+    }
+  });
+  const avg = nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
+  return { value: avg, stringValue: String(avg), success: true };
+});
+
+registerFormulaFunction('COUNT', (rawArgs, context) => {
+  let count = 0;
+  rawArgs.forEach(arg => {
+    const res = evaluateSingleTokenOrExpression(arg, context);
+    if (Array.isArray(res.value)) {
+      count += res.value.filter(v => v !== undefined && v !== null && String(v).trim() !== '').length;
+    } else if (res.stringValue && res.stringValue.trim() !== '') {
+      count += 1;
+    }
+  });
+  return { value: count, stringValue: String(count), success: true };
+});
+
+// --- Text Functions ---
+registerFormulaFunction('CONCATENATE', (rawArgs, context) => {
+  const str = rawArgs.map(a => evaluateSingleTokenOrExpression(a, context).stringValue).join('');
+  return { value: str, stringValue: str, success: true };
+});
+
+registerFormulaFunction('TEXT', (rawArgs, context) => {
+  if (rawArgs.length >= 1) {
+    const inner = evaluateSingleTokenOrExpression(rawArgs[0], context);
+    return { value: inner.stringValue, stringValue: inner.stringValue, success: true };
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('UPPER', (rawArgs, context) => {
+  const str = rawArgs.length > 0 ? evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue : '';
+  return { value: str.toUpperCase(), stringValue: str.toUpperCase(), success: true };
+});
+
+registerFormulaFunction('LOWER', (rawArgs, context) => {
+  const str = rawArgs.length > 0 ? evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue : '';
+  return { value: str.toLowerCase(), stringValue: str.toLowerCase(), success: true };
+});
+
+registerFormulaFunction('TRIM', (rawArgs, context) => {
+  const str = rawArgs.length > 0 ? evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue : '';
+  return { value: str.trim(), stringValue: str.trim(), success: true };
+});
+
+registerFormulaFunction('LEFT', (rawArgs, context) => {
+  if (rawArgs.length === 0) return { value: '', stringValue: '', success: true };
+  const str = evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue;
+  const count = rawArgs[1] ? parseInt(evaluateSingleTokenOrExpression(rawArgs[1], context).stringValue, 10) || 0 : 1;
+  const res = str.slice(0, count);
+  return { value: res, stringValue: res, success: true };
+});
+
+registerFormulaFunction('RIGHT', (rawArgs, context) => {
+  if (rawArgs.length === 0) return { value: '', stringValue: '', success: true };
+  const str = evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue;
+  const count = rawArgs[1] ? parseInt(evaluateSingleTokenOrExpression(rawArgs[1], context).stringValue, 10) || 0 : 1;
+  const res = str.slice(Math.max(0, str.length - count));
+  return { value: res, stringValue: res, success: true };
+});
+
+registerFormulaFunction('MID', (rawArgs, context) => {
+  if (rawArgs.length < 2) return { value: '', stringValue: '', success: true };
+  const str = evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue;
+  const start = Math.max(1, parseInt(evaluateSingleTokenOrExpression(rawArgs[1], context).stringValue, 10) || 1) - 1;
+  const len = rawArgs[2] ? parseInt(evaluateSingleTokenOrExpression(rawArgs[2], context).stringValue, 10) || 0 : str.length;
+  const res = str.slice(start, start + len);
+  return { value: res, stringValue: res, success: true };
+});
+
+registerFormulaFunction('LEN', (rawArgs, context) => {
+  if (rawArgs.length === 0) return { value: 0, stringValue: '0', success: true };
+  const str = evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue;
+  return { value: str.length, stringValue: String(str.length), success: true };
+});
+
+registerFormulaFunction('CONTAINS', (rawArgs, context) => {
+  if (rawArgs.length < 2) return { value: false, stringValue: 'false', success: true };
+  const haystack = evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue.toLowerCase();
+  const needle = evaluateSingleTokenOrExpression(rawArgs[1], context).stringValue.toLowerCase();
+  const found = haystack.includes(needle);
+  return { value: found, stringValue: String(found), success: true };
+});
+
+// --- Logical & Conditional Functions ---
+registerFormulaFunction('SWITCH', (rawArgs, context) => {
+  if (rawArgs.length >= 3) {
+    const targetVal = evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue.trim().toUpperCase();
+    const hasDefault = (rawArgs.length - 1) % 2 === 1;
+    const casesEnd = hasDefault ? rawArgs.length - 1 : rawArgs.length;
+    
+    for (let i = 1; i < casesEnd; i += 2) {
+      const caseVal = evaluateSingleTokenOrExpression(rawArgs[i], context).stringValue.trim().toUpperCase();
+      if (targetVal === caseVal) {
+        return evaluateSingleTokenOrExpression(rawArgs[i + 1], context);
+      }
+    }
+    if (hasDefault) {
+      return evaluateSingleTokenOrExpression(rawArgs[rawArgs.length - 1], context);
+    }
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('IFS', (rawArgs, context) => {
+  for (let i = 0; i < rawArgs.length; i += 2) {
+    if (i + 1 < rawArgs.length) {
+      const condStr = rawArgs[i].trim();
+      const isTrue = evaluateBooleanCondition(condStr, context);
+      if (isTrue) {
+        return evaluateSingleTokenOrExpression(rawArgs[i + 1], context);
+      }
+    }
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('IF', (rawArgs, context) => {
+  if (rawArgs.length >= 2) {
+    const condRes = evaluateBooleanCondition(rawArgs[0], context);
+    if (condRes) {
+      return evaluateSingleTokenOrExpression(rawArgs[1], context);
+    } else if (rawArgs[2]) {
+      return evaluateSingleTokenOrExpression(rawArgs[2], context);
+    } else {
+      return { value: '', stringValue: '', success: true };
+    }
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('ISBLANK', (rawArgs, context) => {
+  const inner = rawArgs.length > 0 ? evaluateSingleTokenOrExpression(rawArgs[0], context) : { stringValue: '' };
+  const isBlank = !inner.stringValue || inner.stringValue.trim() === '';
+  return { value: isBlank, stringValue: isBlank ? 'true' : 'false', success: true };
+});
+
+registerFormulaFunction('ISNOTBLANK', (rawArgs, context) => {
+  const inner = rawArgs.length > 0 ? evaluateSingleTokenOrExpression(rawArgs[0], context) : { stringValue: '' };
+  const isNotBlank = Boolean(inner.stringValue && inner.stringValue.trim() !== '');
+  return { value: isNotBlank, stringValue: isNotBlank ? 'true' : 'false', success: true };
+});
+
+// --- Date & Time Functions ---
+registerFormulaFunction('TODAY', () => {
+  const today = new Date();
+  const formatted = formatInputDate(today);
+  return { value: today, stringValue: formatted, success: true };
+});
+
+registerFormulaFunction('NOW', () => {
+  const now = new Date();
+  const formatted = formatInputDateTime(now);
+  return { value: now, stringValue: formatted, success: true };
+});
+
+registerFormulaFunction('EOMONTH', (rawArgs, context) => {
+  if (rawArgs.length >= 1) {
+    const dateRes = evaluateAppSheetFormula(rawArgs[0], context);
+    const parsedDate = parseAnyDate(dateRes.value || dateRes.stringValue);
+    let offset = 0;
+    if (rawArgs[1]) {
+      const offsetRes = evaluateAppSheetFormula(rawArgs[1], context);
+      offset = Math.round(parseLocaleNumber(offsetRes.value || offsetRes.stringValue, 0));
+    }
+    if (parsedDate) {
+      const lastDay = new Date(parsedDate.getFullYear(), parsedDate.getMonth() + 1 + offset, 0);
+      const formatted = formatInputDate(lastDay);
+      return { value: lastDay, stringValue: formatted, success: true };
+    }
+  }
+  return { value: '', stringValue: '', success: false, error: 'Fecha inválida en EOMONTH' };
+});
+
+registerFormulaFunction('DATE', (rawArgs, context) => {
+  if (rawArgs.length === 3) {
+    const y = parseInt(evaluateAppSheetFormula(rawArgs[0], context).stringValue, 10);
+    const m = parseInt(evaluateAppSheetFormula(rawArgs[1], context).stringValue, 10);
+    const d = parseInt(evaluateAppSheetFormula(rawArgs[2], context).stringValue, 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      const dateObj = new Date(y, m - 1, d);
+      const formatted = formatInputDate(dateObj);
+      return { value: dateObj, stringValue: formatted, success: true };
+    }
+  } else if (rawArgs.length === 1) {
+    const innerRes = evaluateAppSheetFormula(rawArgs[0], context);
+    const parsedDate = parseAnyDate(innerRes.value || innerRes.stringValue);
+    if (parsedDate) {
+      const formatted = formatInputDate(parsedDate);
+      return { value: parsedDate, stringValue: formatted, success: true };
+    }
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('YEAR', (rawArgs, context) => {
+  if (rawArgs.length === 0) return { value: '', stringValue: '', success: true };
+  const d = parseAnyDate(evaluateSingleTokenOrExpression(rawArgs[0], context).value);
+  const val = d ? d.getFullYear() : '';
+  return { value: val, stringValue: String(val), success: true };
+});
+
+registerFormulaFunction('MONTH', (rawArgs, context) => {
+  if (rawArgs.length === 0) return { value: '', stringValue: '', success: true };
+  const d = parseAnyDate(evaluateSingleTokenOrExpression(rawArgs[0], context).value);
+  const val = d ? d.getMonth() + 1 : '';
+  return { value: val, stringValue: String(val), success: true };
+});
+
+registerFormulaFunction('DAY', (rawArgs, context) => {
+  if (rawArgs.length === 0) return { value: '', stringValue: '', success: true };
+  const d = parseAnyDate(evaluateSingleTokenOrExpression(rawArgs[0], context).value);
+  const val = d ? d.getDate() : '';
+  return { value: val, stringValue: String(val), success: true };
+});
+
+// --- Relational & Collection Functions ---
+registerFormulaFunction('LOOKUP', (rawArgs, context) => {
+  if (rawArgs.length >= 4) {
+    const needle = evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue;
+    const table = stripQuotes(rawArgs[1]);
+    const searchCol = stripQuotes(rawArgs[2]);
+    const returnCol = stripQuotes(rawArgs[3]);
+    const val = executeLookup(needle, table, searchCol, returnCol, context);
+    return { value: val, stringValue: val, success: true };
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('SELECT', (rawArgs, context) => {
+  if (rawArgs.length < 1) return { value: [], stringValue: '', success: true };
+  const targetColExpr = rawArgs[0].trim();
+  const filterCondExpr = rawArgs[1] ? rawArgs[1].trim() : '';
+
+  let targetTable = context.tableName || '';
+  let targetCol = targetColExpr;
+  const tMatch = targetColExpr.match(/^([A-Za-z0-9_]+)\[([^\]]+)\]$/);
+  if (tMatch) {
+    targetTable = tMatch[1].trim();
+    targetCol = tMatch[2].trim();
+  } else if (targetColExpr.startsWith('[') && targetColExpr.endsWith(']')) {
+    targetCol = targetColExpr.slice(1, -1).trim();
+  }
+
+  let records: SheetRecord[] = [];
+  const normTable = normalizeToken(targetTable);
+  if (normTable.includes('product') || normTable.includes('catalogo') || normTable.includes('maestro')) {
+    records = context.products || [];
+  } else if (normTable.includes('politic') || normTable.includes('canje')) {
+    records = context.policies || [];
+  } else if (context.allSheetsData && context.allSheetsData[targetTable]) {
+    records = context.allSheetsData[targetTable];
+  } else if (context.allSheetsData) {
+    const foundKey = Object.keys(context.allSheetsData).find(k => normalizeToken(k) === normTable);
+    if (foundKey) records = context.allSheetsData[foundKey];
+  }
+
+  if (records.length === 0 && context.row) {
+    records = [context.row];
+  }
+
+  const results: any[] = [];
+  records.forEach(rec => {
+    let matches = true;
+    if (filterCondExpr) {
+      matches = evaluateBooleanCondition(filterCondExpr, {
+        ...context,
+        row: rec
+      });
+    }
+    if (matches) {
+      const val = resolveRowValue(rec, targetCol);
+      if (val !== undefined && val !== null && val !== '') {
+        results.push(val);
+      }
+    }
+  });
+
+  const joined = results.map(String).join(', ');
+  return { value: results, stringValue: joined, success: true };
+});
+
+registerFormulaFunction('FILTER', (rawArgs, context) => {
+  return FUNCTION_REGISTRY.get('SELECT')!(rawArgs, context);
+});
+
+registerFormulaFunction('ANY', (rawArgs, context) => {
+  if (rawArgs.length === 0) return { value: '', stringValue: '', success: true };
+  const res = evaluateSingleTokenOrExpression(rawArgs[0], context);
+  if (Array.isArray(res.value)) {
+    const first = res.value.length > 0 ? res.value[0] : '';
+    return { value: first, stringValue: String(first ?? ''), success: true };
+  }
+  const str = res.stringValue || '';
+  const firstElem = str.includes(',') ? str.split(',')[0].trim() : str;
+  return { value: firstElem, stringValue: firstElem, success: true };
+});
+
+registerFormulaFunction('IN', (rawArgs, context) => {
+  if (rawArgs.length < 2) return { value: false, stringValue: 'false', success: true };
+  const needle = evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue.trim().toUpperCase();
+  const listRes = evaluateSingleTokenOrExpression(rawArgs[1], context);
+  let isFound = false;
+  if (Array.isArray(listRes.value)) {
+    isFound = listRes.value.some(item => String(item ?? '').trim().toUpperCase() === needle);
+  } else {
+    const parts = (listRes.stringValue || '').split(',').map(s => s.trim().toUpperCase());
+    isFound = parts.includes(needle);
+  }
+  return { value: isFound, stringValue: isFound ? 'true' : 'false', success: true };
+});
+
+registerFormulaFunction('INDEX', (rawArgs, context) => {
+  if (rawArgs.length < 2) return { value: '', stringValue: '', success: true };
+  const listRes = evaluateSingleTokenOrExpression(rawArgs[0], context);
+  const idx = Math.max(1, parseInt(evaluateSingleTokenOrExpression(rawArgs[1], context).stringValue, 10) || 1) - 1;
+  let val: any = '';
+  if (Array.isArray(listRes.value)) {
+    val = listRes.value[idx] ?? '';
+  } else {
+    const parts = (listRes.stringValue || '').split(',').map(s => s.trim());
+    val = parts[idx] ?? '';
+  }
+  return { value: val, stringValue: String(val ?? ''), success: true };
+});
+
+registerFormulaFunction('CEILING', (rawArgs, context) => {
+  if (rawArgs.length >= 1) {
+    const n = parseLocaleNumber(evaluateSingleTokenOrExpression(rawArgs[0], context).value, NaN);
+    const ceil = isNaN(n) ? 0 : Math.ceil(n);
+    return { value: ceil, stringValue: String(ceil), success: true };
+  }
+  return { value: 0, stringValue: '0', success: true };
+});
+
+registerFormulaFunction('FLOOR', (rawArgs, context) => {
+  if (rawArgs.length >= 1) {
+    const n = parseLocaleNumber(evaluateSingleTokenOrExpression(rawArgs[0], context).value, NaN);
+    const flr = isNaN(n) ? 0 : Math.floor(n);
+    return { value: flr, stringValue: String(flr), success: true };
+  }
+  return { value: 0, stringValue: '0', success: true };
+});
+
+registerFormulaFunction('MOD', (rawArgs, context) => {
+  if (rawArgs.length >= 2) {
+    const n1 = parseLocaleNumber(evaluateSingleTokenOrExpression(rawArgs[0], context).value, NaN);
+    const n2 = parseLocaleNumber(evaluateSingleTokenOrExpression(rawArgs[1], context).value, NaN);
+    if (!isNaN(n1) && !isNaN(n2) && n2 !== 0) {
+      const mod = n1 % n2;
+      return { value: mod, stringValue: String(mod), success: true };
+    }
+  }
+  return { value: 0, stringValue: '0', success: true };
+});
+
+registerFormulaFunction('POWER', (rawArgs, context) => {
+  if (rawArgs.length >= 2) {
+    const base = parseLocaleNumber(evaluateSingleTokenOrExpression(rawArgs[0], context).value, NaN);
+    const exp = parseLocaleNumber(evaluateSingleTokenOrExpression(rawArgs[1], context).value, NaN);
+    if (!isNaN(base) && !isNaN(exp)) {
+      const pow = Math.pow(base, exp);
+      return { value: pow, stringValue: String(pow), success: true };
+    }
+  }
+  return { value: 0, stringValue: '0', success: true };
+});
+
+registerFormulaFunction('SQRT', (rawArgs, context) => {
+  if (rawArgs.length >= 1) {
+    const n = parseLocaleNumber(evaluateSingleTokenOrExpression(rawArgs[0], context).value, NaN);
+    const sqrt = isNaN(n) || n < 0 ? 0 : Math.sqrt(n);
+    return { value: sqrt, stringValue: String(sqrt), success: true };
+  }
+  return { value: 0, stringValue: '0', success: true };
+});
+
+registerFormulaFunction('WORKDAY', (rawArgs, context) => {
+  if (rawArgs.length >= 2) {
+    const dateRes = evaluateSingleTokenOrExpression(rawArgs[0], context);
+    const daysRes = evaluateSingleTokenOrExpression(rawArgs[1], context);
+    const d = parseAnyDate(dateRes.value || dateRes.stringValue);
+    const numDays = Math.round(parseLocaleNumber(daysRes.value || daysRes.stringValue, 0));
+    if (d && !isNaN(numDays)) {
+      let cur = new Date(d.getTime());
+      let added = 0;
+      const step = numDays >= 0 ? 1 : -1;
+      const target = Math.abs(numDays);
+      while (added < target) {
+        cur.setDate(cur.getDate() + step);
+        const dayOfWeek = cur.getDay(); // 0 = Sun, 6 = Sat
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          added++;
+        }
+      }
+      const formatted = formatInputDate(cur);
+      return { value: cur, stringValue: formatted, success: true };
+    }
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('SUBSTITUTE', (rawArgs, context) => {
+  if (rawArgs.length >= 3) {
+    const text = evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue;
+    const oldStr = evaluateSingleTokenOrExpression(rawArgs[1], context).stringValue;
+    const newStr = evaluateSingleTokenOrExpression(rawArgs[2], context).stringValue;
+    if (oldStr) {
+      const replaced = text.split(oldStr).join(newStr);
+      return { value: replaced, stringValue: replaced, success: true };
+    }
+    return { value: text, stringValue: text, success: true };
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('REPLACE', (rawArgs, context) => {
+  if (rawArgs.length >= 4) {
+    const text = evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue;
+    const start = Math.max(1, parseInt(evaluateSingleTokenOrExpression(rawArgs[1], context).stringValue, 10) || 1) - 1;
+    const len = Math.max(0, parseInt(evaluateSingleTokenOrExpression(rawArgs[2], context).stringValue, 10) || 0);
+    const newText = evaluateSingleTokenOrExpression(rawArgs[3], context).stringValue;
+    const replaced = text.slice(0, start) + newText + text.slice(start + len);
+    return { value: replaced, stringValue: replaced, success: true };
+  }
+  return { value: '', stringValue: '', success: true };
+});
+
+registerFormulaFunction('ENCODEURL', (rawArgs, context) => {
+  if (rawArgs.length >= 1) {
+    const text = evaluateSingleTokenOrExpression(rawArgs[0], context).stringValue;
+    const encoded = encodeURIComponent(text);
+    return { value: encoded, stringValue: encoded, success: true };
+  }
+  return { value: '', stringValue: '', success: true };
+});
 
 /**
  * Detailed column verification entry
@@ -1156,7 +1623,6 @@ export function validateFormulaDetailed(
       // Dereferenced column: [REF].[PROP]
       const parts = rawColName.split('.');
       const refCol = parts[0].trim();
-      const propCol = parts[1].trim();
       const refExists = normHeaders.includes(normalizeToken(refCol)) || availableHeaders.some(h => normalizeToken(h) === normalizeToken(refCol));
       referencedColumns.push({
         name: rawColName,
@@ -1224,9 +1690,6 @@ export function validateFormulaDetailed(
   };
 }
 
-/**
- * Applies all configured formulas in table schema to a record
- */
 /**
  * Sorts columns topologically based on formula dependencies so that columns
  * referenced by other formulas are computed first.
@@ -1306,6 +1769,10 @@ export function applyTableSchemaFormulas(
   context: Omit<FormulaEvaluationContext, 'row'>
 ): Record<string, any> {
   if (!tableSchema) return row;
+
+  if (!context._indexes) {
+    (context as any)._indexes = buildFormulaIndexes(context);
+  }
 
   const updated = { ...row };
   const allCols = Array.from(new Set([...headers, ...Object.keys(tableSchema)]));
