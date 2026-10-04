@@ -67,7 +67,7 @@ export function useItemFormManager({
           initialData[h] = raw;
         }
       });
-      const calculatedData = autoCalculateItemFormData(initialData, headers, products, policies, sheetConfig);
+      const calculatedData = autoCalculateItemFormData(initialData, headers, products, policies, sheetConfig, activeSheet?.title);
       setFormData(calculatedData);
     } else {
       setEditingItem(null);
@@ -115,7 +115,7 @@ export function useItemFormManager({
         initialData[skuCol] = prefillSku;
       }
       
-      const calculatedData = autoCalculateItemFormData(initialData, headers, products, policies, sheetConfig);
+      const calculatedData = autoCalculateItemFormData(initialData, headers, products, policies, sheetConfig, activeSheet?.title);
       setFormData(calculatedData);
     }
     setIsModalOpen(true);
@@ -163,7 +163,7 @@ export function useItemFormManager({
       }
     });
 
-    const calculatedData = autoCalculateItemFormData(initialData, headers, products, policies, sheetConfig);
+    const calculatedData = autoCalculateItemFormData(initialData, headers, products, policies, sheetConfig, activeSheet?.title);
     setFormData(calculatedData);
     setIsModalOpen(true);
   }, [onBeforeOpen, headers, activeSheet, sheetConfig, products, policies]);
@@ -357,9 +357,9 @@ export function useItemFormManager({
       if (diasRetiroCol && !hasFormula(diasRetiroCol)) newForm[diasRetiroCol] = '';
     }
 
-    newForm = autoCalculateItemFormData(newForm, headers, products, policies, sheetConfig);
+    newForm = autoCalculateItemFormData(newForm, headers, products, policies, sheetConfig, activeSheet?.title);
     setFormData(newForm);
-  }, [formData, formErrors, headers, sheetConfig, products, policies, hasFormula]);
+  }, [formData, formErrors, headers, sheetConfig, products, policies, hasFormula, activeSheet?.title]);
 
   const handleBatchFormUpdate = useCallback((updates: Record<string, string>) => {
     let newForm = { ...formData, ...updates };
@@ -388,9 +388,9 @@ export function useItemFormManager({
       });
     }
 
-    newForm = autoCalculateItemFormData(newForm, headers, products, policies, sheetConfig);
+    newForm = autoCalculateItemFormData(newForm, headers, products, policies, sheetConfig, activeSheet?.title);
     setFormData(newForm);
-  }, [formData, formErrors, headers, sheetConfig, products, policies, hasFormula]);
+  }, [formData, formErrors, headers, sheetConfig, products, policies, hasFormula, activeSheet?.title]);
 
   // El objeto se recreaba en cada render y alimenta ~10 miembros del contexto.
   // Devolver una referencia estable es requisito para que el value del

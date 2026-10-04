@@ -2594,6 +2594,43 @@ console.log('\n--- 27. Servicio del espejo: fallo persistido y drenado (ruta rea
   assert(Number(res2.value) === 50000, '_THISROW: resuelve expresiones aritméticas con [_THISROW]');
 }
 
+// --- 30. SSOT Formula Engine Priority & Fast O(1) Augmentation ---
+{
+  console.log('\n--- 30. SSOT Formula Engine Priority & Fast O(1) Augmentation ---');
+  const { autoCalculateItemFormData } = await import('./src/utils/referenceResolver');
+  const { augmentItemsWithVirtualColumns } = await import('./src/utils/virtualColumnsEvaluator');
+
+  const sampleConfig: any = {
+    customAliases: {},
+    schema: {
+      'Inventario General': {
+        PM: { formula: 'SWITCH([MUNDO], "ALI", "PAMELA VAZQUEZ", "MED", "FABIOLA INALAF", "DESCONOCIDO")', isVirtual: true },
+        FECHA_DE_RETIRO: { formula: 'TODAY() + 10', isVirtual: true }
+      }
+    }
+  };
+
+  const headers = ['SKU', 'MUNDO', 'PM', 'FECHA_DE_RETIRO'];
+  const inputForm = {
+    SKU: '2000210',
+    MUNDO: 'ALI',
+    PM: '',
+    FECHA_DE_RETIRO: ''
+  };
+
+  const calculated = autoCalculateItemFormData(inputForm, headers, [], [], sampleConfig, 'Inventario General');
+  assert(calculated.PM === 'PAMELA VAZQUEZ', 'ssot: fórmula asigna PM según esquema de tabla activa');
+
+  const items = [{ SKU: '2000210', MUNDO: 'ALI', PM: 'PAMELA VAZQUEZ', FECHA_DE_RETIRO: '2026-10-14' }] as any[];
+  const augmented = augmentItemsWithVirtualColumns({
+    items: items as any,
+    headers,
+    sheetTitle: 'Inventario General',
+    sheetConfig: sampleConfig
+  });
+  assert((augmented as any) === items, 'ssot: la aumentación O(1) omite re-evaluaciones redundantes si los valores ya existen');
+}
+
 console.log(`\n========================================`);
 console.log(`RESULTADOS DE PRUEBAS: ${passed} PASADAS, ${failed} FALLADAS`);
 console.log(`========================================\n`);

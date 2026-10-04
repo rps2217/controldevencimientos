@@ -3,6 +3,7 @@ import { parseAnyDate, calculateWithdrawalDate, formatDisplayDate, formatInputDa
 import { extractCuVcFromRow } from './cuVcConsolidator';
 import { SheetConfig, SheetRecord } from '../types';
 import { applyTableSchemaFormulas } from './appSheetFormulaEngine';
+import { findTableSchema } from './virtualColumnsEvaluator';
 
 export interface MasterProductSummary {
   sku: string;
@@ -875,12 +876,35 @@ export function autoCalculateItemFormData(
   headers: string[],
   products: SheetRecord[] = [],
   policies: SheetRecord[] = [],
-  sheetConfig?: SheetConfig
+  sheetConfig?: SheetConfig,
+  targetSheetTitle?: string
 ): Record<string, string> {
   const newForm = { ...currentForm };
   if (!headers || headers.length === 0) return newForm;
 
   const customAliases = sheetConfig?.customAliases;
+
+  // Locate target table schema using SSOT
+  const activeTableSchema = sheetConfig ? findTableSchema(targetSheetTitle, sheetConfig) : undefined;
+
+  // Identify columns that have explicit AppSheet formulas in the target table schema
+  const columnsWithFormulas = new Set<string>();
+  if (activeTableSchema) {
+    Object.entries(activeTableSchema).forEach(([colName, colSchema]) => {
+      if (colSchema?.formula && colSchema.formula.trim()) {
+        columnsWithFormulas.add(colName);
+      }
+    });
+  } else if (sheetConfig?.schema) {
+    for (const [_, colSchemas] of Object.entries(sheetConfig.schema)) {
+      if (!colSchemas) continue;
+      Object.entries(colSchemas).forEach(([colName, colSchema]) => {
+        if (headers.includes(colName) && colSchema?.formula && colSchema.formula.trim()) {
+          columnsWithFormulas.add(colName);
+        }
+      });
+    }
+  }
 
   // Identify semantic headers
   const skuCol = findColumnBySemantic(headers, 'sku', customAliases) || 
@@ -913,7 +937,7 @@ export function autoCalculateItemFormData(
       // Auto dereference fields (Description, Provider, Category, etc.) if empty or needed
       const dereferenced = dereferenceMasterProduct(masterProduct, headers, customAliases);
       for (const [k, v] of Object.entries(dereferenced)) {
-        if (v !== undefined && v !== null && String(v).trim() !== '') {
+        if (!columnsWithFormulas.has(k) && v !== undefined && v !== null && String(v).trim() !== '') {
           const isPolicyOrDays = /pol[ií]tica|politica|canje|dias(_|\s)?(retiro|anticipacion|canje|limite)|dias_retiro_vc/i.test(k);
           if (isPolicyOrDays || !newForm[k] || newForm[k].trim() === '') {
             newForm[k] = String(v);
@@ -923,7 +947,7 @@ export function autoCalculateItemFormData(
     }
   }
 
-  // 2. MM & YYYY <-> FECHA_VC Sync
+  // 2. MM & YYYY <-> FECHA_VC Sync (skip if FECHA_VC, MM, or YYYY are driven by formula)
   let mVal = mmCol && newForm[mmCol] ? newForm[mmCol].trim() : '';
   let yVal = yyyyCol && newForm[yyyyCol] ? newForm[yyyyCol].trim() : '';
   let fechaVcVal = fechaVcCol && newForm[fechaVcCol] ? newForm[fechaVcCol].trim() : '';
@@ -937,7 +961,7 @@ export function autoCalculateItemFormData(
       const calcM = String(lastDay.getMonth() + 1).padStart(2, '0');
       const calcD = String(lastDay.getDate()).padStart(2, '0');
       const computedDateStr = `${calcY}-${calcM}-${calcD}`;
-      if (fechaVcCol && (!newForm[fechaVcCol] || newForm[fechaVcCol] !== computedDateStr)) {
+      if (fechaVcCol && !columnsWithFormulas.has(fechaVcCol) && (!newForm[fechaVcCol] || newForm[fechaVcCol] !== computedDateStr)) {
         newForm[fechaVcCol] = computedDateStr;
         fechaVcVal = computedDateStr;
       }
@@ -947,21 +971,8 @@ export function autoCalculateItemFormData(
     if (parsedDate) {
       const extractedY = String(parsedDate.getFullYear());
       const extractedM = String(parsedDate.getMonth() + 1).padStart(2, '0');
-      if (yyyyCol && !newForm[yyyyCol]) { newForm[yyyyCol] = extractedY; yVal = extractedY; }
-      if (mmCol && !newForm[mmCol]) { newForm[mmCol] = extractedM; mVal = extractedM; }
-    }
-  }
-
-  // Identify columns that have explicit AppSheet formulas in table schema
-  const columnsWithFormulas = new Set<string>();
-  if (sheetConfig?.schema) {
-    for (const [_, colSchemas] of Object.entries(sheetConfig.schema)) {
-      if (!colSchemas) continue;
-      Object.entries(colSchemas).forEach(([colName, colSchema]) => {
-        if (colSchema?.formula && colSchema.formula.trim()) {
-          columnsWithFormulas.add(colName);
-        }
-      });
+      if (yyyyCol && !columnsWithFormulas.has(yyyyCol) && !newForm[yyyyCol]) { newForm[yyyyCol] = extractedY; yVal = extractedY; }
+      if (mmCol && !columnsWithFormulas.has(mmCol) && !newForm[mmCol]) { newForm[mmCol] = extractedM; mVal = extractedM; }
     }
   }
 
@@ -1013,34 +1024,45 @@ export function autoCalculateItemFormData(
     if (fechaRetiroCol && !columnsWithFormulas.has(fechaRetiroCol)) {
       newForm[fechaRetiroCol] = policyRes.fechaRetiroDisplay;
     }
-    newForm['FECHA_RETIRO_CALC'] = policyRes.fechaRetiroDisplay;
+    if (!columnsWithFormulas.has('FECHA_RETIRO_CALC')) {
+      newForm['FECHA_RETIRO_CALC'] = policyRes.fechaRetiroDisplay;
+    }
     newForm._fechaRetiroCalc = policyRes.fechaRetiroDisplay;
-  } else if (!newForm['FECHA_RETIRO_CALC']) {
+  } else if (!newForm['FECHA_RETIRO_CALC'] && !columnsWithFormulas.has('FECHA_RETIRO_CALC')) {
     newForm['FECHA_RETIRO_CALC'] = '-';
   }
 
   newForm._policySource = policyRes.source;
   newForm._policySourceDesc = policyRes.sourceDescription;
 
-  // 8. Auto-calculate CU_VC = SKU + YYYY + MM using extractCuVcFromRow
+  // 8. Auto-calculate CU_VC = SKU + YYYY + MM using extractCuVcFromRow (skip if driven by formula)
   const derivedCuInfo = extractCuVcFromRow(newForm, headers, customAliases);
   if (derivedCuInfo.cuVc) {
     headers.forEach(h => {
-      const isCuHeader = /^cu(_|\s)?(vc|calculado)?$/i.test(h.trim()) || 
-                         /^id_vc$/i.test(h.trim()) || 
-                         /^codigo(_|\s)?unico$/i.test(h.trim()) || 
-                         /^cu$/i.test(h.trim());
-      if (isCuHeader) {
-        newForm[h] = derivedCuInfo.cuVc;
+      if (!columnsWithFormulas.has(h)) {
+        const isCuHeader = /^cu(_|\s)?(vc|calculado)?$/i.test(h.trim()) || 
+                           /^id_vc$/i.test(h.trim()) || 
+                           /^codigo(_|\s)?unico$/i.test(h.trim()) || 
+                           /^cu$/i.test(h.trim());
+        if (isCuHeader) {
+          newForm[h] = derivedCuInfo.cuVc;
+        }
       }
     });
-    if (cuVcCol) {
+    if (cuVcCol && !columnsWithFormulas.has(cuVcCol)) {
       newForm[cuVcCol] = derivedCuInfo.cuVc;
     }
   }
 
-  // 9. Evaluate Custom Configured Column Formulas (AppSheet-Style Declarative Engine)
-  if (sheetConfig?.schema) {
+  // 9. Evaluate Custom Configured Column Formulas (AppSheet-Style Declarative Engine) - SSOT Authority
+  if (activeTableSchema) {
+    const computed = applyTableSchemaFormulas(newForm, headers, activeTableSchema, {
+      products,
+      policies,
+      customAliases
+    });
+    Object.assign(newForm, computed);
+  } else if (sheetConfig?.schema) {
     for (const [_, colSchemas] of Object.entries(sheetConfig.schema)) {
       if (!colSchemas) continue;
       const hasFormulasForHeaders = Object.keys(colSchemas).some(h => headers.includes(h) && colSchemas[h]?.formula);

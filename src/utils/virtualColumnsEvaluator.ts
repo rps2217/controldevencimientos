@@ -170,6 +170,12 @@ export function augmentItemsWithVirtualColumns(
     return items;
   }
 
+  // O(1) check: if items are already pre-enriched with all virtual columns (e.g. via applyTableSchemaFormulas in Dashboard), skip re-evaluation
+  const firstItem = items[0];
+  if (firstItem && schemaVirtualCols.every(({ colKey }) => firstItem[colKey] !== undefined)) {
+    return items;
+  }
+
   const evalCtx: FormulaEvaluationContext = {
     row: {},
     headers,
