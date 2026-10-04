@@ -342,8 +342,8 @@ export function evaluateArithmeticExpression(
     return isNaN(num) ? '0' : String(num);
   });
 
-  // 2. Substitute all [COL_NAME] references with their numeric values
-  const substituted = substitutedFunctions.replace(/\[(?:_THISROW\.)?([^\]]+)\]/gi, (_, colName) => {
+  // 2. Substitute all [COL_NAME] or [_THISROW].[COL_NAME] references with their numeric values
+  const substituted = substitutedFunctions.replace(/(?:\[_THISROW\]\.|_THISROW\.)?\[([^\]]+)\]/gi, (_, colName) => {
     const val = resolveRowValue(context.row, colName.trim());
     const num = parseLocaleNumber(val, NaN);
     return isNaN(num) ? '0' : String(num);
@@ -511,17 +511,17 @@ function evaluateSingleTokenOrExpression(
 
   // F. De-referencing: [COL].[PROP] or [_THISROW].[COL].[PROP]
   const derefMatch = trimmed.match(/^\[(?:_THISROW\.)?([^\]]+)\]\.\[?([^\]\s]+)\]?$/i);
-  if (derefMatch) {
+  if (derefMatch && derefMatch[1].trim().toUpperCase() !== '_THISROW') {
     const refCol = derefMatch[1].trim();
     const propCol = derefMatch[2].trim();
     const val = resolveDereference(refCol, propCol, context);
     return { value: val, stringValue: val, success: true };
   }
 
-  // G. Column Reference: [COL] or [_THISROW].[COL]
-  const colMatch = trimmed.match(/^\[(?:_THISROW\.)?([^\]]+)\]$/i);
+  // G. Column Reference: [COL], [_THISROW].[COL], or _THISROW.COL
+  const colMatch = trimmed.match(/^\[_THISROW\]\.\[([^\]]+)\]$/i) || trimmed.match(/^(?:\[_THISROW\]\.|_THISROW\.)?\[([^\]]+)\]$/i) || trimmed.match(/^(?:\[_THISROW\]\.|_THISROW\.)([a-zA-Z0-9_]+)$/i);
   if (colMatch) {
-    const colName = colMatch[1].trim();
+    const colName = (colMatch[1] || '').trim();
     const val = resolveRowValue(context.row, colName);
     const strVal = val !== undefined && val !== null ? String(val) : '';
     return { value: val, stringValue: strVal, success: true };

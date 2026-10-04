@@ -2575,6 +2575,25 @@ console.log('\n--- 27. Servicio del espejo: fallo persistido y drenado (ruta rea
   assert(execDraft.subject.includes('[RESUMEN EJECUTIVO]'), 'pmReport: genera asunto correcto para resumen ejecutivo');
 }
 
+// --- 29. [_THISROW] Expressions & Context Evaluation ---
+{
+  console.log('\n--- 29. [_THISROW] Expressions & Context Evaluation ---');
+  const { evaluateAppSheetFormula } = await import('./src/utils/appSheetFormulaEngine');
+
+  const contextRow = {
+    SKU: '2000210',
+    DESCRIPCION: 'Paracetamol 500mg',
+    CANTIDAD: 50,
+    PRECIO: 1000
+  };
+
+  const res1 = evaluateAppSheetFormula('[_THISROW].[SKU]', { row: contextRow });
+  assert(res1.value === '2000210', '_THISROW: resuelve referencia explícita [_THISROW].[SKU]');
+
+  const res2 = evaluateAppSheetFormula('[_THISROW].[CANTIDAD] * [_THISROW].[PRECIO]', { row: contextRow });
+  assert(Number(res2.value) === 50000, '_THISROW: resuelve expresiones aritméticas con [_THISROW]');
+}
+
 console.log(`\n========================================`);
 console.log(`RESULTADOS DE PRUEBAS: ${passed} PASADAS, ${failed} FALLADAS`);
 console.log(`========================================\n`);
