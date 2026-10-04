@@ -73,22 +73,54 @@ export function generateShortVcId(): string {
 
 let saveSessionsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingSessionsToSave: StockCountSession[] | null = null;
+let inMemorySessionsCache: StockCountSession[] | null = null;
 
 /**
  * Loads saved count sessions from localStorage (IndexedDB fallback safe)
  */
 export function loadStockCountSessionsFromStorage(): StockCountSession[] {
-  return readStorage<StockCountSession[]>(
+  if (inMemorySessionsCache && inMemorySessionsCache.length > 0) {
+    return inMemorySessionsCache;
+  }
+  const loaded = readStorage<StockCountSession[]>(
     STORAGE_KEYS.STOCK_COUNT_SESSIONS,
     objectArraySchema,
     []
   );
+  if (loaded && loaded.length > 0) {
+    inMemorySessionsCache = loaded;
+  }
+  return loaded;
+}
+
+/**
+ * Carga asíncrona de sesiones con prioridad en IndexedDB.
+ * Garantiza persistencia íntegra aun cuando se supere la cuota de localStorage.
+ */
+export async function loadStockCountSessionsFromStorageAsync(): Promise<StockCountSession[]> {
+  try {
+    const idbData = await indexedDbService.getSetting<StockCountSession[]>(STORAGE_KEYS.STOCK_COUNT_SESSIONS, []);
+    if (Array.isArray(idbData) && idbData.length > 0) {
+      inMemorySessionsCache = idbData;
+      try {
+        localStorage.setItem(STORAGE_KEYS.STOCK_COUNT_SESSIONS, JSON.stringify(idbData));
+      } catch {
+        // Cuota excedida: datos seguros en IndexedDB
+      }
+      return idbData;
+    }
+  } catch (err) {
+    console.warn('Error loading sessions from IndexedDB, fallback to synchronous storage:', err);
+  }
+
+  return loadStockCountSessionsFromStorage();
 }
 
 /**
  * Persists count sessions to storage immediately (synchronous)
  */
 export function saveStockCountSessionsToStorage(sessions: StockCountSession[]): void {
+  inMemorySessionsCache = sessions;
   try {
     localStorage.setItem(STORAGE_KEYS.STOCK_COUNT_SESSIONS, JSON.stringify(sessions));
   } catch (e) {

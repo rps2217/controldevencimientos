@@ -1,4 +1,4 @@
-import { Database, FileSpreadsheet, Package, FileText, TableProperties, PieChart, Calendar, Barcode, Truck, Network, LucideIcon } from 'lucide-react';
+import { Database, FileSpreadsheet, Package, FileText, TableProperties, PieChart, Calendar, Barcode, Truck, LucideIcon } from 'lucide-react';
 
 export interface ModuleDefinition {
   id: string;

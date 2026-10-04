@@ -29,17 +29,51 @@ import { indexedDbService } from '../db/indexedDbService';
 // ==========================================
 
 
+// En-memoria cache para acceso síncrono ultra-rápido y protección ante cuota de localStorage
+let inMemoryCampaignsCache: InventoryCampaign[] | null = null;
+
 /**
  * Loads all saved inventory campaigns from storage
  */
 export function loadCampaignsFromStorage(): InventoryCampaign[] {
-  return readStorage<InventoryCampaign[]>(STORAGE_KEYS.CAMPAIGNS, objectArraySchema, []);
+  if (inMemoryCampaignsCache && inMemoryCampaignsCache.length > 0) {
+    return inMemoryCampaignsCache;
+  }
+  const loaded = readStorage<InventoryCampaign[]>(STORAGE_KEYS.CAMPAIGNS, objectArraySchema, []);
+  if (loaded && loaded.length > 0) {
+    inMemoryCampaignsCache = loaded;
+  }
+  return loaded;
+}
+
+/**
+ * Carga asíncrona unificada con prioridad en IndexedDB.
+ * Esencial cuando las fotos de inventario superan el límite de 5MB de localStorage.
+ */
+export async function loadCampaignsFromStorageAsync(): Promise<InventoryCampaign[]> {
+  try {
+    const idbData = await indexedDbService.getSetting<InventoryCampaign[]>(STORAGE_KEYS.CAMPAIGNS, []);
+    if (Array.isArray(idbData) && idbData.length > 0) {
+      inMemoryCampaignsCache = idbData;
+      try {
+        localStorage.setItem(STORAGE_KEYS.CAMPAIGNS, JSON.stringify(idbData));
+      } catch {
+        // Cuota de 5MB superada: normal con snapshots ERP masivos
+      }
+      return idbData;
+    }
+  } catch (err) {
+    console.warn('Error loading campaigns from IndexedDB, fallback to synchronous storage:', err);
+  }
+
+  return loadCampaignsFromStorage();
 }
 
 /**
  * Persists inventory campaigns to storage
  */
 export function saveCampaignsToStorage(campaigns: InventoryCampaign[]): void {
+  inMemoryCampaignsCache = campaigns;
   try {
     localStorage.setItem(STORAGE_KEYS.CAMPAIGNS, JSON.stringify(campaigns));
   } catch (e) {

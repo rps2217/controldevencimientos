@@ -46,7 +46,21 @@ El proyecto sigue una estructura modular limpia construida en **React 18+**, **T
     │   ├── useModuleViewState.ts # Persistencia y transiciones de estado por módulo/pestaña
     │   ├── useOfflineSync.ts     # Hook de sincronización y vaciado de cola offline
     │   └── useColumnResize.ts    # Manejo interactivo del ancho de columnas
+    ├── lib/
+    │   ├── sheets.ts             # Fachada pública retrocompatible para Google Sheets & Apps Script
+    │   ├── sheetsTypes.ts        # Tipos, constantes (SPREADSHEET_ID) y utilidades de fila
+    │   ├── sheetsClient.ts       # Cliente HTTP robusto con reintentos y caché TTL en memoria
+    │   ├── sheetsConfigSync.ts   # Sincronización de configuraciones (Script Properties y _CONFIG_APP)
+    │   ├── sheetsCampaignSync.ts # Sincronización atómica y fragmentación (Chunks) de campañas
+    │   ├── sheetsAuditLog.ts     # Volcado y deduplicación en hoja de auditoría dedicada
+    │   └── appsScriptTemplate.ts # Código de producción y generadores para Apps Script
     ├── utils/
+    │   ├── formula/              # Motor modularizado de fórmulas AppSheet
+    │   │   ├── formulaTypes.ts   # Contexto, registros O(1), resolución y de-referenciación
+    │   │   ├── formulaParser.ts  # AST parser, evaluador aritmético y evaluador de condiciones
+    │   │   ├── formulaFunctions.ts # Registro de funciones numéricas, texto, fechas y colecciones
+    │   │   └── formulaValidation.ts# Validación semántica detallada y ordenamiento topológico
+    │   ├── appSheetFormulaEngine.ts # Fachada pública retrocompatible del motor de fórmulas
     │   ├── appStorage.ts        # Fuente única de claves de localStorage (STORAGE_KEYS), migración e isDemoMode()
     │   ├── columnAliases.ts      # Motor de detección semántica de encabezados de columnas
     │   ├── pureCalculations.ts   # Cálculos puros y parsing de fechas y métricas (Zero-DOM/Web Worker compatible)
@@ -98,6 +112,7 @@ Resuelve el problema común de las hojas de cálculo con encabezados inconsisten
 - **`parseLocaleNumber` / `formatLocaleNumber`** (en `pureCalculations.ts`): Conversión y formateo robusto de valores numéricos de stock/cantidad que contengan comas y puntos decimales europeos/americanos.
 - **`getItemStatus(item, headers)`** (en `dateCalculations.tsx`): Calcula de manera inteligente el estado operativo de un ítem (ej. Vencido, Crítico por vencer, Próximo a retiro, En buen estado) comparando con la fecha actual.
 - **`getEventCategory(item, headers)`** (en `pureCalculations.ts`): Clasifica automáticamente eventos e incidencias en categorías (`TRANSPORTE`, `DIFERENCIAS`, `MERMAS`, `CALIDAD`, etc.).
+- **Predicados Unificados de Filtrado SSOT** (en `pureCalculations.ts`): `isExpiryDomainItem`, `isIncidenceDomainItem`, `matchesPmRadarFilter`, `matchesEventResolutionFilter`, `matchesMonthOffsetFilter`, `matchesColumnFilters`, `matchesSearchTerm`. Fuente única de verdad consumida idénticamente por `inventoryWorker.ts`, `useInventoryFiltering.ts` y `sliceRegistry.ts`, garantizando sincronía exacta entre contadores de slices, tablas y worker sin duplicar lógica.
 
 Nota: `pureCalculations.ts` no depende del DOM ni de React (es el módulo que consume el Web Worker); `dateCalculations.tsx` re-exporta sus funciones para no romper a los consumidores existentes y añade los envoltorios de UI.
 

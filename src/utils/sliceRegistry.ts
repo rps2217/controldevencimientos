@@ -1,8 +1,17 @@
 import { TableSlice, InventoryItem, TableCapability, TableCapabilitySetting, SheetConfig } from '../types';
 import { getItemStatus, getEventCategory, getItemResolutionStatus } from './dateCalculations';
 import { findColumnBySemantic, KnownFieldSemantic } from './columnAliases';
+import { 
+  isExpiryDomainItem, 
+  isIncidenceDomainItem, 
+  matchesPmRadarFilter, 
+  matchesEventResolutionFilter, 
+  matchesColumnFilters, 
+  matchesSearchTerm 
+} from './pureCalculations';
 
 import { STORAGE_KEYS, readStorage, stringArraySchema, objectArraySchema } from '../utils/appStorage';
+import { indexedDbService } from '../db/indexedDbService';
 
 /**
  * Deduce las capacidades de dominio de una hoja a partir de sus encabezados.
@@ -308,16 +317,47 @@ export const BUILT_IN_SLICES: TableSlice[] = [
 ];
 
 
+let inMemorySlicesCache: TableSlice[] | null = null;
+
 export function loadCustomSlices(): TableSlice[] {
-  return readStorage<TableSlice[]>(STORAGE_KEYS.CUSTOM_SLICES, objectArraySchema, []);
+  if (inMemorySlicesCache && inMemorySlicesCache.length > 0) {
+    return inMemorySlicesCache;
+  }
+  const loaded = readStorage<TableSlice[]>(STORAGE_KEYS.CUSTOM_SLICES, objectArraySchema, []);
+  if (loaded && loaded.length > 0) {
+    inMemorySlicesCache = loaded;
+  }
+  return loaded;
+}
+
+export async function loadCustomSlicesAsync(): Promise<TableSlice[]> {
+  try {
+    const idbSlices = await indexedDbService.getSetting<TableSlice[]>(STORAGE_KEYS.CUSTOM_SLICES, []);
+    if (Array.isArray(idbSlices) && idbSlices.length > 0) {
+      inMemorySlicesCache = idbSlices;
+      try {
+        localStorage.setItem(STORAGE_KEYS.CUSTOM_SLICES, JSON.stringify(idbSlices));
+      } catch {
+        // Cuota excedida: se mantiene seguro en IndexedDB
+      }
+      return idbSlices;
+    }
+  } catch (err) {
+    console.warn('Error loading custom slices from IndexedDB:', err);
+  }
+  return loadCustomSlices();
 }
 
 export function saveCustomSlices(slices: TableSlice[]): void {
+  inMemorySlicesCache = slices;
   try {
     localStorage.setItem(STORAGE_KEYS.CUSTOM_SLICES, JSON.stringify(slices));
   } catch (err) {
     console.warn('Error saving custom slices to localStorage:', err);
   }
+  indexedDbService.saveSetting(STORAGE_KEYS.CUSTOM_SLICES, slices).catch((err) => {
+    console.warn('Error saving custom slices to IndexedDB:', err);
+  });
 }
 
 export function loadHiddenSliceIds(sheetConfigHidden?: string[]): string[] {
@@ -411,12 +451,13 @@ export function itemMatchesSlice(
   // `VENC. CERC.` es un evento FRC (mercadería recibida con poca vida útil), no una
   // categoría de vencimiento: pertenece al dominio de incidencia. Por eso el radar de
   // vencimientos sólo admite VENCIMIENTO puro y el registro FRC admite todo lo demás.
+  const itemCategory = getEventCategory(item, headers);
   if (slice.requiredCapability === 'vencimiento') {
-    if (getEventCategory(item, headers) !== 'VENCIMIENTO') {
+    if (!isExpiryDomainItem(itemCategory)) {
       return false;
     }
   } else if (slice.requiredCapability === 'incidencia') {
-    if (getEventCategory(item, headers) === 'VENCIMIENTO') {
+    if (!isIncidenceDomainItem(itemCategory)) {
       return false;
     }
   }
@@ -424,44 +465,25 @@ export function itemMatchesSlice(
   // 1. Search term match
   if (filterConfig.searchTerm && filterConfig.searchTerm.trim() !== '') {
     const term = filterConfig.searchTerm.trim().toLowerCase();
-    let matchesSearch = false;
-    for (let i = 0; i < headers.length; i++) {
-      const val = item[headers[i]];
-      if (val !== undefined && val !== null && String(val).toLowerCase().includes(term)) {
-        matchesSearch = true;
-        break;
-      }
+    if (!matchesSearchTerm(item, headers, term)) {
+      return false;
     }
-    if (!matchesSearch) return false;
   }
 
   // 2. Quick Chip match
   if (filterConfig.quickChip && filterConfig.quickChip.trim() !== '') {
     const chip = filterConfig.quickChip.trim().toLowerCase();
-    let matchesChip = false;
-    for (let i = 0; i < headers.length; i++) {
-      const val = item[headers[i]];
-      if (val !== undefined && val !== null && String(val).toLowerCase().includes(chip)) {
-        matchesChip = true;
-        break;
-      }
+    if (!matchesSearchTerm(item, headers, chip)) {
+      return false;
     }
-    if (!matchesChip) return false;
   }
 
   // 3. PM Radar Status match
   if (filterConfig.pmRadarFilter && filterConfig.pmRadarFilter.length > 0) {
     const st = getItemStatus(item, headers);
-    const pmSet = new Set(filterConfig.pmRadarFilter);
-    let matchesPm = false;
-    if (pmSet.has('retire_now') && (st.code === 'RETIRE_NOW' || st.code === 'EXPIRED')) matchesPm = true;
-    else if (pmSet.has('drainage') && st.code === 'DRAINAGE_PM') matchesPm = true;
-    else if (pmSet.has('upcoming') && st.code === 'UPCOMING') matchesPm = true;
-    else if (pmSet.has('en_regla') && st.code === 'NORMAL') matchesPm = true;
-    else if (pmSet.has('canje_proveedor') && st.actionType === 'CANJE_PROVEEDOR') matchesPm = true;
-    else if (pmSet.has('merma_directa') && st.actionType === 'MERMA_DIRECTA') matchesPm = true;
-    else if (pmSet.has('orphan_catalog') && item._isOrphan) matchesPm = true;
-    if (!matchesPm) return false;
+    if (!matchesPmRadarFilter({ ...st, isOrphan: item._isOrphan }, filterConfig.pmRadarFilter)) {
+      return false;
+    }
   }
 
   // Orphan catalog flag match
@@ -471,7 +493,7 @@ export function itemMatchesSlice(
 
   // 4. Event Category match
   if (filterConfig.eventFilter && filterConfig.eventFilter.length > 0) {
-    const cat = getEventCategory(item, headers);
+    const cat = itemCategory;
     if (!cat || !filterConfig.eventFilter.includes(cat)) {
       return false;
     }
@@ -480,8 +502,9 @@ export function itemMatchesSlice(
   // 5. Event Resolution / Traspaso Status match
   if (filterConfig.eventResolutionFilter && filterConfig.eventResolutionFilter.length > 0) {
     const res = getItemResolutionStatus(item, headers);
-    const status = res.isResolved ? 'completed' : 'pending';
-    if (!filterConfig.eventResolutionFilter.includes(status)) {
+    const traspasoCol = findColumnBySemantic(headers, 'n_traspaso');
+    const traspasoVal = traspasoCol ? item[traspasoCol] : undefined;
+    if (!matchesEventResolutionFilter(res.isResolved, traspasoVal, filterConfig.eventResolutionFilter)) {
       return false;
     }
   }
@@ -497,16 +520,9 @@ export function itemMatchesSlice(
 
   // 7. Column filters match
   if (filterConfig.columnFilters && Object.keys(filterConfig.columnFilters).length > 0) {
-    for (const [colName, allowedVals] of Object.entries(filterConfig.columnFilters)) {
-      if (allowedVals && allowedVals.length > 0) {
-        const rawVal = item[colName];
-        const valStr = rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== ''
-          ? String(rawVal).trim()
-          : '(Vacío)';
-        if (!allowedVals.includes(valStr)) {
-          return false;
-        }
-      }
+    const activeColEntries = Object.entries(filterConfig.columnFilters) as [string, string[]][];
+    if (!matchesColumnFilters(item, activeColEntries)) {
+      return false;
     }
   }
 

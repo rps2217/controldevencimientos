@@ -7,7 +7,18 @@ import {
   createColumnsContext 
 } from '../utils/dateCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
-import { parseAnyDate, formatDisplayDate, createMetricsAccumulator } from '../utils/pureCalculations';
+import { 
+  formatDisplayDate, 
+  createMetricsAccumulator,
+  computeItemRawStatus,
+  isExpiryDomainItem,
+  isIncidenceDomainItem,
+  matchesPmRadarFilter,
+  matchesEventResolutionFilter,
+  matchesMonthOffsetFilter,
+  matchesColumnFilters,
+  matchesSearchTerm
+} from '../utils/pureCalculations';
 import { augmentItemsWithVirtualColumns, getSchemaVirtualColumns } from '../utils/virtualColumnsEvaluator';
 import { detectTableCapabilities } from '../utils/sliceRegistry';
 import { sortInventoryItems, compareItemValues } from '../utils/sortUtils';
@@ -361,7 +372,6 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
 
       const fallbackColContext = createColumnsContext(headers);
       const traspasoCol = hasEventResFilter ? (fallbackColContext.traspasoCol || findColumnBySemantic(headers, 'n_traspaso') || 'N_TRASPASO') : '';
-      const vcCol = fallbackColContext.vcCol;
       const term = (deferredSearchTerm.trim() || activeQuickChip || '').toLowerCase();
       const hasSearch = term.length > 0;
 
@@ -375,7 +385,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
         // el worker (`inventoryWorker.ts`), para que las dos rutas no puedan divergir.
         if (canExpire) {
           const cat = getEventCategory(item, headers, fallbackColContext);
-          if (cat !== 'VENCIMIENTO') {
+          if (!isExpiryDomainItem(cat)) {
             continue;
           }
           if (frcBodFilterSet && frcBodCol) {
@@ -385,49 +395,23 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
           }
           if (pmRadarFilterSet) {
             const st = getItemStatus(item, headers, fallbackColContext);
-            let matchPm = false;
-            if (pmRadarFilterSet.has('drainage') && st.code === 'DRAINAGE_PM') matchPm = true;
-            else if (pmRadarFilterSet.has('upcoming') && st.code === 'UPCOMING') matchPm = true;
-            else if (pmRadarFilterSet.has('retire_now') && (st.code === 'RETIRE_NOW' || st.code === 'EXPIRED')) matchPm = true;
-            else if (pmRadarFilterSet.has('en_regla') && st.code === 'NORMAL') matchPm = true;
-            else if (pmRadarFilterSet.has('canje_proveedor') && st.actionType === 'CANJE_PROVEEDOR') matchPm = true;
-            else if (pmRadarFilterSet.has('merma_directa') && st.actionType === 'MERMA_DIRECTA') matchPm = true;
-            else if (pmRadarFilterSet.has('orphan_catalog') && item._isOrphan) matchPm = true;
-            if (!matchPm) continue;
-          }
-          if (dynamicMonthRange) {
-            const today = new Date();
-            let dVc = null;
-            if (vcCol && item[vcCol]) {
-              dVc = parseAnyDate(item[vcCol]);
-            }
-            if (dVc) {
-              const offset = (dVc.getFullYear() - today.getFullYear()) * 12 + dVc.getMonth() - today.getMonth();
-              if (offset < dynamicMonthRange.startOffset || offset > dynamicMonthRange.endOffset) {
-                continue;
-              }
-            } else {
+            if (!matchesPmRadarFilter({ ...st, isOrphan: item._isOrphan }, pmRadarFilterSet)) {
               continue;
             }
-          } else if (dynamicMonthFilter && dynamicMonthFilter.length > 0) {
-            const today = new Date();
-            let dVc = null;
-            if (vcCol && item[vcCol]) {
-              dVc = parseAnyDate(item[vcCol]);
-            }
-            if (dVc) {
-              const offset = (dVc.getFullYear() - today.getFullYear()) * 12 + dVc.getMonth() - today.getMonth();
-              if (!dynamicMonthFilter.includes(offset)) {
-                continue;
-              }
-            } else {
+          }
+          if (dynamicMonthRange || (dynamicMonthFilter && dynamicMonthFilter.length > 0)) {
+            const rawStatus = computeItemRawStatus(item, headers, fallbackColContext);
+            if (!matchesMonthOffsetFilter(rawStatus.expiryMonthOffset, dynamicMonthRange, dynamicMonthFilter)) {
               continue;
             }
           }
         } else if (canLogEvents) {
-          if (eventFilterSet) {
-            const cat = getEventCategory(item, headers, fallbackColContext);
-            if (!cat || !eventFilterSet.has(cat)) continue;
+          const cat = getEventCategory(item, headers, fallbackColContext);
+          if (!isIncidenceDomainItem(cat)) {
+            continue;
+          }
+          if (eventFilterSet && (!cat || !eventFilterSet.has(cat))) {
+            continue;
           }
           if (frcBodFilterSet && frcBodCol) {
             const val = item[frcBodCol];
@@ -436,47 +420,21 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
           }
           if (eventResFilterSet) {
             const isResolved = getItemResolutionStatus(item, headers, fallbackColContext).isResolved;
-            const status = isResolved ? 'completed' : 'pending';
             const traspasoVal = item[traspasoCol];
-            const matchRes = eventResFilterSet.has(status) || (traspasoVal && eventResFilterSet.has(String(traspasoVal)));
-            if (!matchRes) continue;
+            if (!matchesEventResolutionFilter(isResolved, traspasoVal, eventResFilterSet)) {
+              continue;
+            }
           }
         }
 
         // Column filters
-        if (hasColFilters) {
-          let matchCols = true;
-          for (let j = 0; j < activeColFilterEntries.length; j++) {
-            const [colName, valSet] = activeColFilterEntries[j];
-            let val = item[colName];
-            if (val === undefined) {
-              const matchedKey = Object.keys(item).find(
-                (k) => k.toLowerCase().trim() === colName.toLowerCase().trim()
-              );
-              if (matchedKey) {
-                val = item[matchedKey];
-              }
-            }
-            const valStr = val !== undefined && val !== null && String(val).trim() !== '' ? String(val).trim() : '(Vacío)';
-            if (!valSet.has(valStr)) {
-              matchCols = false;
-              break;
-            }
-          }
-          if (!matchCols) continue;
+        if (hasColFilters && !matchesColumnFilters(item, activeColFilterEntries)) {
+          continue;
         }
 
         // Global text search
-        if (hasSearch) {
-          let matchSearch = false;
-          for (let j = 0; j < searchableHeaders.length; j++) {
-            const val = item[searchableHeaders[j]];
-            if (val !== undefined && val !== null && String(val).toLowerCase().includes(term)) {
-              matchSearch = true;
-              break;
-            }
-          }
-          if (!matchSearch) continue;
+        if (hasSearch && !matchesSearchTerm(item, searchableHeaders, term)) {
+          continue;
         }
 
         rawFiltered.push(item);

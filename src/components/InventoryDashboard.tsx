@@ -23,7 +23,7 @@ import { useTicketPrinting } from '../hooks/useTicketPrinting';
 import { useModuleViewState } from '../hooks/useModuleViewState';
 import { useTableVirtualization } from '../hooks/useTableVirtualization';
 import { useInventoryMutations } from '../hooks/useInventoryMutations';
-import { STORAGE_KEYS, readStorage, writeStorage, sheetConfigShapeSchema } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, writeStorage, readStorageWithIndexedDbFallback, sheetConfigShapeSchema } from '../utils/appStorage';
 
 // Helpers para almacenamiento persistente y configuración modular
 import { mergeCloudConfigs, ModuleViewState } from '../utils/dashboardConfigUtils';
@@ -110,6 +110,15 @@ export const InventoryDashboard: React.FC = () => {
   const [sheetConfig, setSheetConfig] = useState<SheetConfig>(() =>
     readStorage<SheetConfig>(STORAGE_KEYS.SHEET_CONFIG, sheetConfigShapeSchema, {})
   );
+
+  // Hidratación asíncrona unificada desde IndexedDB si localStorage estaba vacío o corrupto
+  useEffect(() => {
+    readStorageWithIndexedDbFallback<SheetConfig>(STORAGE_KEYS.SHEET_CONFIG, sheetConfigShapeSchema, {}).then((recovered) => {
+      if (recovered && Object.keys(recovered).length > 0) {
+        setSheetConfig(prev => (!prev || Object.keys(prev).length === 0) ? recovered : prev);
+      }
+    }).catch(() => {});
+  }, []);
 
   // Puente hacia `useInventoryData.fetchData`: se asigna tras declararlo. El
   // callback de sincronización lo lee al vaciar la cola, no durante el render,

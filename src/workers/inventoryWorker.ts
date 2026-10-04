@@ -7,7 +7,14 @@ import {
   createMetricsAccumulator,
   MetricsResult,
   ItemStatusCode,
-  ItemActionType 
+  ItemActionType,
+  isExpiryDomainItem,
+  isIncidenceDomainItem,
+  matchesPmRadarFilter,
+  matchesEventResolutionFilter,
+  matchesMonthOffsetFilter,
+  matchesColumnFilters,
+  matchesSearchTerm
 } from '../utils/pureCalculations';
 
 export interface WorkerNormalizedItem {
@@ -221,95 +228,44 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
       // View constraints. `VENC. CERC.` es un evento FRC, no vencimiento: el radar
       // sólo admite VENCIMIENTO puro y el registro FRC todo lo demás.
       if (canExpire) {
-        if (item.eventCategory !== 'VENCIMIENTO') {
+        if (!isExpiryDomainItem(item.eventCategory)) {
           continue;
         }
         if (frcBodFilterSet && frcBodCol) {
           if (!frcBodFilterSet.has(item.bodegaVal)) continue;
         }
-        if (pmRadarFilterSet) {
-          let matchPm = false;
-          if (pmRadarFilterSet.has('drainage') && item.statusCode === 'DRAINAGE_PM') matchPm = true;
-          else if (pmRadarFilterSet.has('upcoming') && item.statusCode === 'UPCOMING') matchPm = true;
-          else if (
-            pmRadarFilterSet.has('retire_now') &&
-            (item.statusCode === 'RETIRE_NOW' || item.statusCode === 'EXPIRED')
-          )
-            matchPm = true;
-          else if (pmRadarFilterSet.has('en_regla') && item.statusCode === 'NORMAL') matchPm = true;
-          else if (pmRadarFilterSet.has('canje_proveedor') && item.actionType === 'CANJE_PROVEEDOR') matchPm = true;
-          else if (pmRadarFilterSet.has('merma_directa') && item.actionType === 'MERMA_DIRECTA') matchPm = true;
-          else if (pmRadarFilterSet.has('orphan_catalog') && item.isOrphan) matchPm = true;
-          if (!matchPm) continue;
+        if (pmRadarFilterSet && !matchesPmRadarFilter(item, pmRadarFilterSet)) {
+          continue;
         }
-        if (dynamicMonthRange) {
-          if (
-            item.expiryMonthOffset === null ||
-            item.expiryMonthOffset < dynamicMonthRange.startOffset ||
-            item.expiryMonthOffset > dynamicMonthRange.endOffset
-          ) {
-            continue;
-          }
-        } else if (dynamicMonthFilter && dynamicMonthFilter.length > 0) {
-          if (item.expiryMonthOffset === null || !dynamicMonthFilter.includes(item.expiryMonthOffset)) {
-            continue;
-          }
+        if (!matchesMonthOffsetFilter(item.expiryMonthOffset, dynamicMonthRange, dynamicMonthFilter)) {
+          continue;
         }
       } else if (canLogEvents) {
-        if (eventFilterSet) {
-          if (!eventFilterSet.has(item.eventCategory)) continue;
+        if (!isIncidenceDomainItem(item.eventCategory)) {
+          continue;
+        }
+        if (eventFilterSet && !eventFilterSet.has(item.eventCategory)) {
+          continue;
         }
         if (frcBodFilterSet && frcBodCol) {
           if (!frcBodFilterSet.has(item.bodegaVal)) continue;
         }
-        if (eventResFilterSet) {
-          const status = item.isResolved ? 'completed' : 'pending';
-          const matchRes =
-            eventResFilterSet.has(status) ||
-            (item.traspasoVal && eventResFilterSet.has(item.traspasoVal));
-          if (!matchRes) continue;
+        if (eventResFilterSet && !matchesEventResolutionFilter(item.isResolved, item.traspasoVal, eventResFilterSet)) {
+          continue;
         }
       }
 
       // Column filters
-      if (hasColFilters) {
-        let matchCols = true;
-        for (let j = 0; j < activeColFilterEntries.length; j++) {
-          const [colName, valSet] = activeColFilterEntries[j];
-          let rawVal = item.original[colName];
-          if (rawVal === undefined) {
-            const matchedKey = Object.keys(item.original).find(
-              (k) => k.toLowerCase().trim() === colName.toLowerCase().trim()
-            );
-            if (matchedKey) {
-              rawVal = item.original[matchedKey];
-            }
-          }
-          const valStr =
-            rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== ''
-              ? String(rawVal).trim()
-              : '(Vacío)';
-          if (!valSet.has(valStr)) {
-            matchCols = false;
-            break;
-          }
-        }
-        if (!matchCols) continue;
+      if (hasColFilters && !matchesColumnFilters(item.original, activeColFilterEntries)) {
+        continue;
       }
 
       // Fast dynamic early-exit search
       if (hasSearch) {
-        let matchSearch = false;
         const searchCols = cachedSearchableHeaders.length > 0 ? cachedSearchableHeaders : cachedHeaders;
-        for (let s = 0; s < searchCols.length; s++) {
-          const colName = searchCols[s];
-          const sVal = item.original[colName];
-          if (sVal !== undefined && sVal !== null && String(sVal).toLowerCase().includes(term)) {
-            matchSearch = true;
-            break;
-          }
+        if (!matchesSearchTerm(item.original, searchCols, term)) {
+          continue;
         }
-        if (!matchSearch) continue;
       }
 
       matchingIndices.push(item.index);

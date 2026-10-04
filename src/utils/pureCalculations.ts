@@ -717,3 +717,145 @@ export function computeGroupAggregates(
     totalCount: items.length
   };
 }
+
+/**
+ * --------------------------------------------------------------------------
+ * UNIFIED FILTER DOMAIN PREDICATES (SSOT - Single Source of Truth)
+ * Consumed by inventoryWorker.ts, useInventoryFiltering.ts, and sliceRegistry.ts
+ * --------------------------------------------------------------------------
+ */
+
+/**
+ * Partición estricta de dominios:
+ * - Vencimientos sólo admite VENCIMIENTO puro.
+ * - Incidencias (FRC) admite todo lo demás (incluido VENCIMIENTO_CERCANO, TRANSPORTE, DIFERENCIA, etc.).
+ */
+export function isExpiryDomainItem(eventCategory: string | null | undefined): boolean {
+  return eventCategory === 'VENCIMIENTO';
+}
+
+export function isIncidenceDomainItem(eventCategory: string | null | undefined): boolean {
+  return eventCategory !== 'VENCIMIENTO';
+}
+
+export interface PmRadarMatchCriteria {
+  statusCode?: string;
+  code?: string;
+  actionType?: string;
+  isOrphan?: boolean;
+}
+
+/**
+ * Predicado de coincidencia para el Radar PM y estados de vencimiento
+ */
+export function matchesPmRadarFilter(
+  criteria: PmRadarMatchCriteria,
+  pmRadarFilter: Set<string> | ReadonlyArray<string>
+): boolean {
+  const filterSet = pmRadarFilter instanceof Set ? pmRadarFilter : new Set(pmRadarFilter);
+  if (filterSet.size === 0) return true;
+
+  const code = criteria.statusCode || criteria.code;
+  const { actionType, isOrphan } = criteria;
+
+  if (filterSet.has('retire_now') && (code === 'RETIRE_NOW' || code === 'EXPIRED')) return true;
+  if (filterSet.has('drainage') && code === 'DRAINAGE_PM') return true;
+  if (filterSet.has('upcoming') && code === 'UPCOMING') return true;
+  if (filterSet.has('en_regla') && code === 'NORMAL') return true;
+  if (filterSet.has('canje_proveedor') && actionType === 'CANJE_PROVEEDOR') return true;
+  if (filterSet.has('merma_directa') && actionType === 'MERMA_DIRECTA') return true;
+  if (filterSet.has('orphan_catalog') && !!isOrphan) return true;
+
+  return false;
+}
+
+/**
+ * Predicado de coincidencia para la resolución de eventos (pendiente/completado o folio de traspaso)
+ */
+export function matchesEventResolutionFilter(
+  isResolved: boolean,
+  traspasoVal: unknown,
+  eventResFilter: Set<string> | ReadonlyArray<string>
+): boolean {
+  const filterSet = eventResFilter instanceof Set ? eventResFilter : new Set(eventResFilter);
+  if (filterSet.size === 0) return true;
+
+  const status = isResolved ? 'completed' : 'pending';
+  const traspasoStr = traspasoVal !== undefined && traspasoVal !== null ? String(traspasoVal).trim() : '';
+
+  return filterSet.has(status) || (traspasoStr !== '' && filterSet.has(traspasoStr));
+}
+
+/**
+ * Predicado para filtro dinámico de meses por rango u offset puntual
+ */
+export function matchesMonthOffsetFilter(
+  expiryMonthOffset: number | null | undefined,
+  dynamicMonthRange?: { startOffset: number; endOffset: number } | null,
+  dynamicMonthFilter?: ReadonlyArray<number> | null
+): boolean {
+  if (dynamicMonthRange) {
+    if (expiryMonthOffset === null || expiryMonthOffset === undefined) return false;
+    return expiryMonthOffset >= dynamicMonthRange.startOffset && expiryMonthOffset <= dynamicMonthRange.endOffset;
+  }
+  if (dynamicMonthFilter && dynamicMonthFilter.length > 0) {
+    if (expiryMonthOffset === null || expiryMonthOffset === undefined) return false;
+    return dynamicMonthFilter.includes(expiryMonthOffset);
+  }
+  return true;
+}
+
+/**
+ * Predicado para filtros por columnas específicas
+ */
+export function matchesColumnFilters(
+  row: Record<string, unknown>,
+  activeColFilterEntries: ReadonlyArray<[string, Set<string> | ReadonlyArray<string>]>
+): boolean {
+  if (activeColFilterEntries.length === 0) return true;
+
+  for (let j = 0; j < activeColFilterEntries.length; j++) {
+    const [colName, valContainer] = activeColFilterEntries[j];
+    const valSet = valContainer instanceof Set ? valContainer : new Set(valContainer);
+    if (valSet.size === 0) continue;
+
+    let rawVal = row[colName];
+    if (rawVal === undefined) {
+      const colLower = colName.toLowerCase().trim();
+      const matchedKey = Object.keys(row).find(
+        (k) => k.toLowerCase().trim() === colLower
+      );
+      if (matchedKey) {
+        rawVal = row[matchedKey];
+      }
+    }
+    const valStr =
+      rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== ''
+        ? String(rawVal).trim()
+        : '(Vacío)';
+    if (!valSet.has(valStr)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Predicado para búsqueda de texto libre sobre columnas designadas
+ */
+export function matchesSearchTerm(
+  row: Record<string, unknown>,
+  searchableHeaders: ReadonlyArray<string>,
+  searchTermLower: string
+): boolean {
+  if (!searchTermLower) return true;
+
+  for (let s = 0; s < searchableHeaders.length; s++) {
+    const colName = searchableHeaders[s];
+    const sVal = row[colName];
+    if (sVal !== undefined && sVal !== null && String(sVal).toLowerCase().includes(searchTermLower)) {
+      return true;
+    }
+  }
+  return false;
+}

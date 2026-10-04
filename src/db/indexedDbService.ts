@@ -3,7 +3,17 @@
  * Reemplaza el frágil límite de 5MB de localStorage por una base de datos local
  * asíncrona, robusta y capaz de almacenar cientos de miles de registros y colas de mutación.
  */
-import { STORAGE_KEYS, sheetCacheKey, readStorage, writeStorage, objectArraySchema, cachedSheetSchema, type CachedSheetFallback } from '../utils/appStorage';
+import { 
+  STORAGE_KEYS, 
+  sheetCacheKey, 
+  readStorage, 
+  writeStorage, 
+  objectArraySchema, 
+  cachedSheetSchema, 
+  type CachedSheetFallback,
+  registerIndexedDbWriter,
+  registerIndexedDbReader
+} from '../utils/appStorage';
 import { isFailedMutation } from '../utils/offlineQueueUtils';
 import type { SheetRow, CellValue } from '../lib/sheets';
 
@@ -869,3 +879,7 @@ class IndexedDbService {
 }
 
 export const indexedDbService = new IndexedDbService();
+
+// Conexión unificada bidireccional entre appStorage e IndexedDB
+registerIndexedDbWriter((key, value) => indexedDbService.saveSetting(key, value));
+registerIndexedDbReader((key) => indexedDbService.getSetting(key, null));

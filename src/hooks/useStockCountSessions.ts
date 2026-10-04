@@ -2,12 +2,14 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { StockCountSession, InventoryCampaign } from '../types';
 import { 
   loadStockCountSessionsFromStorage, 
+  loadStockCountSessionsFromStorageAsync,
   flushStockCountSessionsToStorage, 
   playBeep, 
   getOrCreateDeviceId 
 } from '../utils/stockCountUtils';
 import { 
   loadCampaignsFromStorage, 
+  loadCampaignsFromStorageAsync,
   saveCampaignsToStorage, 
   getActiveCampaignId, 
   setActiveCampaignId 
@@ -63,6 +65,29 @@ export function useStockCountSessions({ showToast }: UseStockCountSessionsProps)
       localStorage.setItem('app_deleted_session_ids_v1', JSON.stringify(deletedSessionIds));
     } catch {}
   }, [deletedSessionIds]);
+
+  // Hidratación asíncrona desde IndexedDB si localStorage fue limpiado o superó su cuota
+  useEffect(() => {
+    let isMounted = true;
+    Promise.all([
+      loadCampaignsFromStorageAsync(),
+      loadStockCountSessionsFromStorageAsync()
+    ]).then(([asyncCampaigns, asyncSessions]) => {
+      if (!isMounted) return;
+      if (asyncCampaigns.length > 0) {
+        setCampaigns(prev => prev.length === 0 ? asyncCampaigns : prev);
+      }
+      if (asyncSessions.length > 0) {
+        setSessions(prev => prev.length === 0 ? asyncSessions : prev);
+      }
+    }).catch((err) => {
+      console.warn('[Storage] Hydration from IndexedDB failed:', err);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Active session entity
   const activeSession = useMemo(() => {

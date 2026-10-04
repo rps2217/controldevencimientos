@@ -128,13 +128,66 @@ export function readStorageValidated<T>(
   }
 }
 
-/** Escritura tolerante: en modo privado o cuota llena no debe tumbar la acción. */
+// Conectores desacoplados para respaldo asíncrono en IndexedDB (evita dependencia circular)
+let indexedDbWriter: ((key: string, value: unknown) => Promise<void>) | null = null;
+let indexedDbReader: ((key: string) => Promise<unknown>) | null = null;
+
+export function registerIndexedDbWriter(writer: (key: string, value: unknown) => Promise<void>): void {
+  indexedDbWriter = writer;
+}
+
+export function registerIndexedDbReader(reader: (key: string) => Promise<unknown>): void {
+  indexedDbReader = reader;
+}
+
+/** Escritura tolerante y unificada: escribe en localStorage y respalda asíncronamente en IndexedDB. */
 export function writeStorage(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    // Storage no disponible o lleno: la app sigue con estado en memoria.
+    // Si localStorage está lleno o bloqueado por cuota (5MB), la escritura en IndexedDB asegura persistencia
   }
+
+  if (indexedDbWriter) {
+    indexedDbWriter(key, value).catch(() => {});
+  }
+}
+
+/**
+ * Lectura asíncrona unificada con respaldo en IndexedDB.
+ * Si localStorage está vacío o corrupto (o superó la cuota de 5MB),
+ * recupera los datos íntegros desde IndexedDB y repara la caché local.
+ */
+export async function readStorageWithIndexedDbFallback<T>(
+  key: string,
+  schema: z.ZodType,
+  fallback: T
+): Promise<T> {
+  const localVal = readStorage<T | null>(key, schema, null as unknown as T);
+  if (localVal !== null && localVal !== undefined) {
+    return localVal;
+  }
+
+  if (indexedDbReader) {
+    try {
+      const idbVal = await indexedDbReader(key);
+      if (idbVal !== null && idbVal !== undefined) {
+        const parsed = schema.safeParse(idbVal);
+        if (parsed.success) {
+          try {
+            localStorage.setItem(key, JSON.stringify(parsed.data));
+          } catch {
+            // Cuota de localStorage llena: los datos siguen existiendo íntegros en IndexedDB
+          }
+          return parsed.data as T;
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  return fallback;
 }
 
 /**
