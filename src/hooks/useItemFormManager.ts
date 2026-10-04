@@ -324,6 +324,11 @@ export function useItemFormManager({
     return errors;
   }, [activeSheet, sheetConfig, canLogEvents, headers, selectedEventCategory, formData]);
 
+  const hasFormula = useCallback((colName: string | undefined) => {
+    if (!colName || !sheetConfig?.schema) return false;
+    return Object.values(sheetConfig.schema).some(s => s?.[colName]?.formula && s[colName].formula.trim());
+  }, [sheetConfig?.schema]);
+
   const handleFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     let newForm = { ...formData, [name]: value };
@@ -346,15 +351,15 @@ export function useItemFormManager({
       const diasRetiroCol = findColumnBySemantic(headers, 'dias_retiro', sheetConfig?.customAliases) || 
                             findColumnBySemantic(headers, 'dias_anticipacion', sheetConfig?.customAliases);
       
-      if (descriptionCol) newForm[descriptionCol] = '';
-      if (providerCol) newForm[providerCol] = '';
-      if (policyCol) newForm[policyCol] = '';
-      if (diasRetiroCol) newForm[diasRetiroCol] = '';
+      if (descriptionCol && !hasFormula(descriptionCol)) newForm[descriptionCol] = '';
+      if (providerCol && !hasFormula(providerCol)) newForm[providerCol] = '';
+      if (policyCol && !hasFormula(policyCol)) newForm[policyCol] = '';
+      if (diasRetiroCol && !hasFormula(diasRetiroCol)) newForm[diasRetiroCol] = '';
     }
 
     newForm = autoCalculateItemFormData(newForm, headers, products, policies, sheetConfig);
     setFormData(newForm);
-  }, [formData, formErrors, headers, sheetConfig, products, policies]);
+  }, [formData, formErrors, headers, sheetConfig, products, policies, hasFormula]);
 
   const handleBatchFormUpdate = useCallback((updates: Record<string, string>) => {
     let newForm = { ...formData, ...updates };
@@ -369,10 +374,10 @@ export function useItemFormManager({
       const diasRetiroCol = findColumnBySemantic(headers, 'dias_retiro', sheetConfig?.customAliases) || 
                             findColumnBySemantic(headers, 'dias_anticipacion', sheetConfig?.customAliases);
       
-      if (descriptionCol && !updates[descriptionCol]) newForm[descriptionCol] = '';
-      if (providerCol && !updates[providerCol]) newForm[providerCol] = '';
-      if (policyCol && !updates[policyCol]) newForm[policyCol] = '';
-      if (diasRetiroCol && !updates[diasRetiroCol]) newForm[diasRetiroCol] = '';
+      if (descriptionCol && !updates[descriptionCol] && !hasFormula(descriptionCol)) newForm[descriptionCol] = '';
+      if (providerCol && !updates[providerCol] && !hasFormula(providerCol)) newForm[providerCol] = '';
+      if (policyCol && !updates[policyCol] && !hasFormula(policyCol)) newForm[policyCol] = '';
+      if (diasRetiroCol && !updates[diasRetiroCol] && !hasFormula(diasRetiroCol)) newForm[diasRetiroCol] = '';
     }
 
     if (Object.keys(updates).some(k => formErrors[k])) {
@@ -385,7 +390,7 @@ export function useItemFormManager({
 
     newForm = autoCalculateItemFormData(newForm, headers, products, policies, sheetConfig);
     setFormData(newForm);
-  }, [formData, formErrors, headers, sheetConfig, products, policies]);
+  }, [formData, formErrors, headers, sheetConfig, products, policies, hasFormula]);
 
   // El objeto se recreaba en cada render y alimenta ~10 miembros del contexto.
   // Devolver una referencia estable es requisito para que el value del

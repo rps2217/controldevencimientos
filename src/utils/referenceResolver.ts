@@ -952,19 +952,32 @@ export function autoCalculateItemFormData(
     }
   }
 
+  // Identify columns that have explicit AppSheet formulas in table schema
+  const columnsWithFormulas = new Set<string>();
+  if (sheetConfig?.schema) {
+    for (const [_, colSchemas] of Object.entries(sheetConfig.schema)) {
+      if (!colSchemas) continue;
+      Object.entries(colSchemas).forEach(([colName, colSchema]) => {
+        if (colSchema?.formula && colSchema.formula.trim()) {
+          columnsWithFormulas.add(colName);
+        }
+      });
+    }
+  }
+
   // 3. UNIFIED RESOLUTION of Policy, Withdrawal Days, and Withdrawal Date
   const policyRes = resolveItemPolicyAndRetiro(newForm, headers, products, policies, customAliases);
 
-  // 4. Auto-fill POLITICA
-  if (policyCol) {
+  // 4. Auto-fill POLITICA (skip if column has explicit formula)
+  if (policyCol && !columnsWithFormulas.has(policyCol)) {
     if (!newForm[policyCol] || newForm[policyCol].trim() === '' || newForm[policyCol] === 'Canje Estándar (30 días)') {
       newForm[policyCol] = policyRes.policy;
     }
   }
   newForm._politica = policyRes.policy;
 
-  // 5. Auto-fill PM if empty
-  if (pmCol && (!newForm[pmCol] || newForm[pmCol].trim() === '')) {
+  // 5. Auto-fill PM if empty (skip if column has explicit formula)
+  if (pmCol && !columnsWithFormulas.has(pmCol) && (!newForm[pmCol] || newForm[pmCol].trim() === '')) {
     if (masterProduct) {
       const masterPmCol = Object.keys(masterProduct).find(k => /pm|product_manager|responsable|comprador|gestor|jefe/i.test(k));
       if (masterPmCol && masterProduct[masterPmCol]) {
@@ -973,8 +986,8 @@ export function autoCalculateItemFormData(
     }
   }
 
-  // 6. Auto-fill DIAS_RETIRO
-  if (diasRetiroCol) {
+  // 6. Auto-fill DIAS_RETIRO (skip if column has explicit formula)
+  if (diasRetiroCol && !columnsWithFormulas.has(diasRetiroCol)) {
     const currentDaysVal = String(newForm[diasRetiroCol] || '').trim();
     if (
       currentDaysVal === '' || 
@@ -988,14 +1001,16 @@ export function autoCalculateItemFormData(
   }
   newForm._diasRetiro = String(policyRes.diasRetiro);
 
-  // 7. FECHA_RETIRO Calculation (Consistently uses resolveItemPolicyAndRetiro / calculateWithdrawalDate)
+  // 7. FECHA_RETIRO Calculation (skip if column has explicit formula)
   if (policyRes.fechaRetiroDisplay && policyRes.fechaRetiroDisplay !== '-') {
     headers.forEach(h => {
-      if (/fecha(_|\s)?retiro/i.test(h) || /retiro(_|\s)?calc/i.test(h) || /^fecha(_|\s)?canje/i.test(h)) {
-        newForm[h] = policyRes.fechaRetiroDisplay;
+      if (!columnsWithFormulas.has(h)) {
+        if (/fecha(_|\s)?retiro/i.test(h) || /retiro(_|\s)?calc/i.test(h) || /^fecha(_|\s)?canje/i.test(h)) {
+          newForm[h] = policyRes.fechaRetiroDisplay;
+        }
       }
     });
-    if (fechaRetiroCol) {
+    if (fechaRetiroCol && !columnsWithFormulas.has(fechaRetiroCol)) {
       newForm[fechaRetiroCol] = policyRes.fechaRetiroDisplay;
     }
     newForm['FECHA_RETIRO_CALC'] = policyRes.fechaRetiroDisplay;
