@@ -146,15 +146,7 @@ export const DashboardTopNav: React.FC = () => {
               <h1 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-slate-100 tracking-tight whitespace-nowrap">
                 {viewMeta.title}
               </h1>
-              <span className="text-slate-400 dark:text-slate-500 text-xs font-mono tabular-nums shrink-0 font-medium">
-                · {filteredItems.length} reg.
-              </span>
             </div>
-            {isRelationalActive && activeView === 'main' && (
-              <span className="hidden xl:inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Relacional
-              </span>
-            )}
           </div>
         </div>
 
@@ -239,15 +231,6 @@ export const DashboardTopNav: React.FC = () => {
             </button>
           )}
 
-          {/* Camera Scan Trigger on Mobile & Tablet */}
-          <button
-            onClick={() => setIsScannerOpen(true)}
-            className="app-button bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 w-10 h-10 flex items-center justify-center shrink-0"
-            title="Escanear con cámara"
-          >
-            <Scan className="w-4 h-4" />
-          </button>
-
           {/* Conteo Físico Terminal (Desktop & Tablet) */}
           {canCount && (
             <button
@@ -273,29 +256,27 @@ export const DashboardTopNav: React.FC = () => {
             </button>
           </div>
 
-          {/* Sync Indicator */}
-          <div 
-            onClick={onOpenSyncAudit}
-            className="hidden lg:flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-2xs shrink-0 cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-all group"
-            title={
-              isSyncing 
-                ? 'Sincronizando cambios...' 
-                : isOffline 
-                  ? 'Modo sin conexión' 
-                  : `En línea${latencyMs ? ` · ${latencyMs}ms` : ''}`
-            }
-          >
-            {isSyncing ? (
-              <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin shrink-0" />
-            ) : isOffline ? (
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-            ) : (
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-            )}
-            <span className="text-slate-600 dark:text-slate-300 text-[11px] font-medium hidden xl:inline">
-              {isSyncing ? 'Sincronizando' : isOffline ? 'Offline' : 'En línea'}
-            </span>
-          </div>
+          {/* Sync Indicator (shown only during active sync or offline) */}
+          {(isSyncing || isOffline) && (
+            <div 
+              onClick={onOpenSyncAudit}
+              className="hidden lg:flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-2xs shrink-0 cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-all group"
+              title={
+                isSyncing 
+                  ? 'Sincronizando cambios...' 
+                  : 'Modo sin conexión'
+              }
+            >
+              {isSyncing ? (
+                <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin shrink-0" />
+              ) : (
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              )}
+              <span className="text-slate-600 dark:text-slate-300 text-[11px] font-medium hidden xl:inline">
+                {isSyncing ? 'Sincronizando' : 'Offline'}
+              </span>
+            </div>
+          )}
 
           {/* Refresh button */}
           <button 
