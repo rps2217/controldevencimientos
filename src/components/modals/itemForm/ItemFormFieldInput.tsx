@@ -318,35 +318,40 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
               name={header}
               value={currentValue}
               onChange={handleChange}
-              placeholder={`Ingresar o pegar ${header}...`}
-              className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl pl-3.5 pr-16 py-2 text-sm font-mono font-bold text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none transition-all ${
-                hasError 
-                  ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-                  : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+              readOnly={isAutoCalc}
+              placeholder={isAutoCalc ? 'Calculado automáticamente por fórmula' : `Ingresar o pegar ${header}...`}
+              className={`w-full border rounded-xl pl-3.5 pr-16 py-2 text-sm font-mono font-bold placeholder-slate-400 outline-none transition-all ${
+                isAutoCalc
+                  ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+                  : hasError 
+                    ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' 
+                    : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
               }`}
             />
-            <div className="absolute right-1.5 flex items-center gap-1">
-              {currentValue ? (
-                <button
-                  type="button"
-                  onClick={() => onChange({ target: { name: header, value: '' } } as React.ChangeEvent<HTMLInputElement>)}
-                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                  title="Limpiar código"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handlePasteSku}
-                  className="px-2 py-1 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-bold rounded-lg flex items-center gap-1 transition-colors"
-                  title="Pegar código desde portapapeles"
-                >
-                  <ClipboardPaste className="w-3 h-3" />
-                  <span>Pegar</span>
-                </button>
-              )}
-            </div>
+            {!isAutoCalc && (
+              <div className="absolute right-1.5 flex items-center gap-1">
+                {currentValue ? (
+                  <button
+                    type="button"
+                    onClick={() => onChange({ target: { name: header, value: '' } } as React.ChangeEvent<HTMLInputElement>)}
+                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    title="Limpiar código"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handlePasteSku}
+                    className="px-2 py-1 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-bold rounded-lg flex items-center gap-1 transition-colors"
+                    title="Pegar código desde portapapeles"
+                  >
+                    <ClipboardPaste className="w-3 h-3" />
+                    <span>Pegar</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Real-time Catalog Feedback for SKU */}
@@ -377,19 +382,22 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
               name={header}
               value={currentValue}
               onChange={handleChange}
+              readOnly={isAutoCalc}
               onFocus={() => {
-                if (currentValue && currentValue.trim().length >= 2) {
+                if (!isAutoCalc && currentValue && currentValue.trim().length >= 2) {
                   setDescSearchOpen(true);
                 }
               }}
-              placeholder="Buscar producto por nombre o escribir descripción..."
-              className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl pl-9 pr-8 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none transition-all ${
-                hasError 
-                  ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-                  : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+              placeholder={isAutoCalc ? 'Calculado automáticamente por fórmula' : 'Buscar producto por nombre o escribir descripción...'}
+              className={`w-full border rounded-xl pl-9 pr-8 py-2 text-sm outline-none transition-all ${
+                isAutoCalc
+                  ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+                  : hasError 
+                    ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' 
+                    : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
               }`}
             />
-            {currentValue && (
+            {!isAutoCalc && currentValue && (
               <button
                 type="button"
                 onClick={() => {
@@ -404,7 +412,7 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
           </div>
 
           {/* Autocomplete Dropdown */}
-          {descSearchOpen && descSearchResults.length > 0 && (
+          {!isAutoCalc && descSearchOpen && descSearchResults.length > 0 && (
             <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden divide-y divide-slate-100 dark:divide-slate-700/60 max-h-56 overflow-y-auto animate-in fade-in-50 zoom-in-95 duration-100">
               <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-900/60 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center justify-between">
                 <span>Coincidencias en Catálogo Maestro</span>
@@ -446,8 +454,11 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
               <button
                 key={choice}
                 type="button"
+                disabled={isAutoCalc}
                 onClick={() => handleYesNoToggle(choice)}
-                className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
+                className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition-all ${
+                  isAutoCalc ? 'cursor-not-allowed opacity-60 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400' : 'cursor-pointer'
+                } ${
                   isSelected
                     ? choice === 'SÍ'
                       ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm shadow-emerald-200 dark:shadow-none ring-2 ring-emerald-400/30'
@@ -473,8 +484,11 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
                 <button
                   key={opt}
                   type="button"
+                  disabled={isAutoCalc}
                   onClick={() => handleEnumListToggle(opt)}
-                  className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all ${
+                    isAutoCalc ? 'cursor-not-allowed opacity-60 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400' : 'cursor-pointer'
+                  } ${
                     isSelected
                       ? 'bg-blue-600 text-white border-blue-700 shadow-2xs'
                       : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-300'
@@ -498,8 +512,11 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
                 <button
                   key={opt}
                   type="button"
+                  disabled={isAutoCalc}
                   onClick={() => onChange({ target: { name: header, value: opt } } as React.ChangeEvent<HTMLInputElement>)}
-                  className={`flex-1 min-w-[42px] py-1.5 px-2 text-xs font-bold rounded-xl border transition-all cursor-pointer text-center truncate ${
+                  className={`flex-1 min-w-[42px] py-1.5 px-2 text-xs font-bold rounded-xl border transition-all ${
+                    isAutoCalc ? 'cursor-not-allowed opacity-60 bg-slate-100 dark:bg-slate-800 text-slate-400' : 'cursor-pointer'
+                  } text-center truncate ${
                     isSelected
                       ? 'bg-blue-600 text-white border-blue-700 shadow-sm shadow-blue-200 dark:shadow-none ring-2 ring-blue-400/20'
                       : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -515,10 +532,13 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             name={header}
             value={currentValue}
             onChange={handleChange}
-            className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 outline-none transition-all ${
-              hasError 
-                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+            disabled={isAutoCalc}
+            className={`w-full border rounded-xl px-3.5 py-2 text-sm outline-none transition-all ${
+              isAutoCalc
+                ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+                : hasError 
+                  ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' 
+                  : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
             }`}
           >
             <option value="">-- Seleccionar {colSchema?.label || header} --</option>
@@ -546,11 +566,14 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             step="any"
             value={currentValue}
             onChange={handleChange}
-            placeholder="0"
-            className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl pl-7 pr-3.5 py-2 text-sm font-mono font-bold text-slate-800 dark:text-slate-100 outline-none transition-all ${
-              hasError 
-                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+            readOnly={isAutoCalc}
+            placeholder={isAutoCalc ? 'Calculado' : '0'}
+            className={`w-full border rounded-xl pl-7 pr-3.5 py-2 text-sm font-mono font-bold outline-none transition-all ${
+              isAutoCalc
+                ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+                : hasError 
+                  ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' 
+                  : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
             }`}
           />
         </div>
@@ -565,11 +588,14 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             step="any"
             value={currentValue}
             onChange={handleChange}
-            placeholder="0"
-            className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl pl-3.5 pr-7 py-2 text-sm font-mono font-bold text-slate-800 dark:text-slate-100 outline-none transition-all ${
-              hasError 
-                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+            readOnly={isAutoCalc}
+            placeholder={isAutoCalc ? 'Calculado' : '0'}
+            className={`w-full border rounded-xl pl-3.5 pr-7 py-2 text-sm font-mono font-bold outline-none transition-all ${
+              isAutoCalc
+                ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+                : hasError 
+                  ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' 
+                  : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
             }`}
           />
           <span className="absolute right-3 font-mono font-bold text-slate-400 select-none">%</span>
@@ -582,16 +608,22 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
           <input
             type="color"
             name={header}
+            disabled={isAutoCalc}
             value={currentValue || '#3b82f6'}
             onChange={handleChange}
-            className="w-10 h-10 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent"
+            className={`w-10 h-10 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent ${isAutoCalc ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
           />
           <input
             type="text"
             value={currentValue}
             onChange={handleChange}
+            readOnly={isAutoCalc}
             placeholder="#HEX"
-            className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-mono"
+            className={`flex-1 border rounded-xl px-3 py-2 text-sm font-mono outline-none transition-all ${
+              isAutoCalc
+                ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+                : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100'
+            }`}
           />
         </div>
       ) : colSchema?.type === 'ref' ? (
@@ -600,26 +632,31 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
           <input
             type="text"
             name={header}
-            list={`datalist-ref-${header}`}
+            list={!isAutoCalc ? `datalist-ref-${header}` : undefined}
             value={currentValue}
             onChange={handleChange}
-            placeholder={`Seleccionar o escribir de ${colSchema.refTable || 'tabla relacionada'}...`}
-            className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 outline-none transition-all ${
-              hasError 
-                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+            readOnly={isAutoCalc}
+            placeholder={isAutoCalc ? 'Calculado por fórmula' : `Seleccionar o escribir de ${colSchema.refTable || 'tabla relacionada'}...`}
+            className={`w-full border rounded-xl px-3.5 py-2 text-sm outline-none transition-all ${
+              isAutoCalc
+                ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+                : hasError 
+                  ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' 
+                  : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
             }`}
           />
-          <datalist id={`datalist-ref-${header}`}>
-            {masterSummaries.map((summary, idx) => {
-              if (!summary.sku) return null;
-              return (
-                <option key={`ref-${idx}-${summary.sku}`} value={summary.sku}>
-                  {summary.name ? `${summary.sku} - ${summary.name}` : summary.sku}
-                </option>
-              );
-            })}
-          </datalist>
+          {!isAutoCalc && (
+            <datalist id={`datalist-ref-${header}`}>
+              {masterSummaries.map((summary, idx) => {
+                if (!summary.sku) return null;
+                return (
+                  <option key={`ref-${idx}-${summary.sku}`} value={summary.sku}>
+                    {summary.name ? `${summary.sku} - ${summary.name}` : summary.sku}
+                  </option>
+                );
+              })}
+            </datalist>
+          )}
         </div>
       ) : isLongTextCol ? (
         <div className="space-y-2">
@@ -628,29 +665,34 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             rows={2}
             value={formData[header] || ''}
             onChange={handleChange}
-            placeholder={`Detalles de ${header.toLowerCase()}...`}
-            className={`w-full app-input px-3.5 py-2 text-sm resize-none ${
-              hasError 
-                ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10' 
-                : ''
+            readOnly={isAutoCalc}
+            placeholder={isAutoCalc ? 'Calculado por fórmula' : `Detalles de ${header.toLowerCase()}...`}
+            className={`w-full rounded-xl border px-3.5 py-2 text-sm resize-none outline-none transition-all ${
+              isAutoCalc
+                ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+                : hasError 
+                  ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' 
+                  : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
             }`}
           />
           {/* Quick Operational Suggestions (Valid_If) */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Sugerencias:
-            </span>
-            {getOperationalSuggestions(selectedEventCategory as any).map(sugg => (
-              <button
-                key={sugg}
-                type="button"
-                onClick={() => onApplySuggestion(header, sugg)}
-                className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
-              >
-                + {sugg}
-              </button>
-            ))}
-          </div>
+          {!isAutoCalc && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Sugerencias:
+              </span>
+              {getOperationalSuggestions(selectedEventCategory as any).map(sugg => (
+                <button
+                  key={sugg}
+                  type="button"
+                  onClick={() => onApplySuggestion(header, sugg)}
+                  className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  + {sugg}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ) : isTraspasoCol ? (
         <div className="space-y-2">
@@ -660,30 +702,37 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
               name={header}
               value={formData[header] || ''}
               onChange={onChange}
-              placeholder="Ej: TR-84920 (o dejar vacío si está pendiente)"
-              className={`flex-1 bg-white dark:bg-slate-900 border rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none transition-all ${
-                hasError 
-                  ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-                  : 'border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+              readOnly={isAutoCalc}
+              placeholder={isAutoCalc ? 'Calculado por fórmula' : 'Ej: TR-84920 (o dejar vacío si está pendiente)'}
+              className={`flex-1 border rounded-xl px-3.5 py-2 text-sm font-mono font-bold outline-none transition-all ${
+                isAutoCalc
+                  ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+                  : hasError 
+                    ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100' 
+                    : 'border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100'
               }`}
             />
-            <button
-              type="button"
-              onClick={() => onGenerateTraspaso(header)}
-              className="px-3 py-2 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold rounded-xl transition-colors shrink-0"
-              title="Generar folio TR aleatorio"
-            >
-              Generar TR
-            </button>
-            {isTraspasoFilled && (
-              <button
-                type="button"
-                onClick={() => onClearTraspaso(header)}
-                className="px-2.5 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold rounded-xl transition-colors shrink-0"
-                title="Marcar como pendiente"
-              >
-                Limpiar
-              </button>
+            {!isAutoCalc && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onGenerateTraspaso(header)}
+                  className="px-3 py-2 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold rounded-xl transition-colors shrink-0"
+                  title="Generar folio TR aleatorio"
+                >
+                  Generar TR
+                </button>
+                {isTraspasoFilled && (
+                  <button
+                    type="button"
+                    onClick={() => onClearTraspaso(header)}
+                    className="px-2.5 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold rounded-xl transition-colors shrink-0"
+                    title="Marcar como pendiente"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -696,15 +745,18 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             step="any"
             value={formData[header] !== undefined ? formData[header] : ''}
             onChange={handleChange}
-            placeholder="0"
-            className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm font-mono font-bold text-slate-800 dark:text-slate-100 outline-none transition-all ${
-              hasError 
-                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+            readOnly={isAutoCalc}
+            placeholder={isAutoCalc ? 'Calculado' : '0'}
+            className={`w-full border rounded-xl px-3.5 py-2 text-sm font-mono font-bold outline-none transition-all ${
+              isAutoCalc
+                ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+                : hasError 
+                  ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' 
+                  : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
             }`}
           />
           {/* Quantity Presets */}
-          {isCant && (
+          {!isAutoCalc && isCant && (
             <div className="flex items-center gap-1">
               {QUICK_QUANTITY_PRESETS.map(delta => (
                 <button
@@ -725,10 +777,14 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
           name={header}
           value={formatInputDate(formData[header])}
           onChange={handleChange}
-          className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 outline-none transition-all ${
-            hasError 
-              ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-              : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+          readOnly={isAutoCalc}
+          disabled={isAutoCalc}
+          className={`w-full border rounded-xl px-3.5 py-2 text-sm outline-none transition-all ${
+            isAutoCalc
+              ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+              : hasError 
+                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' 
+                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
           }`}
         />
       ) : isDateTimeCol ? (
@@ -737,10 +793,14 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
           name={header}
           value={formatInputDateTime(formData[header])}
           onChange={handleChange}
-          className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 outline-none transition-all ${
-            hasError 
-              ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-              : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+          readOnly={isAutoCalc}
+          disabled={isAutoCalc}
+          className={`w-full border rounded-xl px-3.5 py-2 text-sm outline-none transition-all ${
+            isAutoCalc
+              ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+              : hasError 
+                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' 
+                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
           }`}
         />
       ) : (
