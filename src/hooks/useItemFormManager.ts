@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { z } from 'zod';
 import { InventoryItem, SheetConfig, SheetProperties, EventCategory, SheetRecord } from '../types';
 import { findColumnBySemantic } from '../utils/columnAliases';
-import { getEventCategory, formatInputDate, formatInputDateTime, parseLocaleNumber, parseAnyDate, EVENT_CATEGORIES } from '../utils/dateCalculations';
+import { getEventCategory, getCategoryFromEventValue, formatInputDate, formatInputDateTime, parseLocaleNumber, parseAnyDate, EVENT_CATEGORIES } from '../utils/dateCalculations';
 import { autoCalculateItemFormData } from '../utils/referenceResolver';
 import { evaluateAppSheetFormula, evaluateBooleanCondition } from '../utils/appSheetFormulaEngine';
 
@@ -358,6 +358,13 @@ export function useItemFormManager({
       if (diasRetiroCol && !hasFormula(diasRetiroCol)) newForm[diasRetiroCol] = '';
     }
 
+    const eventCol = findColumnBySemantic(headers, 'tipo_evento', sheetConfig?.customAliases) || 
+                     headers.find(h => /^frc(_|\s)?even/i.test(h.trim()));
+    if (eventCol && name === eventCol) {
+      const parsedCat = getCategoryFromEventValue(value) || 'VENCIMIENTO';
+      setSelectedEventCategory(parsedCat);
+    }
+
     newForm = autoCalculateItemFormData(newForm, headers, products, policies, sheetConfig, activeSheet?.title);
     setFormData(newForm);
   }, [formData, formErrors, headers, sheetConfig, products, policies, hasFormula, activeSheet?.title]);
@@ -379,6 +386,13 @@ export function useItemFormManager({
       if (providerCol && !updates[providerCol] && !hasFormula(providerCol)) newForm[providerCol] = '';
       if (policyCol && !updates[policyCol] && !hasFormula(policyCol)) newForm[policyCol] = '';
       if (diasRetiroCol && !updates[diasRetiroCol] && !hasFormula(diasRetiroCol)) newForm[diasRetiroCol] = '';
+    }
+
+    const eventCol = findColumnBySemantic(headers, 'tipo_evento', sheetConfig?.customAliases) || 
+                     headers.find(h => /^frc(_|\s)?even/i.test(h.trim()));
+    if (eventCol && updates[eventCol] !== undefined) {
+      const parsedCat = getCategoryFromEventValue(updates[eventCol]) || 'VENCIMIENTO';
+      setSelectedEventCategory(parsedCat);
     }
 
     if (Object.keys(updates).some(k => formErrors[k])) {

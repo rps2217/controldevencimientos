@@ -19,7 +19,6 @@ import { findColumnBySemantic } from '../../utils/columnAliases';
 import { findExistingItemByCuVc, extractCuVcFromRow } from '../../utils/cuVcConsolidator';
 
 // Subcomponents (Ponytail Protocol Modularization)
-import { ItemFormCategorySelector } from './itemForm/ItemFormCategorySelector';
 import { ItemFormMasterRefCard } from './itemForm/ItemFormMasterRefCard';
 import { ItemFormPolicyCard } from './itemForm/ItemFormPolicyCard';
 import { ItemFormCuVcBanner } from './itemForm/ItemFormCuVcBanner';
@@ -435,21 +434,6 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="p-6 overflow-y-auto space-y-5 flex-1">
-            
-            {/* Event Category Selector (Main or Events views) */}
-            {isMainOrEvents && (
-              <div className="space-y-1.5">
-                <ItemFormCategorySelector
-                  selectedEventCategory={selectedEventCategory}
-                  onSelectEventCategory={onSelectEventCategory}
-                />
-                {formErrors.__event_category && (
-                  <p className="text-xs font-bold text-rose-500 px-1">
-                    {formErrors.__event_category}
-                  </p>
-                )}
-              </div>
-            )}
 
             {/* AppSheet Feature 1: Ref Active Banner (Linked Master Product) */}
             {linkedMasterSummary && (
