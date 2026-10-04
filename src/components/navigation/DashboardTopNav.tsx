@@ -160,7 +160,7 @@ export const DashboardTopNav: React.FC = () => {
                 key={`search-desk-${activeView}`}
                 ref={searchInputRef}
                 type="text"
-                defaultValue={searchTerm}
+                value={typedSearch}
                 onChange={(e) => commitSearch(e.target.value)}
                 placeholder={activeView === 'analytics' ? "Buscar métricas..." : `Buscar en ${searchableHeaders.length} columnas...`}
                 className="w-full bg-transparent pl-2.5 pr-2 py-1.5 text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none"
