@@ -530,7 +530,7 @@ function evaluateSingleTokenOrExpression(
   // H. NUMBER(val) - AppSheet Standard
   // Returns the Integer equivalent of a value if a recognizable number, or 0 if not.
   // If blank (that is, ""), returns a blank Number value ("").
-  const numberMatch = trimmed.match(/^NUMBER\s*\((.*)\)$/i);
+  const numberMatch = trimmed.match(/^NUMBER\s*\(([\s\S]*)\)$/i);
   if (numberMatch) {
     const args = parseFunctionArguments(numberMatch[1]);
     if (args.length >= 1) {
@@ -553,7 +553,7 @@ function evaluateSingleTokenOrExpression(
   // I. DECIMAL(val)
   // Returns the Decimal equivalent of a value if a recognizable number, or 0 if not.
   // If blank, returns a blank value ("").
-  const decimalMatch = trimmed.match(/^DECIMAL\s*\((.*)\)$/i);
+  const decimalMatch = trimmed.match(/^DECIMAL\s*\(([\s\S]*)\)$/i);
   if (decimalMatch) {
     const args = parseFunctionArguments(decimalMatch[1]);
     if (args.length >= 1) {
@@ -573,7 +573,7 @@ function evaluateSingleTokenOrExpression(
   }
 
   // J. INT(val)
-  const intMatch = trimmed.match(/^INT\s*\((.*)\)$/i);
+  const intMatch = trimmed.match(/^INT\s*\(([\s\S]*)\)$/i);
   if (intMatch) {
     const args = parseFunctionArguments(intMatch[1]);
     if (args.length >= 1) {
@@ -593,7 +593,7 @@ function evaluateSingleTokenOrExpression(
   }
 
   // K. ROUND(val, digits?)
-  const roundMatch = trimmed.match(/^ROUND\s*\((.*)\)$/i);
+  const roundMatch = trimmed.match(/^ROUND\s*\(([\s\S]*)\)$/i);
   if (roundMatch) {
     const args = parseFunctionArguments(roundMatch[1]);
     if (args.length >= 1) {
@@ -608,7 +608,7 @@ function evaluateSingleTokenOrExpression(
   }
 
   // L. ABS(val)
-  const absMatch = trimmed.match(/^ABS\s*\((.*)\)$/i);
+  const absMatch = trimmed.match(/^ABS\s*\(([\s\S]*)\)$/i);
   if (absMatch) {
     const args = parseFunctionArguments(absMatch[1]);
     if (args.length >= 1) {
@@ -620,7 +620,7 @@ function evaluateSingleTokenOrExpression(
   }
 
   // M. TEXT(val)
-  const textMatch = trimmed.match(/^TEXT\s*\((.*)\)$/i);
+  const textMatch = trimmed.match(/^TEXT\s*\(([\s\S]*)\)$/i);
   if (textMatch) {
     const args = parseFunctionArguments(textMatch[1]);
     if (args.length >= 1) {
@@ -630,7 +630,7 @@ function evaluateSingleTokenOrExpression(
   }
 
   // N. LOOKUP function: LOOKUP(needle, table, searchCol, returnCol)
-  const lookupMatch = trimmed.match(/^LOOKUP\s*\((.*)\)$/i);
+  const lookupMatch = trimmed.match(/^LOOKUP\s*\(([\s\S]*)\)$/i);
   if (lookupMatch) {
     const args = parseFunctionArguments(lookupMatch[1]);
     if (args.length >= 4) {
@@ -644,7 +644,7 @@ function evaluateSingleTokenOrExpression(
   }
 
   // O. CONCATENATE(a, b, c, ...)
-  const concatMatch = trimmed.match(/^CONCATENATE\s*\((.*)\)$/i);
+  const concatMatch = trimmed.match(/^CONCATENATE\s*\(([\s\S]*)\)$/i);
   if (concatMatch) {
     const args = parseFunctionArguments(concatMatch[1]);
     const str = args.map(a => evaluateSingleTokenOrExpression(a, context).stringValue).join('');
@@ -664,7 +664,7 @@ function evaluateSingleTokenOrExpression(
   }
 
   // Q. EOMONTH(date, offsetMonths)
-  const eomonthMatch = trimmed.match(/^EOMONTH\s*\((.*)\)$/i);
+  const eomonthMatch = trimmed.match(/^EOMONTH\s*\(([\s\S]*)\)$/i);
   if (eomonthMatch) {
     const args = parseFunctionArguments(eomonthMatch[1]);
     if (args.length >= 1) {
@@ -685,7 +685,7 @@ function evaluateSingleTokenOrExpression(
   }
 
   // J. DATE(year, month, day) OR DATE(date_or_text)
-  const dateMatch = trimmed.match(/^DATE\s*\((.*)\)$/i);
+  const dateMatch = trimmed.match(/^DATE\s*\(([\s\S]*)\)$/i);
   if (dateMatch) {
     const args = parseFunctionArguments(dateMatch[1]);
     if (args.length === 3) {
@@ -768,7 +768,7 @@ function evaluateSingleTokenOrExpression(
   }
 
   // L1. IFS(cond1, val1, cond2, val2, ...)
-  const ifsMatch = trimmed.match(/^IFS\s*\((.*)\)$/i);
+  const ifsMatch = trimmed.match(/^IFS\s*\(([\s\S]*)\)$/i);
   if (ifsMatch) {
     const args = parseFunctionArguments(ifsMatch[1]);
     for (let i = 0; i < args.length; i += 2) {
@@ -784,7 +784,7 @@ function evaluateSingleTokenOrExpression(
   }
 
   // L2. SWITCH(expr, val1, res1, val2, res2, ... [default])
-  const switchMatch = trimmed.match(/^SWITCH\s*\((.*)\)$/i);
+  const switchMatch = trimmed.match(/^SWITCH\s*\(([\s\S]*)\)$/i);
   if (switchMatch) {
     const args = parseFunctionArguments(switchMatch[1]);
     if (args.length >= 3) {
@@ -806,7 +806,7 @@ function evaluateSingleTokenOrExpression(
   }
 
   // L3. IF(condition, trueVal, falseVal)
-  const ifMatch = trimmed.match(/^IF\s*\((.*)\)$/i);
+  const ifMatch = trimmed.match(/^IF\s*\(([\s\S]*)\)$/i);
   if (ifMatch) {
     const args = parseFunctionArguments(ifMatch[1]);
     if (args.length >= 2) {
@@ -822,13 +822,13 @@ function evaluateSingleTokenOrExpression(
   }
 
   // M. ISBLANK(val) and ISNOTBLANK(val)
-  const isBlankMatch = trimmed.match(/^ISBLANK\s*\((.*)\)$/i);
+  const isBlankMatch = trimmed.match(/^ISBLANK\s*\(([\s\S]*)\)$/i);
   if (isBlankMatch) {
     const inner = evaluateSingleTokenOrExpression(isBlankMatch[1], context);
     const isBlank = !inner.stringValue || inner.stringValue.trim() === '';
     return { value: isBlank, stringValue: isBlank ? 'true' : 'false', success: true };
   }
-  const isNotBlankMatch = trimmed.match(/^ISNOTBLANK\s*\((.*)\)$/i);
+  const isNotBlankMatch = trimmed.match(/^ISNOTBLANK\s*\(([\s\S]*)\)$/i);
   if (isNotBlankMatch) {
     const inner = evaluateSingleTokenOrExpression(isNotBlankMatch[1], context);
     const isNotBlank = Boolean(inner.stringValue && inner.stringValue.trim() !== '');
@@ -836,17 +836,17 @@ function evaluateSingleTokenOrExpression(
   }
 
   // N. Text functions: UPPER, LOWER, TRIM
-  const upperMatch = trimmed.match(/^UPPER\s*\((.*)\)$/i);
+  const upperMatch = trimmed.match(/^UPPER\s*\(([\s\S]*)\)$/i);
   if (upperMatch) {
     const inner = evaluateSingleTokenOrExpression(upperMatch[1], context).stringValue;
     return { value: inner.toUpperCase(), stringValue: inner.toUpperCase(), success: true };
   }
-  const lowerMatch = trimmed.match(/^LOWER\s*\((.*)\)$/i);
+  const lowerMatch = trimmed.match(/^LOWER\s*\(([\s\S]*)\)$/i);
   if (lowerMatch) {
     const inner = evaluateSingleTokenOrExpression(lowerMatch[1], context).stringValue;
     return { value: inner.toLowerCase(), stringValue: inner.toLowerCase(), success: true };
   }
-  const trimMatch = trimmed.match(/^TRIM\s*\((.*)\)$/i);
+  const trimMatch = trimmed.match(/^TRIM\s*\(([\s\S]*)\)$/i);
   if (trimMatch) {
     const inner = evaluateSingleTokenOrExpression(trimMatch[1], context).stringValue;
     return { value: inner.trim(), stringValue: inner.trim(), success: true };
