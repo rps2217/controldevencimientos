@@ -50,8 +50,8 @@ export const ViewConfigControlDrawer: React.FC = () => {
   const isOpen = rightDrawer.isRightDrawerOpen ?? false;
   const onClose = () => rightDrawer.setIsRightDrawerOpen(false);
   const allHeaders = useMemo(
-    () => dashboard.headers ?? [],
-    [dashboard.headers]
+    () => dashboard.allTableHeaders ?? dashboard.headers ?? [],
+    [dashboard.allTableHeaders, dashboard.headers]
   );
   const hiddenColumns = dashboard.hiddenColumns?.[dashboard.activeView] || [];
   const onToggleColumnVisibility = (h: string) => dashboard.toggleVisibility?.(h);
@@ -334,9 +334,16 @@ export const ViewConfigControlDrawer: React.FC = () => {
                         className="w-full text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer appearance-none"
                       >
                         <option value="none">Sin agrupar (Lista plana)</option>
-                        {allHeaders.map(h => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
+                        {allHeaders.map(h => {
+                          const colDef = activeSheetTitle ? sheetConfig?.schema?.[activeSheetTitle]?.[h] : undefined;
+                          const label = colDef?.label || h;
+                          const isVirtual = colDef?.isVirtual || colDef?.type === 'calculated';
+                          return (
+                            <option key={h} value={h}>
+                              {isVirtual ? `⚡ ${label} (Virtual)` : label} {label !== h && !isVirtual ? `(${h})` : ''}
+                            </option>
+                          );
+                        })}
                       </select>
                       <div className="absolute right-3 top-3.5 pointer-events-none border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-500" />
                     </div>

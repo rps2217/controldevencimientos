@@ -21,6 +21,7 @@ export interface DashboardContextType {
   activeView: string;
   setActiveView: (view: string, searchTermOverride?: string) => void;
   headers: string[];
+  allTableHeaders?: string[];
   setHeaders?: React.Dispatch<React.SetStateAction<string[]>>;
   visibleHeaders: string[];
   products: SheetRecord[];
@@ -272,6 +273,7 @@ export const DashboardProvider: React.FC<{
     activeView: value.activeView,
     setActiveView: value.setActiveView,
     headers: value.headers,
+    allTableHeaders: value.allTableHeaders,
     visibleHeaders: value.visibleHeaders,
     products: value.products,
     policies: value.policies,

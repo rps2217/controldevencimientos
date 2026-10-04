@@ -68,19 +68,47 @@ export const STANDARD_VIRTUAL_PRESETS: Record<string, ColumnSchema> = {
 };
 
 /**
+ * Helper to locate the schema for a table using title, activeView or case-insensitive matching.
+ */
+export function findTableSchema(
+  sheetTitle: string | undefined,
+  sheetConfig: SheetConfig,
+  activeView?: string
+): Record<string, ColumnSchema> | undefined {
+  if (!sheetConfig?.schema) return undefined;
+  if (sheetTitle && sheetConfig.schema[sheetTitle]) {
+    return sheetConfig.schema[sheetTitle];
+  }
+  if (activeView && sheetConfig.schema[activeView]) {
+    return sheetConfig.schema[activeView];
+  }
+  if (sheetTitle) {
+    const lower = sheetTitle.toLowerCase();
+    const entry = Object.entries(sheetConfig.schema).find(([k]) => k.toLowerCase() === lower);
+    if (entry) return entry[1];
+  }
+  if (activeView) {
+    const lower = activeView.toLowerCase();
+    const entry = Object.entries(sheetConfig.schema).find(([k]) => k.toLowerCase() === lower);
+    if (entry) return entry[1];
+  }
+  return undefined;
+}
+
+/**
  * Returns a list of all virtual columns defined for a given table in SheetConfig.schema
  */
 export function getSchemaVirtualColumns(
   sheetTitle: string | undefined,
-  sheetConfig: SheetConfig
+  sheetConfig: SheetConfig,
+  activeView?: string
 ): { colKey: string; schema: ColumnSchema }[] {
-  if (!sheetTitle) return [];
-  const tableSchema = sheetConfig.schema?.[sheetTitle];
+  const tableSchema = findTableSchema(sheetTitle, sheetConfig, activeView);
   if (!tableSchema) return [];
 
   const list: { colKey: string; schema: ColumnSchema }[] = [];
   Object.entries(tableSchema).forEach(([colKey, colDef]) => {
-    if (colDef.isVirtual || colDef.type === 'calculated') {
+    if (colDef.isVirtual || colDef.type === 'calculated' || Boolean(colDef.formula)) {
       list.push({ colKey, schema: colDef });
     }
   });

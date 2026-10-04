@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { SheetConfig, TableCapability } from '../types';
 import { STORAGE_KEYS, readStorage, writeStorage, stringArrayMapSchema, type StringArrayMap } from '../utils/appStorage';
+import { findTableSchema } from '../utils/virtualColumnsEvaluator';
 
 export interface ManageableColumn {
   id: string;
@@ -68,30 +69,30 @@ export function useColumnManager({
   // Map of virtual column IDs -> labels from schema
   const virtualMap = useMemo(() => {
     const map: Record<string, string> = {};
-    const schemaForSheet = activeSheetTitle ? sheetConfig.schema?.[activeSheetTitle] : undefined;
+    const schemaForSheet = findTableSchema(activeSheetTitle, sheetConfig, activeView);
     if (schemaForSheet) {
       Object.entries(schemaForSheet).forEach(([colId, colDef]) => {
-        if (colDef.isVirtual || colDef.type === 'calculated') {
+        if (colDef.isVirtual || colDef.type === 'calculated' || Boolean(colDef.formula)) {
           map[colId] = colDef.label || colId;
         }
       });
     }
     return map;
-  }, [activeSheetTitle, sheetConfig.schema]);
+  }, [activeSheetTitle, activeView, sheetConfig.schema]);
 
   // Combined list of base candidate column IDs: real headers + schema virtual cols
   const combinedCandidates = useMemo(() => {
     const result = [...headers];
-    const schemaForSheet = activeSheetTitle ? sheetConfig.schema?.[activeSheetTitle] : undefined;
+    const schemaForSheet = findTableSchema(activeSheetTitle, sheetConfig, activeView);
     if (schemaForSheet) {
       Object.entries(schemaForSheet).forEach(([colId, colDef]) => {
-        if ((colDef.isVirtual || colDef.type === 'calculated') && !result.includes(colId)) {
+        if ((colDef.isVirtual || colDef.type === 'calculated' || Boolean(colDef.formula)) && !result.includes(colId)) {
           result.push(colId);
         }
       });
     }
     return result;
-  }, [headers, activeSheetTitle, sheetConfig.schema]);
+  }, [headers, activeSheetTitle, activeView, sheetConfig.schema]);
 
   // Ordered list of all candidate columns for activeView
   const orderedColumnIds = useMemo(() => {
@@ -117,10 +118,10 @@ export function useColumnManager({
   // All manageable columns metadata
   const allManageableColumns = useMemo<ManageableColumn[]>(() => {
     const viewHidden = hiddenColumns[activeView] || [];
-    const schemaForSheet = activeSheetTitle ? sheetConfig.schema?.[activeSheetTitle] : undefined;
+    const schemaForSheet = findTableSchema(activeSheetTitle, sheetConfig, activeView);
 
     return orderedColumnIds.map(id => {
-      const isVirtual = Boolean(virtualMap[id]) || schemaForSheet?.[id]?.isVirtual === true || schemaForSheet?.[id]?.type === 'calculated';
+      const isVirtual = Boolean(virtualMap[id]) || schemaForSheet?.[id]?.isVirtual === true || schemaForSheet?.[id]?.type === 'calculated' || Boolean(schemaForSheet?.[id]?.formula);
       const label = schemaForSheet?.[id]?.label || virtualMap[id] || id;
       const isSchemaHidden = schemaForSheet?.[id]?.visible === false;
       const isUserHidden = viewHidden.includes(id);

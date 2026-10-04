@@ -562,7 +562,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
               setEditingSliceModalItem(null);
             }}
             tableKey={activeView}
-            headers={headers}
+            headers={context.allTableHeaders ?? headers}
             currentFilters={currentFilters}
             currentSort={sortConfig}
             currentGroupBy={groupByColumn ?? undefined}

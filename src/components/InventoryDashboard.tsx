@@ -10,6 +10,7 @@ import { getEventCategory, getItemStatus } from '../utils/dateCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { resolveTableCapabilities } from '../utils/sliceRegistry';
 import { applyTableSchemaFormulas } from '../utils/appSheetFormulaEngine';
+import { findTableSchema } from '../utils/virtualColumnsEvaluator';
 import { useColumnResize } from '../hooks/useColumnResize';
 import { useColumnManager } from '../hooks/useColumnManager';
 import { useInventoryFiltering, handleFilterToggle } from '../hooks/useInventoryFiltering';
@@ -311,18 +312,22 @@ export const InventoryDashboard: React.FC = () => {
   });
 
   // Fusiona encabezados físicos con columnas virtuales declaradas en el esquema de la tabla activa
+  const activeTableSchema = useMemo(() => {
+    return findTableSchema(activeSheet?.title, sheetConfig, activeView);
+  }, [activeSheet?.title, sheetConfig.schema, activeView]);
+
   const allTableHeaders = useMemo(() => {
-    if (!activeSheet?.title) return headers;
-    const tableSchema = sheetConfig.schema?.[activeSheet.title];
-    if (!tableSchema) return headers;
-    const virtualKeys = Object.keys(tableSchema).filter(k => tableSchema[k]?.isVirtual || tableSchema[k]?.type === 'calculated');
+    if (!activeTableSchema) return headers;
+    const virtualKeys = Object.keys(activeTableSchema).filter(k => 
+      activeTableSchema[k]?.isVirtual || activeTableSchema[k]?.type === 'calculated' || Boolean(activeTableSchema[k]?.formula)
+    );
     if (virtualKeys.length === 0) return headers;
     const combined = [...headers];
     virtualKeys.forEach(vk => {
       if (!combined.includes(vk)) combined.push(vk);
     });
     return combined;
-  }, [headers, activeSheet?.title, sheetConfig.schema]);
+  }, [headers, activeTableSchema]);
 
   // Centralized Column Manager Hook
   const {
@@ -345,16 +350,15 @@ export const InventoryDashboard: React.FC = () => {
 
   const columnLabelsMap = useMemo(() => {
     const map: Record<string, string> = {};
-    const schemaForSheet = activeSheet?.title ? sheetConfig.schema?.[activeSheet.title] : undefined;
-    if (schemaForSheet) {
-      Object.keys(schemaForSheet).forEach(colId => {
-        if (schemaForSheet[colId]?.label) {
-          map[colId] = schemaForSheet[colId].label;
+    if (activeTableSchema) {
+      Object.keys(activeTableSchema).forEach(colId => {
+        if (activeTableSchema[colId]?.label) {
+          map[colId] = activeTableSchema[colId].label;
         }
       });
     }
     return map;
-  }, [activeSheet?.title, sheetConfig.schema]);
+  }, [activeTableSchema]);
 
   const {
     isSidebarCollapsed,
@@ -378,31 +382,28 @@ export const InventoryDashboard: React.FC = () => {
 
   // Evaluación en memoria de fórmulas de columnas virtuales sobre cada registro cargado
   const enrichedItems = useMemo(() => {
-    if (!activeSheet?.title || items.length === 0) return items;
-    const tableSchema = sheetConfig.schema?.[activeSheet.title];
-    if (!tableSchema) return items;
-    const hasFormulas = Object.values(tableSchema).some(col => col.formula && col.formula.trim());
+    if (items.length === 0 || !activeTableSchema) return items;
+    const hasFormulas = Object.values(activeTableSchema).some(col => col.formula && col.formula.trim());
     if (!hasFormulas) return items;
 
     return items.map(item => {
-      return applyTableSchemaFormulas(item, allTableHeaders, tableSchema, {
+      return applyTableSchemaFormulas(item, allTableHeaders, activeTableSchema, {
         products,
         policies,
         customAliases: sheetConfig.customAliases
       }) as InventoryItem;
     });
-  }, [items, activeSheet?.title, sheetConfig.schema, allTableHeaders, products, policies, sheetConfig.customAliases]);
+  }, [items, activeTableSchema, allTableHeaders, products, policies, sheetConfig.customAliases]);
 
   const searchableHeaders = useMemo(() => {
-    if (!activeSheet) return allTableHeaders;
-    const currentSchema = sheetConfig.schema?.[activeSheet.title];
+    if (!activeTableSchema) return allTableHeaders;
     return allTableHeaders.filter(h => {
-      if (currentSchema && currentSchema[h] !== undefined) {
-        return currentSchema[h].searchable !== false;
+      if (activeTableSchema[h] !== undefined) {
+        return activeTableSchema[h].searchable !== false;
       }
       return true;
     });
-  }, [allTableHeaders, activeSheet, sheetConfig.schema]);
+  }, [allTableHeaders, activeTableSchema]);
 
   // Unified filtering, metrics aggregation, virtual columns, and grouping hook
   const {
@@ -477,7 +478,6 @@ export const InventoryDashboard: React.FC = () => {
   });
 
   // Precomputed metadata for visible columns to prevent per-cell regex in 60fps virtualization
-  const activeTableSchema = activeSheet?.title ? sheetConfig.schema?.[activeSheet.title] : undefined;
   const { visibleColumnMeta } = usePrecomputedColumns(allTableHeaders, effectiveVisibleHeaders, frcBodCol, activeTableSchema);
 
   const hasActiveFilters = 
@@ -750,6 +750,7 @@ export const InventoryDashboard: React.FC = () => {
     activeView,
     setActiveView: handleSetActiveView,
     headers,
+    allTableHeaders,
     setHeaders: _setHeaders,
     visibleHeaders,
     products,
