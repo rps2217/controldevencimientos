@@ -109,13 +109,64 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Description search results from Master Catalog
-  const descSearchResults = useMemo(() => {
-    if (!isDescField || !descSearchOpen || !currentValue || currentValue.trim().length < 2 || products.length === 0) {
-      return [];
+  // Helper to parse enum options from schema or fallback semantics
+  const enumOptions = useMemo(() => {
+    if (colSchema?.options && colSchema.options.trim()) {
+      return colSchema.options
+        .split(/[,;\n]/)
+        .map(s => s.trim())
+        .filter(Boolean);
     }
-    return searchMasterProducts(currentValue, products, 6, customAliases);
-  }, [isDescField, descSearchOpen, currentValue, products, customAliases]);
+    // Fallback options based on semantic column type if type is enum or field is MM/YYYY
+    const isMonth = Boolean(findColumnBySemantic([header], 'mes', customAliases)) || /^(mm|mes)$/i.test(header);
+    if (isMonth) {
+      return ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+    }
+    const isYear = Boolean(findColumnBySemantic([header], 'anio', customAliases)) || /^(yyyy|año|anio|year)$/i.test(header);
+    if (isYear) {
+      const currentYr = new Date().getFullYear();
+      const years: string[] = [];
+      for (let y = currentYr - 1; y <= currentYr + 7; y++) {
+        years.push(String(y));
+      }
+      return years;
+    }
+    if (isPolicyCol && policySuggestions.length > 0) {
+      return policySuggestions;
+    }
+    if (isProviderCol && providerSuggestions.length > 0) {
+      return providerSuggestions;
+    }
+    return [];
+  }, [colSchema?.options, header, customAliases, isPolicyCol, policySuggestions, isProviderCol, providerSuggestions]);
+
+  const isEnumCol = colSchema?.type === 'enum' || (enumOptions.length > 0 && colSchema?.type !== 'text' && !isSkuField && !isDescField && !isCant && !isDateCol && !isDateTimeCol);
+  const isEnumListCol = colSchema?.type === 'enumlist';
+  const isYesNoCol = colSchema?.type === 'yes_no';
+  const isPriceCol = colSchema?.type === 'price';
+  const isPercentageCol = colSchema?.type === 'percentage';
+  const isColorCol = colSchema?.type === 'color';
+  const isLongTextCol = colSchema?.type === 'longtext' || isObs;
+  const isNumericCol = colSchema?.type === 'number' || isCant;
+
+  const handleEnumListToggle = (optionVal: string) => {
+    const currentList = currentValue ? currentValue.split(',').map(s => s.trim()).filter(Boolean) : [];
+    let updatedList: string[];
+    if (currentList.includes(optionVal)) {
+      updatedList = currentList.filter(item => item !== optionVal);
+    } else {
+      updatedList = [...currentList, optionVal];
+    }
+    onChange({
+      target: { name: header, value: updatedList.join(', ') }
+    } as React.ChangeEvent<HTMLInputElement>);
+  };
+
+  const handleYesNoToggle = (boolVal: string) => {
+    onChange({
+      target: { name: header, value: boolVal }
+    } as React.ChangeEvent<HTMLInputElement>);
+  };
 
   // SKU Verification with Master Catalog
   const matchedSkuProduct = useMemo(() => {
@@ -124,6 +175,14 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
     }
     return findMasterProduct(currentValue.trim(), products, customAliases);
   }, [isSkuField, currentValue, products, customAliases]);
+
+  // Description search results from Master Catalog
+  const descSearchResults = useMemo(() => {
+    if (!isDescField || !descSearchOpen || !currentValue || currentValue.trim().length < 2 || products.length === 0) {
+      return [];
+    }
+    return searchMasterProducts(currentValue, products, 6, customAliases);
+  }, [isDescField, descSearchOpen, currentValue, products, customAliases]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { value } = e.target;
@@ -374,6 +433,167 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             </div>
           )}
         </div>
+      ) : isYesNoCol ? (
+        /* ========================================================================= */
+        /* YES_NO INPUT: Segmented Toggle Buttons                                   */
+        /* ========================================================================= */
+        <div className="flex items-center gap-2">
+          {['SÍ', 'NO'].map(choice => {
+            const isSelected = String(currentValue).toUpperCase() === choice || 
+                               (choice === 'SÍ' && (currentValue === 'true' || currentValue === '1' || currentValue === 'SI')) ||
+                               (choice === 'NO' && (currentValue === 'false' || currentValue === '0'));
+            return (
+              <button
+                key={choice}
+                type="button"
+                onClick={() => handleYesNoToggle(choice)}
+                className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
+                  isSelected
+                    ? choice === 'SÍ'
+                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm shadow-emerald-200 dark:shadow-none ring-2 ring-emerald-400/30'
+                      : 'bg-rose-600 text-white border-rose-700 shadow-sm shadow-rose-200 dark:shadow-none ring-2 ring-rose-400/30'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                {choice}
+              </button>
+            );
+          })}
+        </div>
+      ) : isEnumListCol && enumOptions.length > 0 ? (
+        /* ========================================================================= */
+        /* ENUMLIST INPUT: Multi-select Toggle Chips                                */
+        /* ========================================================================= */
+        <div className="space-y-1.5 p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="flex flex-wrap gap-1.5">
+            {enumOptions.map(opt => {
+              const currentList = currentValue ? currentValue.split(',').map(s => s.trim()) : [];
+              const isSelected = currentList.includes(opt);
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => handleEnumListToggle(opt)}
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-blue-600 text-white border-blue-700 shadow-2xs'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-300'
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : isEnumCol && enumOptions.length > 0 && !isAutoCalc ? (
+        /* ========================================================================= */
+        /* ENUM INPUT: Options Selector (Pills for small lists, Select for large)   */
+        /* ========================================================================= */
+        enumOptions.length <= 6 && enumOptions.every(o => o.length <= 14) ? (
+          <div className="flex flex-wrap gap-1">
+            {enumOptions.map(opt => {
+              const isSelected = String(currentValue).trim().toLowerCase() === opt.trim().toLowerCase();
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => onChange({ target: { name: header, value: opt } } as React.ChangeEvent<HTMLInputElement>)}
+                  className={`flex-1 min-w-[42px] py-1.5 px-2 text-xs font-bold rounded-xl border transition-all cursor-pointer text-center truncate ${
+                    isSelected
+                      ? 'bg-blue-600 text-white border-blue-700 shadow-sm shadow-blue-200 dark:shadow-none ring-2 ring-blue-400/20'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <select
+            name={header}
+            value={currentValue}
+            onChange={handleChange}
+            className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 outline-none transition-all ${
+              hasError 
+                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
+                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+            }`}
+          >
+            <option value="">-- Seleccionar {colSchema?.label || header} --</option>
+            {enumOptions.map((opt, idx) => (
+              <option key={idx} value={opt}>
+                {opt}
+              </option>
+            ))}
+            {currentValue && !enumOptions.some(o => o.toLowerCase() === currentValue.toLowerCase()) && (
+              <option value={currentValue}>
+                {currentValue} (Personalizado)
+              </option>
+            )}
+          </select>
+        )
+      ) : isPriceCol ? (
+        /* ========================================================================= */
+        /* PRICE INPUT: Currency prefix                                             */
+        /* ========================================================================= */
+        <div className="relative flex items-center">
+          <span className="absolute left-3 font-mono font-bold text-slate-400 select-none">$</span>
+          <input
+            type="number"
+            name={header}
+            step="any"
+            value={currentValue}
+            onChange={handleChange}
+            placeholder="0"
+            className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl pl-7 pr-3.5 py-2 text-sm font-mono font-bold text-slate-800 dark:text-slate-100 outline-none transition-all ${
+              hasError 
+                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
+                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+            }`}
+          />
+        </div>
+      ) : isPercentageCol ? (
+        /* ========================================================================= */
+        /* PERCENTAGE INPUT: % suffix                                               */
+        /* ========================================================================= */
+        <div className="relative flex items-center">
+          <input
+            type="number"
+            name={header}
+            step="any"
+            value={currentValue}
+            onChange={handleChange}
+            placeholder="0"
+            className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl pl-3.5 pr-7 py-2 text-sm font-mono font-bold text-slate-800 dark:text-slate-100 outline-none transition-all ${
+              hasError 
+                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
+                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+            }`}
+          />
+          <span className="absolute right-3 font-mono font-bold text-slate-400 select-none">%</span>
+        </div>
+      ) : isColorCol ? (
+        /* ========================================================================= */
+        /* COLOR INPUT: Color Picker                                                */
+        /* ========================================================================= */
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            name={header}
+            value={currentValue || '#3b82f6'}
+            onChange={handleChange}
+            className="w-10 h-10 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent"
+          />
+          <input
+            type="text"
+            value={currentValue}
+            onChange={handleChange}
+            placeholder="#HEX"
+            className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-mono"
+          />
+        </div>
       ) : colSchema?.type === 'ref' ? (
         /* Ref type dropdown for generic references */
         <div className="relative">
@@ -401,7 +621,7 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             })}
           </datalist>
         </div>
-      ) : isObs ? (
+      ) : isLongTextCol ? (
         <div className="space-y-2">
           <textarea
             name={header}
@@ -467,7 +687,7 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             )}
           </div>
         </div>
-      ) : isCant ? (
+      ) : isNumericCol ? (
         <div className="space-y-1.5">
           <input
             type="number"
@@ -484,18 +704,20 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             }`}
           />
           {/* Quantity Presets */}
-          <div className="flex items-center gap-1">
-            {QUICK_QUANTITY_PRESETS.map(delta => (
-              <button
-                key={delta}
-                type="button"
-                onClick={() => onAdjustQuantity(header, delta)}
-                className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
-              >
-                +{delta}
-              </button>
-            ))}
-          </div>
+          {isCant && (
+            <div className="flex items-center gap-1">
+              {QUICK_QUANTITY_PRESETS.map(delta => (
+                <button
+                  key={delta}
+                  type="button"
+                  onClick={() => onAdjustQuantity(header, delta)}
+                  className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  +{delta}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ) : isDateCol ? (
         <input
@@ -521,29 +743,6 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
               : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
           }`}
         />
-      ) : isPolicyCol && policySuggestions.length > 0 && !isAutoCalc ? (
-        <select
-          name={header}
-          value={formData[header] || ''}
-          onChange={handleChange}
-          className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 outline-none transition-all ${
-            hasError 
-              ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-              : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
-          }`}
-        >
-          <option value="">-- Seleccionar Política Comercial --</option>
-          {policySuggestions.map((sugg, idx) => (
-            <option key={idx} value={sugg}>
-              {sugg}
-            </option>
-          ))}
-          {formData[header] && !policySuggestions.includes(formData[header]) && (
-            <option value={formData[header]}>
-              {formData[header]} (Personalizada)
-            </option>
-          )}
-        </select>
       ) : (
         <>
           <input

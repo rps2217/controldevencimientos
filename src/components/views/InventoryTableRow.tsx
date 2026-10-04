@@ -399,7 +399,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       )}
 
       {/* Cell Values using Precomputed Column Metadata */}
-      {visibleColumnMeta.map(({ header, isSku, isEventCol, isTraspasoCol, isBodCol, isDateCol }) => {
+      {visibleColumnMeta.map(({ header, isSku, isEventCol, isTraspasoCol, isBodCol, isDateCol, colSchema }) => {
         const val = item[header];
         const eventCat = isEventCol && val ? getCategoryFromEventValue(val) : null;
         const colWidth = getColWidth(header, header);
@@ -411,7 +411,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
             style={{ width: `${colWidth}px`, minWidth: `${colWidth}px`, maxWidth: `${colWidth}px` }}
             className={`hidden md:table-cell ${paddingClass} truncate text-slate-800 dark:text-slate-200`}
           >
-            <div className="w-full flex justify-start overflow-hidden">
+            <div className="w-full flex justify-start items-center overflow-hidden">
               {isProductsView && isSku ? (
                 <button 
                   onClick={() => onClickItem(item)}
@@ -516,6 +516,27 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                     <span className="truncate">Anotar Traspaso</span>
                   </button>
                 )
+              ) : colSchema?.type === 'price' && val !== undefined && val !== null && String(val).trim() !== '' ? (
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 truncate">
+                  ${!isNaN(Number(val)) ? Number(val).toLocaleString('es-CL') : String(val)}
+                </span>
+              ) : colSchema?.type === 'percentage' && val !== undefined && val !== null && String(val).trim() !== '' ? (
+                <span className="font-mono font-bold text-blue-700 dark:text-blue-300 truncate">
+                  {String(val)}%
+                </span>
+              ) : colSchema?.type === 'yes_no' && val !== undefined && val !== null && String(val).trim() !== '' ? (
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  String(val).toUpperCase() === 'SÍ' || String(val).toUpperCase() === 'SI' || String(val) === 'true' || val === true
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                    : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
+                }`}>
+                  {String(val).toUpperCase() === 'SÍ' || String(val).toUpperCase() === 'SI' || String(val) === 'true' || val === true ? 'SÍ' : 'NO'}
+                </span>
+              ) : colSchema?.type === 'color' && val !== undefined && val !== null && String(val).trim() !== '' ? (
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 shrink-0 shadow-2xs" style={{ backgroundColor: String(val) }} />
+                  <span className="font-mono text-[11px] truncate">{String(val)}</span>
+                </div>
               ) : (
                 <span className="truncate block text-left w-full">
                   {val !== undefined && val !== null && String(val).trim() !== ''

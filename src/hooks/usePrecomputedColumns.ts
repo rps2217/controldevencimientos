@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { findColumnBySemantic } from '../utils/columnAliases';
+import { ColumnSchema } from '../types';
 
 export interface ColumnMetadata {
   header: string;
@@ -8,12 +9,14 @@ export interface ColumnMetadata {
   isTraspasoCol: boolean;
   isBodCol: boolean;
   isDateCol: boolean;
+  colSchema?: ColumnSchema;
 }
 
 export function usePrecomputedColumns(
   headers: string[],
   visibleHeaders: string[],
-  frcBodCol: string | null
+  frcBodCol: string | null,
+  tableSchema?: Record<string, ColumnSchema>
 ): {
   visibleColumnMeta: ColumnMetadata[];
   skuCol: string | null;
@@ -43,7 +46,8 @@ export function usePrecomputedColumns(
         isEventCol,
         isTraspasoCol,
         isBodCol,
-        isDateCol
+        isDateCol,
+        colSchema: tableSchema?.[header]
       };
     });
 
@@ -54,5 +58,5 @@ export function usePrecomputedColumns(
       traspasoCol,
       bodCol
     };
-  }, [headers, visibleHeaders, frcBodCol]);
+  }, [headers, visibleHeaders, frcBodCol, tableSchema]);
 }

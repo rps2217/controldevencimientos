@@ -477,7 +477,8 @@ export const InventoryDashboard: React.FC = () => {
   });
 
   // Precomputed metadata for visible columns to prevent per-cell regex in 60fps virtualization
-  const { visibleColumnMeta } = usePrecomputedColumns(allTableHeaders, effectiveVisibleHeaders, frcBodCol);
+  const activeTableSchema = activeSheet?.title ? sheetConfig.schema?.[activeSheet.title] : undefined;
+  const { visibleColumnMeta } = usePrecomputedColumns(allTableHeaders, effectiveVisibleHeaders, frcBodCol, activeTableSchema);
 
   const hasActiveFilters = 
     searchTerm !== '' || 
