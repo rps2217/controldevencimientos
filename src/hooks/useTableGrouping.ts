@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { SheetConfig } from '../types';
 import { findTableSchema } from '../utils/virtualColumnsEvaluator';
+import { resolveColumnInHeaders } from '../utils/columnAliases';
 
 /**
  * Agrupación contextual de filas por columna, persistida por tabla en
@@ -38,41 +39,37 @@ export const useTableGrouping = ({
     });
   }, [activeSheetKey, sheetConfig, saveConfig]);
 
-  const handleSetGroupByColumn = useCallback((col: string) => {
-    setGroupByColumn(col);
-    persistGrouping({ groupByColumn: col });
-  }, [persistGrouping, setGroupByColumn]);
+  const handleSetGroupByColumn = useCallback((col: string, persist = true) => {
+    const schemaForTable = findTableSchema(activeSheetKey, sheetConfig);
+    const resolved = col === 'none' ? 'none' : (resolveColumnInHeaders(col, headers, schemaForTable, sheetConfig.customAliases) || col);
+    setGroupByColumn(resolved);
+    if (persist) {
+      persistGrouping({ groupByColumn: resolved });
+    }
+  }, [activeSheetKey, headers, sheetConfig, persistGrouping, setGroupByColumn]);
 
-  const handleSetGroupByDirection = useCallback((dir: 'asc' | 'desc') => {
+  const handleSetGroupByDirection = useCallback((dir: 'asc' | 'desc', persist = true) => {
     setGroupByDirection(dir);
-    persistGrouping({ groupByDirection: dir });
+    if (persist) {
+      persistGrouping({ groupByDirection: dir });
+    }
   }, [persistGrouping, setGroupByDirection]);
 
-  // Se leen los primitivos guardados, no el objeto: `tableGroupings` cambia de
-  // identidad en cada guardado, así que depender de él re-ejecutaría el efecto sin
-  // que el valor haya cambiado. Con los primitivos, el efecto se re-ejecuta cuando
-  // de verdad cambia la agrupación (incluida la config que llega de la nube después
-  // del montaje, que antes se perdía).
   const savedGroupByColumn = sheetConfig.tableGroupings?.[activeSheetKey]?.groupByColumn;
   const savedGroupByDirection = sheetConfig.tableGroupings?.[activeSheetKey]?.groupByDirection;
 
+  // Hidratar cuando cambia savedGroupByColumn (ej. config de la nube llega tarde) o al cambiar de hoja
   useEffect(() => {
-    if (savedGroupByColumn) {
-      const col = savedGroupByColumn;
-      const dir = savedGroupByDirection || 'asc';
+    if (savedGroupByColumn && savedGroupByColumn !== 'none') {
       const schemaForTable = findTableSchema(activeSheetKey, sheetConfig);
-      const isVirtual = Boolean(schemaForTable?.[col]);
-      const isHeader = headers.includes(col);
-      if (col === 'none' || isHeader || isVirtual) {
-        setGroupByColumn(col);
-        setGroupByDirection(dir);
+      const resolved = resolveColumnInHeaders(savedGroupByColumn, headers, schemaForTable, sheetConfig.customAliases);
+      if (resolved) {
+        setGroupByColumn(resolved);
+        setGroupByDirection(savedGroupByDirection || 'asc');
       } else {
         setGroupByColumn('none');
         setGroupByDirection('asc');
       }
-    } else {
-      setGroupByColumn('none');
-      setGroupByDirection('asc');
     }
   }, [activeSheetKey, headers, savedGroupByColumn, savedGroupByDirection, setGroupByColumn, setGroupByDirection, sheetConfig]);
 
@@ -80,10 +77,13 @@ export const useTableGrouping = ({
   // cabecera del grupo, repetirla añade ruido.
   const effectiveVisibleHeaders = useMemo(() => {
     if (groupByColumn && groupByColumn !== 'none') {
-      return visibleHeaders.filter(h => h !== groupByColumn);
+      const schemaForTable = findTableSchema(activeSheetKey, sheetConfig);
+      const resolved = resolveColumnInHeaders(groupByColumn, headers, schemaForTable, sheetConfig.customAliases) || groupByColumn;
+      const lowerGroup = resolved.toLowerCase().trim();
+      return visibleHeaders.filter(h => h !== groupByColumn && h !== resolved && h.toLowerCase().trim() !== lowerGroup);
     }
     return visibleHeaders;
-  }, [visibleHeaders, groupByColumn]);
+  }, [visibleHeaders, groupByColumn, headers, activeSheetKey, sheetConfig]);
 
   return { handleSetGroupByColumn, handleSetGroupByDirection, effectiveVisibleHeaders };
 };

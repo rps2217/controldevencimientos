@@ -6,7 +6,7 @@ import {
   getItemResolutionStatus,
   createColumnsContext 
 } from '../utils/dateCalculations';
-import { findColumnBySemantic } from '../utils/columnAliases';
+import { findColumnBySemantic, resolveColumnInHeaders } from '../utils/columnAliases';
 import { 
   formatDisplayDate, 
   createMetricsAccumulator,
@@ -19,7 +19,7 @@ import {
   matchesColumnFilters,
   matchesSearchTerm
 } from '../utils/pureCalculations';
-import { augmentItemsWithVirtualColumns, getSchemaVirtualColumns } from '../utils/virtualColumnsEvaluator';
+import { augmentItemsWithVirtualColumns, getSchemaVirtualColumns, findTableSchema } from '../utils/virtualColumnsEvaluator';
 import { detectTableCapabilities } from '../utils/sliceRegistry';
 import { sortInventoryItems, compareItemValues } from '../utils/sortUtils';
 import { useInventoryWorker } from './useInventoryWorker';
@@ -465,19 +465,37 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
   ]);
 
   // Grouping logic
+  const activeTableSchema = useMemo(() => {
+    return findTableSchema(props.activeSheetTitle, sheetConfig);
+  }, [props.activeSheetTitle, sheetConfig]);
+
   const isGroupByDateCol = useMemo(() => {
-    return groupByColumn !== 'none' && (
-      findColumnBySemantic([groupByColumn], 'fecha_vc') === groupByColumn ||
-      findColumnBySemantic([groupByColumn], 'fecha_retiro') === groupByColumn ||
-      /fecha|vencimiento|caducidad|f_vto|f_venc|f\.vto|f\.venc|exp_date/i.test(groupByColumn)
+    if (!groupByColumn || groupByColumn === 'none') return false;
+    const resolvedCol = resolveColumnInHeaders(groupByColumn, headers, activeTableSchema, sheetConfig?.customAliases) || groupByColumn;
+    return (
+      findColumnBySemantic([resolvedCol], 'fecha_vc') === resolvedCol ||
+      findColumnBySemantic([resolvedCol], 'fecha_retiro') === resolvedCol ||
+      /fecha|vencimiento|caducidad|f_vto|f_venc|f\.vto|f\.venc|exp_date/i.test(resolvedCol)
     );
-  }, [groupByColumn]);
+  }, [groupByColumn, headers, activeTableSchema, sheetConfig?.customAliases]);
 
   const groupedItems = useMemo(() => {
-    if (groupByColumn === 'none') return null;
+    if (!groupByColumn || groupByColumn === 'none') return null;
+    const resolvedCol = resolveColumnInHeaders(groupByColumn, headers, activeTableSchema, sheetConfig?.customAliases) || groupByColumn;
     const map = new Map<string, InventoryItem[]>();
+
     for (const item of filteredItems) {
-      const rawVal = item[groupByColumn];
+      let rawVal = item[resolvedCol] !== undefined ? item[resolvedCol] : item[groupByColumn];
+      if (rawVal === undefined) {
+        const lower = resolvedCol.toLowerCase().trim();
+        for (const k of Object.keys(item)) {
+          if (k.toLowerCase().trim() === lower) {
+            rawVal = item[k];
+            break;
+          }
+        }
+      }
+
       let val = '(Sin asignar / Vacío)';
       if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
         if (isGroupByDateCol || (typeof rawVal === 'string' && /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}/i.test(rawVal.trim())) || rawVal instanceof Date) {
@@ -494,7 +512,7 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     return Array.from(map.entries()).sort((a, b) => {
       return compareItemValues(a[0], b[0], groupByDirection);
     });
-  }, [filteredItems, groupByColumn, groupByDirection, isGroupByDateCol]);
+  }, [filteredItems, groupByColumn, groupByDirection, isGroupByDateCol, headers, activeTableSchema, sheetConfig?.customAliases]);
 
   // Virtualization display row structure
   const displayRows = useMemo<DisplayRow[]>(() => {

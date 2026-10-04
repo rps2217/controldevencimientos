@@ -551,3 +551,59 @@ export function orderFieldsForDisplay(keys: string[], customAliases?: Record<str
   return [...keys].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }
 
+/**
+ * Resuelve el nombre exacto de la columna presente en los encabezados reales de la hoja,
+ * tolerando variaciones de mayúsculas/minúsculas, espacios, columnas virtuales del esquema
+ * y alias semánticos conocidos (ej. 'proveedor' -> 'RUT PROVEEDOR' o 'PROVEEDOR').
+ */
+export function resolveColumnInHeaders(
+  col: string | undefined | null,
+  headers: string[],
+  schemaForTable?: Record<string, any>,
+  customAliases?: Record<string, string[]>
+): string | null {
+  if (!col || col === 'none') return null;
+  const safeHeaders = Array.isArray(headers) ? headers : [];
+
+  // 1. Coincidencia exacta directa en headers
+  if (safeHeaders.includes(col)) return col;
+
+  // 2. Coincidencia exacta en columnas virtuales / calculadas del esquema
+  if (schemaForTable && schemaForTable[col]) return col;
+
+  // 3. Coincidencia insensible a mayúsculas/minúsculas y espacios en headers
+  const normalized = col.trim().toLowerCase();
+  const directHeaderMatch = safeHeaders.find(h => h.trim().toLowerCase() === normalized);
+  if (directHeaderMatch) return directHeaderMatch;
+
+  // 4. Coincidencia insensible en columnas del esquema
+  if (schemaForTable) {
+    const schemaMatch = Object.keys(schemaForTable).find(k => k.trim().toLowerCase() === normalized);
+    if (schemaMatch) return schemaMatch;
+  }
+
+  // 5. Coincidencia semántica inteligente (si col coincide con una clave semántica conocida)
+  if (normalized in FIELD_PATTERNS) {
+    const semanticMatch = findColumnBySemantic(safeHeaders, normalized as KnownFieldSemantic, customAliases);
+    if (semanticMatch) return semanticMatch;
+  }
+
+  // Comprobar si col es semántico de alguna columna existente
+  for (const h of safeHeaders) {
+    const sem = semanticOf(h, customAliases);
+    if (sem && (sem === normalized || FIELD_PATTERNS[sem]?.some(p => p.test(col) || p.test(normalized)))) {
+      return h;
+    }
+  }
+
+  // 6. Normalización sin guiones ni caracteres especiales
+  const alphaOnly = normalized.replace(/[^a-z0-9]/g, '');
+  if (alphaOnly) {
+    const looseMatch = safeHeaders.find(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, '') === alphaOnly);
+    if (looseMatch) return looseMatch;
+  }
+
+  return col;
+}
+
+

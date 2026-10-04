@@ -7,6 +7,7 @@ import {
   itemMatchesSlice,
   computeSliceCounts
 } from '../src/utils/sliceRegistry';
+import { resolveColumnInHeaders } from '../src/utils/columnAliases';
 import { mergeCloudConfigs } from '../src/utils/dashboardConfigUtils';
 import { TableSlice, SheetConfig, InventoryItem } from '../src/types';
 
@@ -161,4 +162,19 @@ test('Slices - Si un slice se elimina en un dispositivo, se purga de slices en l
   const merged = mergeCloudConfigs(local, remote);
   assert(!merged.slices?.some(s => s.id === 'slice_to_delete'), 'El slice eliminado no debe reaparecer en slices');
   assert(merged.deletedSliceIds?.includes('slice_to_delete'));
+});
+
+test('Slices - Resolución semántica e insensible a mayúsculas para agrupación', () => {
+  const headers = ['SKU', 'DESCRIPCION', 'RUT PROVEEDOR', 'FECHA_VC'];
+
+  // 1. Exact match
+  assert.equal(resolveColumnInHeaders('SKU', headers), 'SKU');
+  // 2. Case insensitive
+  assert.equal(resolveColumnInHeaders('sku', headers), 'SKU');
+  assert.equal(resolveColumnInHeaders('descripcion', headers), 'DESCRIPCION');
+  // 3. Semantic match (proveedor -> RUT PROVEEDOR)
+  assert.equal(resolveColumnInHeaders('proveedor', headers), 'RUT PROVEEDOR');
+  assert.equal(resolveColumnInHeaders('PROVEEDOR', headers), 'RUT PROVEEDOR');
+  // 4. 'none'
+  assert.equal(resolveColumnInHeaders('none', headers), null);
 });

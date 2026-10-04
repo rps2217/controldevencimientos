@@ -529,7 +529,7 @@ export const InventoryDashboard: React.FC = () => {
     sheetConfig,
     setSheetConfig,
     saveConfig,
-    headers,
+    headers: allTableHeaders,
     augmentedItems,
     frcBodCol,
     activeSliceId,

@@ -164,6 +164,8 @@ export function useTableSlices({
       setActiveSliceId(null);
       clearAllFilters();
       showAllColumns();
+      handleSetGroupByColumn('none');
+      handleSetGroupByDirection('asc');
       return;
     }
 
