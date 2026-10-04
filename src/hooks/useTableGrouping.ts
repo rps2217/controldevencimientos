@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { SheetConfig } from '../types';
 import { findTableSchema } from '../utils/virtualColumnsEvaluator';
 import { resolveColumnInHeaders } from '../utils/columnAliases';
