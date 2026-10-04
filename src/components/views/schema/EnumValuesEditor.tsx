@@ -3,6 +3,9 @@ import {
   Plus, Trash2, ArrowUp, ArrowDown, ListPlus, Check, 
   FileText, Sparkles, X, AlignLeft, Eye, HelpCircle
 } from 'lucide-react';
+import { 
+  EnumOption, parseEnumOptions, serializeEnumOptions, ENUM_COLOR_MAP 
+} from '../../../utils/enumColorHelper';
 
 interface EnumValuesEditorProps {
   options: string;
@@ -19,20 +22,16 @@ export const EnumValuesEditor: React.FC<EnumValuesEditorProps> = ({
   const [mode, setMode] = useState<'list' | 'raw'>('list');
   const [rawText, setRawText] = useState<string>(options || '');
   
-  // Parse options string into item list
-  const parseOptions = (str: string): string[] => {
-    if (!str || !str.trim()) return [];
-    return str.split(',').map(s => s.trim()).filter(Boolean);
-  };
-
-  const [items, setItems] = useState<string[]>(() => parseOptions(options));
+  const [items, setItems] = useState<EnumOption[]>(() => parseEnumOptions(options));
   const lastInputRef = useRef<HTMLInputElement | null>(null);
   const [justAddedIndex, setJustAddedIndex] = useState<number | null>(null);
 
   // Sync with external options change if different
   useEffect(() => {
-    const parsed = parseOptions(options);
-    if (parsed.join(',') !== items.join(',')) {
+    const parsed = parseEnumOptions(options);
+    const serializedParsed = serializeEnumOptions(parsed);
+    const serializedCurrent = serializeEnumOptions(items);
+    if (serializedParsed !== serializedCurrent) {
       setItems(parsed);
       setRawText(options);
     }
@@ -48,9 +47,9 @@ export const EnumValuesEditor: React.FC<EnumValuesEditorProps> = ({
   }, [justAddedIndex, items.length]);
 
   // Propagate changes to parent
-  const commitItems = (newItems: string[]) => {
+  const commitItems = (newItems: EnumOption[]) => {
     setItems(newItems);
-    const serialized = newItems.map(s => s.trim()).filter(Boolean).join(', ');
+    const serialized = serializeEnumOptions(newItems);
     setRawText(serialized);
     onChange(serialized);
   };
@@ -60,20 +59,28 @@ export const EnumValuesEditor: React.FC<EnumValuesEditorProps> = ({
     // If the user pastes text with commas or newlines, split automatically
     if (val.includes(',') || val.includes('\n')) {
       const parts = val.split(/[,\n]/).map(p => p.trim()).filter(Boolean);
+      const newOpts = parts.map(p => ({ value: p }));
       const updated = [...items];
-      updated.splice(index, 1, ...parts);
+      updated.splice(index, 1, ...newOpts);
       commitItems(updated);
       return;
     }
 
     const updated = [...items];
-    updated[index] = val;
+    updated[index] = { ...updated[index], value: val };
+    commitItems(updated);
+  };
+
+  // Update item color
+  const handleItemColorChange = (index: number, color: string | undefined) => {
+    const updated = [...items];
+    updated[index] = { ...updated[index], color: color || undefined };
     commitItems(updated);
   };
 
   // Add a new empty item row
   const handleAddItem = () => {
-    const updated = [...items, ''];
+    const updated = [...items, { value: '' }];
     commitItems(updated);
     setJustAddedIndex(updated.length - 1);
   };
@@ -109,7 +116,7 @@ export const EnumValuesEditor: React.FC<EnumValuesEditorProps> = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddItem();
-    } else if (e.key === 'Backspace' && items[index] === '' && items.length > 1) {
+    } else if (e.key === 'Backspace' && items[index]?.value === '' && items.length > 1) {
       e.preventDefault();
       handleRemoveItem(index);
     }
@@ -118,7 +125,7 @@ export const EnumValuesEditor: React.FC<EnumValuesEditorProps> = ({
   // Apply raw text changes
   const handleRawTextChange = (val: string) => {
     setRawText(val);
-    const parsed = parseOptions(val);
+    const parsed = parseEnumOptions(val);
     setItems(parsed);
     onChange(val);
   };
@@ -132,7 +139,7 @@ export const EnumValuesEditor: React.FC<EnumValuesEditorProps> = ({
   ];
 
   const applyTemplate = (templateValues: string[]) => {
-    commitItems(templateValues);
+    commitItems(templateValues.map(v => ({ value: v })));
   };
 
   return (
@@ -147,7 +154,7 @@ export const EnumValuesEditor: React.FC<EnumValuesEditorProps> = ({
               Valores Permitidos ({isEnumList ? 'EnumList - Múltiple' : 'Enum - Simple'})
             </span>
             <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
-              {items.filter(Boolean).length} valores
+              {items.filter(o => o.value).length} valores
             </span>
           </div>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
@@ -222,12 +229,38 @@ export const EnumValuesEditor: React.FC<EnumValuesEditorProps> = ({
                     <input
                       ref={isLast ? lastInputRef : null}
                       type="text"
-                      value={item}
+                      value={item.value}
                       onChange={(e) => handleItemChange(index, e.target.value)}
                       onKeyDown={(e) => handleKeyDown(e, index)}
                       placeholder={`Opción #${index + 1} (ej. PENDIENTE)...`}
-                      className="flex-1 bg-transparent px-2 py-1 text-xs font-semibold text-slate-800 dark:text-slate-100 outline-none placeholder-slate-400"
+                      className="flex-1 bg-transparent px-2 py-1 text-xs font-semibold text-slate-800 dark:text-slate-100 outline-none placeholder-slate-400 min-w-0"
                     />
+
+                    {/* Beautiful Native-styled Color Dropdown Pill */}
+                    <select
+                      value={item.color || ''}
+                      onChange={(e) => handleItemColorChange(index, e.target.value || undefined)}
+                      className={`text-[11px] font-black px-2 py-1 rounded-lg border outline-none cursor-pointer transition-colors shrink-0 max-w-[120px] ${
+                        item.color && ENUM_COLOR_MAP[item.color]
+                          ? ENUM_COLOR_MAP[item.color].badge
+                          : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                      }`}
+                      title="Asignar color a este valor de Enum"
+                    >
+                      <option value="" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-200 font-semibold">Sin Color</option>
+                      <option value="slate" className="bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">Slate / Gris</option>
+                      <option value="red" className="bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-200">Rojo</option>
+                      <option value="orange" className="bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-200">Naranja</option>
+                      <option value="amber" className="bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-200">Ámbar</option>
+                      <option value="yellow" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-200">Amarillo</option>
+                      <option value="green" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200">Verde</option>
+                      <option value="emerald" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">Esmeralda</option>
+                      <option value="teal" className="bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-200">Teal</option>
+                      <option value="blue" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200">Azul</option>
+                      <option value="indigo" className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">Índigo</option>
+                      <option value="purple" className="bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-200">Púrpura</option>
+                      <option value="pink" className="bg-pink-50 text-pink-700 dark:bg-pink-950 dark:text-pink-200">Rosa</option>
+                    </select>
 
                     {/* Action Controls: Move Up, Move Down, Delete */}
                     <div className="flex items-center gap-0.5 shrink-0">
@@ -286,13 +319,13 @@ export const EnumValuesEditor: React.FC<EnumValuesEditorProps> = ({
         /* Mode 2: Quick CSV / Multiline Textarea */
         <div className="space-y-2">
           <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-            Ingresa o pega las opciones separadas por coma o saltos de línea:
+            Ingresa o pega las opciones (pueden usar opcionalmente el formato Valor::color, ej. SI::green, NO::red):
           </label>
           <textarea
             rows={4}
             value={rawText}
             onChange={(e) => handleRawTextChange(e.target.value)}
-            placeholder="Opción 1, Opción 2, Opción 3, Opción 4..."
+            placeholder="PENDIENTE::amber, EN PROCESO::blue, REALIZADO::emerald"
             className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs font-mono text-slate-800 dark:text-slate-100 outline-none focus:border-blue-500 leading-relaxed"
           />
           <p className="text-[10px] text-slate-400">
@@ -323,8 +356,8 @@ export const EnumValuesEditor: React.FC<EnumValuesEditorProps> = ({
         </div>
       </div>
 
-      {/* Live Form Preview of Enum Chips */}
-      {items.filter(Boolean).length > 0 && (
+      {/* Live Form Preview of Enum Chips with Custom Colors */}
+      {items.filter(o => o.value).length > 0 && (
         <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
           <div className="flex items-center gap-2 mb-2">
             <Eye className="w-3.5 h-3.5 text-blue-500" />
@@ -333,14 +366,19 @@ export const EnumValuesEditor: React.FC<EnumValuesEditorProps> = ({
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5 p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
-            {items.filter(Boolean).map((opt, i) => (
-              <span
-                key={i}
-                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-              >
-                {opt}
-              </span>
-            ))}
+            {items.filter(o => o.value).map((opt, i) => {
+              const style = opt.color && ENUM_COLOR_MAP[opt.color]
+                ? ENUM_COLOR_MAP[opt.color].badge
+                : 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+              return (
+                <span
+                  key={i}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${style}`}
+                >
+                  {opt.value}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

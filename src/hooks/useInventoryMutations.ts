@@ -112,8 +112,13 @@ export function useInventoryMutations({
       }
 
       const eventCol = findColumnBySemantic(headers, 'tipo_evento') || headers.find(h => /^frc(_|\s)?even/i.test(h.trim()) || /tipo.*evento|evento|tipo.*registro/i.test(h));
-      if (eventCol && selectedEventCategory && EVENT_CATEGORIES[selectedEventCategory]) {
-        mergedFormData[eventCol] = EVENT_CATEGORIES[selectedEventCategory].rawCode || EVENT_CATEGORIES[selectedEventCategory].name;
+      if (eventCol) {
+        const userChoice = formData[eventCol]?.trim();
+        if (userChoice) {
+          mergedFormData[eventCol] = userChoice;
+        } else if (selectedEventCategory) {
+          mergedFormData[eventCol] = EVENT_CATEGORIES[selectedEventCategory]?.rawCode || EVENT_CATEGORIES[selectedEventCategory]?.name || selectedEventCategory;
+        }
       }
 
       // Auto-generate ID_FRC for FRC sheets if empty

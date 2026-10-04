@@ -5,6 +5,7 @@ import { QUICK_QUANTITY_PRESETS, getOperationalSuggestions } from '../../../util
 import { formatInputDate, formatInputDateTime } from '../../../utils/dateCalculations';
 import { findColumnBySemantic } from '../../../utils/columnAliases';
 import { AlertCircle, Search, CheckCircle2, Package, ClipboardPaste, X } from 'lucide-react';
+import { parseEnumOptions } from '../../../utils/enumColorHelper';
 
 interface ItemFormFieldInputProps {
   header: string;
@@ -112,10 +113,7 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
   // Helper to parse enum options from schema or fallback semantics
   const enumOptions = useMemo(() => {
     if (colSchema?.options && colSchema.options.trim()) {
-      return colSchema.options
-        .split(/[,;\n]/)
-        .map(s => s.trim())
-        .filter(Boolean);
+      return parseEnumOptions(colSchema.options).map(o => o.value);
     }
     // Fallback options based on semantic column type if type is enum or field is MM/YYYY
     const isMonth = Boolean(findColumnBySemantic([header], 'mes', customAliases)) || /^(mm|mes)$/i.test(header);

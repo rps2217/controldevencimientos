@@ -43,7 +43,19 @@ export const QuickTransferModal: React.FC<QuickTransferModalProps> = ({
   const cant = item[cantCol] || '-';
   const lote = item[loteCol] || '-';
   const cat = getEventCategory(item, headers);
-  const catDef = EVENT_CATEGORIES[cat];
+  const catDef = EVENT_CATEGORIES[cat] || {
+    id: cat,
+    rawCode: cat,
+    name: cat,
+    shortLabel: cat,
+    description: '',
+    badgeBg: 'bg-slate-100 dark:bg-slate-800',
+    badgeText: 'text-slate-800 dark:text-slate-200',
+    badgeBorder: 'border-slate-200 dark:border-slate-700',
+    cardBorder: 'border-slate-300 dark:border-slate-700',
+    cardBg: 'bg-slate-600 text-white',
+    iconBg: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

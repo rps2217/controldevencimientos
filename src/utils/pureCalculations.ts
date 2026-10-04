@@ -7,40 +7,36 @@ import { findColumnBySemantic } from './columnAliases';
  */
 export function getCategoryFromEventValue(rawVal: unknown): EventCategory | null {
   if (rawVal === null || rawVal === undefined) return null;
-  const raw = String(rawVal).trim().toUpperCase();
+  const raw = String(rawVal).trim();
   if (!raw || raw === '-') return null;
 
-  if (raw === 'VENC. CERC.' || raw === 'VENC. CERC' || raw.includes('VENC. CERC') || raw.includes('VENC.CERC') || raw.includes('CERCAN')) {
+  const upper = raw.toUpperCase();
+
+  // Exact mappings for historical sheet data compatibility (no fuzzy substring .includes heurísticas)
+  if (upper === 'VENC. CERC.' || upper === 'VENC. CERC') {
     return 'VENCIMIENTO_CERCANO';
   }
-  if (raw === 'DET. PED' || raw === 'DET. PED.' || raw.includes('DET. PED') || raw.includes('DET.PED') || raw.includes('TRANSP') || raw.includes('DETERIORO')) {
+  if (upper === 'DET. PED' || upper === 'DET. PED.') {
     return 'TRANSPORTE';
   }
-  if (raw === 'CAL. INTER' || raw === 'CAL. INTER.' || raw.includes('CAL. INTER') || raw.includes('CAL. INT') || raw.includes('CALIDAD INT') || raw.includes('INTERNA')) {
+  if (upper === 'CAL. INTER' || upper === 'CAL. INTER.') {
     return 'CAL_INTERNA';
   }
-  if (raw === 'CAL. EXT.' || raw === 'CAL. EXT' || raw.includes('CAL. EXT') || raw.includes('CALIDAD EXT') || raw.includes('EXTERNA')) {
+  if (upper === 'CAL. EXT.' || upper === 'CAL. EXT') {
     return 'CAL_EXTERNA';
   }
-  if (raw === 'CANJES' || raw.includes('CANJE')) {
-    return 'CANJES';
-  }
-  if (raw === 'DIF. PED' || raw === 'DIF. PED.' || raw.includes('DIF. PED') || raw.includes('DIF.PED') || raw.includes('DIFER')) {
+  if (upper === 'DIF. PED' || upper === 'DIF. PED.') {
     return 'DIFERENCIA';
   }
-  if (raw === 'MERMAS' || raw === 'MERMA' || (raw.includes('MERMA') && !raw.includes('FALTANTE'))) {
-    return 'MERMAS';
-  }
-  if (raw === 'SOBRANTE INVENT.' || raw.includes('SOBRANTE') || raw.includes('AVER') || raw.includes('ROTURA')) {
+  if (upper === 'SOBRANTE INVENT.') {
     return 'AVERIA';
   }
-  if (raw === 'FALTANTE INVENT.' || raw.includes('FALTANTE') || raw.includes('DEVOL') || raw.includes('RECLAM')) {
+  if (upper === 'FALTANTE INVENT.') {
     return 'DEVOLUCION';
   }
-  if (raw.includes('VENC') || raw.includes('CADUC')) {
-    return 'VENCIMIENTO';
-  }
-  return null;
+
+  // SSOT User-defined Enum or direct string value (Heuristics eliminated)
+  return raw as EventCategory;
 }
 
 /**

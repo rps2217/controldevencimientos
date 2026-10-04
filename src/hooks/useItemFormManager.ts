@@ -38,9 +38,10 @@ export function useItemFormManager({
     setSelectedEventCategory(cat);
     const eventCol = findColumnBySemantic(headers, 'tipo_evento') || headers.find(h => /^frc(_|\s)?even/i.test(h.trim()));
     if (eventCol) {
+      const val = EVENT_CATEGORIES[cat]?.rawCode || EVENT_CATEGORIES[cat]?.name || cat;
       setFormData(prev => ({
         ...prev,
-        [eventCol]: EVENT_CATEGORIES[cat].rawCode || EVENT_CATEGORIES[cat].name
+        [eventCol]: val
       }));
     }
   }, [headers]);
@@ -108,7 +109,7 @@ export function useItemFormManager({
       }
 
       if (eventCol) {
-        initialData[eventCol] = EVENT_CATEGORIES[cat].name;
+        initialData[eventCol] = EVENT_CATEGORIES[cat]?.name || cat;
       }
 
       if (prefillSku && skuCol) {
