@@ -2,6 +2,132 @@ import { findColumnBySemantic, KnownFieldSemantic, normalizeHeaderString, FIELD_
 import { rowToObject } from './pureCalculations';
 import { SheetRecord } from '../types';
 
+export const DICCIONARIO_SINONIMOS_FRC: Record<string, string[]> = {
+  "FRC_N": ["FOLIO", "FRC_N", "N° FRC", "Folio Único", "NUMERO FRC", "FRC"],
+  "FRC_SKU": ["FRC_SKU", "EVSKU_EV", "SKU", "CÓDIGO", "CODIGO", "ITEM"],
+  "FRC_DESC": ["FRC_DESC", "PRODUCTO_EV", "PRODUCTO", "DESCRIPCIÓN", "DESCRIPCION", "NOMBRE"],
+  "FRC_LOTE": ["FRC_LOTE", "LOTE", "N° LOTE", "LOT"],
+  "FRC_VENCE": ["FRC_VENCE", "FECHAINGRESO_EV", "VENCIMIENTO", "VENCE", "FECHA_VENCE", "F. VENCE"],
+  "FRC_RESOLUCION": ["Resolución (AB)", "ESTADO", "OBSERVACION", "OBSERVACIÓN", "RESOLUCION", "RESOLUCIÓN"],
+  "N_TRASPASO": ["N_TRASPASO", "TRASPASO", "N° TRASPASO", "NUMERO TRASPASO"],
+  "FRC_CANT": ["FRC_CANT", "UNIDADES", "CANTIDAD", "CANT", "DIFERENCIA", "Guía dice", "Dif."],
+  "FRC_BOD": ["FRC_BOD", "DESTINOTRASPASO", "DESTINO", "BODEGA", "BOD"],
+  "FRC_EVEN": ["FRC_EVEN", "EVENTO_TIPO", "TIPO EVENTO"],
+  "ID_FRC": [] // Autogenerado al guardar con crypto.randomUUID()
+};
+
+export const COLUMNAS_OBJETIVO_FRC = [
+  "FRC_N", "FRC_SKU", "FRC_DESC", "FRC_LOTE", "FRC_VENCE", 
+  "FRC_RESOLUCION", "N_TRASPASO", "FRC_CANT", "FRC_BOD", "FRC_EVEN", "ID_FRC"
+];
+
+/**
+ * Limpieza estricta de cadenas de texto (remueve indicadores visuales de Looker Studio, acentos y mayúsculas)
+ */
+export function limpiarTexto(texto: any): string {
+  if (texto === undefined || texto === null) return "";
+  return texto
+    .toString()
+    .replace(/[▼▲▶◀•▪🔹]/g, "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
+ * Busca el índice de columna correspondiente a una llave objetivo según el diccionario de sinónimos FRC
+ */
+export function encontrarColumnaPorSinonimo(columnaDestino: string, cabecerasOrigen: string[]): number {
+  const aliasPermitidos = DICCIONARIO_SINONIMOS_FRC[columnaDestino] || [columnaDestino];
+  const aliasLimpios = aliasPermitidos.map(limpiarTexto);
+  const cabecerasLimpias = cabecerasOrigen.map(limpiarTexto);
+
+  for (let i = 0; i < cabecerasLimpias.length; i++) {
+    if (aliasLimpios.length > 0 && aliasLimpios.includes(cabecerasLimpias[i])) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Procesa datos del portapapeles FRC soportando tanto formato Horizontal (Tabular) como Vertical (Looker Studio lineal)
+ */
+export function parseFrcPasteData(texto: string): { mappedRows: SheetRecord[]; originalHeaders: string[]; error?: string } {
+  const lineasOriginales = texto.split(/\r\n|\n/).map(l => l.trim());
+  const lineas = lineasOriginales.filter(l => l !== "" && l !== "▼" && l !== "▲" && l !== "▶" && l !== "◀");
+
+  if (lineas.length < 2) {
+    return { mappedRows: [], originalHeaders: [], error: "El texto pegado no contiene suficientes filas válidas." };
+  }
+
+  let cabecerasOrigen: string[] = [];
+  let filasDatos: string[][] = [];
+
+  // DETECCIÓN DE FORMATO HORIZONTAL O VERTICAL
+  if (lineasOriginales[0].includes('\t')) {
+    // Caso Horizontal (Estructura Tabular)
+    cabecerasOrigen = lineasOriginales[0].split('\t').map(c => c.replace(/[▼▲▶◀]/g, "").trim());
+    for (let i = 1; i < lineasOriginales.length; i++) {
+      if (lineasOriginales[i].trim() !== "") {
+        filasDatos.push(lineasOriginales[i].split('\t').map(c => c.trim()));
+      }
+    }
+  } else {
+    // Caso Vertical (Looker Studio Lineal)
+    const todosLosAlias = Object.values(DICCIONARIO_SINONIMOS_FRC).flat().map(limpiarTexto);
+    let indicePrimerDato = -1;
+
+    for (let k = 0; k < lineas.length; k++) {
+      const lineaLimpia = limpiarTexto(lineas[k]);
+      if (!todosLosAlias.includes(lineaLimpia)) {
+        indicePrimerDato = k;
+        break;
+      }
+    }
+
+    if (indicePrimerDato > 0) {
+      cabecerasOrigen = lineas.slice(0, indicePrimerDato);
+      const datosPuros = lineas.slice(indicePrimerDato);
+      const anchoTabla = cabecerasOrigen.length;
+
+      for (let f = 0; f < datosPuros.length; f += anchoTabla) {
+        const subFila = datosPuros.slice(f, f + anchoTabla);
+        if (subFila.length === anchoTabla) {
+          filasDatos.push(subFila);
+        }
+      }
+    } else {
+      return { mappedRows: [], originalHeaders: [], error: "No se pudieron identificar las columnas en los datos verticales. Verifica tus sinónimos." };
+    }
+  }
+
+  // MAPEO HACIA LAS COLUMNAS OBJETIVO FRC
+  const datosMapeados: SheetRecord[] = [];
+
+  filasDatos.forEach(celdas => {
+    const filaObjeto: SheetRecord = {};
+
+    COLUMNAS_OBJETIVO_FRC.forEach(colDestino => {
+      if (colDestino === "ID_FRC") {
+        filaObjeto[colDestino] = "(Autogenerado)";
+      } else {
+        const indexOrigen = encontrarColumnaPorSinonimo(colDestino, cabecerasOrigen);
+        if (indexOrigen > -1 && celdas[indexOrigen] !== undefined) {
+          filaObjeto[colDestino] = celdas[indexOrigen].trim();
+        } else {
+          filaObjeto[colDestino] = "";
+        }
+      }
+    });
+
+    datosMapeados.push(filaObjeto);
+  });
+
+  return { mappedRows: datosMapeados, originalHeaders: cabecerasOrigen };
+}
+
 export interface ParsedSpreadsheetResult {
   headers: string[];
   rows: SheetRecord[];
