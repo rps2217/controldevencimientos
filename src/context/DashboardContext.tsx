@@ -176,6 +176,7 @@ export interface DashboardContextType {
   searchableHeaders?: string[];
   hasActiveFilters?: boolean;
   clearAllFilters?: () => void;
+  isWorkerProcessing?: boolean;
   isActionsMenuOpen?: boolean;
   setIsActionsMenuOpen?: (open: boolean) => void;
   lastCachedAt?: number | string | null;
@@ -440,6 +441,7 @@ export const DashboardProvider: React.FC<{
     handleResetColWidths: value.handleResetColWidths,
     handleToggleStickyColumns: value.handleToggleStickyColumns,
     hiddenColumns: value.hiddenColumns,
+    isWorkerProcessing: value.isWorkerProcessing,
     isActionsMenuOpen: value.isActionsMenuOpen,
     setIsActionsMenuOpen: value.setIsActionsMenuOpen,
     isSidebarCollapsed: value.isSidebarCollapsed,

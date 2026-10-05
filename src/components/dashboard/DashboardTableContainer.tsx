@@ -15,8 +15,17 @@ export const DashboardTableContainer: React.FC = () => {
   const expandAllGroups = dashboard.expandAllGroups;
   const collapseAllGroups = dashboard.collapseAllGroups;
 
+  const isWorkerProcessing = dashboard.isWorkerProcessing ?? false;
+
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 md:bg-white md:dark:bg-slate-900 md:border border-slate-200 dark:border-slate-800 md:rounded-3xl md:shadow-sm overflow-hidden min-h-0 relative">
+      {/* Subtle top worker processing indicator */}
+      {isWorkerProcessing && (
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-blue-500/20 overflow-hidden z-30">
+          <div className="h-full bg-blue-600 dark:bg-blue-400 animate-pulse w-full" />
+        </div>
+      )}
+
       <InventoryTable />
 
       {/* Footer summary bar */}
@@ -59,9 +68,13 @@ export const DashboardTableContainer: React.FC = () => {
             </div>
           )}
         </div>
-        <span className="hidden md:inline text-[11px] text-slate-500 dark:text-slate-400">
-          Tip: Arrastra las líneas entre columnas para cambiar su tamaño, o haz <strong>doble clic</strong> para auto-ajustar.
-        </span>
+        
+        <div className="hidden md:flex items-center gap-2.5 text-[11px] text-slate-500 dark:text-slate-400">
+          <span className="inline-flex items-center gap-1 bg-slate-200/80 dark:bg-slate-700/80 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-slate-700 dark:text-slate-200" title="Atajos de teclado activos para la tabla">
+            ▲/▼ Navegar · Enter Seleccionar
+          </span>
+          <span>Tip: Doble clic en divisor de columna para auto-ajustar.</span>
+        </div>
       </div>
     </div>
   );

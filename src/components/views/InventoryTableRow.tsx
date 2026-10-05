@@ -582,7 +582,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                   })}
                 </div>
               ) : (
-                <span className="truncate block text-left w-full">
+                <span className={`truncate block text-left w-full ${(isDateCol || (val !== null && typeof val === 'number') || (typeof val === 'string' && !isNaN(Number(val)) && val.trim() !== '')) ? 'font-mono tabular-nums' : ''}`}>
                   {val !== undefined && val !== null && String(val).trim() !== ''
                     ? (isDateCol || (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}/i.test(val.trim())) || val instanceof Date)
                       ? formatDisplayDate(val)
