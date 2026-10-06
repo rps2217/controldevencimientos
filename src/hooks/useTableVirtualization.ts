@@ -34,9 +34,7 @@ export function useTableVirtualization(paginatedDisplayRows: DisplayRow[]): UseT
 
   const measureElement = useCallback((node: Element | null) => {
     if (node) {
-      requestAnimationFrame(() => {
-        rowVirtualizer.measureElement(node);
-      });
+      rowVirtualizer.measureElement(node);
     }
   }, [rowVirtualizer]);
 
