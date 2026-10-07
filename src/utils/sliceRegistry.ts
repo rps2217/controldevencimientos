@@ -38,19 +38,13 @@ export function detectTableCapabilities(
   const caps = new Set<TableCapability>();
 
   // El conteo físico necesita identificar el SKU y cuantificar existencias: sin
-  // ambas columnas el terminal no tiene nada que reconciliar (p. ej. una hoja de
-  // Clientes con teléfono y email no debe ofrecerlo).
+  // ambas columnas el terminal no tiene nada que reconciliar.
   if (has('sku') && has('cantidad')) caps.add('conteo');
 
   // La precedencia vencimiento > incidencia es deliberada: `getEventCategory` asume
   // VENCIMIENTO por defecto, así que una hoja con fecha de vencimiento se trata como
   // tabla de vencimientos aunque además tenga columna de evento (es el caso de la
-  // pestaña `main`, que trae FRC_EVEN). Sin esa precedencia, `main` heredaría los
-  // slices de incidencias y cambiaría el comportamiento actual.
-  //
-  // `catalogo` es la rama final: describir productos es lo que queda cuando la hoja
-  // no tiene fechas ni registra eventos. Así una hoja ajena de catálogo (SKU +
-  // descripción + proveedor) se detecta sin depender del nombre de la pestaña.
+  // pestaña `main`, que trae FRC_EVEN).
   if (has('fecha_vc') || has('fecha_retiro') || (has('mes') && has('anio'))) caps.add('vencimiento');
   else if (has('tipo_evento')) caps.add('incidencia');
   else if (has('sku') && has('descripcion')) caps.add('catalogo');
@@ -63,15 +57,25 @@ export function detectTableCapabilities(
  *
  * El automático es el valor por defecto (Ponytail: sin UI obligatoria, una hoja nueva
  * funciona sola). El override existe solo para el caso ambiguo que la detección no puede
- * resolver: una hoja con columna `Fecha` genérica que el usuario sí sabe que es de
- * vencimiento, o una hoja de vencimientos con datos sucios que no detecta nada.
+ * resolver.
  */
 export function resolveTableCapabilities(
   headers: string[],
   customAliases?: Record<string, string[]>,
-  override?: TableCapabilitySetting
+  override?: TableCapabilitySetting,
+  tableKey?: string
 ): Set<TableCapability> {
+  if (!Array.isArray(headers) || headers.length === 0) return new Set();
   const caps = detectTableCapabilities(headers, customAliases);
+  if (tableKey === 'events') {
+    caps.add('incidencia');
+    if (!override?.enabled?.includes('vencimiento')) {
+      caps.delete('vencimiento');
+    }
+  }
+  if (tableKey === 'main') {
+    caps.add('vencimiento');
+  }
   override?.enabled?.forEach(c => caps.add(c));
   override?.disabled?.forEach(c => caps.delete(c));
   return caps;
@@ -425,7 +429,7 @@ export function getSlicesForTable(
   capabilityOverride?: TableCapabilitySetting,
   deletedSliceIds: string[] = []
 ): TableSlice[] {
-  const caps = resolveTableCapabilities(headers, customAliases, capabilityOverride);
+  const caps = resolveTableCapabilities(headers, customAliases, capabilityOverride, tableKey);
   const deletedSet = new Set(deletedSliceIds);
 
   // Los nativos entran por capacidad, no por nombre de pestana: asi una hoja no
@@ -461,7 +465,7 @@ export function getDeletedSlicesForTable(
 ): TableSlice[] {
   if (!deletedSliceIds || deletedSliceIds.length === 0) return [];
   const deletedSet = new Set(deletedSliceIds);
-  const caps = resolveTableCapabilities(headers, customAliases, capabilityOverride);
+  const caps = resolveTableCapabilities(headers, customAliases, capabilityOverride, tableKey);
 
   // Built-in slices that match table capability and are deleted
   const deletedBuiltIns = BUILT_IN_SLICES

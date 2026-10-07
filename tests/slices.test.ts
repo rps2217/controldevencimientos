@@ -178,3 +178,14 @@ test('Slices - Resolución semántica e insensible a mayúsculas para agrupació
   // 4. 'none'
   assert.equal(resolveColumnInHeaders('none', headers), null);
 });
+
+test('Slices - Detección de capacidades en tabla FRC con FECHA_VC', () => {
+  const frcHeaders = [
+    'LOCAL', 'FRC_SKU', 'FRC_DESCRIPCION', 'FOLIO', 'FECHA_VC', 
+    'OBSERVACION', 'CANTIDAD', 'FRC_EVEN', 'ID_FRC', 'FRC_ESTADO', 'FRC_FECHA_CREACION'
+  ];
+  const slices = getSlicesForTable('events', [], [], frcHeaders);
+  assert(slices.length > 0, 'Debe devolver slices para la tabla FRC/Incidencias');
+  const transporteSlice = slices.find(s => s.id === 'builtin_events_transporte');
+  assert(transporteSlice !== undefined, 'Debe incluir slices de incidencias como Transporte & Chofer');
+});

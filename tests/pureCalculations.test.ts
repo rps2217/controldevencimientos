@@ -14,6 +14,7 @@ import {
   parseLocaleNumber,
   formatLocaleNumber,
   getCategoryFromEventValue,
+  getEventCategory,
   isExpiryDomainItem,
   isIncidenceDomainItem,
   matchesPmRadarFilter,
@@ -204,6 +205,34 @@ async function runTests() {
   const statusFuture = computeItemRawStatus(futureRow, headers);
   assert(statusFuture.code === 'NORMAL', 'computeItemRawStatus: clasifica como NORMAL cuando está holgado en fecha');
   assert((statusFuture.daysToExpiry ?? 0) > 100, 'computeItemRawStatus: calcula daysToExpiry positivo');
+
+  // --- 6. Registro FRC con categoría de evento vacía y búsqueda ---
+  console.log('\n--- 6. Registro FRC importado con categoría vacía ---');
+  const frcHeaders = [
+    'LOCAL', 'FRC_SKU', 'FRC_DESCRIPCION', 'FOLIO', 'FECHA_VC', 
+    'OBSERVACION', 'CANTIDAD', 'FRC_EVEN', 'ID_FRC', 'FRC_ESTADO', 'FRC_FECHA_CREACION'
+  ];
+  const frcImportedItem = {
+    _rowIndex: 2,
+    LOCAL: '121-900',
+    FRC_SKU: '2100110108486',
+    FRC_DESCRIPCION: 'CARDUUS MAR D6 TAB',
+    FOLIO: '964826',
+    FECHA_VC: '2027-09-15',
+    OBSERVACION: '',
+    CANTIDAD: '12',
+    FRC_EVEN: '',
+    ID_FRC: 'f31bbef2-1592-44e7-8f18-eabd121f9294',
+    FRC_ESTADO: '',
+    FRC_FECHA_CREACION: '05/10/2026 13:13:24'
+  };
+
+  const frcCat = getEventCategory(frcImportedItem, frcHeaders);
+  assert(frcCat === 'VENCIMIENTO_CERCANO', 'getEventCategory: registro FRC con FECHA_VC y FRC_EVEN vacío se clasifica como VENCIMIENTO_CERCANO');
+  assert(isIncidenceDomainItem(frcCat) === true, 'isIncidenceDomainItem: registro FRC pertenece al dominio de incidencias');
+  assert(matchesSearchTerm(frcImportedItem, frcHeaders, '2100110108486') === true, 'matchesSearchTerm: encuentra SKU en registro FRC');
+  assert(matchesSearchTerm(frcImportedItem, frcHeaders, 'carduus') === true, 'matchesSearchTerm: encuentra descripción en registro FRC');
+  assert(matchesSearchTerm(frcImportedItem, frcHeaders, '964826') === true, 'matchesSearchTerm: encuentra folio en registro FRC');
 
   console.log('\n========================================');
   console.log(`TOTAL PRUEBAS: ${passed + failed}`);

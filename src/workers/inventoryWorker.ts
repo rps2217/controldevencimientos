@@ -241,9 +241,6 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
           continue;
         }
       } else if (canLogEvents) {
-        if (!isIncidenceDomainItem(item.eventCategory)) {
-          continue;
-        }
         if (eventFilterSet && !eventFilterSet.has(item.eventCategory)) {
           continue;
         }

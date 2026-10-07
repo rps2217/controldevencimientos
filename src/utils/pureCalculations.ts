@@ -290,11 +290,28 @@ export function createColumnsContext(headers: string[]): CalculationColumnsConte
 
 export function getEventCategory(item: InventoryItem, headers: string[], colContext?: CalculationColumnsContext): EventCategory {
   const eventHeader = colContext ? colContext.eventHeader : (findColumnBySemantic(headers, 'tipo_evento') || headers.find(h => /^frc(_|\s)?even/i.test(h.trim())));
-  if (eventHeader && item[eventHeader]) {
+  if (eventHeader && item[eventHeader] !== undefined && item[eventHeader] !== null && String(item[eventHeader]).trim() !== '') {
     const parsed = getCategoryFromEventValue(item[eventHeader]);
     if (parsed) return parsed;
   }
   
+  // Detect if this row belongs to an FRC/Incidences context
+  const isFrcRow = Boolean(
+    item.ID_FRC || 
+    item.id_frc || 
+    item.FRC_N || 
+    item.frc_n ||
+    (eventHeader && headers.some(h => /^frc_/i.test(h.trim())))
+  );
+
+  if (isFrcRow) {
+    const vcCol = colContext ? colContext.vcCol : findColumnBySemantic(headers, 'fecha_vc');
+    if (vcCol && item[vcCol] !== undefined && item[vcCol] !== null && String(item[vcCol]).trim() !== '') {
+      return 'VENCIMIENTO_CERCANO';
+    }
+    return 'DIFERENCIA';
+  }
+
   // Check if item has FECHA_VC or MM/YYYY
   const vcCol = colContext ? colContext.vcCol : findColumnBySemantic(headers, 'fecha_vc');
   if (vcCol && item[vcCol]) return 'VENCIMIENTO';
@@ -731,10 +748,12 @@ export function computeGroupAggregates(
  * - Incidencias (FRC) admite todo lo demás (incluido VENCIMIENTO_CERCANO, TRANSPORTE, DIFERENCIA, etc.).
  */
 export function isExpiryDomainItem(eventCategory: string | null | undefined): boolean {
+  if (!eventCategory) return true;
   return eventCategory === 'VENCIMIENTO';
 }
 
 export function isIncidenceDomainItem(eventCategory: string | null | undefined): boolean {
+  if (!eventCategory) return true;
   return eventCategory !== 'VENCIMIENTO';
 }
 

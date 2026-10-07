@@ -407,9 +407,6 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
           }
         } else if (canLogEvents) {
           const cat = getEventCategory(item, headers, fallbackColContext);
-          if (!isIncidenceDomainItem(cat)) {
-            continue;
-          }
           if (eventFilterSet && (!cat || !eventFilterSet.has(cat))) {
             continue;
           }
