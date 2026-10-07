@@ -14,7 +14,9 @@ import {
 } from './sheetsClient';
 
 const CONFIG_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const NEGATIVE_CONFIG_TTL_MS = 3 * 60 * 1000; // 3 minutes for absent/unsupported config
 let cachedPropertiesConfig: { data: ScriptResponse['config']; timestamp: number } | null = null;
+let lastFailedPropertiesCheck = 0;
 
 // PropertiesService storage (zero extra sheets needed)
 export async function getScriptPropertiesConfig(forceRefresh = false): Promise<ScriptResponse['config'] | null> {
@@ -22,13 +24,18 @@ export async function getScriptPropertiesConfig(forceRefresh = false): Promise<S
   if (!forceRefresh && cachedPropertiesConfig && (now - cachedPropertiesConfig.timestamp < CONFIG_TTL_MS)) {
     return cachedPropertiesConfig.data;
   }
+  if (!forceRefresh && lastFailedPropertiesCheck && (now - lastFailedPropertiesCheck < NEGATIVE_CONFIG_TTL_MS)) {
+    return null;
+  }
   try {
     const res = await fetchFromScript({ action: 'getAppProperties', spreadsheetId: SPREADSHEET_ID });
-    if (res && res.success && res.config && (res.config.schema || res.config.main)) {
+    if (res && res.success && res.config && (res.config.schema || res.config.main || res.config.slices)) {
       cachedPropertiesConfig = { data: res.config, timestamp: now };
       return res.config;
     }
+    lastFailedPropertiesCheck = now;
   } catch (e) {
+    lastFailedPropertiesCheck = now;
     console.warn('Script Properties config not found or not supported yet:', e);
   }
   return null;

@@ -268,7 +268,7 @@ export function useInventoryData({
         const prodRows = batchData[prodSheetTitle];
         const h = prodRows[0];
         setProducts(prodRows.slice(1).map((row: SheetRow) => rowToObject(h, row)));
-        await indexedDbService.saveCachedSheet(prodSheetTitle, prodRows);
+        indexedDbService.saveCachedSheet(prodSheetTitle, prodRows).catch(e => console.warn('[Cache] Error saving products:', e));
         hasRelational = true;
       } else if (products.length > 0) {
         hasRelational = true;
@@ -279,7 +279,7 @@ export function useInventoryData({
         const polRows = batchData[polSheetTitle];
         const h = polRows[0];
         setPolicies(polRows.slice(1).map((row: SheetRow) => rowToObject(h, row)));
-        await indexedDbService.saveCachedSheet(polSheetTitle, polRows);
+        indexedDbService.saveCachedSheet(polSheetTitle, polRows).catch(e => console.warn('[Cache] Error saving policies:', e));
         hasRelational = true;
       } else if (policies.length > 0) {
         hasRelational = true;
@@ -290,13 +290,13 @@ export function useInventoryData({
         const mainRows = batchData[mainSheetTitle];
         const h = mainRows[0];
         setAllMainItems(mainRows.slice(1).map((row: SheetRow, index: number) => ({ ...rowToObject(h, row), _rowIndex: index + 2 })));
-        await indexedDbService.saveCachedSheet(mainSheetTitle, mainRows);
+        indexedDbService.saveCachedSheet(mainSheetTitle, mainRows).catch(e => console.warn('[Cache] Error saving main items:', e));
       }
 
       // Procesar la Hoja Activa
       if (targetSheetProp && batchData[targetSheetProp.title]) {
         const rows = batchData[targetSheetProp.title];
-        await indexedDbService.saveCachedSheet(targetSheetProp.title, rows);
+        indexedDbService.saveCachedSheet(targetSheetProp.title, rows).catch(e => console.warn('[Cache] Error saving active sheet:', e));
         setLastCachedAt(new Date().toISOString());
         setIsOffline(false);
 

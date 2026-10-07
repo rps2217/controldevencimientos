@@ -373,6 +373,7 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
     if (!parsedData || parsedData.rows.length === 0) return;
 
     // Validation Guard: If this is an FRC sheet or has an event column, verify every row has an event assigned
+    let effectiveDefaultEvent = selectedDefaultEvent;
     if (eventTargetCol && isFrcSheet) {
       const sourceEventKey = customMappings[eventTargetCol] || eventTargetCol;
       const rowsMissingEvent = parsedData.rows.filter(r => {
@@ -381,27 +382,29 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
       });
 
       if (rowsMissingEvent.length > 0) {
-        if (selectedDefaultEvent) {
-          // If a default event is chosen, auto-apply it before submitting
-          handleAssignEventToRows(selectedDefaultEvent, true);
-        } else {
-          setStatusMessage({
-            text: `⚠️ Atención: Hay ${rowsMissingEvent.length} fila(s) sin Tipo de Evento. Selecciona un evento arriba o pulsa "Auto-asignar" para continuar.`,
-            type: 'error'
-          });
-          return;
+        if (!effectiveDefaultEvent) {
+          effectiveDefaultEvent = 'DIF. PED';
         }
+        // Also update local parsed state for visual consistency
+        handleAssignEventToRows(effectiveDefaultEvent, true);
       }
     }
 
     setIsProcessing(true);
     try {
       // Map rows according to customMappings
+      const sourceEventKey = eventTargetCol ? (customMappings[eventTargetCol] || eventTargetCol) : null;
       const mappedRowsList = parsedData.rows.map((sourceRow, rowIndex) => {
         const mappedItem: SheetRecord = {};
         targetHeaders.forEach(targetCol => {
           const mappedSourceCol = customMappings[targetCol];
-          const rawVal = mappedSourceCol ? sourceRow[mappedSourceCol] : undefined;
+          let rawVal = mappedSourceCol ? sourceRow[mappedSourceCol] : undefined;
+          
+          // If this is the event column and is currently empty in an FRC sheet, assign the default event
+          if (targetCol === eventTargetCol && isFrcSheet && (!rawVal || String(rawVal).trim() === '')) {
+            rawVal = effectiveDefaultEvent || 'DIF. PED';
+          }
+
           if (rawVal !== undefined && String(rawVal).trim() !== '' && String(rawVal).trim() !== '(Autogenerado)') {
             mappedItem[targetCol] = String(rawVal).trim();
           } else if (isAutoGeneratableCol(targetCol)) {
