@@ -24,6 +24,20 @@
     <link rel="mask-icon" href="/icon.svg" color="#10b981" />
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      (function() {
+        var isROError = function(m) {
+          var s = String(m || '').toLowerCase();
+          return s.indexOf('resizeobserver') !== -1 || s.indexOf('undelivered notifications') !== -1;
+        };
+        window.addEventListener('error', function(e) {
+          if (isROError(e.message || (e.error && e.error.message))) {
+            e.stopImmediatePropagation();
+            if (e.preventDefault) e.preventDefault();
+          }
+        }, true);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

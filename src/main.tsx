@@ -7,10 +7,11 @@ import './index.css';
 
 migrateLegacyStorageKeys();
 
-// Suppress harmless browser ResizeObserver loop errors (Recharts, Virtualizer)
-const isResizeObserverError = (msg: string) =>
-  msg.includes('ResizeObserver') ||
-  msg.includes('undelivered notifications');
+// Suppress harmless browser ResizeObserver loop errors (Recharts, Virtualizer, Resizable Panels)
+const isResizeObserverError = (msg: unknown) => {
+  const str = String(msg || '').toLowerCase();
+  return str.includes('resizeobserver') || str.includes('undelivered notifications');
+};
 
 window.addEventListener('error', (e) => {
   const msg = e.message || (e.error && e.error.message) || '';
@@ -18,7 +19,7 @@ window.addEventListener('error', (e) => {
     e.stopImmediatePropagation();
     e.preventDefault();
   }
-});
+}, true);
 
 window.addEventListener('unhandledrejection', (e) => {
   const msg = (e.reason && (e.reason.message || String(e.reason))) || '';

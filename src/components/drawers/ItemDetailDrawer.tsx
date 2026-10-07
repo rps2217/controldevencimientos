@@ -166,28 +166,37 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   useEffect(() => {
     if (!isResizing) return;
 
+    let rafId: number | null = null;
+
     const handleMouseMove = (e: MouseEvent) => {
-      const drawerRight = drawerRef.current
-        ? drawerRef.current.getBoundingClientRect().right
-        : window.innerWidth;
-      const newWidth = drawerRight - e.clientX;
-      const maxW = Math.min(MAX_PANEL_WIDTH, window.innerWidth * 0.65);
-      const clamped = Math.max(MIN_PANEL_WIDTH, Math.min(newWidth, maxW));
-      setPanelWidth(clamped);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const drawerRight = drawerRef.current
+          ? drawerRef.current.getBoundingClientRect().right
+          : window.innerWidth;
+        const newWidth = drawerRight - e.clientX;
+        const maxW = Math.min(MAX_PANEL_WIDTH, window.innerWidth * 0.65);
+        const clamped = Math.max(MIN_PANEL_WIDTH, Math.min(newWidth, maxW));
+        setPanelWidth(clamped);
+      });
     };
 
     const handleTouchMove = (e: TouchEvent) => {
       if (!e.touches[0]) return;
-      const drawerRight = drawerRef.current
-        ? drawerRef.current.getBoundingClientRect().right
-        : window.innerWidth;
-      const newWidth = drawerRight - e.touches[0].clientX;
-      const maxW = Math.min(MAX_PANEL_WIDTH, window.innerWidth * 0.65);
-      const clamped = Math.max(MIN_PANEL_WIDTH, Math.min(newWidth, maxW));
-      setPanelWidth(clamped);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const drawerRight = drawerRef.current
+          ? drawerRef.current.getBoundingClientRect().right
+          : window.innerWidth;
+        const newWidth = drawerRight - e.touches[0].clientX;
+        const maxW = Math.min(MAX_PANEL_WIDTH, window.innerWidth * 0.65);
+        const clamped = Math.max(MIN_PANEL_WIDTH, Math.min(newWidth, maxW));
+        setPanelWidth(clamped);
+      });
     };
 
     const stopResizing = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       setIsResizing(false);
       savePanelWidth(panelWidth);
     };
@@ -198,6 +207,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
     window.addEventListener('touchend', stopResizing);
 
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', stopResizing);
       window.removeEventListener('touchmove', handleTouchMove);
