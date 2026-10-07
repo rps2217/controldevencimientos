@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { getSpreadsheetMetadata, getAllSheetsData, getScriptPropertiesConfig, loadCloudConfig } from '../lib/sheets';
 import type { SheetRow } from '../lib/sheets';
 import { InventoryItem, SpreadsheetMetadata, SheetProperties, SheetConfig, SheetRecord } from '../types';
@@ -72,8 +72,17 @@ export function useInventoryData({
   // Vista a la que pertenecen `items`/`headers` ya renderizados. El modo demo/offline
   // no debe conservar datos de la vista anterior al cambiar de hoja (ver el catch).
   const renderedViewRef = useRef<string | null>(null);
+  const activeViewRef = useRef(activeView);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    activeViewRef.current = activeView;
+  }, [activeView]);
 
   const fetchData = useCallback(async (currentConfig = sheetConfig, currentView = activeView, forceRefresh = false) => {
+    const requestId = ++requestIdRef.current;
+    const isStale = () => requestId !== requestIdRef.current || activeViewRef.current !== currentView;
+
     let hasRenderedCache = false;
     // Hoja objetivo de la vista, resuelta ANTES del try para poder usarla tambien en el
     // catch: alli decide si los datos ya renderizados pertenecen a la vista actual o son
@@ -100,6 +109,7 @@ export function useInventoryData({
       if (!forceRefresh) {
         try {
           const cachedTarget = await indexedDbService.getCachedSheet(expectedTargetSheet);
+          if (isStale()) return;
           if (cachedTarget && cachedTarget.rows && cachedTarget.rows.length > 0) {
             const h = cachedTarget.rows[0].map(String);
             setHeaders(h);
@@ -116,6 +126,7 @@ export function useInventoryData({
               return it;
             });
 
+            if (isStale()) return;
             renderedViewRef.current = currentView;
             setItems(parsed);
             if (currentView === 'main') setAllMainItems(parsed);
@@ -129,22 +140,27 @@ export function useInventoryData({
           const cachedProds = await indexedDbService.getCachedSheet(prodTitle);
           if (cachedProds && cachedProds.rows && cachedProds.rows.length > 1) {
             const ph = cachedProds.rows[0];
-            setProducts(cachedProds.rows.slice(1).map(r => rowToObject(ph, r)));
-            setIsRelationalActive(true);
+            if (!isStale()) {
+              setProducts(cachedProds.rows.slice(1).map(r => rowToObject(ph, r)));
+              setIsRelationalActive(true);
+            }
           }
 
           const polTitle = currentConfig.policies || 'Politicas_Canje';
           const cachedPols = await indexedDbService.getCachedSheet(polTitle);
           if (cachedPols && cachedPols.rows && cachedPols.rows.length > 1) {
             const polH = cachedPols.rows[0];
-            setPolicies(cachedPols.rows.slice(1).map(r => rowToObject(polH, r)));
-            setIsRelationalActive(true);
+            if (!isStale()) {
+              setPolicies(cachedPols.rows.slice(1).map(r => rowToObject(polH, r)));
+              setIsRelationalActive(true);
+            }
           }
         } catch (cacheErr) {
           console.warn('[Cache] Error al leer caché inicial IndexedDB:', cacheErr);
         }
       }
 
+      if (isStale()) return;
       if (!hasRenderedCache) {
         setLoading(true);
       }
@@ -154,6 +170,7 @@ export function useInventoryData({
       // FASE 2: REVALIDACIÓN CON GOOGLE SHEETS (Batch Fetching en 1 Solo Viaje)
       // =========================================================================
       const meta = await getSpreadsheetMetadata(forceRefresh);
+      if (isStale()) return;
       setMetadata(meta);
       const allSheets = meta.sheets.map(s => s.properties.title);
       
@@ -242,6 +259,7 @@ export function useInventoryData({
 
       // 🚀 Batch Fetching: Reduce llamadas HTTP secuenciales a 1 sola petición paralela o agregada
       const batchData = await getAllSheetsData(sheetsToFetch, forceRefresh);
+      if (isStale()) return;
 
       let hasRelational = false;
 
@@ -301,18 +319,22 @@ export function useInventoryData({
 
             return item;
           });
+          if (isStale()) return;
           renderedViewRef.current = currentView;
           setItems(parsedItems);
           if (currentView === 'main') setAllMainItems(parsedItems);
         } else {
+          if (isStale()) return;
           renderedViewRef.current = currentView;
           setHeaders([]);
           setItems([]);
         }
       }
 
+      if (isStale()) return;
       setIsRelationalActive(hasRelational);
     } catch (err: unknown) {
+      if (isStale()) return;
       console.warn('Network or Apps Script error:', err);
 
       // Conservar lo ya renderizado SOLO si pertenece a la vista actual. Si el usuario
