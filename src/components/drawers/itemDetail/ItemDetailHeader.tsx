@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Package, X, Edit2, Trash2, Copy, Barcode as BarcodeIcon, ChevronLeft, ChevronRight 
+  Package, X, Edit2, Trash2, Copy, Barcode as BarcodeIcon, ChevronLeft, ChevronRight, Maximize2, Minimize2 
 } from 'lucide-react';
 import { InventoryItem } from '../../../types';
 
@@ -18,6 +18,8 @@ interface ItemDetailHeaderProps {
   onNavigateNext?: () => void;
   currentIndex?: number;
   totalCount?: number;
+  isExpandedHorizontal?: boolean;
+  onToggleExpand?: () => void;
 }
 
 export const ItemDetailHeader: React.FC<ItemDetailHeaderProps> = ({
@@ -33,7 +35,9 @@ export const ItemDetailHeader: React.FC<ItemDetailHeaderProps> = ({
   onNavigatePrev,
   onNavigateNext,
   currentIndex,
-  totalCount
+  totalCount,
+  isExpandedHorizontal,
+  onToggleExpand
 }) => {
   return (
     <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-2.5 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
@@ -120,6 +124,15 @@ export const ItemDetailHeader: React.FC<ItemDetailHeaderProps> = ({
                 title="Eliminar registro"
               >
                 <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            {onToggleExpand && (
+              <button
+                onClick={onToggleExpand}
+                className="p-1.5 text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-blue-600 hover:text-white transition-colors cursor-pointer hidden sm:block"
+                title={isExpandedHorizontal ? "Cambiar a panel lateral" : "Expandir a vista horizontal (Ficha Técnica en 3 columnas)"}
+              >
+                {isExpandedHorizontal ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
             )}
             <button 
