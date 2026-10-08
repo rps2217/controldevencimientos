@@ -88,6 +88,7 @@ export function useColumnManager({
   }, [activeSheetTitle, activeView, sheetConfig.schema, tableCapabilities]);
 
   // Combined list of base candidate column IDs: real headers + virtual status cols + schema virtual cols
+  // [MODIFIED FOR STATUS COLUMN IN COLUMN MANAGER]
   const combinedCandidates = useMemo(() => {
     const result = [...headers];
     if (tableCapabilities?.has('vencimiento') && !result.includes('_status')) {
