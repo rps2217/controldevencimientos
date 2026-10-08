@@ -47,6 +47,7 @@ interface ModalsState {
   relationalEntity: { type: 'proveedor' | 'bodega' | 'sku' | 'categoria'; value: string } | null;
   isBluetoothPrinterOpen: boolean;
   bluetoothPrinterItems: InventoryItem[];
+  isFormatRulesModalOpen: boolean;
 }
 
 interface ModalsActions {
@@ -75,6 +76,7 @@ interface ModalsActions {
   setIsBluetoothPrinterOpen: (open: boolean) => void;
   setBluetoothPrinterItems: (items: InventoryItem[]) => void;
   openBluetoothPrinter: (items?: InventoryItem[]) => void;
+  setIsFormatRulesModalOpen: (open: boolean) => void;
 
   /** Abre el editor de slices con el slice a editar (o null para crear). */
   openSliceEditor: (slice: TableSlice | null) => void;
@@ -99,7 +101,8 @@ const NOOP_STATE: ModalsState = {
   isBulkActionsConfigOpen: false, isStockCountOpen: false, isSyncAuditOpen: false,
   isMobileMenuOpen: false, isSliceManagerOpen: false, isSliceModalOpen: false,
   editingSliceModalItem: null, isRelationalMenuOpen: false, relationalEntity: null,
-  isBluetoothPrinterOpen: false, bluetoothPrinterItems: []
+  isBluetoothPrinterOpen: false, bluetoothPrinterItems: [],
+  isFormatRulesModalOpen: false
 };
 
 export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -129,6 +132,7 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [relationalEntity, setRelationalEntity] = useState<{ type: 'proveedor' | 'bodega' | 'sku' | 'categoria'; value: string } | null>(null);
   const [isBluetoothPrinterOpen, setIsBluetoothPrinterOpen] = useState(false);
   const [bluetoothPrinterItems, setBluetoothPrinterItems] = useState<InventoryItem[]>([]);
+  const [isFormatRulesModalOpen, setIsFormatRulesModalOpen] = useState(false);
 
   const openBluetoothPrinter = useCallback((items?: InventoryItem[]) => {
     if (items && items.length > 0) {
@@ -156,6 +160,7 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isSliceManagerOpen, isSliceModalOpen, editingSliceModalItem,
     isRelationalMenuOpen, relationalEntity,
     isBluetoothPrinterOpen, bluetoothPrinterItems,
+    isFormatRulesModalOpen,
   }), [
     isPmReportOpen, isScriptModalOpen, isConfigOpen, isScannerOpen,
     isMobilePistoleoOpen, isBulkEditOpen, isGmailModalOpen, gmailModalItems,
@@ -165,6 +170,7 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isSliceManagerOpen, isSliceModalOpen, editingSliceModalItem,
     isRelationalMenuOpen, relationalEntity,
     isBluetoothPrinterOpen, bluetoothPrinterItems,
+    isFormatRulesModalOpen,
   ]);
 
   const openSliceEditor = useCallback((slice: TableSlice | null) => {
@@ -198,6 +204,7 @@ export const ModalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsSyncAuditOpen, setIsMobileMenuOpen,
     setIsSliceManagerOpen, setIsSliceModalOpen, setEditingSliceModalItem,
     setIsBluetoothPrinterOpen, setBluetoothPrinterItems, openBluetoothPrinter,
+    setIsFormatRulesModalOpen,
     openSliceEditor, openQuickTraspaso, openWhatsApp, openEmail,
     openRelationalMenu, closeRelationalMenu,
   }), [openSliceEditor, openQuickTraspaso, openWhatsApp, openEmail, openRelationalMenu, closeRelationalMenu, openBluetoothPrinter]);
@@ -231,6 +238,7 @@ const NOOP_ACTIONS: ModalsActions = {
   setIsMobileMenuOpen: noop, setIsSliceManagerOpen: noop, setIsSliceModalOpen: noop,
   setEditingSliceModalItem: noop, setIsBluetoothPrinterOpen: noop, setBluetoothPrinterItems: noop,
   openBluetoothPrinter: noop, openSliceEditor: noop,
+  setIsFormatRulesModalOpen: noop,
   openQuickTraspaso: noop, openWhatsApp: noop, openEmail: noop,
   openRelationalMenu: noop, closeRelationalMenu: noop,
 };

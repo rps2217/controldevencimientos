@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   ChevronDown, Barcode as BarcodeIcon 
 } from 'lucide-react';
@@ -17,7 +17,11 @@ import { ItemDetailHeader } from './itemDetail/ItemDetailHeader';
 import { ItemDetailMasterRefCard } from './itemDetail/ItemDetailMasterRefCard';
 import { ItemDetailStatusBanner } from './itemDetail/ItemDetailStatusBanner';
 import { ItemDetailSkuTrace } from './itemDetail/ItemDetailSkuTrace';
+import { ItemDetailParentChild } from './itemDetail/ItemDetailParentChild';
 import { ItemDetailFieldsGrid } from './itemDetail/ItemDetailFieldsGrid';
+import { FormatRule } from '../../types';
+import { evaluateItemFormatRules, renderFormatRuleIcon } from '../../utils/formatRulesEngine';
+import { Sparkles } from 'lucide-react';
 
 interface ItemDetailDrawerProps {
   product: InventoryItem | null;
@@ -35,6 +39,9 @@ interface ItemDetailDrawerProps {
   policies: SheetRecord[];
   products?: SheetRecord[];
   customAliases?: Record<string, string[]>;
+  formatRules?: FormatRule[];
+  onOpenParentChildInspector?: (entityType: 'sku' | 'proveedor' | 'bodega', entityValue: string) => void;
+  onSelectRelatedItem?: (item: InventoryItem) => void;
 }
 
 export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
@@ -50,8 +57,12 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   currentIndex,
   totalCount,
   allMainItems,
+  policies = [],
   products = [],
-  customAliases
+  customAliases,
+  formatRules = [],
+  onOpenParentChildInspector,
+  onSelectRelatedItem
 }) => {
   const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>(() =>
     readStorage<Record<string, boolean>>(STORAGE_KEYS.DETAIL_HIDDEN_FIELDS, booleanMapSchema, {})
@@ -287,6 +298,18 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   // Status computation for expiration
   const status = getItemStatus(product, productKeys);
 
+  // Parent-Child entity values
+  const provKey = findColumnBySemantic(productKeys, 'proveedor', customAliases);
+  const providerVal = (provKey && product[provKey]) || masterSummary?.provider || '';
+  const bodKey = findColumnBySemantic(productKeys, 'frc_bod', customAliases) || productKeys.find(k => /bodega|sucursal|local/i.test(k));
+  const bodegaVal = (bodKey && product[bodKey]) || product.FRC_BOD || product.BODEGA || '';
+
+  // AppSheet Format Rules Evaluation
+  const formatResult = useMemo(() => {
+    if (!product || !formatRules || formatRules.length === 0) return null;
+    return evaluateItemFormatRules(product, productKeys, formatRules, detailMode, customAliases);
+  }, [product, productKeys, formatRules, detailMode, customAliases]);
+
   // Content JSX rendered inside either mobile overlay or desktop split panel
   const detailInnerContent = (
     <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
@@ -310,6 +333,28 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
       {/* Scrollable Content */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4">
         
+        {/* AppSheet Format Rules Active Badges */}
+        {formatResult && formatResult.matchingRules.length > 0 && (
+          <div className="p-3 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/40 flex items-center justify-between text-xs flex-wrap gap-2">
+            <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span>Format Rules ({formatResult.matchingRules.length}):</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {formatResult.matchingRules.map((r: FormatRule) => (
+                <span 
+                  key={r.id}
+                  style={{ backgroundColor: r.backgroundColor, color: r.textColor }}
+                  className="px-2 py-0.5 rounded-lg text-[10px] font-bold border border-black/5 flex items-center gap-1 shadow-2xs"
+                >
+                  {renderFormatRuleIcon(r.icon, 'w-3 h-3')}
+                  <span>{r.name}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Expiration Status Banner */}
         <ItemDetailStatusBanner
           status={status}
@@ -323,33 +368,19 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
           />
         )}
 
-        {/* SKU Trace & Related Expirations / Events */}
-        {(expirations.length > 0 || incidents.length > 0) && (
-          <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowSkuTrace(!showSkuTrace)}
-              className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              <span className="flex items-center gap-2">
-                <span>Trazabilidad SKU ({expirations.length} vtos, {incidents.length} incidencias)</span>
-              </span>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showSkuTrace ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showSkuTrace && (
-              <div className="p-3 border-t border-slate-200 dark:border-slate-700">
-                <ItemDetailSkuTrace
-                  sku={sku}
-                  expirations={expirations}
-                  incidents={incidents}
-                  onNewEventForProduct={onNewEventForProduct}
-                  customAliases={customAliases}
-                />
-              </div>
-            )}
-          </div>
-        )}
+        {/* AppSheet Parent-Child Related Records Explorer */}
+        <ItemDetailParentChild
+          sku={sku}
+          provider={providerVal ? String(providerVal) : undefined}
+          warehouse={bodegaVal ? String(bodegaVal) : undefined}
+          allMainItems={allMainItems}
+          products={products}
+          policies={policies}
+          onSelectRelatedItem={onSelectRelatedItem || onEdit}
+          onNewEventForProduct={onNewEventForProduct}
+          onOpenInspector={onOpenParentChildInspector}
+          customAliases={customAliases}
+        />
 
         {/* Barcode Preview Accordion */}
         {sku && sku !== '-' && (

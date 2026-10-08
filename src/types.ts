@@ -78,6 +78,7 @@ export interface SheetConfig {
   backendMirror?: BackendMirrorConfig;
   enableStickyColumns?: boolean;
   enabledModules?: Record<string, boolean>;
+  formatRules?: FormatRule[];
   updatedAt?: string;
 }
 
@@ -290,6 +291,70 @@ export interface TableSlice {
  * sea cual sea la vista). Añadirla sería una capacidad sin efecto.
  */
 export type TableCapability = 'vencimiento' | 'incidencia' | 'conteo' | 'catalogo';
+
+// ==========================================
+// FORMAT RULES DECLARATIVAS (ESTILO APPSHEET)
+// ==========================================
+
+export type FormatRuleOperator = 
+  | 'equals' 
+  | 'not_equals' 
+  | 'contains' 
+  | 'not_contains' 
+  | 'greater_than' 
+  | 'greater_equal' 
+  | 'less_than' 
+  | 'less_equal' 
+  | 'is_empty' 
+  | 'is_not_empty';
+
+export interface FormatRuleCondition {
+  /** Columna de la tabla o alias semántico ('DIAS_PARA_VENCER', 'ESTADO', 'CANTIDAD', 'POLITICA', etc.) */
+  column: string;
+  operator: FormatRuleOperator;
+  value: string;
+}
+
+export interface FormatRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  /** '*' para todas las tablas o clave de tabla específica ('main', 'events', 'products', 'policies') */
+  tableKey?: string;
+  /** Lista de columnas a estilizar, o ['_row'] para resaltar la fila completa */
+  columns: string[];
+  condition: FormatRuleCondition;
+  textColor?: string;
+  backgroundColor?: string;
+  bold?: boolean;
+  italic?: boolean;
+  /** Identificador de icono Lucide (Flame, AlertTriangle, Truck, Ban, Clock, CheckCircle, ShieldAlert, Tag, Sparkles) */
+  icon?: string;
+  badge?: boolean;
+  priority?: number;
+}
+
+// ==========================================
+// REGISTROS RELACIONADOS / PARENT-CHILD
+// ==========================================
+
+export type RelatedEntityType = 'proveedor' | 'sku' | 'bodega' | 'chofer' | 'categoria';
+
+export interface RelatedEntitySummary {
+  entityType: RelatedEntityType;
+  entityValue: string;
+  batches: InventoryItem[];
+  incidents: InventoryItem[];
+  catalogProducts: SheetRecord[];
+  policies: SheetRecord[];
+  kpis: {
+    totalUnits: number;
+    totalBatches: number;
+    totalIncidents: number;
+    criticalBatchesCount: number;
+    pendingIncidentsCount: number;
+  };
+}
 
 // ==========================================
 // MÓDULO DE CONTEO MASIVO DE EXISTENCIAS

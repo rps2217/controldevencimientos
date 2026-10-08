@@ -16,6 +16,8 @@ import {
 import { ColumnMetadata } from '../../hooks/usePrecomputedColumns';
 import { findPhoneColumn, findEmailColumn, findColumnBySemantic } from '../../utils/columnAliases';
 import { getEnumStyle } from '../../utils/enumColorHelper';
+import { FormatRule } from '../../types';
+import { evaluateItemFormatRules, renderFormatRuleIcon } from '../../utils/formatRulesEngine';
 
 export interface InventoryTableRowProps {
   item: InventoryItem;
@@ -49,6 +51,8 @@ export interface InventoryTableRowProps {
   isEmailEnabled?: boolean;
   isStickyEnabled?: boolean;
   tableDensity?: 'comfortable' | 'compact' | 'ultra';
+  formatRules?: FormatRule[];
+  currentTableKey?: string;
 }
 
 export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
@@ -79,8 +83,17 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   isEmailEnabled = true,
   isStickyEnabled = false,
   tableDensity = 'compact',
+  formatRules = [],
+  currentTableKey = '*'
 }) => {
   const modalsActions = useModalsActions();
+
+  // AppSheet Format Rules Evaluation
+  const formatResult = useMemo(() => {
+    if (!formatRules || formatRules.length === 0) return null;
+    return evaluateItemFormatRules(item, headers, formatRules, currentTableKey);
+  }, [item, headers, formatRules, currentTableKey]);
+
   const eventCategory = getEventCategory(item, headers);
   const eventCategoryDef = eventCategory ? (EVENT_CATEGORIES[eventCategory] || {
     id: eventCategory,
@@ -153,6 +166,9 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       data-index={virtualIndex} 
       ref={measureElementRef} 
       onClick={() => onClickItem(item)}
+      style={formatResult?.rowStyle?.backgroundColor && !isActiveDetail && !isSelected ? {
+        backgroundColor: formatResult.rowStyle.backgroundColor
+      } : undefined}
       className={`transition-all duration-150 group cursor-pointer ${rowBgClass} md:border-b border-transparent md:border-slate-100 dark:md:border-slate-800 block md:table-row w-full`}
       title="Haz clic para ver detalles del registro"
     >
@@ -444,6 +460,15 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                 </button>
               ) : isSku && val ? (
                 <div className="flex items-center gap-1.5 truncate">
+                  {formatResult?.rowStyle?.icon && (
+                    <span 
+                      title={`Format Rule: ${formatResult.rowStyle.ruleName || 'Regla activa'}`}
+                      style={{ color: formatResult.rowStyle.textColor || '#ef4444' }}
+                      className="shrink-0"
+                    >
+                      {renderFormatRuleIcon(formatResult.rowStyle.icon, 'w-3.5 h-3.5')}
+                    </span>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

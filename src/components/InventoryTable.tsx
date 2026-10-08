@@ -7,6 +7,7 @@ import { findColumnBySemantic } from '../utils/columnAliases';
 import { EVENT_CATEGORIES } from '../utils/dateCalculations';
 import { useDashboard } from '../context/DashboardContext';
 import { isActionEnabledForTable, buildBulkActionContext } from '../utils/bulkActionsRegistry';
+import { getStoredFormatRules } from '../utils/formatRulesEngine';
 
 export const InventoryTable: React.FC = () => {
   const dashboard = useDashboard();
@@ -89,6 +90,10 @@ export const InventoryTable: React.FC = () => {
   const expandAllGroups = dashboard.expandAllGroups;
   const collapseAllGroups = dashboard.collapseAllGroups;
   const isSticky = sheetConfig?.enableStickyColumns === true;
+  const formatRules = useMemo(
+    () => getStoredFormatRules(sheetConfig?.formatRules),
+    [sheetConfig?.formatRules]
+  );
 
   // Keyboard Arrow Navigation
   const [focusedRowIndex, setFocusedRowIndex] = React.useState<number | null>(null);
@@ -570,6 +575,8 @@ export const InventoryTable: React.FC = () => {
                     isEmailEnabled={isEmailEnabled}
                     isStickyEnabled={isSticky}
                     tableDensity={tableDensity}
+                    formatRules={formatRules}
+                    currentTableKey={dashboard.activeView}
                   />
                 );
               })}

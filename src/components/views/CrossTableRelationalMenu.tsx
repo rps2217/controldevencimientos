@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   X, 
   ExternalLink, 
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
 import { findColumnBySemantic } from '../../utils/columnAliases';
+import { RelatedRecordsInspector } from './RelatedRecordsInspector';
 
 export interface CrossTableRelationalMenuProps {
   isOpen: boolean;
@@ -40,6 +41,7 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
   } = dashboard;
 
   const cleanValue = (entityValue || '').trim();
+  const [showParentChildModal, setShowParentChildModal] = useState(false);
 
   // Compute counts across all tables for this entity
   const counts = useMemo(() => {
@@ -84,6 +86,45 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
   }, [items, allMainItems, products, policies, cleanValue]);
 
   if (!isOpen || !cleanValue) return null;
+
+  if (showParentChildModal) {
+    return (
+      <RelatedRecordsInspector
+        isOpen={true}
+        onClose={() => {
+          setShowParentChildModal(false);
+          onClose();
+        }}
+        entityType={entityType}
+        entityValue={cleanValue}
+        allMainItems={allMainItems || []}
+        products={products}
+        policies={policies}
+        onSelectRow={(item) => {
+          dashboard.setSelectedProduct?.(item);
+          setShowParentChildModal(false);
+          onClose();
+        }}
+        onOpenCreateBatch={(prefill) => {
+          dashboard.handleOpenModal?.(undefined);
+          if (dashboard.handleBatchFormUpdate) {
+            dashboard.handleBatchFormUpdate(prefill);
+          }
+        }}
+        onOpenCreateIncident={(sku, prefill) => {
+          dashboard.handleOpenModal?.(undefined, sku);
+          if (prefill && dashboard.handleBatchFormUpdate) {
+            dashboard.handleBatchFormUpdate(prefill);
+          }
+        }}
+        onApplyFilterToTable={(val) => {
+          dashboard.setSearchTerm(val);
+        }}
+        showToast={(msg, type) => dashboard.showToast(msg, type)}
+        customAliases={sheetConfig?.customAliases}
+      />
+    );
+  }
 
   const handleFilterCurrentTable = () => {
     setSearchTerm(cleanValue);
@@ -178,6 +219,37 @@ export const CrossTableRelationalMenu: React.FC<CrossTableRelationalMenuProps> =
                 {counts.currentView} registros
               </span>
               <ArrowRight className="w-4 h-4 text-indigo-500 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </button>
+
+          {/* Option: Visión 360° Parent-Child */}
+          <button
+            onClick={() => setShowParentChildModal(true)}
+            className="w-full p-3.5 rounded-xl border-2 border-blue-500/30 dark:border-blue-500/40 bg-blue-50/60 dark:bg-blue-950/40 hover:bg-blue-100/80 dark:hover:bg-blue-900/60 hover:border-blue-500 transition-all cursor-pointer flex items-center justify-between group text-left shadow-2xs"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-600 text-white group-hover:scale-105 transition-transform shadow-xs">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-black text-blue-900 dark:text-blue-200 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
+                    Explorador 360° Parent-Child
+                  </h4>
+                  <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
+                    AppSheet
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Desglose interactivo de lotes, incidencias y catálogo de esta entidad
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-blue-200/80 dark:bg-blue-800/80 text-blue-900 dark:text-blue-100">
+                {counts.main + counts.events} vinculados
+              </span>
+              <ArrowRight className="w-4 h-4 text-blue-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
           </button>
 

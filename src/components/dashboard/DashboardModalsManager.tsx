@@ -29,6 +29,7 @@ const SyncAuditModal = lazy(() => import('../modals/SyncAuditModal').then(m => (
 const StockCountTerminal = lazy(() => import('../views/StockCountTerminal').then(m => ({ default: m.StockCountTerminal })));
 const CrossTableRelationalMenu = lazy(() => import('../views/CrossTableRelationalMenu').then(m => ({ default: m.CrossTableRelationalMenu })));
 const BluetoothPrinterModal = lazy(() => import('../modals/BluetoothPrinterModal').then(m => ({ default: m.BluetoothPrinterModal })));
+const FormatRulesManagerModal = lazy(() => import('../modals/FormatRulesManagerModal').then(m => ({ default: m.FormatRulesManagerModal })));
 
 export interface DashboardModalsManagerProps {
   handleOpenModal: (item?: InventoryItem, prefillSku?: string, initialCategory?: EventCategory) => void;
@@ -657,6 +658,24 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
             isOpen={modalsState.isBluetoothPrinterOpen}
             onClose={() => modalsActions.setIsBluetoothPrinterOpen(false)}
             itemsToPrint={modalsState.bluetoothPrinterItems}
+          />
+        </Suspense>
+      )}
+
+      {/* APPSHEET FORMAT RULES MANAGER MODAL */}
+      {modalsState.isFormatRulesModalOpen && (
+        <Suspense fallback={<LazyFallback />}>
+          <FormatRulesManagerModal
+            isOpen={modalsState.isFormatRulesModalOpen}
+            onClose={() => modalsActions.setIsFormatRulesModalOpen(false)}
+            formatRules={sheetConfig.formatRules || []}
+            onSaveRules={(newRules) => {
+              const updatedConfig = { ...sheetConfig, formatRules: newRules };
+              setSheetConfig(updatedConfig);
+              saveConfig(updatedConfig);
+            }}
+            headers={headers}
+            currentTableKey={activeView}
           />
         </Suspense>
       )}

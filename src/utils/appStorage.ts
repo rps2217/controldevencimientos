@@ -46,6 +46,9 @@ export const STORAGE_KEYS = {
   HIDDEN_SLICE_IDS: 'appsheet_hidden_slice_ids',
   DELETED_SLICE_IDS: 'appsheet_deleted_slice_ids',
 
+  // Reglas de Formato Condicional (AppSheet Format Rules)
+  FORMAT_RULES: 'appsheet_format_rules',
+
   // Varios
   DEVICE_ID: 'app_device_id',
   MODULE_STATES: 'app_module_states',

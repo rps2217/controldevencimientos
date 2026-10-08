@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Sliders, Plus, Layers, SlidersHorizontal, Upload 
+  Sliders, Plus, Layers, SlidersHorizontal, Upload, Paintbrush 
 } from 'lucide-react';
 import { SLICE_COLOR_CLASSES } from '../../utils/sliceRegistry';
 import { SliceIcon } from '../slices/SliceSelectorBar';
@@ -129,6 +129,18 @@ export const DashboardPageHeader: React.FC = () => {
           >
             <Upload className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             <span className="hidden sm:inline">Importar FRC</span>
+          </button>
+        )}
+
+        {/* Format Rules (AppSheet) Button */}
+        {activeView !== 'schema' && activeView !== 'analytics' && (
+          <button
+            onClick={() => modalsActions.setIsFormatRulesModalOpen(true)}
+            className="px-2.5 sm:px-3 py-1.5 rounded-xl font-bold border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 shrink-0"
+            title="Administrar Reglas de Formato Condicional (AppSheet Format Rules)"
+          >
+            <Paintbrush className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span className="hidden sm:inline">Format Rules</span>
           </button>
         )}
 

@@ -8,6 +8,7 @@ import { LazyFallback } from '../common/LazyFallback';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
 import { isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
+import { getStoredFormatRules } from '../../utils/formatRulesEngine';
 
 const AnalyticsDashboard = lazy(() => import('../views/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 
@@ -162,6 +163,11 @@ export const DashboardViewRouter: React.FC<DashboardViewRouterProps> = ({
             policies={policies}
             products={products}
             customAliases={sheetConfig.customAliases}
+            formatRules={getStoredFormatRules(sheetConfig.formatRules)}
+            onOpenParentChildInspector={(entityType, entityValue) => {
+              modalsActions.openRelationalMenu?.(entityType, entityValue);
+            }}
+            onSelectRelatedItem={(item) => setSelectedProduct(item)}
           />
         </div>
       )}
