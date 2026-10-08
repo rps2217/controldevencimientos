@@ -8,12 +8,14 @@ import {
   ExternalLink,
   Calendar,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  Maximize2
 } from 'lucide-react';
 import { InventoryItem, SheetRecord, EventCategory } from '../../../types';
 import { findColumnBySemantic } from '../../../utils/columnAliases';
 import { formatDisplayDate, formatLocaleNumber, getItemStatus } from '../../../utils/dateCalculations';
 import { buildEntityRelationshipSummary } from '../../../utils/relatedRecordsEngine';
+import { RelatedRecordsModal } from './RelatedRecordsModal';
 
 interface ItemDetailParentChildProps {
   sku: string;
@@ -41,6 +43,7 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
   customAliases
 }) => {
   const [activeTab, setActiveTab] = useState<'sku' | 'provider' | 'warehouse'>('sku');
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Relaciones por SKU
   const skuSummary = useMemo(() => {
@@ -87,32 +90,51 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
       ? provider 
       : warehouse;
 
+  const activeTabTitle = activeTab === 'sku' 
+    ? 'Registros del Mismo SKU' 
+    : activeTab === 'provider' 
+      ? 'Registros del Proveedor' 
+      : 'Registros de la Bodega';
+
   if (!skuSummary && !providerSummary && !warehouseSummary) {
     return null;
   }
 
   return (
     <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-3">
-      {/* Header with Title and Inspector Link */}
+      {/* Header with Title, Expand and Inspector Link */}
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
           <Layers className="w-3.5 h-3.5 text-indigo-500" />
           <span>Registros Relacionados (Parent-Child)</span>
         </h4>
 
-        {currentEntityValue && onOpenInspector && (
-          <button
-            type="button"
-            onClick={() => {
-              const mappedType = activeTab === 'provider' ? 'proveedor' : activeTab === 'warehouse' ? 'bodega' : 'sku';
-              onOpenInspector(mappedType, currentEntityValue);
-            }}
-            className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-          >
-            <span>Ver Visión 360°</span>
-            <ExternalLink className="w-3 h-3" />
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {activeSummary && activeSummary.batches.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="p-1 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors"
+              title="Expandir tabla completa de relacionados"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {currentEntityValue && onOpenInspector && (
+            <button
+              type="button"
+              onClick={() => {
+                const mappedType = activeTab === 'provider' ? 'proveedor' : activeTab === 'warehouse' ? 'bodega' : 'sku';
+                onOpenInspector(mappedType, currentEntityValue);
+              }}
+              className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+            >
+              <span>Visión 360°</span>
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -186,43 +208,85 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
         </div>
       )}
 
-      {/* Mini Batches Sub-list */}
+      {/* Mini Batches Sub-list with richer info */}
       {activeSummary && (
-        <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
-          {activeSummary.batches.slice(0, 8).map((batch, idx) => {
+        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+          {activeSummary.batches.slice(0, 6).map((batch, idx) => {
             const status = getItemStatus(batch, Object.keys(batch));
             const bSku = batch.SKU || batch.sku || '-';
+            const bDesc = batch.DESCRIPCION || batch.descripcion || batch.PRODUCTO || '';
             const bQty = batch.CANTIDAD || batch.cantidad || '1';
-            const bFecha = batch.FECHA_VC || batch.fecha_vc || `${batch.MES}/${batch.ANIO}` || '-';
+            const bFecha = batch.FECHA_VC || batch.fecha_vc || `${batch.MES || ''}/${batch.ANIO || ''}` || '-';
+            const bLote = batch.LOTE || batch.lote || '';
 
             return (
               <div
                 key={idx}
                 onClick={() => onSelectRelatedItem?.(batch)}
-                className="p-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between gap-2 text-xs hover:border-blue-400 cursor-pointer transition-colors"
+                className="p-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between gap-2 text-xs hover:border-indigo-500 cursor-pointer transition-colors group"
               >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200 truncate">
-                    {bSku}
-                  </span>
-                  <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${status.color}`}>
-                    {status.label}
-                  </span>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 truncate">
+                      {bSku}
+                    </span>
+                    {bLote && (
+                      <span className="text-[10px] font-mono text-slate-400">
+                        L: {bLote}
+                      </span>
+                    )}
+                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${status.color}`}>
+                      {status.label}
+                    </span>
+                  </div>
+                  {bDesc && (
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      {bDesc}
+                    </span>
+                  )}
                 </div>
 
                 <div className="text-right shrink-0 font-mono text-[11px]">
-                  <span className="font-bold text-slate-700 dark:text-slate-300 mr-2">
+                  <span className="font-bold text-slate-700 dark:text-slate-300 block">
                     {formatLocaleNumber(bQty)} un.
                   </span>
-                  <span className="text-slate-400">
+                  <span className="text-[10px] text-slate-400">
                     {formatDisplayDate(bFecha)}
                   </span>
                 </div>
               </div>
             );
           })}
+
+          {activeSummary.batches.length > 6 && (
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="w-full py-1.5 text-center text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-xl transition-colors flex items-center justify-center gap-1"
+            >
+              <span>Ver todos los {activeSummary.batches.length} registros (Expandir tabla)</span>
+              <Maximize2 className="w-3 h-3" />
+            </button>
+          )}
         </div>
+      )}
+
+      {/* Expanded Modal */}
+      {activeSummary && currentEntityValue && (
+        <RelatedRecordsModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title={activeTabTitle}
+          entityValue={currentEntityValue}
+          entityType={activeTab === 'provider' ? 'proveedor' : activeTab === 'warehouse' ? 'bodega' : 'sku'}
+          batches={activeSummary.batches}
+          onSelectItem={(item) => {
+            onSelectRelatedItem?.(item);
+          }}
+          onNewEvent={onNewEventForProduct}
+        />
       )}
     </div>
   );
 };
+
