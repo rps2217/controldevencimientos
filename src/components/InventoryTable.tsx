@@ -22,8 +22,10 @@ export const InventoryTable: React.FC = () => {
   // nombre de vista: asi una hoja no canonica con columnas de vencimiento/incidencia
   // recibe el mismo modulo que las canonicas (`main`/`events`).
   const caps = dashboard.tableCapabilities;
-  const showExpiryCol = caps?.has('vencimiento') ?? false;
-  const showResolutionCol = caps?.has('incidencia') ?? false;
+  const activeView = dashboard.activeView ?? 'main';
+  const hiddenColumns = dashboard.hiddenColumns?.[activeView] || [];
+  const showExpiryCol = (caps?.has('vencimiento') ?? false) && !hiddenColumns.includes('_status');
+  const showResolutionCol = (caps?.has('incidencia') ?? false) && !hiddenColumns.includes('_res_status');
   // Columnas extra del colSpan: la de acciones + las virtuales de estado presentes.
   const extraCols = 3 + (showExpiryCol ? 1 : 0) + (showResolutionCol ? 1 : 0);
   const tableContainerRef = dashboard.tableContainerRef;

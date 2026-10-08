@@ -38,6 +38,7 @@ export function useColumnManager({
   headers,
   activeSheetTitle,
   activeView,
+  tableCapabilities,
   sheetConfig
 }: UseColumnManagerOptions): UseColumnManagerReturn {
   // Load column orders and hidden columns from localStorage
@@ -69,6 +70,12 @@ export function useColumnManager({
   // Map of virtual column IDs -> labels from schema
   const virtualMap = useMemo(() => {
     const map: Record<string, string> = {};
+    if (tableCapabilities?.has('vencimiento')) {
+      map['_status'] = 'Estado / Radar PM';
+    }
+    if (tableCapabilities?.has('incidencia')) {
+      map['_res_status'] = 'Estado Gestión';
+    }
     const schemaForSheet = findTableSchema(activeSheetTitle, sheetConfig, activeView);
     if (schemaForSheet) {
       Object.entries(schemaForSheet).forEach(([colId, colDef]) => {
@@ -78,11 +85,17 @@ export function useColumnManager({
       });
     }
     return map;
-  }, [activeSheetTitle, activeView, sheetConfig.schema]);
+  }, [activeSheetTitle, activeView, sheetConfig.schema, tableCapabilities]);
 
-  // Combined list of base candidate column IDs: real headers + schema virtual cols
+  // Combined list of base candidate column IDs: real headers + virtual status cols + schema virtual cols
   const combinedCandidates = useMemo(() => {
     const result = [...headers];
+    if (tableCapabilities?.has('vencimiento') && !result.includes('_status')) {
+      result.unshift('_status');
+    }
+    if (tableCapabilities?.has('incidencia') && !result.includes('_res_status')) {
+      result.unshift('_res_status');
+    }
     const schemaForSheet = findTableSchema(activeSheetTitle, sheetConfig, activeView);
     if (schemaForSheet) {
       Object.entries(schemaForSheet).forEach(([colId, colDef]) => {
@@ -92,7 +105,7 @@ export function useColumnManager({
       });
     }
     return result;
-  }, [headers, activeSheetTitle, activeView, sheetConfig.schema]);
+  }, [headers, tableCapabilities, activeSheetTitle, activeView, sheetConfig.schema]);
 
   // Ordered list of all candidate columns for activeView
   const orderedColumnIds = useMemo(() => {
@@ -121,7 +134,7 @@ export function useColumnManager({
     const schemaForSheet = findTableSchema(activeSheetTitle, sheetConfig, activeView);
 
     return orderedColumnIds.map(id => {
-      const isVirtual = Boolean(virtualMap[id]) || schemaForSheet?.[id]?.isVirtual === true || schemaForSheet?.[id]?.type === 'calculated' || Boolean(schemaForSheet?.[id]?.formula);
+      const isVirtual = id === '_status' || id === '_res_status' || Boolean(virtualMap[id]) || schemaForSheet?.[id]?.isVirtual === true || schemaForSheet?.[id]?.type === 'calculated' || Boolean(schemaForSheet?.[id]?.formula);
       const label = schemaForSheet?.[id]?.label || virtualMap[id] || id;
       const isSchemaHidden = schemaForSheet?.[id]?.visible === false;
       const isUserHidden = viewHidden.includes(id);

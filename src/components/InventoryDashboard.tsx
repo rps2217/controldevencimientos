@@ -837,7 +837,6 @@ export const InventoryDashboard: React.FC = () => {
     showAllColumns,
     resetColumnOrder,
     handleColumnDrop,
-
     handleSaveQuickTraspaso,
 
     globalTicketConfig,
