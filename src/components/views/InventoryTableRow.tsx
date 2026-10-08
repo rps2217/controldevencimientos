@@ -166,8 +166,8 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       data-index={virtualIndex} 
       ref={measureElementRef} 
       onClick={() => onClickItem(item)}
-      style={formatResult?.rowStyle?.backgroundColor && !isActiveDetail && !isSelected ? {
-        backgroundColor: formatResult.rowStyle.backgroundColor
+      style={formatResult?.rowStyle?.textColor && !isActiveDetail && !isSelected ? {
+        borderLeft: `4px solid ${formatResult.rowStyle.textColor}`
       } : undefined}
       className={`transition-all duration-150 group cursor-pointer ${rowBgClass} md:border-b border-transparent md:border-slate-100 dark:md:border-slate-800 block md:table-row w-full`}
       title="Haz clic para ver detalles del registro"

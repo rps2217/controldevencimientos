@@ -46,8 +46,7 @@ export const DEFAULT_BUILT_IN_FORMAT_RULES: FormatRule[] = [
       operator: 'less_equal',
       value: '0'
     },
-    textColor: '#991b1b',
-    backgroundColor: '#fee2e2',
+    textColor: '#ef4444',
     bold: true,
     icon: 'AlertTriangle',
     badge: true,
@@ -64,8 +63,7 @@ export const DEFAULT_BUILT_IN_FORMAT_RULES: FormatRule[] = [
       operator: 'less_equal',
       value: '15'
     },
-    textColor: '#b45309',
-    backgroundColor: '#fef3c7',
+    textColor: '#f59e0b',
     bold: true,
     icon: 'Flame',
     badge: true,
@@ -76,14 +74,13 @@ export const DEFAULT_BUILT_IN_FORMAT_RULES: FormatRule[] = [
     name: '🔄 Política de Canje con Proveedor',
     enabled: true,
     tableKey: '*',
-    columns: ['_row'],
+    columns: ['POLITICA'],
     condition: {
       column: 'POLITICA',
       operator: 'contains',
       value: 'Canje'
     },
-    textColor: '#1d4ed8',
-    backgroundColor: '#eff6ff',
+    textColor: '#3b82f6',
     bold: false,
     icon: 'Truck',
     badge: false,
@@ -94,14 +91,13 @@ export const DEFAULT_BUILT_IN_FORMAT_RULES: FormatRule[] = [
     name: '🗑️ Merma Directa (Sin Canje)',
     enabled: true,
     tableKey: '*',
-    columns: ['_row'],
+    columns: ['POLITICA'],
     condition: {
       column: 'POLITICA',
       operator: 'contains',
       value: 'Merma'
     },
-    textColor: '#be123c',
-    backgroundColor: '#fff1f2',
+    textColor: '#ef4444',
     bold: false,
     icon: 'Ban',
     badge: false,
@@ -112,14 +108,13 @@ export const DEFAULT_BUILT_IN_FORMAT_RULES: FormatRule[] = [
     name: '⏳ Incidencia Pendiente de Gestión',
     enabled: true,
     tableKey: 'events',
-    columns: ['_row'],
+    columns: ['ESTADO'],
     condition: {
       column: 'ESTADO',
       operator: 'contains',
       value: 'Pendiente'
     },
-    textColor: '#b45309',
-    backgroundColor: '#fffbeb',
+    textColor: '#f59e0b',
     bold: false,
     icon: 'Clock',
     badge: false,
@@ -133,14 +128,34 @@ const formatRulesSchema = z.array(z.any());
  * Carga las reglas de formato persistidas, fusionando con SheetConfig y fallback a defaults.
  */
 export function getStoredFormatRules(sheetConfigRules?: FormatRule[]): FormatRule[] {
+  let loadedRules: FormatRule[] | null = null;
   if (sheetConfigRules && Array.isArray(sheetConfigRules) && sheetConfigRules.length > 0) {
-    return sheetConfigRules;
+    loadedRules = sheetConfigRules;
+  } else {
+    const fromStorage = readStorage<FormatRule[]>(STORAGE_KEYS.FORMAT_RULES, formatRulesSchema, null as any);
+    if (fromStorage && Array.isArray(fromStorage) && fromStorage.length > 0) {
+      loadedRules = fromStorage;
+    }
   }
-  const fromStorage = readStorage<FormatRule[]>(STORAGE_KEYS.FORMAT_RULES, formatRulesSchema, null as any);
-  if (fromStorage && Array.isArray(fromStorage) && fromStorage.length > 0) {
-    return fromStorage;
-  }
-  return DEFAULT_BUILT_IN_FORMAT_RULES;
+
+  const baseRules = (loadedRules && loadedRules.length > 0) ? loadedRules : DEFAULT_BUILT_IN_FORMAT_RULES;
+
+  // Sanitizar reglas existentes para que no tengan background en _row que rompa los temas oscuros
+  return baseRules.map(r => {
+    if (r.id === 'rule_builtin_canje' && (r.columns?.includes('_row') || r.backgroundColor)) {
+      return { ...r, columns: ['POLITICA'], backgroundColor: undefined };
+    }
+    if (r.id === 'rule_builtin_merma' && (r.columns?.includes('_row') || r.backgroundColor)) {
+      return { ...r, columns: ['POLITICA'], backgroundColor: undefined };
+    }
+    if (r.id === 'rule_builtin_pending_event' && (r.columns?.includes('_row') || r.backgroundColor)) {
+      return { ...r, columns: ['ESTADO'], backgroundColor: undefined };
+    }
+    if ((r.id === 'rule_builtin_expired' || r.id === 'rule_builtin_critical_15') && r.backgroundColor) {
+      return { ...r, backgroundColor: undefined };
+    }
+    return r;
+  });
 }
 
 /**
