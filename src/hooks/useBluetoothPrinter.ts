@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   bluetoothPrinterService, 
-  BluetoothPrinterStatus 
+  BluetoothPrinterStatus,
+  MarklifeLabelOptions
 } from '../services/bluetoothPrinterService';
 import { InventoryItem } from '../types';
 
@@ -24,16 +25,17 @@ export function useBluetoothPrinter() {
     await bluetoothPrinterService.disconnect();
   }, []);
 
-  const printTest = useCallback(async (rollId?: string) => {
-    return await bluetoothPrinterService.printTestLabel(rollId || selectedRollId);
+  const printTest = useCallback(async (rollId?: string, options?: MarklifeLabelOptions) => {
+    return await bluetoothPrinterService.printTestLabel(rollId || selectedRollId, options);
   }, [selectedRollId]);
 
   const printBatch = useCallback(async (
     items: InventoryItem[], 
     rollId?: string,
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number) => void,
+    options?: MarklifeLabelOptions
   ) => {
-    return await bluetoothPrinterService.printBatch(items, rollId || selectedRollId, onProgress);
+    return await bluetoothPrinterService.printBatch(items, rollId || selectedRollId, onProgress, options);
   }, [selectedRollId]);
 
   return {

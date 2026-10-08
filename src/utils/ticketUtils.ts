@@ -65,6 +65,8 @@ export function getDefaultTicketGeneralSettings(
     barcodeHeightMm: 8,
     showBarcodeTextInReport: false,
     cutMarginMm: 2,
+    marklifeBarcodeOnly: true,
+    marklifeShowSkuText: true,
   };
 }
 

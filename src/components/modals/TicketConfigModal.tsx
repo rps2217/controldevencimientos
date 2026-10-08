@@ -46,7 +46,7 @@ import {
   FIT_QUALITY_LABEL
 } from '../../utils/labelMediaProfile';
 import { useBluetoothPrinter } from '../../hooks/useBluetoothPrinter';
-import { bluetoothPrinterService } from '../../services/bluetoothPrinterService';
+import { bluetoothPrinterService, MarklifeLabelOptions } from '../../services/bluetoothPrinterService';
 
 interface TicketConfigModalProps {
   isOpen: boolean;
@@ -203,16 +203,25 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
     return activeRoll ? fitQuality(evaluateFit(skuDeMuestra, activeRoll)) : null;
   }, [skuDeMuestra, activeRoll]);
 
+  // Configuración de la etiqueta Marklife P15 (Solo Código de Barras vs Responsivo a Columnas)
+  const marklifeOptions: MarklifeLabelOptions = useMemo(() => ({
+    barcodeOnly: localGeneral.marklifeBarcodeOnly !== false,
+    showSkuText: localGeneral.marklifeShowSkuText !== false,
+    columnsConfig: localColumns,
+    headers: headers,
+  }), [localGeneral.marklifeBarcodeOnly, localGeneral.marklifeShowSkuText, localColumns, headers]);
+
   // Renderizar la etiqueta de la Marklife P15 en canvas en tiempo real
   useEffect(() => {
     if (!isOpen) return;
 
     const sampleItemObj = sampleItems.length > 0 ? {
-      sku: String(sampleItems[0]['sku'] || sampleItems[0]['SKU'] || sampleItems[0]['codigo'] || sampleItems[0]['CU_VC'] || '780123456789'),
+      sku: String(sampleItems[0]['sku'] || sampleItems[0]['SKU'] || sampleItems[0]['codigo'] || sampleItems[0]['CU_VC'] || skuDeMuestra || '780123456789'),
       descripcion: String(sampleItems[0]['descripcion'] || sampleItems[0]['DESCRIPCION'] || 'PRODUCTO DE MUESTRA 500G'),
       fechaVc: String(sampleItems[0]['fecha_vc'] || sampleItems[0]['FECHA_VC'] || '31/10/2026'),
       lote: String(sampleItems[0]['lote'] || sampleItems[0]['LOTE'] || 'L-98421'),
       cantidad: sampleItems[0]['cantidad'] || sampleItems[0]['CANTIDAD'] || '1 UN',
+      ...sampleItems[0]
     } : {
       sku: skuDeMuestra,
       descripcion: 'PRODUCTO DE MUESTRA 500G',
@@ -221,7 +230,7 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
       cantidad: '24 UN',
     };
 
-    const canvas = bluetoothPrinterService.generateLabelCanvas(sampleItemObj, activeRoll);
+    const canvas = bluetoothPrinterService.generateLabelCanvas(sampleItemObj, activeRoll, marklifeOptions);
     if (previewCanvasRef.current) {
       const container = previewCanvasRef.current;
       container.width = canvas.width;
@@ -231,7 +240,7 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
         ctx.drawImage(canvas, 0, 0);
       }
     }
-  }, [isOpen, activeRoll, sampleItems, skuDeMuestra]);
+  }, [isOpen, activeRoll, sampleItems, skuDeMuestra, marklifeOptions]);
 
   if (!isOpen) return null;
 
@@ -240,7 +249,9 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
       columns: localColumns,
       general: {
         ...localGeneral,
-        labelRollId: currentRollId
+        labelRollId: currentRollId,
+        marklifeBarcodeOnly: localGeneral.marklifeBarcodeOnly !== false,
+        marklifeShowSkuText: localGeneral.marklifeShowSkuText !== false,
       }
     });
     onClose();
@@ -252,7 +263,9 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
       columns: localColumns,
       general: {
         ...localGeneral,
-        labelRollId: currentRollId
+        labelRollId: currentRollId,
+        marklifeBarcodeOnly: localGeneral.marklifeBarcodeOnly !== false,
+        marklifeShowSkuText: localGeneral.marklifeShowSkuText !== false,
       }
     });
 
@@ -269,7 +282,7 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
   const handleTestPrintMarklife = async () => {
     setBleSuccessMsg(null);
     try {
-      const ok = await printTestBle(currentRollId);
+      const ok = await printTestBle(currentRollId, marklifeOptions);
       if (ok) {
         setBleSuccessMsg('¡Etiqueta de prueba enviada con éxito a la Marklife P15!');
         setTimeout(() => setBleSuccessMsg(null), 4000);
@@ -288,7 +301,7 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
     try {
       const count = await printBatchBle(items, currentRollId, (curr, tot) => {
         setBleProgress({ current: curr, total: tot });
-      });
+      }, marklifeOptions);
       setBleProgress(null);
       if (count > 0) {
         setBleSuccessMsg(`¡${count} etiquetas impresas exitosamente en la Marklife P15!`);
@@ -882,6 +895,86 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
                   </p>
                 </div>
 
+                {/* MODO DE CONTENIDO DE LA ETIQUETA MARKLIFE (SOLO CÓDIGO DE BARRAS VS RESPONSIVO) */}
+                <div className="space-y-2.5 p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Barcode className="w-3.5 h-3.5 text-indigo-500" />
+                      Contenido de la Etiqueta Marklife
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      {localGeneral.marklifeBarcodeOnly !== false ? 'Modo Puro Barras' : 'Modo Responsivo'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Opción 1: Solo Código de Barras (Recomendado) */}
+                    <button
+                      type="button"
+                      onClick={() => setLocalGeneral(prev => ({ ...prev, marklifeBarcodeOnly: true }))}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        localGeneral.marklifeBarcodeOnly !== false
+                          ? 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-900 dark:text-indigo-200'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <div className="flex items-center gap-1.5 font-bold text-xs">
+                          <Barcode className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Solo Código de Barras</span>
+                        </div>
+                        {localGeneral.marklifeBarcodeOnly !== false && (
+                          <span className="text-[9px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded-full">
+                            Activo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                        Maximiza altura de barras (Code128). Sin textos extra para lectura instantánea con pistola láser.
+                      </p>
+                    </button>
+
+                    {/* Opción 2: Responsivo a Selección de Columnas */}
+                    <button
+                      type="button"
+                      onClick={() => setLocalGeneral(prev => ({ ...prev, marklifeBarcodeOnly: false }))}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        localGeneral.marklifeBarcodeOnly === false
+                          ? 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-900 dark:text-indigo-200'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <div className="flex items-center gap-1.5 font-bold text-xs">
+                          <Sliders className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Responsivo a Columnas</span>
+                        </div>
+                        {localGeneral.marklifeBarcodeOnly === false && (
+                          <span className="text-[9px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded-full">
+                            Activo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                        Respeta las {visibleCount} columnas activadas en "Columnas del Ticket" (descripción, lote, etc.).
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Checkbox condicional para SKU legible al pie */}
+                  {localGeneral.marklifeBarcodeOnly !== false && (
+                    <label className="flex items-center gap-2 pt-1 text-xs text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={localGeneral.marklifeShowSkuText !== false}
+                        onChange={(e) => setLocalGeneral(prev => ({ ...prev, marklifeShowSkuText: e.target.checked }))}
+                        className="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      />
+                      <span>Incluir número legible del SKU al pie de las barras</span>
+                    </label>
+                  )}
+                </div>
+
                 {/* MENSAJES DE ÉXITO O PROGRESO DE IMPRESIÓN */}
                 {bleSuccessMsg && (
                   <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900/60 text-emerald-800 dark:text-emerald-200 text-xs font-medium flex items-center gap-2">
@@ -1174,11 +1267,46 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
               {/* VISTA PREVIA B: ETIQUETA ADHESIVA MARKLIFE P15 */}
               {previewMode === 'marklife' && (
                 <div className="flex flex-col items-center justify-center space-y-3 w-full max-w-xs">
+                  {/* Selector rápido de modo directo en la previsualización */}
+                  <div className="flex items-center gap-1 p-1 bg-slate-200 dark:bg-slate-800 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setLocalGeneral(prev => ({ ...prev, marklifeBarcodeOnly: true }))}
+                      className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                        localGeneral.marklifeBarcodeOnly !== false
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
+                      }`}
+                    >
+                      <Barcode className="w-3 h-3" />
+                      <span>Solo Barras</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLocalGeneral(prev => ({ ...prev, marklifeBarcodeOnly: false }))}
+                      className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                        localGeneral.marklifeBarcodeOnly === false
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
+                      }`}
+                    >
+                      <Sliders className="w-3 h-3" />
+                      <span>Con Columnas ({visibleCount})</span>
+                    </button>
+                  </div>
+
                   {/* Etiqueta adhesiva troquelada simulada */}
                   <div className="p-3 bg-white dark:bg-slate-900 rounded-3xl shadow-xl border-2 border-dashed border-indigo-200 dark:border-indigo-900/80 flex flex-col items-center justify-center space-y-2 relative">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400">
-                      Etiqueta Troquelada ({activeRoll.widthMm} × {activeRoll.heightMm} mm)
-                    </span>
+                    <div className="flex items-center justify-between w-full px-1">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400">
+                        Troquel {activeRoll.widthMm} × {activeRoll.heightMm} mm
+                      </span>
+                      <span className="text-[9px] font-semibold text-slate-500">
+                        {localGeneral.marklifeBarcodeOnly !== false 
+                          ? (localGeneral.marklifeShowSkuText !== false ? 'Barras + SKU' : 'Puras Barras')
+                          : `${visibleCount} cols`}
+                      </span>
+                    </div>
 
                     <div className="p-2.5 bg-white rounded-xl shadow-xs border border-slate-300 inline-block overflow-hidden max-w-full">
                       <canvas

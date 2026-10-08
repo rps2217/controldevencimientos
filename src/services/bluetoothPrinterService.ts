@@ -24,6 +24,26 @@ export const FALLBACK_SERVICES = [
   '000018f0-0000-1000-8000-00805f9b34fb', // Generic Thermal
 ];
 
+export interface MarklifeLabelOptions {
+  /**
+   * Si es true, imprime ÚNICAMENTE el código de barras ocupando el alto máximo
+   * de la etiqueta para lectura instantánea sin fallos con pistola láser. (Predeterminado true).
+   */
+  barcodeOnly?: boolean;
+  /**
+   * Si es true, muestra el texto numérico/alfanumérico del SKU centrado bajo las barras (predeterminado true).
+   */
+  showSkuText?: boolean;
+  /**
+   * Mapa de configuración de columnas del ticket (para cuando barcodeOnly es false).
+   */
+  columnsConfig?: Record<string, { show: boolean; bold?: boolean; size?: number }>;
+  /**
+   * Encabezados de la tabla activa.
+   */
+  headers?: string[];
+}
+
 export interface BluetoothPrinterStatus {
   isSupported: boolean;
   isConnected: boolean;
@@ -244,15 +264,22 @@ class BluetoothPrinterService {
 
   /**
    * Genera el bitmap rasterizado de una etiqueta en un Canvas 2D a 203 DPI (8 puntos/mm).
+   * Soporta tanto Modo Solo Código de Barras (maximizado para escáner láser)
+   * como Modo Responsivo a la selección de columnas del ticket.
    */
-  public generateLabelCanvas(item: {
-    sku: string;
-    descripcion?: string;
-    fechaVc?: string;
-    lote?: string;
-    cantidad?: string | number;
-    ubicacion?: string;
-  }, roll: LabelMedia): HTMLCanvasElement {
+  public generateLabelCanvas(
+    item: {
+      sku: string;
+      descripcion?: string;
+      fechaVc?: string;
+      lote?: string;
+      cantidad?: string | number;
+      ubicacion?: string;
+      [key: string]: any;
+    }, 
+    roll: LabelMedia,
+    options?: MarklifeLabelOptions
+  ): HTMLCanvasElement {
     const canvas = document.createElement('canvas');
     // Ancho fijo del cabezal (12mm = 96 dots, 15mm = 120 dots)
     const widthDots = Math.round(roll.widthMm * DOTS_PER_MM);
@@ -280,10 +307,10 @@ class BluetoothPrinterService {
       const rotWidth = heightDots;
       const rotHeight = widthDots;
 
-      this.drawRotatedLabelContent(ctx, item, rotWidth, rotHeight);
+      this.drawRotatedLabelContent(ctx, item, rotWidth, rotHeight, options);
       ctx.restore();
     } else {
-      this.drawStandardLabelContent(ctx, item, widthDots, heightDots);
+      this.drawStandardLabelContent(ctx, item, widthDots, heightDots, options);
     }
 
     return canvas;
@@ -291,89 +318,188 @@ class BluetoothPrinterService {
 
   private drawRotatedLabelContent(
     ctx: CanvasRenderingContext2D,
-    item: { sku: string; descripcion?: string; fechaVc?: string; lote?: string; cantidad?: string | number },
+    item: { sku: string; descripcion?: string; fechaVc?: string; lote?: string; cantidad?: string | number; [key: string]: any },
     w: number,
-    h: number
+    h: number,
+    options?: MarklifeLabelOptions
   ) {
     ctx.fillStyle = '#000000';
     ctx.textBaseline = 'top';
 
-    // Margen seguro
+    const barcodeOnly = options?.barcodeOnly !== false; // Predeterminado true
+    const showSkuText = options?.showSkuText !== false; // Predeterminado true
+    const cleanSku = (item.sku || '').trim() || '000000';
+
+    const codes = encodeCode128(cleanSku);
+    if (!codes) {
+      ctx.font = 'bold 14px monospace';
+      ctx.fillText(`SKU: ${cleanSku}`, 10, Math.floor(h / 2) - 8);
+      return;
+    }
+
+    const binary = codesToBinaryString(codes);
+    const modules = binary.length;
     const margin = 8;
     const usableW = w - margin * 2;
+    const modWidth = Math.max(1, Math.floor(usableW / modules));
+    const totalBarW = modules * modWidth;
+    const startX = margin + Math.floor((usableW - totalBarW) / 2);
 
-    // 1. Título / SKU superior
-    ctx.font = 'bold 15px monospace';
-    ctx.fillText(`SKU: ${item.sku}`, margin, 6);
+    if (barcodeOnly) {
+      // MODO SOLO CÓDIGO DE BARRAS (Maximizado para escáner láser / terminal de bodega)
+      if (showSkuText) {
+        const textH = 14;
+        const barHeight = Math.max(28, h - textH - 12);
+        const startY = 4;
 
-    // 2. Dibujar Código de Barras Code128 centrado
-    const codes = encodeCode128(item.sku.trim());
-    if (codes) {
-      const binary = codesToBinaryString(codes);
-      const modules = binary.length;
-      const barHeight = Math.max(22, Math.floor(h * 0.32));
-      const startY = 24;
+        for (let i = 0; i < modules; i++) {
+          if (binary[i] === '1') {
+            ctx.fillRect(startX + i * modWidth, startY, modWidth, barHeight);
+          }
+        }
 
-      // Calcular ancho de módulo para llenar proporcionalmente
-      const modWidth = Math.max(1, Math.floor(usableW / modules));
-      const totalBarW = modules * modWidth;
-      const startX = margin + Math.floor((usableW - totalBarW) / 2);
+        // SKU centrado bajo las barras
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(cleanSku, Math.floor(w / 2), startY + barHeight + 3);
+        ctx.textAlign = 'start';
+      } else {
+        // 100% PURE BARCODE (Sin ningún texto, altura completa)
+        const barHeight = Math.max(30, h - 10);
+        const startY = 5;
 
-      for (let i = 0; i < modules; i++) {
-        if (binary[i] === '1') {
-          ctx.fillRect(startX + i * modWidth, startY, modWidth, barHeight);
+        for (let i = 0; i < modules; i++) {
+          if (binary[i] === '1') {
+            ctx.fillRect(startX + i * modWidth, startY, modWidth, barHeight);
+          }
         }
       }
+      return;
+    }
 
-      // 3. Texto inferior (Descripción, Vencimiento, Lote)
-      const textStartY = startY + barHeight + 4;
-      ctx.font = '11px sans-serif';
-      
-      let lineY = textStartY;
-      if (item.descripcion) {
-        const descCut = item.descripcion.length > 28 ? item.descripcion.substring(0, 26) + '..' : item.descripcion;
-        ctx.fillText(descCut, margin, lineY);
-        lineY += 13;
+    // MODO RESPONSIVO A LA SELECCIÓN DE COLUMNAS DEL TICKET
+    const colsConfig = options?.columnsConfig || {};
+    
+    // Detectar qué columnas están habilitadas por el usuario
+    const showSku = Object.entries(colsConfig).some(([k, v]) => /sku|codigo/i.test(k) && v?.show) ?? true;
+    const showDesc = Object.entries(colsConfig).some(([k, v]) => /descrip|nombre/i.test(k) && v?.show);
+    const showVto = Object.entries(colsConfig).some(([k, v]) => /fecha.*(vc|venc|retiro)|vto|vencimiento/i.test(k) && v?.show);
+    const showLote = Object.entries(colsConfig).some(([k, v]) => /lote/i.test(k) && v?.show);
+    const showCant = Object.entries(colsConfig).some(([k, v]) => /cant/i.test(k) && v?.show);
+
+    const hasDescLine = Boolean(showDesc && item.descripcion);
+    const infoPieces: string[] = [];
+    if (showVto && item.fechaVc) infoPieces.push(`VTO:${item.fechaVc}`);
+    if (showLote && item.lote) infoPieces.push(`L:${item.lote}`);
+    if (showCant && item.cantidad) infoPieces.push(`C:${item.cantidad}`);
+    const hasInfoLine = infoPieces.length > 0;
+
+    const extraLines = (hasDescLine ? 1 : 0) + (hasInfoLine ? 1 : 0);
+
+    let curY = 4;
+    if (showSku) {
+      ctx.font = 'bold 13px monospace';
+      ctx.fillText(`SKU: ${cleanSku}`, margin, curY);
+      curY += 16;
+    }
+
+    // Altura proporcional para código de barras
+    const remainingH = h - curY - (extraLines * 13) - 4;
+    const barHeight = Math.max(22, remainingH);
+
+    for (let i = 0; i < modules; i++) {
+      if (binary[i] === '1') {
+        ctx.fillRect(startX + i * modWidth, curY, modWidth, barHeight);
       }
+    }
+    curY += barHeight + 3;
 
-      ctx.font = 'bold 11px monospace';
-      let infoText = '';
-      if (item.fechaVc) infoText += `VTO: ${item.fechaVc} `;
-      if (item.lote) infoText += `L: ${item.lote}`;
-      if (item.cantidad) infoText += ` C:${item.cantidad}`;
+    if (hasDescLine && curY < h - 10) {
+      ctx.font = '10px sans-serif';
+      const descCut = item.descripcion!.length > 30 ? item.descripcion!.substring(0, 28) + '..' : item.descripcion!;
+      ctx.fillText(descCut, margin, curY);
+      curY += 12;
+    }
 
-      if (infoText) {
-        ctx.fillText(infoText.trim(), margin, lineY);
-      }
+    if (hasInfoLine && curY < h - 8) {
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText(infoPieces.join(' '), margin, curY);
     }
   }
 
   private drawStandardLabelContent(
     ctx: CanvasRenderingContext2D,
-    item: { sku: string; descripcion?: string; fechaVc?: string; lote?: string; cantidad?: string | number },
+    item: { sku: string; descripcion?: string; fechaVc?: string; lote?: string; cantidad?: string | number; [key: string]: any },
     w: number,
-    _h: number
+    h: number,
+    options?: MarklifeLabelOptions
   ) {
     ctx.fillStyle = '#000000';
     ctx.textBaseline = 'top';
+
+    const barcodeOnly = options?.barcodeOnly !== false;
+    const showSkuText = options?.showSkuText !== false;
+    const cleanSku = (item.sku || '').trim() || '000000';
+
+    const codes = encodeCode128(cleanSku);
     const margin = 6;
 
+    if (codes) {
+      const binary = codesToBinaryString(codes);
+      const modules = binary.length;
+      const usableW = w - margin * 2;
+      const modWidth = Math.max(1, Math.floor(usableW / modules));
+      const totalBarW = modules * modWidth;
+      const startX = margin + Math.floor((usableW - totalBarW) / 2);
+
+      if (barcodeOnly) {
+        if (showSkuText) {
+          const textH = 12;
+          const barHeight = Math.max(26, h - textH - 10);
+          for (let i = 0; i < modules; i++) {
+            if (binary[i] === '1') {
+              ctx.fillRect(startX + i * modWidth, 4, modWidth, barHeight);
+            }
+          }
+          ctx.font = 'bold 11px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(cleanSku, Math.floor(w / 2), barHeight + 6);
+          ctx.textAlign = 'start';
+        } else {
+          const barHeight = Math.max(26, h - 8);
+          for (let i = 0; i < modules; i++) {
+            if (binary[i] === '1') {
+              ctx.fillRect(startX + i * modWidth, 4, modWidth, barHeight);
+            }
+          }
+        }
+        return;
+      }
+    }
+
+    // Modo responsivo estándar
     ctx.font = 'bold 12px monospace';
-    ctx.fillText(`SKU: ${item.sku}`, margin, 4);
+    ctx.fillText(`SKU: ${cleanSku}`, margin, 4);
 
-    if (item.descripcion) {
+    const colsConfig = options?.columnsConfig || {};
+    const showDesc = Object.entries(colsConfig).some(([k, v]) => /descrip|nombre/i.test(k) && v?.show);
+    const showVto = Object.entries(colsConfig).some(([k, v]) => /fecha.*(vc|venc)|vto/i.test(k) && v?.show);
+    const showLote = Object.entries(colsConfig).some(([k, v]) => /lote/i.test(k) && v?.show);
+
+    let y = 18;
+    if (showDesc && item.descripcion) {
       ctx.font = '10px sans-serif';
-      ctx.fillText(item.descripcion.substring(0, 18), margin, 18);
+      ctx.fillText(item.descripcion.substring(0, 18), margin, y);
+      y += 14;
     }
-
-    if (item.fechaVc) {
-      ctx.font = 'bold 11px monospace';
-      ctx.fillText(`VTO: ${item.fechaVc}`, margin, 32);
+    if (showVto && item.fechaVc) {
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText(`VTO: ${item.fechaVc}`, margin, y);
+      y += 14;
     }
-
-    if (item.lote) {
+    if (showLote && item.lote) {
       ctx.font = '10px monospace';
-      ctx.fillText(`LOTE: ${item.lote}`, margin, 46);
+      ctx.fillText(`L: ${item.lote}`, margin, y);
     }
   }
 
@@ -467,13 +593,18 @@ class BluetoothPrinterService {
   /**
    * Imprime una etiqueta individual.
    */
-  public async printLabel(item: {
-    sku: string;
-    descripcion?: string;
-    fechaVc?: string;
-    lote?: string;
-    cantidad?: string | number;
-  }, rollId = '12x40'): Promise<boolean> {
+  public async printLabel(
+    item: {
+      sku: string;
+      descripcion?: string;
+      fechaVc?: string;
+      lote?: string;
+      cantidad?: string | number;
+      [key: string]: any;
+    }, 
+    rollId = '12x40',
+    options?: MarklifeLabelOptions
+  ): Promise<boolean> {
     if (!this.status.isConnected) {
       const connected = await this.connect();
       if (!connected) return false;
@@ -483,7 +614,7 @@ class BluetoothPrinterService {
       this.updateStatus({ isPrinting: true, error: null });
 
       const roll = findRoll(rollId) || ROLLOS[2]; // Default 12x40mm
-      const canvas = this.generateLabelCanvas(item, roll);
+      const canvas = this.generateLabelCanvas(item, roll, options);
       const bytes = this.canvasToMarklifeBytes(canvas);
 
       await this.sendInChunks(bytes);
@@ -505,7 +636,7 @@ class BluetoothPrinterService {
   /**
    * Imprime una etiqueta de prueba para calibración inmediata de la Marklife P15.
    */
-  public async printTestLabel(rollId = '12x40'): Promise<boolean> {
+  public async printTestLabel(rollId = '12x40', options?: MarklifeLabelOptions): Promise<boolean> {
     const today = new Date();
     const futureDate = new Date(today.getFullYear(), today.getMonth() + 6, today.getDate());
     const displayDate = formatDisplayDate(futureDate.toISOString());
@@ -516,7 +647,7 @@ class BluetoothPrinterService {
       fechaVc: displayDate,
       lote: 'L-2026A',
       cantidad: '10 UN',
-    }, rollId);
+    }, rollId, options);
   }
 
   /**
@@ -525,7 +656,8 @@ class BluetoothPrinterService {
   public async printBatch(
     items: InventoryItem[], 
     rollId = '12x40',
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number) => void,
+    options?: MarklifeLabelOptions
   ): Promise<number> {
     if (items.length === 0) return 0;
 
@@ -542,7 +674,7 @@ class BluetoothPrinterService {
       const lote = String(item['lote'] || item['LOTE'] || '').trim();
       const cant = item['cantidad'] || item['CANTIDAD'];
 
-      const ok = await this.printLabel({ sku, descripcion: desc, fechaVc, lote, cantidad: cant }, rollId);
+      const ok = await this.printLabel({ sku, descripcion: desc, fechaVc, lote, cantidad: cant, ...item }, rollId, options);
       if (ok) {
         printedCount++;
       }

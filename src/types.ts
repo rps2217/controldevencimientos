@@ -210,6 +210,16 @@ export interface TicketGeneralSettings {
    * reporta, así que el operario debe declararlo.
    */
   labelRollId?: string;
+  /**
+   * Modo de etiqueta Marklife P15: si es true, imprime ÚNICAMENTE el código de barras
+   * ocupando toda la altura de la etiqueta para lectura instantánea sin fallos con pistola láser.
+   * Si es false, es responsivo a la selección de columnas del ticket.
+   */
+  marklifeBarcodeOnly?: boolean;
+  /**
+   * Si es true, imprime el número de SKU legible al pie del código de barras en la etiqueta.
+   */
+  marklifeShowSkuText?: boolean;
 }
 
 export interface ViewTicketSettings {
