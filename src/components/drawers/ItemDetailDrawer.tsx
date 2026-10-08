@@ -226,6 +226,12 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
     };
   }, [isResizing, panelWidth]);
 
+  // AppSheet Format Rules Evaluation (Must be called unconditionally before early return)
+  const formatResult = useMemo(() => {
+    if (!product || !formatRules || formatRules.length === 0) return null;
+    return evaluateItemFormatRules(product, productKeys, formatRules, detailMode, customAliases);
+  }, [product, productKeys, formatRules, detailMode, customAliases]);
+
   // ALL HOOKS EXECUTED UNCONDITIONALLY ABOVE
   if (!product) return null;
 
@@ -303,12 +309,6 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   const providerVal = (provKey && product[provKey]) || masterSummary?.provider || '';
   const bodKey = findColumnBySemantic(productKeys, 'frc_bod', customAliases) || productKeys.find(k => /bodega|sucursal|local/i.test(k));
   const bodegaVal = (bodKey && product[bodKey]) || product.FRC_BOD || product.BODEGA || '';
-
-  // AppSheet Format Rules Evaluation
-  const formatResult = useMemo(() => {
-    if (!product || !formatRules || formatRules.length === 0) return null;
-    return evaluateItemFormatRules(product, productKeys, formatRules, detailMode, customAliases);
-  }, [product, productKeys, formatRules, detailMode, customAliases]);
 
   // Content JSX rendered inside either mobile overlay or desktop split panel
   const detailInnerContent = (
