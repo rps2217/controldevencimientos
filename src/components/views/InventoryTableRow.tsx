@@ -17,7 +17,7 @@ import { ColumnMetadata } from '../../hooks/usePrecomputedColumns';
 import { findPhoneColumn, findEmailColumn, findColumnBySemantic } from '../../utils/columnAliases';
 import { getEnumStyle } from '../../utils/enumColorHelper';
 import { FormatRule } from '../../types';
-import { evaluateItemFormatRules, renderFormatRuleIcon } from '../../utils/formatRulesEngine';
+import { evaluateItemFormatRules, renderFormatRuleIcon, getColumnFormatStyle } from '../../utils/formatRulesEngine';
 
 export interface InventoryTableRowProps {
   item: InventoryItem;
@@ -53,6 +53,7 @@ export interface InventoryTableRowProps {
   tableDensity?: 'comfortable' | 'compact' | 'ultra';
   formatRules?: FormatRule[];
   currentTableKey?: string;
+  customAliases?: Record<string, string[]>;
 }
 
 export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
@@ -84,15 +85,16 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   isStickyEnabled = false,
   tableDensity = 'compact',
   formatRules = [],
-  currentTableKey = '*'
+  currentTableKey = '*',
+  customAliases
 }) => {
   const modalsActions = useModalsActions();
 
   // AppSheet Format Rules Evaluation
   const formatResult = useMemo(() => {
     if (!formatRules || formatRules.length === 0) return null;
-    return evaluateItemFormatRules(item, headers, formatRules, currentTableKey);
-  }, [item, headers, formatRules, currentTableKey]);
+    return evaluateItemFormatRules(item, headers, formatRules, currentTableKey, customAliases);
+  }, [item, headers, formatRules, currentTableKey, customAliases]);
 
   const eventCategory = getEventCategory(item, headers);
   const eventCategoryDef = eventCategory ? (EVENT_CATEGORIES[eventCategory] || {
@@ -223,9 +225,35 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
           {/* SKU & Title */}
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                {skuCol && item[skuCol] ? String(item[skuCol]) : 'Sin SKU'}
-              </span>
+              {(() => {
+                const skuStyle = getColumnFormatStyle(formatResult, skuCol || 'SKU', headers, customAliases);
+                const activeIcon = skuStyle?.icon || formatResult?.rowStyle?.icon;
+                const activeColor = skuStyle?.textColor || formatResult?.rowStyle?.textColor;
+                return (
+                  <>
+                    {activeIcon && (
+                      <span 
+                        style={{ color: activeColor || '#ef4444' }}
+                        className="shrink-0"
+                      >
+                        {renderFormatRuleIcon(activeIcon, 'w-4 h-4')}
+                      </span>
+                    )}
+                    <span 
+                      style={skuStyle ? {
+                        color: skuStyle.textColor,
+                        backgroundColor: skuStyle.backgroundColor,
+                        fontWeight: skuStyle.bold ? 900 : undefined
+                      } : undefined}
+                      className={`font-mono text-base sm:text-lg font-black tracking-tight ${
+                        skuStyle?.badge ? 'px-2 py-0.5 rounded-lg border shadow-2xs' : ''
+                      } ${skuStyle?.textColor ? '' : 'text-slate-900 dark:text-slate-100'}`}
+                    >
+                      {skuCol && item[skuCol] ? String(item[skuCol]) : 'Sin SKU'}
+                    </span>
+                  </>
+                );
+              })()}
               {item._isOrphan && (
                 <span 
                   className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800 shadow-2xs"
@@ -235,27 +263,69 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                 </span>
               )}
             </div>
-            <div className="text-sm text-slate-600 dark:text-slate-300 leading-snug line-clamp-2 mt-0.5 font-medium">
-              {descCol && item[descCol] ? String(item[descCol]) : 'Sin descripción'}
-            </div>
+            {descCol && item[descCol] && (() => {
+              const descStyle = getColumnFormatStyle(formatResult, descCol, headers, customAliases);
+              return (
+                <div 
+                  style={descStyle ? {
+                    color: descStyle.textColor,
+                    backgroundColor: descStyle.backgroundColor,
+                    fontWeight: descStyle.bold ? 700 : undefined,
+                    fontStyle: descStyle.italic ? 'italic' : undefined
+                  } : undefined}
+                  className={`text-sm leading-snug line-clamp-2 mt-0.5 font-medium ${
+                    descStyle?.badge ? 'px-2 py-0.5 rounded-lg border inline-flex items-center gap-1 shadow-2xs' : ''
+                  } ${descStyle?.textColor ? '' : 'text-slate-600 dark:text-slate-300'}`}
+                >
+                  {descStyle?.icon && renderFormatRuleIcon(descStyle.icon, 'w-3.5 h-3.5 shrink-0')}
+                  <span>{String(item[descCol])}</span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* iOS Inset Metrics Strip */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2.5 bg-slate-50/90 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
-            {qtyCol && item[qtyCol] !== undefined && (
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Cantidad</span>
-                <span className="font-mono text-sm font-extrabold text-slate-800 dark:text-slate-200">{String(item[qtyCol])}</span>
-              </div>
-            )}
-            {dateCol && item[dateCol] && (
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Fecha</span>
-                <span className="font-mono text-sm font-extrabold text-slate-800 dark:text-slate-200">
-                  {formatDisplayDate(item[dateCol])}
-                </span>
-              </div>
-            )}
+            {qtyCol && item[qtyCol] !== undefined && (() => {
+              const qtyStyle = getColumnFormatStyle(formatResult, qtyCol, headers, customAliases) ||
+                               getColumnFormatStyle(formatResult, 'CANTIDAD', headers, customAliases);
+              return (
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Cantidad</span>
+                  <span 
+                    style={qtyStyle ? {
+                      color: qtyStyle.textColor,
+                      backgroundColor: qtyStyle.backgroundColor,
+                      fontWeight: qtyStyle.bold ? 900 : undefined
+                    } : undefined}
+                    className={`font-mono text-sm font-extrabold flex items-center gap-1 ${qtyStyle?.badge ? 'px-1.5 py-0.5 rounded border' : ''} ${qtyStyle?.textColor ? '' : 'text-slate-800 dark:text-slate-200'}`}
+                  >
+                    {qtyStyle?.icon && renderFormatRuleIcon(qtyStyle.icon, 'w-3 h-3')}
+                    {String(item[qtyCol])}
+                  </span>
+                </div>
+              );
+            })()}
+            {dateCol && item[dateCol] && (() => {
+              const dateStyle = getColumnFormatStyle(formatResult, dateCol, headers, customAliases) ||
+                                getColumnFormatStyle(formatResult, 'FECHA_VC', headers, customAliases);
+              return (
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Fecha</span>
+                  <span 
+                    style={dateStyle ? {
+                      color: dateStyle.textColor,
+                      backgroundColor: dateStyle.backgroundColor,
+                      fontWeight: dateStyle.bold ? 900 : undefined
+                    } : undefined}
+                    className={`font-mono text-sm font-extrabold flex items-center gap-1 ${dateStyle?.badge ? 'px-1.5 py-0.5 rounded border' : ''} ${dateStyle?.textColor ? '' : 'text-slate-800 dark:text-slate-200'}`}
+                  >
+                    {dateStyle?.icon && renderFormatRuleIcon(dateStyle.icon, 'w-3 h-3')}
+                    {formatDisplayDate(item[dateCol])}
+                  </span>
+                </div>
+              );
+            })()}
             {showResolutionCol && eventResStatus && (
               <div className="flex flex-col col-span-2 sm:col-span-1">
                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Gestión</span>
@@ -439,20 +509,40 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
         }) : null;
         const colWidth = getColWidth(header, header);
         const isProveedorCol = /proveedor|vendor|supplier/i.test(header) || findColumnBySemantic(headers, 'proveedor') === header;
+        const colFormatStyle = getColumnFormatStyle(formatResult, header, headers, customAliases);
 
         return (
           <td 
             key={header} 
-            style={{ width: `${colWidth}px`, minWidth: `${colWidth}px`, maxWidth: `${colWidth}px` }}
-            className={`hidden md:table-cell ${paddingClass} truncate text-slate-800 dark:text-slate-200`}
+            style={{ 
+              width: `${colWidth}px`, 
+              minWidth: `${colWidth}px`, 
+              maxWidth: `${colWidth}px`,
+              ...(colFormatStyle?.backgroundColor && !colFormatStyle.badge ? {
+                backgroundColor: `${colFormatStyle.backgroundColor}15`
+              } : {})
+            }}
+            className={`hidden md:table-cell ${paddingClass} truncate ${
+              colFormatStyle?.textColor ? '' : 'text-slate-800 dark:text-slate-200'
+            }`}
           >
             <div className="w-full flex justify-start items-center overflow-hidden">
               {isProductsView && isSku ? (
                 <button 
                   onClick={() => onClickItem(item)}
+                  style={colFormatStyle ? {
+                    color: colFormatStyle.textColor,
+                    fontWeight: colFormatStyle.bold ? 700 : undefined,
+                    fontStyle: colFormatStyle.italic ? 'italic' : undefined
+                  } : undefined}
                   className="font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline flex items-center gap-1 truncate text-left"
                   title="Ver detalle del producto y registros relacionados"
                 >
+                  {colFormatStyle?.icon && (
+                    <span style={{ color: colFormatStyle.textColor || 'currentColor' }} className="shrink-0">
+                      {renderFormatRuleIcon(colFormatStyle.icon, 'w-3.5 h-3.5')}
+                    </span>
+                  )}
                   <span className="truncate max-w-[200px]">{String(val ?? '')}</span>
                   <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 px-1 py-0.2 rounded font-mono shrink-0">
                     DETALLE
@@ -460,21 +550,38 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                 </button>
               ) : isSku && val ? (
                 <div className="flex items-center gap-1.5 truncate">
-                  {formatResult?.rowStyle?.icon && (
+                  {colFormatStyle?.icon ? (
                     <span 
-                      title={`Format Rule: ${formatResult.rowStyle.ruleName || 'Regla activa'}`}
+                      title={`Regla: ${colFormatStyle.ruleName || 'Format Rule'}`}
+                      style={{ color: colFormatStyle.textColor || '#ef4444' }}
+                      className="shrink-0"
+                    >
+                      {renderFormatRuleIcon(colFormatStyle.icon, 'w-3.5 h-3.5')}
+                    </span>
+                  ) : formatResult?.rowStyle?.icon ? (
+                    <span 
+                      title={`Regla: ${formatResult.rowStyle.ruleName || 'Format Rule'}`}
                       style={{ color: formatResult.rowStyle.textColor || '#ef4444' }}
                       className="shrink-0"
                     >
                       {renderFormatRuleIcon(formatResult.rowStyle.icon, 'w-3.5 h-3.5')}
                     </span>
-                  )}
+                  ) : null}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       modalsActions.openRelationalMenu?.('sku', String(val));
                     }}
-                    className="font-mono font-semibold text-slate-800 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block text-left cursor-pointer"
+                    style={colFormatStyle ? {
+                      color: colFormatStyle.textColor,
+                      backgroundColor: colFormatStyle.backgroundColor,
+                      fontWeight: colFormatStyle.bold ? 700 : undefined,
+                      fontStyle: colFormatStyle.italic ? 'italic' : undefined,
+                      borderColor: colFormatStyle.textColor ? `${colFormatStyle.textColor}40` : undefined
+                    } : undefined}
+                    className={`font-mono font-semibold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block text-left cursor-pointer ${
+                      colFormatStyle?.badge ? 'px-2 py-0.5 rounded-lg border shadow-2xs' : ''
+                    } ${colFormatStyle?.textColor ? '' : 'text-slate-800 dark:text-slate-100'}`}
                     title={`SKU: ${String(val)}. Clic para exploración relacional cruzada.`}
                   >
                     {String(val)}
@@ -494,10 +601,23 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                     e.stopPropagation();
                     modalsActions.openRelationalMenu?.('proveedor', String(val));
                   }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all cursor-pointer shadow-2xs group/prov truncate"
+                  style={colFormatStyle ? {
+                    color: colFormatStyle.textColor,
+                    backgroundColor: colFormatStyle.backgroundColor,
+                    fontWeight: colFormatStyle.bold ? 700 : undefined,
+                    fontStyle: colFormatStyle.italic ? 'italic' : undefined,
+                    borderColor: colFormatStyle.textColor ? `${colFormatStyle.textColor}40` : undefined
+                  } : undefined}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer shadow-2xs group/prov truncate ${
+                    colFormatStyle?.backgroundColor ? '' : 'border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
+                  }`}
                   title={`Proveedor: ${String(val)}. Clic para exploración relacional cruzada entre tablas.`}
                 >
-                  <Building2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0 group-hover/prov:scale-110 transition-transform" />
+                  {colFormatStyle?.icon ? (
+                    renderFormatRuleIcon(colFormatStyle.icon, 'w-3.5 h-3.5 shrink-0')
+                  ) : (
+                    <Building2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0 group-hover/prov:scale-110 transition-transform" />
+                  )}
                   <span className="truncate">{String(val)}</span>
                   <ExternalLink className="w-3 h-3 text-indigo-400 opacity-60 group-hover/prov:opacity-100 transition-opacity shrink-0" />
                 </button>
@@ -507,10 +627,23 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                     e.stopPropagation(); 
                     onEventFilterClick(eventCat, e.ctrlKey || e.metaKey); 
                   }}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${catDef.badgeBg} ${catDef.badgeText} ${catDef.badgeBorder} truncate cursor-pointer hover:opacity-80 transition-opacity`}
+                  style={colFormatStyle ? {
+                    color: colFormatStyle.textColor,
+                    backgroundColor: colFormatStyle.backgroundColor,
+                    fontWeight: colFormatStyle.bold ? 700 : undefined,
+                    fontStyle: colFormatStyle.italic ? 'italic' : undefined,
+                    borderColor: colFormatStyle.textColor ? `${colFormatStyle.textColor}40` : undefined
+                  } : undefined}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border truncate cursor-pointer hover:opacity-80 transition-opacity ${
+                    colFormatStyle?.backgroundColor ? '' : `${catDef.badgeBg} ${catDef.badgeText} ${catDef.badgeBorder}`
+                  }`}
                   title="Clic normal: Solo este tipo. Ctrl+Clic: Sumar."
                 >
-                  {renderEventIcon(eventCat, 'w-3.5 h-3.5 shrink-0')}
+                  {colFormatStyle?.icon ? (
+                    renderFormatRuleIcon(colFormatStyle.icon, 'w-3.5 h-3.5 shrink-0')
+                  ) : (
+                    renderEventIcon(eventCat, 'w-3.5 h-3.5 shrink-0')
+                  )}
                   <span className="truncate">{String(val)}</span>
                 </button>
               ) : isBodCol && val !== undefined && val !== null && String(val).trim() !== '' ? (
@@ -520,20 +653,39 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                     const bodVal = String(val).trim();
                     onFrcBodFilterClick(bodVal, e.ctrlKey || e.metaKey);
                   }}
+                  style={colFormatStyle ? {
+                    color: colFormatStyle.textColor,
+                    backgroundColor: colFormatStyle.backgroundColor,
+                    fontWeight: colFormatStyle.bold ? 700 : undefined,
+                    fontStyle: colFormatStyle.italic ? 'italic' : undefined,
+                    borderColor: colFormatStyle.textColor ? `${colFormatStyle.textColor}40` : undefined
+                  } : undefined}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border truncate cursor-pointer transition-all shadow-2xs ${
                     frcBodFilter.includes(String(val).trim())
                       ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-300 dark:ring-blue-800'
-                      : 'bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-800/80 hover:bg-blue-100 dark:hover:bg-blue-900/60'
+                      : colFormatStyle?.backgroundColor ? '' : 'bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-800/80 hover:bg-blue-100 dark:hover:bg-blue-900/60'
                   }`}
                   title={`Bodega: ${String(val)}. Clic normal: Filtrar solo esta bodega. Ctrl+Clic: Sumar al filtro.`}
                 >
-                  <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                  {colFormatStyle?.icon ? (
+                    renderFormatRuleIcon(colFormatStyle.icon, 'w-3.5 h-3.5 shrink-0')
+                  ) : (
+                    <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                  )}
                   <span className="truncate">{String(val)}</span>
                 </button>
               ) : isEventView && isTraspasoCol ? (
                 val !== undefined && val !== null && String(val).trim() !== '' ? (
                   <div className="flex items-center justify-start gap-1.5 group/traspaso w-full">
-                    <span className="font-mono font-bold text-xs bg-emerald-100/90 dark:bg-emerald-950/70 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700/80 px-2 py-0.5 rounded-md truncate">
+                    <span 
+                      style={colFormatStyle ? {
+                        color: colFormatStyle.textColor,
+                        backgroundColor: colFormatStyle.backgroundColor,
+                        fontWeight: colFormatStyle.bold ? 700 : undefined
+                      } : undefined}
+                      className="font-mono font-bold text-xs bg-emerald-100/90 dark:bg-emerald-950/70 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700/80 px-2 py-0.5 rounded-md truncate"
+                    >
+                      {colFormatStyle?.icon && renderFormatRuleIcon(colFormatStyle.icon, 'w-3 h-3 inline mr-1')}
                       {String(val)}
                     </span>
                     <button
@@ -561,19 +713,43 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                   </button>
                 )
               ) : colSchema?.type === 'price' && val !== undefined && val !== null && String(val).trim() !== '' ? (
-                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 truncate">
+                <span 
+                  style={colFormatStyle ? {
+                    color: colFormatStyle.textColor,
+                    backgroundColor: colFormatStyle.backgroundColor,
+                    fontWeight: colFormatStyle.bold ? 700 : undefined
+                  } : undefined}
+                  className={`font-mono font-bold text-slate-900 dark:text-slate-100 truncate ${colFormatStyle?.badge ? 'px-2 py-0.5 rounded-md border shadow-2xs' : ''}`}
+                >
+                  {colFormatStyle?.icon && renderFormatRuleIcon(colFormatStyle.icon, 'w-3.5 h-3.5 inline mr-1')}
                   ${!isNaN(Number(val)) ? Number(val).toLocaleString('es-CL') : String(val)}
                 </span>
               ) : colSchema?.type === 'percentage' && val !== undefined && val !== null && String(val).trim() !== '' ? (
-                <span className="font-mono font-bold text-blue-700 dark:text-blue-300 truncate">
+                <span 
+                  style={colFormatStyle ? {
+                    color: colFormatStyle.textColor,
+                    backgroundColor: colFormatStyle.backgroundColor,
+                    fontWeight: colFormatStyle.bold ? 700 : undefined
+                  } : undefined}
+                  className={`font-mono font-bold text-blue-700 dark:text-blue-300 truncate ${colFormatStyle?.badge ? 'px-2 py-0.5 rounded-md border shadow-2xs' : ''}`}
+                >
+                  {colFormatStyle?.icon && renderFormatRuleIcon(colFormatStyle.icon, 'w-3.5 h-3.5 inline mr-1')}
                   {String(val)}%
                 </span>
               ) : colSchema?.type === 'yes_no' && val !== undefined && val !== null && String(val).trim() !== '' ? (
-                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                  String(val).toUpperCase() === 'SÍ' || String(val).toUpperCase() === 'SI' || String(val) === 'true' || val === true
-                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
-                    : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
-                }`}>
+                <span 
+                  style={colFormatStyle ? {
+                    color: colFormatStyle.textColor,
+                    backgroundColor: colFormatStyle.backgroundColor
+                  } : undefined}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    colFormatStyle?.backgroundColor ? 'border' :
+                    String(val).toUpperCase() === 'SÍ' || String(val).toUpperCase() === 'SI' || String(val) === 'true' || val === true
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                      : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
+                  }`}
+                >
+                  {colFormatStyle?.icon && renderFormatRuleIcon(colFormatStyle.icon, 'w-3 h-3')}
                   {String(val).toUpperCase() === 'SÍ' || String(val).toUpperCase() === 'SI' || String(val) === 'true' || val === true ? 'SÍ' : 'NO'}
                 </span>
               ) : colSchema?.type === 'color' && val !== undefined && val !== null && String(val).trim() !== '' ? (
@@ -584,8 +760,19 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
               ) : colSchema?.type === 'enum' && val !== undefined && val !== null && String(val).trim() !== '' && getEnumStyle(String(val), colSchema?.options || '') ? (() => {
                 const style = getEnumStyle(String(val), colSchema?.options || '');
                 return (
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border transition-colors ${style?.badge}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${style?.dot}`} />
+                  <span 
+                    style={colFormatStyle ? {
+                      color: colFormatStyle.textColor,
+                      backgroundColor: colFormatStyle.backgroundColor,
+                      borderColor: colFormatStyle.textColor ? `${colFormatStyle.textColor}40` : undefined
+                    } : undefined}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border transition-colors ${colFormatStyle?.backgroundColor ? '' : style?.badge}`}
+                  >
+                    {colFormatStyle?.icon ? (
+                      renderFormatRuleIcon(colFormatStyle.icon, 'w-3 h-3')
+                    ) : (
+                      <span className={`w-1.5 h-1.5 rounded-full ${style?.dot}`} />
+                    )}
                     <span>{String(val)}</span>
                   </span>
                 );
@@ -607,12 +794,35 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                   })}
                 </div>
               ) : (
-                <span className={`truncate block text-left w-full ${(isDateCol || (val !== null && typeof val === 'number') || (typeof val === 'string' && !isNaN(Number(val)) && val.trim() !== '')) ? 'font-mono tabular-nums' : ''}`}>
-                  {val !== undefined && val !== null && String(val).trim() !== ''
-                    ? (isDateCol || (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}/i.test(val.trim())) || val instanceof Date)
-                      ? formatDisplayDate(val)
-                      : String(val)
-                    : '-'}
+                <span 
+                  style={colFormatStyle ? {
+                    color: colFormatStyle.textColor,
+                    backgroundColor: colFormatStyle.backgroundColor,
+                    fontWeight: colFormatStyle.bold ? 700 : undefined,
+                    fontStyle: colFormatStyle.italic ? 'italic' : undefined,
+                    borderColor: colFormatStyle.textColor ? `${colFormatStyle.textColor}40` : undefined
+                  } : undefined}
+                  className={`truncate block text-left w-full ${
+                    colFormatStyle?.badge || (colFormatStyle?.backgroundColor && !colFormatStyle?.badge)
+                      ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border shadow-2xs max-w-full'
+                      : ''
+                  } ${
+                    !colFormatStyle?.textColor ? 'text-slate-800 dark:text-slate-200' : ''
+                  } ${(isDateCol || (val !== null && typeof val === 'number') || (typeof val === 'string' && !isNaN(Number(val)) && val.trim() !== '')) ? 'font-mono tabular-nums' : ''}`}
+                  title={colFormatStyle?.ruleName ? `Regla: ${colFormatStyle.ruleName}` : undefined}
+                >
+                  {colFormatStyle?.icon && (
+                    <span style={{ color: colFormatStyle.textColor || 'currentColor' }} className="shrink-0 inline-flex items-center mr-1">
+                      {renderFormatRuleIcon(colFormatStyle.icon, 'w-3.5 h-3.5')}
+                    </span>
+                  )}
+                  <span className="truncate">
+                    {val !== undefined && val !== null && String(val).trim() !== ''
+                      ? (isDateCol || (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}/i.test(val.trim())) || val instanceof Date)
+                        ? formatDisplayDate(val)
+                        : String(val)
+                      : '-'}
+                  </span>
                 </span>
               )}
             </div>

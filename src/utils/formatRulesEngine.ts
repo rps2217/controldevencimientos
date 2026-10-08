@@ -194,7 +194,7 @@ export function matchFormatRuleCondition(
   if (targetCol === 'DIAS_PARA_VENCER' || targetCol === 'DIAS_VENCIMIENTO') {
     const status = getItemStatus(item, headers);
     resolvedVal = status.daysToExpiry ?? status.daysToRetire ?? 999;
-  } else if (targetCol === 'ESTADO' || targetCol === 'STATUS') {
+  } else if (targetCol === 'ESTADO' || targetCol === 'STATUS' || targetCol === '_STATUS') {
     const status = getItemStatus(item, headers);
     resolvedVal = status.label;
   } else if (targetCol === 'POLITICA' || targetCol === 'POLICY') {
@@ -204,13 +204,25 @@ export function matchFormatRuleCondition(
     const qtyCol = findColumnBySemantic(headers, 'cantidad', customAliases);
     resolvedVal = qtyCol && item[qtyCol] !== undefined ? item[qtyCol] : (item.CANTIDAD || item.cantidad || 0);
   } else {
-    // 2. Columna literal o alias
+    // 2. Columna literal o búsqueda tolerante a mayúsculas/minúsculas
     if (item[condition.column] !== undefined) {
       resolvedVal = item[condition.column];
     } else {
       const matchHeader = headers.find(h => h.trim().toLowerCase() === condition.column.trim().toLowerCase());
       if (matchHeader && item[matchHeader] !== undefined) {
         resolvedVal = item[matchHeader];
+      } else {
+        // Buscar directamente en las propiedades del ítem ignorando mayúsculas
+        const itemKey = Object.keys(item).find(k => k.trim().toLowerCase() === condition.column.trim().toLowerCase());
+        if (itemKey && item[itemKey] !== undefined) {
+          resolvedVal = item[itemKey];
+        } else {
+          // Buscar por coincidencia semántica
+          const semanticHeader = findColumnBySemantic(headers, condition.column as any, customAliases);
+          if (semanticHeader && item[semanticHeader] !== undefined) {
+            resolvedVal = item[semanticHeader];
+          }
+        }
       }
     }
   }
@@ -230,6 +242,26 @@ export function matchFormatRuleCondition(
     return false;
   }
 
+  // Si ambos lados son fechas válidas, comparar por timestamp
+  const dateActual = parseAnyDate(resolvedVal);
+  const dateExpected = parseAnyDate(rawExpected);
+  const isDateComp = dateActual instanceof Date && !isNaN(dateActual.getTime()) && 
+                     dateExpected instanceof Date && !isNaN(dateExpected.getTime()) &&
+                     (rawExpected.includes('-') || rawExpected.includes('/'));
+
+  if (isDateComp) {
+    const timeActual = dateActual.getTime();
+    const timeExpected = dateExpected.getTime();
+    switch (operator) {
+      case 'equals': return timeActual === timeExpected;
+      case 'not_equals': return timeActual !== timeExpected;
+      case 'greater_than': return timeActual > timeExpected;
+      case 'greater_equal': return timeActual >= timeExpected;
+      case 'less_than': return timeActual < timeExpected;
+      case 'less_equal': return timeActual <= timeExpected;
+    }
+  }
+
   // Comparaciones numéricas si ambos lados son convertibles
   const numActual = typeof resolvedVal === 'number' ? resolvedVal : parseFloat(String(resolvedVal).replace(/,/g, '.'));
   const numExpected = parseFloat(rawExpected.replace(/,/g, '.'));
@@ -245,9 +277,11 @@ export function matchFormatRuleCondition(
       return String(resolvedVal).trim().toLowerCase() !== rawExpected.toLowerCase();
 
     case 'contains':
+      if (!rawExpected) return true;
       return String(resolvedVal).toLowerCase().includes(rawExpected.toLowerCase());
 
     case 'not_contains':
+      if (!rawExpected) return false;
       return !String(resolvedVal).toLowerCase().includes(rawExpected.toLowerCase());
 
     case 'greater_than':
@@ -289,6 +323,60 @@ export interface EvaluatedFormatResult {
 }
 
 /**
+ * Obtiene el estilo de formato condicional que aplica a una columna específica.
+ * Busca coincidencias exactas, insensibles a mayúsculas/minúsculas y semánticas.
+ */
+export function getColumnFormatStyle(
+  formatResult: EvaluatedFormatResult | null | undefined,
+  header: string,
+  headers: string[],
+  customAliases?: Record<string, string[]>
+): AppliedFormatStyle | undefined {
+  if (!formatResult || !formatResult.hasMatches) return undefined;
+
+  const colStyles = formatResult.columnStyles;
+  if (!colStyles || Object.keys(colStyles).length === 0) {
+    return undefined;
+  }
+
+  // 1. Coincidencia exacta
+  if (colStyles[header]) {
+    return colStyles[header];
+  }
+
+  // 2. Coincidencia insensible a mayúsculas y espacios
+  const cleanHeader = header.trim().toLowerCase();
+  for (const [colKey, style] of Object.entries(colStyles)) {
+    if (colKey.trim().toLowerCase() === cleanHeader) {
+      return style;
+    }
+  }
+
+  // 3. Coincidencia semántica directa
+  for (const [colKey, style] of Object.entries(colStyles)) {
+    const semanticCol = findColumnBySemantic(headers, colKey as any, customAliases);
+    if (semanticCol && semanticCol.trim().toLowerCase() === cleanHeader) {
+      return style;
+    }
+  }
+
+  // 4. Mapeo de nombres semánticos universales (ej. 'POLITICA', 'CANTIDAD', 'SKU', 'FECHA_VC', 'PROVEEDOR', 'TIPO_EVENTO')
+  const knownSemantics = ['sku', 'descripcion', 'fecha_vc', 'fecha_retiro', 'cantidad', 'lote', 'politica', 'proveedor', 'tipo_evento'] as const;
+  for (const sem of knownSemantics) {
+    const matchedCol = findColumnBySemantic(headers, sem, customAliases);
+    if (matchedCol && matchedCol.trim().toLowerCase() === cleanHeader) {
+      for (const [colKey, style] of Object.entries(colStyles)) {
+        if (colKey.trim().toLowerCase() === sem.toLowerCase()) {
+          return style;
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * Evalúa todas las reglas activas sobre un ítem en una sola pasada.
  */
 export function evaluateItemFormatRules(
@@ -311,7 +399,7 @@ export function evaluateItemFormatRules(
   for (const rule of rules) {
     if (!rule.enabled) continue;
 
-    // Verificar ámbito de tabla
+    // Verificar ámbito de tabla (si rule.tableKey no está definido o es '*', aplica a todas)
     if (rule.tableKey && rule.tableKey !== '*' && rule.tableKey !== currentTableKey) {
       continue;
     }
@@ -342,8 +430,15 @@ export function evaluateItemFormatRules(
     // Si aplica a columnas específicas
     if (rule.columns && rule.columns.length > 0) {
       for (const col of rule.columns) {
-        if (col !== '_row' && !result.columnStyles[col]) {
-          result.columnStyles[col] = style;
+        if (col !== '_row') {
+          if (!result.columnStyles[col]) {
+            result.columnStyles[col] = style;
+          }
+          // Registrar también en minúsculas para facilitar búsquedas directas
+          const lowerCol = col.trim().toLowerCase();
+          if (!result.columnStyles[lowerCol]) {
+            result.columnStyles[lowerCol] = style;
+          }
         }
       }
     }

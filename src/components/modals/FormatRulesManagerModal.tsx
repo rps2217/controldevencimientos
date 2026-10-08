@@ -248,6 +248,15 @@ export const FormatRulesManagerModal: React.FC<FormatRulesManagerModalProps> = (
                                   {rule.tableKey}
                                 </span>
                               )}
+                              {rule.columns?.includes('_row') || !rule.columns || rule.columns.length === 0 ? (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 font-mono">
+                                  Toda la fila
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 font-mono font-bold">
+                                  Col: {rule.columns.join(', ')}
+                                </span>
+                              )}
                             </div>
                             <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
                               <span>Condición:</span>
@@ -352,9 +361,16 @@ export const FormatRulesManagerModal: React.FC<FormatRulesManagerModalProps> = (
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-medium focus:ring-2 focus:ring-indigo-500 outline-hidden"
                   >
                     <option value="_row">Toda la fila completa (_row)</option>
-                    {headers.filter(h => !h.startsWith('_')).map(h => (
-                      <option key={h} value={h}>Solo columna: {h}</option>
-                    ))}
+                    <optgroup label="Columnas Inteligentes">
+                      <option value="ESTADO">Estado / Alerta (ESTADO)</option>
+                      <option value="DIAS_PARA_VENCER">Días para Vencer (DIAS_PARA_VENCER)</option>
+                      <option value="_res_status">Estado de Gestión (Resuelto / Pendiente)</option>
+                    </optgroup>
+                    <optgroup label="Columnas de la Hoja">
+                      {headers.filter(h => !h.startsWith('_')).map(h => (
+                        <option key={h} value={h}>Solo columna: {h}</option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -496,8 +512,60 @@ export const FormatRulesManagerModal: React.FC<FormatRulesManagerModalProps> = (
                   </div>
                 </div>
 
-                {/* Toggles: Bold & Badge */}
-                <div className="flex items-center gap-4 pt-1">
+                {/* Custom Color Pickers */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Color de Texto</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editingRule.textColor || '#1e293b'}
+                        onChange={e => setEditingRule({ ...editingRule, textColor: e.target.value })}
+                        className="w-8 h-8 rounded-lg cursor-pointer border border-slate-200 dark:border-slate-700 bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={editingRule.textColor || ''}
+                        onChange={e => setEditingRule({ ...editingRule, textColor: e.target.value })}
+                        placeholder="#1e293b"
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] uppercase font-bold text-slate-400">Color de Fondo</label>
+                      {editingRule.backgroundColor && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingRule({ ...editingRule, backgroundColor: undefined })}
+                          className="text-[10px] text-slate-400 hover:text-red-500 hover:underline"
+                        >
+                          Sin Fondo
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editingRule.backgroundColor || '#ffffff'}
+                        onChange={e => setEditingRule({ ...editingRule, backgroundColor: e.target.value })}
+                        className="w-8 h-8 rounded-lg cursor-pointer border border-slate-200 dark:border-slate-700 bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={editingRule.backgroundColor || ''}
+                        onChange={e => setEditingRule({ ...editingRule, backgroundColor: e.target.value })}
+                        placeholder="Transparente (opcional)"
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Toggles: Bold, Italic & Badge */}
+                <div className="flex flex-wrap items-center gap-4 pt-1">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -506,6 +574,16 @@ export const FormatRulesManagerModal: React.FC<FormatRulesManagerModalProps> = (
                       className="w-4 h-4 text-indigo-600 rounded"
                     />
                     <span className="font-bold text-slate-700 dark:text-slate-300">Texto en Negrita</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(editingRule.italic)}
+                      onChange={e => setEditingRule({ ...editingRule, italic: e.target.checked })}
+                      className="w-4 h-4 text-indigo-600 rounded"
+                    />
+                    <span className="font-bold text-slate-700 dark:text-slate-300">Cursiva / Itálica</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">

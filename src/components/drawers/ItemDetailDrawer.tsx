@@ -418,6 +418,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
           toggleFieldVisibility={toggleFieldVisibility}
           handleShowAllFields={handleShowAllFields}
           customAliases={customAliases}
+          formatResult={formatResult}
         />
 
       </div>

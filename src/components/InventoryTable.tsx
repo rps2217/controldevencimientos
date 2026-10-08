@@ -577,6 +577,7 @@ export const InventoryTable: React.FC = () => {
                     tableDensity={tableDensity}
                     formatRules={formatRules}
                     currentTableKey={dashboard.activeView}
+                    customAliases={dashboard.sheetConfig?.customAliases}
                   />
                 );
               })}

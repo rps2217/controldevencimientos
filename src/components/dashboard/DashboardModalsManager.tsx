@@ -8,6 +8,7 @@ import { ConnectionHealthStatus } from '../../hooks/useOfflineSync';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions, useModalsState } from '../../context/ModalsContext';
 import { ManageableColumn } from '../../hooks/useColumnManager';
+import { getStoredFormatRules } from '../../utils/formatRulesEngine';
 
 const PmReportModal = lazy(() => import('../modals/PmReportModal').then(m => ({ default: m.PmReportModal })));
 const ScriptCodeModal = lazy(() => import('../modals/ScriptCodeModal').then(m => ({ default: m.ScriptCodeModal })));
@@ -668,7 +669,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
           <FormatRulesManagerModal
             isOpen={modalsState.isFormatRulesModalOpen}
             onClose={() => modalsActions.setIsFormatRulesModalOpen(false)}
-            formatRules={sheetConfig.formatRules || []}
+            formatRules={getStoredFormatRules(sheetConfig.formatRules)}
             onSaveRules={(newRules) => {
               const updatedConfig = { ...sheetConfig, formatRules: newRules };
               setSheetConfig(updatedConfig);

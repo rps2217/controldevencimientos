@@ -3,6 +3,7 @@ import { Eye, EyeOff, SlidersHorizontal, Copy, Check } from 'lucide-react';
 import { InventoryItem } from '../../../types';
 import { getFieldLabel } from '../../../utils/columnAliases';
 import { formatDisplayDate } from '../../../utils/dateCalculations';
+import { EvaluatedFormatResult, getColumnFormatStyle, renderFormatRuleIcon } from '../../../utils/formatRulesEngine';
 
 interface ItemDetailFieldsGridProps {
   product: InventoryItem;
@@ -16,6 +17,7 @@ interface ItemDetailFieldsGridProps {
   toggleFieldVisibility: (key: string) => void;
   handleShowAllFields: () => void;
   customAliases?: Record<string, string[]>;
+  formatResult?: EvaluatedFormatResult | null;
 }
 
 export const ItemDetailFieldsGrid: React.FC<ItemDetailFieldsGridProps> = ({
@@ -29,7 +31,8 @@ export const ItemDetailFieldsGrid: React.FC<ItemDetailFieldsGridProps> = ({
   setIsConfiguringFields,
   toggleFieldVisibility,
   handleShowAllFields,
-  customAliases
+  customAliases,
+  formatResult
 }) => {
   const [copiedKey, setCopiedKey] = React.useState<string | null>(null);
 
@@ -135,17 +138,45 @@ export const ItemDetailFieldsGrid: React.FC<ItemDetailFieldsGridProps> = ({
               ? formatDisplayDate(rawVal) 
               : String(rawVal);
           const isCopied = copiedKey === key;
+          const fieldStyle = getColumnFormatStyle(formatResult, key, productKeys, customAliases);
 
           return (
             <div 
               key={key}
-              className="p-3 bg-slate-50/80 dark:bg-slate-800/40 rounded-xl border border-slate-200/80 dark:border-slate-700/60 flex items-start justify-between gap-2 group hover:bg-white dark:hover:bg-slate-800 transition-colors"
+              style={fieldStyle?.backgroundColor ? {
+                backgroundColor: fieldStyle.backgroundColor + (fieldStyle.badge ? '25' : '15'),
+                borderColor: fieldStyle.textColor ? `${fieldStyle.textColor}40` : undefined
+              } : undefined}
+              className={`p-3 rounded-xl border flex items-start justify-between gap-2 group transition-colors ${
+                fieldStyle?.backgroundColor 
+                  ? 'shadow-2xs' 
+                  : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-700/60 hover:bg-white dark:hover:bg-slate-800'
+              }`}
             >
               <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block truncate">
-                  {getFieldLabel(key, customAliases)}
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 truncate">
+                  {fieldStyle?.icon && (
+                    <span style={{ color: fieldStyle.textColor || 'currentColor' }} className="shrink-0">
+                      {renderFormatRuleIcon(fieldStyle.icon, 'w-3 h-3')}
+                    </span>
+                  )}
+                  <span className="truncate">{getFieldLabel(key, customAliases)}</span>
+                  {fieldStyle?.ruleName && (
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 font-mono font-normal lowercase ml-auto">
+                      rule
+                    </span>
+                  )}
                 </span>
-                <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 break-words mt-0.5 select-text">
+                <p 
+                  style={fieldStyle ? {
+                    color: fieldStyle.textColor,
+                    fontWeight: fieldStyle.bold ? 700 : undefined,
+                    fontStyle: fieldStyle.italic ? 'italic' : undefined
+                  } : undefined}
+                  className={`text-xs font-semibold break-words mt-0.5 select-text ${
+                    !fieldStyle?.textColor ? 'text-slate-800 dark:text-slate-100' : ''
+                  }`}
+                >
                   {displayVal}
                 </p>
               </div>
