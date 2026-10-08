@@ -497,7 +497,9 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
             activeView={activeView}
             config={globalTicketConfig[activeView] || sheetConfig.ticketPrintConfig?.[activeView] || {}}
             onSave={handleSaveTicketConfig}
-            sampleItems={filteredItems}
+            sampleItems={selectedRowIds && selectedRowIds.length > 0 
+              ? filteredItems.filter(i => new Set(selectedRowIds.map(Number)).has(Number(i._rowIndex))) 
+              : filteredItems}
           />
         </Suspense>
       )}

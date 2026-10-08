@@ -520,13 +520,21 @@ class BluetoothPrinterService {
   }
 
   /**
-   * Imprime un lote de ítems seleccionados.
+   * Imprime un lote de ítems seleccionados con reporte de progreso en tiempo real.
    */
-  public async printBatch(items: InventoryItem[], rollId = '12x40'): Promise<number> {
+  public async printBatch(
+    items: InventoryItem[], 
+    rollId = '12x40',
+    onProgress?: (current: number, total: number) => void
+  ): Promise<number> {
     if (items.length === 0) return 0;
 
     let printedCount = 0;
-    for (const item of items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (onProgress) {
+        onProgress(i + 1, items.length);
+      }
       const sku = String(item['sku'] || item['SKU'] || item['codigo'] || item['CU_VC'] || item['ID_VC'] || '000000').trim();
       const desc = String(item['descripcion'] || item['DESCRIPCION'] || item['nombre'] || '').trim();
       const rawDate = item['fecha_vc'] || item['FECHA_VC'] || item['vencimiento'] || item['VENCIMIENTO'];
@@ -538,7 +546,7 @@ class BluetoothPrinterService {
       if (ok) {
         printedCount++;
       }
-      // Pequeña pausa entre etiquetas físicas
+      // Pequeña pausa entre etiquetas físicas para vaciar el búfer del microcontrolador
       await new Promise(r => setTimeout(r, 350));
     }
 

@@ -28,8 +28,12 @@ export function useBluetoothPrinter() {
     return await bluetoothPrinterService.printTestLabel(rollId || selectedRollId);
   }, [selectedRollId]);
 
-  const printBatch = useCallback(async (items: InventoryItem[], rollId?: string) => {
-    return await bluetoothPrinterService.printBatch(items, rollId || selectedRollId);
+  const printBatch = useCallback(async (
+    items: InventoryItem[], 
+    rollId?: string,
+    onProgress?: (current: number, total: number) => void
+  ) => {
+    return await bluetoothPrinterService.printBatch(items, rollId || selectedRollId, onProgress);
   }, [selectedRollId]);
 
   return {

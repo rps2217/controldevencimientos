@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Printer, Settings, Barcode, Mail, MessageSquare, Download, Flame, Edit2, Trash2, Sliders, X, Copy, RefreshCw, Bluetooth 
+  Printer, Settings, Barcode, Mail, MessageSquare, Download, Flame, Edit2, Trash2, Sliders, X, Copy, RefreshCw 
 } from 'lucide-react';
 import { isActionEnabledForTable, buildBulkActionContext } from '../../utils/bulkActionsRegistry';
 import { exportToExcel } from '../../utils/exportUtils';
@@ -82,14 +82,6 @@ export const FloatingBulkActionBar: React.FC = () => {
             <Barcode className="w-3.5 h-3.5 text-indigo-300" /> Código Barras ({selectedRowIds.length})
           </button>
         )}
-
-        <button 
-          onClick={() => modalsActions.openBluetoothPrinter(selectedItems)}
-          className="text-xs hover:bg-indigo-700 px-3 py-1.5 rounded-xl font-bold transition-colors flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 cursor-pointer"
-          title="Conectar e imprimir directo en impresora Marklife P15 vía Bluetooth BLE"
-        >
-          <Bluetooth className="w-3.5 h-3.5 text-indigo-200" /> Marklife P15 ({selectedRowIds.length})
-        </button>
         
         {isActionEnabledForTable('gmail', bulkActionCtx, sheetConfig) && (
           <button 
