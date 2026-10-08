@@ -34,6 +34,7 @@ export const DashboardTopNav: React.FC = () => {
   const sheetConfig = dashboard.sheetConfig;
   const isOffline = dashboard.isOffline ?? false;
   const isSyncing = dashboard.isSyncing;
+  const offlineQueue = dashboard.offlineQueue ?? [];
   const fetchData = dashboard.fetchData;
   const loading = dashboard.loading ?? false;
   const latencyMs = dashboard.latencyMs;
@@ -256,27 +257,50 @@ export const DashboardTopNav: React.FC = () => {
             </button>
           </div>
 
-          {/* Sync Indicator (shown only during active sync or offline) */}
-          {(isSyncing || isOffline) && (
-            <div 
-              onClick={onOpenSyncAudit}
-              className="hidden lg:flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-2xs shrink-0 cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-all group"
-              title={
-                isSyncing 
-                  ? 'Sincronizando cambios...' 
-                  : 'Modo sin conexión'
-              }
-            >
-              {isSyncing ? (
-                <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin shrink-0" />
-              ) : (
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-              )}
-              <span className="text-slate-600 dark:text-slate-300 text-[11px] font-medium hidden xl:inline">
-                {isSyncing ? 'Sincronizando' : 'Offline'}
+          {/* AppSheet-Style Sync & Offline Status Indicator */}
+          <div 
+            onClick={onOpenSyncAudit}
+            className={`hidden lg:flex items-center gap-2 bg-white dark:bg-slate-800 border px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-2xs shrink-0 cursor-pointer transition-all group ${
+              isSyncing 
+                ? 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/30' 
+                : isOffline || offlineQueue.length > 0
+                ? 'border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/30'
+                : 'border-emerald-200 dark:border-emerald-800/80 hover:border-emerald-300'
+            }`}
+            title={
+              isSyncing 
+                ? 'Sincronizando cambios con la nube...' 
+                : isOffline 
+                ? 'Modo sin conexión (los cambios se guardan localmente)' 
+                : offlineQueue.length > 0 
+                ? `${offlineQueue.length} cambio(s) pendiente(s) de sincronizar` 
+                : 'Sincronizado (Local-First Activo)'
+            }
+          >
+            {isSyncing ? (
+              <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin shrink-0" />
+            ) : isOffline ? (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+            ) : offlineQueue.length > 0 ? (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-bounce shrink-0" />
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            )}
+            <span className="text-slate-700 dark:text-slate-200 text-[11px] font-medium hidden xl:inline">
+              {isSyncing 
+                ? 'Sincronizando' 
+                : isOffline 
+                ? 'Offline' 
+                : offlineQueue.length > 0 
+                ? `${offlineQueue.length} pendiente${offlineQueue.length > 1 ? 's' : ''}` 
+                : 'Sincronizado'}
+            </span>
+            {latencyMs !== null && !isOffline && (
+              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-mono hidden 2xl:inline">
+                ({latencyMs}ms)
               </span>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Refresh button */}
           <button 
