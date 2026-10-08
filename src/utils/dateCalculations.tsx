@@ -27,7 +27,8 @@ import {
   CalculationColumnsContext,
   GroupAggregates,
   ItemStatusCode,
-  ItemActionType
+  ItemActionType,
+  extractItemFields
 } from './pureCalculations';
 
 // Re-export pure calculation functions to keep existing consumers intact
@@ -51,7 +52,8 @@ export {
   createColumnsContext,
   rowToObject,
   getErrorMessage,
-  computeGroupAggregates
+  computeGroupAggregates,
+  extractItemFields
 };
 export type { CalculationColumnsContext, GroupAggregates };
 

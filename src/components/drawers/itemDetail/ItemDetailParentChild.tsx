@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { InventoryItem, SheetRecord, EventCategory } from '../../../types';
 import { findColumnBySemantic } from '../../../utils/columnAliases';
-import { formatDisplayDate, formatLocaleNumber, getItemStatus } from '../../../utils/dateCalculations';
+import { formatDisplayDate, formatLocaleNumber, getItemStatus, extractItemFields } from '../../../utils/dateCalculations';
 import { buildEntityRelationshipSummary } from '../../../utils/relatedRecordsEngine';
 import { RelatedRecordsModal } from './RelatedRecordsModal';
 
@@ -213,11 +213,7 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
         <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
           {activeSummary.batches.slice(0, 6).map((batch, idx) => {
             const status = getItemStatus(batch, Object.keys(batch));
-            const bSku = batch.SKU || batch.sku || '-';
-            const bDesc = batch.DESCRIPCION || batch.descripcion || batch.PRODUCTO || '';
-            const bQty = batch.CANTIDAD || batch.cantidad || '1';
-            const bFecha = batch.FECHA_VC || batch.fecha_vc || `${batch.MES || ''}/${batch.ANIO || ''}` || '-';
-            const bLote = batch.LOTE || batch.lote || '';
+            const { sku: bSku, desc: bDesc, lote: bLote, qty: bQty, fecha: bFecha } = extractItemFields(batch);
 
             return (
               <div

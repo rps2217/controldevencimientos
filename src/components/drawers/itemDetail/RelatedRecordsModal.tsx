@@ -4,7 +4,7 @@ import {
   ArrowUpDown, Package, AlertTriangle 
 } from 'lucide-react';
 import { InventoryItem } from '../../../types';
-import { formatDisplayDate, formatLocaleNumber, getItemStatus } from '../../../utils/dateCalculations';
+import { formatDisplayDate, formatLocaleNumber, getItemStatus, extractItemFields } from '../../../utils/dateCalculations';
 
 interface RelatedRecordsModalProps {
   isOpen: boolean;
@@ -33,12 +33,9 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
 
   const filteredBatches = useMemo(() => {
     return batches.filter(item => {
-      const sku = (item.SKU || item.sku || '').toString().toLowerCase();
-      const desc = (item.DESCRIPCION || item.descripcion || item.PRODUCTO || '').toString().toLowerCase();
-      const lote = (item.LOTE || item.lote || '').toString().toLowerCase();
-      
+      const { sku, desc, lote } = extractItemFields(item);
       const query = searchTerm.toLowerCase();
-      const matchesSearch = !searchTerm || sku.includes(query) || desc.includes(query) || lote.includes(query);
+      const matchesSearch = !searchTerm || sku.toLowerCase().includes(query) || desc.toLowerCase().includes(query) || lote.toLowerCase().includes(query);
 
       if (!matchesSearch) return false;
 
@@ -53,20 +50,18 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
 
       return true;
     }).sort((a, b) => {
+      const fieldsA = extractItemFields(a);
+      const fieldsB = extractItemFields(b);
       if (sortBy === 'sku') {
-        const sA = (a.SKU || a.sku || '').toString();
-        const sB = (b.SKU || b.sku || '').toString();
-        return sA.localeCompare(sB);
+        return fieldsA.sku.localeCompare(fieldsB.sku);
       }
       if (sortBy === 'qty') {
-        const qA = Number(a.CANTIDAD || a.cantidad || 0);
-        const qB = Number(b.CANTIDAD || b.cantidad || 0);
+        const qA = Number(fieldsA.qty || 0);
+        const qB = Number(fieldsB.qty || 0);
         return qB - qA;
       }
       // default sortBy === 'date'
-      const dA = (a.FECHA_VC || a.fecha_vc || '').toString();
-      const dB = (b.FECHA_VC || b.fecha_vc || '').toString();
-      return dA.localeCompare(dB);
+      return fieldsA.fecha.localeCompare(fieldsB.fecha);
     });
   }, [batches, searchTerm, statusFilter, sortBy]);
 
@@ -183,12 +178,7 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredBatches.map((item, index) => {
                     const status = getItemStatus(item, Object.keys(item));
-                    const sku = item.SKU || item.sku || '-';
-                    const desc = item.DESCRIPCION || item.descripcion || item.PRODUCTO || 'Sin descripción';
-                    const lote = item.LOTE || item.lote || '';
-                    const qty = item.CANTIDAD || item.cantidad || '0';
-                    const fecha = item.FECHA_VC || item.fecha_vc || `${item.MES || ''}/${item.ANIO || ''}` || '-';
-                    const bodega = item.BODEGA || item.bodega || item.SUCURSAL || '-';
+                    const { sku, desc, lote, qty, fecha, bodega } = extractItemFields(item);
 
                     return (
                       <tr 

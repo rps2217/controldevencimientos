@@ -878,3 +878,33 @@ export function matchesSearchTerm(
   }
   return false;
 }
+
+/**
+ * Extractor semántico robusto de campos de un ítem de inventario o fila de sheet
+ */
+export function extractItemFields(item: Record<string, unknown>, customAliases?: Record<string, string[]>) {
+  const keys = Object.keys(item);
+  const skuCol = findColumnBySemantic(keys, 'sku', customAliases) || keys.find(k => /sku|codigo|cod|item/i.test(k));
+  const descCol = findColumnBySemantic(keys, 'descripcion', customAliases) || keys.find(k => /desc|producto|articulo|nombre|detalle/i.test(k));
+  const loteCol = findColumnBySemantic(keys, 'lote', customAliases) || keys.find(k => /lote|batch|partida/i.test(k));
+  const qtyCol = findColumnBySemantic(keys, 'cantidad', customAliases) || keys.find(k => /cant|stock|unidades|cantidad/i.test(k));
+  const fechaCol = findColumnBySemantic(keys, 'fecha_vc', customAliases) || keys.find(k => /fecha|venc|vto|cad|exp/i.test(k));
+  const bodCol = findColumnBySemantic(keys, 'frc_bod', customAliases) || keys.find(k => /bodega|sucursal|local|almacen/i.test(k));
+
+  const skuVal = (skuCol && item[skuCol]) ? item[skuCol] : (item.SKU || item.sku || item['CÓDIGO'] || item['CODIGO'] || '-');
+  const descVal = (descCol && item[descCol]) ? item[descCol] : (item.DESCRIPCION || item.descripcion || item.PRODUCTO || item['DESCRIPCIÓN'] || 'Sin descripción');
+  const loteVal = (loteCol && item[loteCol]) ? item[loteCol] : (item.LOTE || item.lote || '');
+  const qtyVal = (qtyCol && item[qtyCol] !== undefined) ? item[qtyCol] : (item.CANTIDAD || item.cantidad || item['CANTIDAD'] || '0');
+  const fechaVal = (fechaCol && item[fechaCol]) ? item[fechaCol] : (item.FECHA_VC || item.fecha_vc || item['FECHA VTO'] || `${item.MES || ''}/${item.ANIO || ''}` || '-');
+  const bodVal = (bodCol && item[bodCol]) ? item[bodCol] : (item.BODEGA || item.bodega || item.SUCURSAL || '-');
+
+  const sku: string = skuVal !== undefined && skuVal !== null && String(skuVal).trim() !== '' ? String(skuVal).trim() : '-';
+  const desc: string = descVal !== undefined && descVal !== null && String(descVal).trim() !== '' ? String(descVal).trim() : 'Sin descripción';
+  const lote: string = loteVal !== undefined && loteVal !== null ? String(loteVal).trim() : '';
+  const qty: unknown = qtyVal;
+  const fecha: string = fechaVal !== undefined && fechaVal !== null && String(fechaVal).trim() !== '' ? String(fechaVal).trim() : '-';
+  const bodega: string = bodVal !== undefined && bodVal !== null && String(bodVal).trim() !== '' ? String(bodVal).trim() : '-';
+
+  return { sku, desc, lote, qty, fecha, bodega };
+}
+
