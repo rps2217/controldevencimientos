@@ -25,6 +25,40 @@
     --color-slate-100: #f4f4f5;
     --color-slate-50:  #fafafa;
   }
+
+  /* Variant 3: Verde Nórdico / Descanso Visual Ergónomico (Sage & Forest Dark) */
+  html.dark.theme-sage {
+    background-color: #0b1614 !important;
+    color: #ecfdf5;
+    --color-slate-950: #0b1614;
+    --color-slate-900: #132420;
+    --color-slate-800: #1d3630;
+    --color-slate-700: #2d5248;
+    --color-slate-600: #3d7165;
+    --color-slate-500: #529285;
+    --color-slate-400: #71b8ab;
+    --color-slate-300: #a7f3d0;
+    --color-slate-200: #d1fae5;
+    --color-slate-100: #ecfdf5;
+    --color-slate-50:  #f0fdf4;
+  }
+
+  /* Variant 4: Ámbar Cálido / Anti-Luz Azul para Turnos Nocturnos (Warm Amber / Sepia) */
+  html.dark.theme-amber {
+    background-color: #14110d !important;
+    color: #fef3c7;
+    --color-slate-950: #14110d;
+    --color-slate-900: #1f1b14;
+    --color-slate-800: #2d261e;
+    --color-slate-700: #42392c;
+    --color-slate-600: #5c4f3d;
+    --color-slate-500: #7d6b50;
+    --color-slate-400: #a6916a;
+    --color-slate-300: #d4c398;
+    --color-slate-200: #fde68a;
+    --color-slate-100: #fef3c7;
+    --color-slate-50:  #fffbeb;
+  }
 }
 
 @layer components {

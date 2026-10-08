@@ -164,7 +164,10 @@ export default function App() {
       const savedVariant = localStorage.getItem(STORAGE_KEYS.THEME_VARIANT);
       const isDark = localStorage.getItem(STORAGE_KEYS.DARK_MODE) === 'true';
       if (!isDark) return 'light';
-      return savedVariant === 'gray' ? 'dark-gray' : 'dark-slate';
+      if (savedVariant === 'gray') return 'dark-gray';
+      if (savedVariant === 'sage') return 'dark-sage';
+      if (savedVariant === 'amber') return 'dark-amber';
+      return 'dark-slate';
     } catch {
       return 'light';
     }
@@ -172,18 +175,17 @@ export default function App() {
 
   useEffect(() => {
     try {
+      document.documentElement.classList.remove('dark', 'theme-gray', 'theme-sage', 'theme-amber');
       if (themeMode === 'light') {
         localStorage.setItem(STORAGE_KEYS.DARK_MODE, 'false');
-        document.documentElement.classList.remove('dark', 'theme-gray');
-      } else if (themeMode === 'dark-slate') {
+      } else {
         localStorage.setItem(STORAGE_KEYS.DARK_MODE, 'true');
-        localStorage.setItem(STORAGE_KEYS.THEME_VARIANT, 'slate');
+        const variant = themeMode.replace('dark-', '');
+        localStorage.setItem(STORAGE_KEYS.THEME_VARIANT, variant);
         document.documentElement.classList.add('dark');
-        document.documentElement.classList.remove('theme-gray');
-      } else if (themeMode === 'dark-gray') {
-        localStorage.setItem(STORAGE_KEYS.DARK_MODE, 'true');
-        localStorage.setItem(STORAGE_KEYS.THEME_VARIANT, 'gray');
-        document.documentElement.classList.add('dark', 'theme-gray');
+        if (variant !== 'slate') {
+          document.documentElement.classList.add(`theme-${variant}`);
+        }
       }
     } catch (err) {
       console.warn('LocalStorage error setting theme:', err);

@@ -507,4 +507,4 @@ export interface CampaignCutoff {
  * Vive aquí y no en `App.tsx` porque la barra superior del dashboard ofrece el
  * selector de tema y no debe importar de su componente raíz (acoplamiento invertido).
  */
-export type ThemeMode = 'light' | 'dark-slate' | 'dark-gray';
+export type ThemeMode = 'light' | 'dark-slate' | 'dark-gray' | 'dark-sage' | 'dark-amber';
