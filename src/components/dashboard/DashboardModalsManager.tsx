@@ -28,6 +28,7 @@ const SliceEditorModal = lazy(() => import('../modals/SliceEditorModal').then(m 
 const SyncAuditModal = lazy(() => import('../modals/SyncAuditModal').then(m => ({ default: m.SyncAuditModal })));
 const StockCountTerminal = lazy(() => import('../views/StockCountTerminal').then(m => ({ default: m.StockCountTerminal })));
 const CrossTableRelationalMenu = lazy(() => import('../views/CrossTableRelationalMenu').then(m => ({ default: m.CrossTableRelationalMenu })));
+const BluetoothPrinterModal = lazy(() => import('../modals/BluetoothPrinterModal').then(m => ({ default: m.BluetoothPrinterModal })));
 
 export interface DashboardModalsManagerProps {
   handleOpenModal: (item?: InventoryItem, prefillSku?: string, initialCategory?: EventCategory) => void;
@@ -645,6 +646,17 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
             onClose={() => modalsActions.closeRelationalMenu?.()}
             entityType={modalsState.relationalEntity.type}
             entityValue={modalsState.relationalEntity.value}
+          />
+        </Suspense>
+      )}
+
+      {/* BLUETOOTH PRINTER MODAL (MARKLIFE P15 / TÉRMICA BLE) */}
+      {modalsState.isBluetoothPrinterOpen && (
+        <Suspense fallback={<LazyFallback />}>
+          <BluetoothPrinterModal
+            isOpen={modalsState.isBluetoothPrinterOpen}
+            onClose={() => modalsActions.setIsBluetoothPrinterOpen(false)}
+            itemsToPrint={modalsState.bluetoothPrinterItems}
           />
         </Suspense>
       )}

@@ -12,8 +12,10 @@ import {
   FileText,
   Sliders,
   Barcode,
-  Scissors
+  Scissors,
+  Bluetooth
 } from 'lucide-react';
+import { useModalsActions } from '../../context/ModalsContext';
 import { 
   ViewTicketConfig, 
   TicketColumnConfig, 
@@ -56,6 +58,7 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
   onSave,
   sampleItems = []
 }) => {
+  const modalsActions = useModalsActions();
   const [localColumns, setLocalColumns] = useState<Record<string, TicketColumnConfig>>({});
   const [localGeneral, setLocalGeneral] = useState<TicketGeneralSettings>({
     title: 'REPORTE VENCIMIENTOS',
@@ -404,6 +407,37 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
                 <FileText className="w-3.5 h-3.5 text-blue-500" />
                 <span>Ajustes Generales del Ticket</span>
+              </div>
+
+              {/* CARD ACCESO DIRECTO MARKLIFE P15 BLUETOOTH */}
+              <div className="p-3 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-xs shrink-0">
+                    <Bluetooth className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Impresora Portátil Marklife P15</p>
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-indigo-200/80 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+                        Bluetooth BLE
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Vincular directamente desde el móvil o PC, calibrar rollos y probar impresión.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    modalsActions.openBluetoothPrinter(sampleItems);
+                  }}
+                  className="w-full sm:w-auto px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Bluetooth className="w-3.5 h-3.5" />
+                  <span>Terminal Marklife</span>
+                </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
