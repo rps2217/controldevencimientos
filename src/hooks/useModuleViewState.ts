@@ -137,7 +137,7 @@ export function useModuleViewState({
     lastViewRef.current = activeView;
   }, [activeView, storageKey]);
 
-  // 2. Continuous background persistence: save state of active view on modification
+  // 2. Continuous background persistence: save state of active view on modification with debouncing
   useEffect(() => {
     if (lastViewRef.current !== activeView) return; // Prevent overwriting during transitions
 
@@ -157,36 +157,40 @@ export function useModuleViewState({
       groupByDirection,
     };
 
-    setModuleStates(prev => {
-      const currentSaved = prev[activeView];
-      if (currentSaved && 
-          currentSaved.activeSliceId === stateToSave.activeSliceId &&
-          currentSaved.searchTerm === stateToSave.searchTerm &&
-          currentSaved.activeQuickChip === stateToSave.activeQuickChip &&
-          JSON.stringify(currentSaved.sortConfig) === JSON.stringify(stateToSave.sortConfig) &&
-          JSON.stringify(currentSaved.eventFilter) === JSON.stringify(stateToSave.eventFilter) &&
-          JSON.stringify(currentSaved.frcBodFilter) === JSON.stringify(stateToSave.frcBodFilter) &&
-          JSON.stringify(currentSaved.eventResolutionFilter) === JSON.stringify(stateToSave.eventResolutionFilter) &&
-          JSON.stringify(currentSaved.pmRadarFilter) === JSON.stringify(stateToSave.pmRadarFilter) &&
-          JSON.stringify(currentSaved.columnFilters) === JSON.stringify(stateToSave.columnFilters) &&
-          JSON.stringify(currentSaved.dynamicMonthFilter) === JSON.stringify(stateToSave.dynamicMonthFilter) &&
-          JSON.stringify(currentSaved.dynamicMonthRange) === JSON.stringify(stateToSave.dynamicMonthRange) &&
-          currentSaved.groupByColumn === stateToSave.groupByColumn &&
-          currentSaved.groupByDirection === stateToSave.groupByDirection) {
-        return prev;
-      }
+    const timer = setTimeout(() => {
+      setModuleStates(prev => {
+        const currentSaved = prev[activeView];
+        if (currentSaved && 
+            currentSaved.activeSliceId === stateToSave.activeSliceId &&
+            currentSaved.searchTerm === stateToSave.searchTerm &&
+            currentSaved.activeQuickChip === stateToSave.activeQuickChip &&
+            JSON.stringify(currentSaved.sortConfig) === JSON.stringify(stateToSave.sortConfig) &&
+            JSON.stringify(currentSaved.eventFilter) === JSON.stringify(stateToSave.eventFilter) &&
+            JSON.stringify(currentSaved.frcBodFilter) === JSON.stringify(stateToSave.frcBodFilter) &&
+            JSON.stringify(currentSaved.eventResolutionFilter) === JSON.stringify(stateToSave.eventResolutionFilter) &&
+            JSON.stringify(currentSaved.pmRadarFilter) === JSON.stringify(stateToSave.pmRadarFilter) &&
+            JSON.stringify(currentSaved.columnFilters) === JSON.stringify(stateToSave.columnFilters) &&
+            JSON.stringify(currentSaved.dynamicMonthFilter) === JSON.stringify(stateToSave.dynamicMonthFilter) &&
+            JSON.stringify(currentSaved.dynamicMonthRange) === JSON.stringify(stateToSave.dynamicMonthRange) &&
+            currentSaved.groupByColumn === stateToSave.groupByColumn &&
+            currentSaved.groupByDirection === stateToSave.groupByDirection) {
+          return prev;
+        }
 
-      const updated = {
-        ...prev,
-        [activeView]: stateToSave
-      };
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-      return updated;
-    });
+        const updated = {
+          ...prev,
+          [activeView]: stateToSave
+        };
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(updated));
+        } catch {
+          // ignore
+        }
+        return updated;
+      });
+    }, 400);
+
+    return () => clearTimeout(timer);
   }, [
     activeView,
     activeSliceId,

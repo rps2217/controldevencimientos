@@ -221,7 +221,8 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     const skuCol = findColumnBySemantic(headers, 'sku', sheetConfig?.customAliases) || headers.find(h => /sku|código|codigo/i.test(h));
     const hasCatalog = catalogSkuSet !== null && catalogSkuSet.size > 0;
 
-    return baseAugmented.map(item => {
+    let hasChanges = false;
+    const result = baseAugmented.map(item => {
       let isOrphan = false;
       if (hasCatalog && skuCol) {
         const rawSku = item[skuCol] || item.SKU || item.sku;
@@ -232,11 +233,17 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
         }
       }
 
+      if (item._isOrphan === isOrphan) {
+        return item;
+      }
+      hasChanges = true;
       return {
         ...item,
         _isOrphan: isOrphan
       } as InventoryItem;
     });
+
+    return hasChanges ? result : baseAugmented;
   }, [items, headers, activeSheetTitle, sheetConfig, products, policies, catalogSkuSet]);
 
   // Web Worker for non-blocking background calculations
