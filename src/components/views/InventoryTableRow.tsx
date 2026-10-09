@@ -24,6 +24,10 @@ export interface InventoryTableRowProps {
   virtualIndex: number;
   headers: string[];
   visibleColumnMeta: ColumnMetadata[];
+  /** Mostrar columna de número de fila (#). Por defecto true. */
+  showRowCol?: boolean;
+  /** Mostrar columna de acciones fijas. Por defecto true. */
+  showActionsCol?: boolean;
   /** La hoja tiene dominio de vencimiento (columna virtual de estado de caducidad). */
   showExpiryCol?: boolean;
   /** La hoja tiene dominio de incidencia (columna virtual de estado de gestion). */
@@ -61,6 +65,8 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   virtualIndex,
   headers,
   visibleColumnMeta,
+  showRowCol = true,
+  showActionsCol = true,
   showExpiryCol = false,
   showResolutionCol = false,
   isCatalog = false,
@@ -400,16 +406,18 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       </td>
 
       {/* Row Index */}
-      <td 
-        style={{ width: `${getColWidth('_row', '#')}px`, minWidth: `${getColWidth('_row', '#')}px`, maxWidth: `${getColWidth('_row', '#')}px`, ...(isStickyEnabled ? { left: '48px' } : {}) }}
-        className={`hidden md:table-cell ${paddingClass} text-center font-mono text-xs text-slate-400 dark:text-slate-500 truncate transition-colors ${
-          isStickyEnabled
-            ? `sticky left-[48px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]`
-            : ''
-        }`}
-      >
-        {item._rowIndex}
-      </td>
+      {showRowCol && (
+        <td 
+          style={{ width: `${getColWidth('_row', '#')}px`, minWidth: `${getColWidth('_row', '#')}px`, maxWidth: `${getColWidth('_row', '#')}px`, ...(isStickyEnabled ? { left: '48px' } : {}) }}
+          className={`hidden md:table-cell ${paddingClass} text-center font-mono text-xs text-slate-400 dark:text-slate-500 truncate transition-colors ${
+            isStickyEnabled
+              ? `sticky left-[48px] z-10 ${stickyBg} shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]`
+              : ''
+          }`}
+        >
+          {item._rowIndex}
+        </td>
+      )}
 
       {/* Expiration Status Badge (Main view) - Unified Single Badge */}
       {showExpiryCol && (
@@ -831,52 +839,54 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       })}
 
       {/* Row Actions */}
-      <td 
-        className={`hidden md:table-cell ${paddingClass} text-right transition-colors ${
-          isStickyEnabled
-            ? 'sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.03)]'
-            : ''
-        }`} 
-        style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-end gap-1">
-          {hasEmail && isEmailEnabled && (
+      {showActionsCol && (
+        <td 
+          className={`hidden md:table-cell ${paddingClass} text-right transition-colors ${
+            isStickyEnabled
+              ? 'sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.03)]'
+              : ''
+          }`} 
+          style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-end gap-1">
+            {hasEmail && isEmailEnabled && (
+              <button 
+                onClick={() => onOpenEmail?.(item)} 
+                className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                title="Enviar Correo Electrónico"
+              >
+                <Mail className="w-4 h-4"/>
+              </button>
+            )}
+            {hasPhone && isWhatsAppEnabled && (
+              <button 
+                onClick={() => onOpenWhatsApp?.(item)} 
+                className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                title="Enviar mensaje de WhatsApp"
+              >
+                <MessageSquare className="w-4 h-4"/>
+              </button>
+            )}
+            {onCopyRow && (
+              <button 
+                onClick={() => onCopyRow(item)} 
+                className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                title="Copia esta fila y edítala"
+              >
+                <Copy className="w-4 h-4"/>
+              </button>
+            )}
             <button 
-              onClick={() => onOpenEmail?.(item)} 
-              className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
-              title="Enviar Correo Electrónico"
+              onClick={() => onDeleteRow(item)} 
+              className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              title="Eliminar fila"
             >
-              <Mail className="w-4 h-4"/>
+              <Trash2 className="w-4 h-4"/>
             </button>
-          )}
-          {hasPhone && isWhatsAppEnabled && (
-            <button 
-              onClick={() => onOpenWhatsApp?.(item)} 
-              className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
-              title="Enviar mensaje de WhatsApp"
-            >
-              <MessageSquare className="w-4 h-4"/>
-            </button>
-          )}
-          {onCopyRow && (
-            <button 
-              onClick={() => onCopyRow(item)} 
-              className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
-              title="Copia esta fila y edítala"
-            >
-              <Copy className="w-4 h-4"/>
-            </button>
-          )}
-          <button 
-            onClick={() => onDeleteRow(item)} 
-            className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
-            title="Eliminar fila"
-          >
-            <Trash2 className="w-4 h-4"/>
-          </button>
-        </div>
-      </td>
+          </div>
+        </td>
+      )}
     </tr>
   );
 }, (prevProps, nextProps) => {
@@ -886,6 +896,8 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   if (prevProps.isSelected !== nextProps.isSelected) return false;
   if (prevProps.isActiveDetail !== nextProps.isActiveDetail) return false;
   if (prevProps.virtualIndex !== nextProps.virtualIndex) return false;
+  if (prevProps.showRowCol !== nextProps.showRowCol) return false;
+  if (prevProps.showActionsCol !== nextProps.showActionsCol) return false;
   if (prevProps.showExpiryCol !== nextProps.showExpiryCol) return false;
   if (prevProps.showResolutionCol !== nextProps.showResolutionCol) return false;
   if (prevProps.isCatalog !== nextProps.isCatalog) return false;

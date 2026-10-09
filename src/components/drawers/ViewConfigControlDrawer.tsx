@@ -53,6 +53,10 @@ export const ViewConfigControlDrawer: React.FC = () => {
     () => dashboard.allTableHeaders ?? dashboard.headers ?? [],
     [dashboard.allTableHeaders, dashboard.headers]
   );
+  const manageableColumns = useMemo(
+    () => dashboard.allManageableColumns ?? [],
+    [dashboard.allManageableColumns]
+  );
   const hiddenColumns = dashboard.hiddenColumns?.[dashboard.activeView] || [];
   const onToggleColumnVisibility = (h: string) => dashboard.toggleVisibility?.(h);
   const onResetColumns = () => dashboard.resetColumnOrder?.();
@@ -126,12 +130,28 @@ export const ViewConfigControlDrawer: React.FC = () => {
 
   if (!isOpen) return null;
 
-  // Filter columns by search term
-  const filteredHeaders = allHeaders.filter(h => 
-    h.toLowerCase().includes(columnSearch.toLowerCase().trim())
-  );
+  // Filter manageable columns by search term
+  const effectiveColumns = useMemo(() => {
+    if (manageableColumns.length > 0) return manageableColumns;
+    return allHeaders.map(h => ({
+      id: h,
+      label: h,
+      isVisible: !hiddenColumns.includes(h),
+      isVirtual: false,
+      isSchemaHidden: false
+    }));
+  }, [manageableColumns, allHeaders, hiddenColumns]);
 
-  const visibleColumnsCount = allHeaders.length - hiddenColumns.length;
+  const filteredManageableColumns = useMemo(() => {
+    const q = columnSearch.toLowerCase().trim();
+    if (!q) return effectiveColumns;
+    return effectiveColumns.filter(c => 
+      c.label.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)
+    );
+  }, [effectiveColumns, columnSearch]);
+
+  const visibleColumnsCount = effectiveColumns.filter(c => c.isVisible).length;
+  const totalColumnsCount = effectiveColumns.length;
 
   // Misma fuente que la barra de slices: evita que el drawer muestre nativos que la
   // barra no ofrece (o al revés) cuando la detección por capacidad los descarta.
@@ -211,7 +231,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
               }`}
             >
               <Eye className="w-3.5 h-3.5" />
-              Columnas ({visibleColumnsCount}/{allHeaders.length})
+              Columnas ({visibleColumnsCount}/{totalColumnsCount})
             </button>
             <button
               type="button"
@@ -465,7 +485,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
                   <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
                     <div className="flex justify-between">
                       <span>Columnas Visibles:</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">{visibleColumnsCount} de {allHeaders.length}</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">{visibleColumnsCount} de {totalColumnsCount}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Slice Activo:</span>
@@ -535,24 +555,51 @@ export const ViewConfigControlDrawer: React.FC = () => {
 
                 {/* Lista de Columnas con Checkbox / Toggles */}
                 <div className="max-h-[50vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-800/40">
-                  {filteredHeaders.length === 0 ? (
+                  {filteredManageableColumns.length === 0 ? (
                     <div className="p-4 text-center text-xs text-slate-400">
                       No se encontraron columnas con ese nombre.
                     </div>
                   ) : (
-                    filteredHeaders.map(header => {
-                      const isHidden = hiddenColumns.includes(header);
+                    filteredManageableColumns.map(col => {
+                      const isHidden = !col.isVisible;
                       return (
                         <div
-                          key={header}
-                          onClick={() => onToggleColumnVisibility(header)}
+                          key={col.id}
+                          onClick={() => onToggleColumnVisibility(col.id)}
                           className="px-3 py-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-750 cursor-pointer transition-colors"
                         >
-                          <span className={`text-xs font-medium truncate pr-2 ${
-                            isHidden ? 'text-slate-400 line-through dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'
-                          }`}>
-                            {header}
-                          </span>
+                          <div className="flex items-center gap-2 min-w-0 pr-2">
+                            <span className={`text-xs font-medium truncate ${
+                              isHidden ? 'text-slate-400 line-through dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'
+                            }`}>
+                              {col.label}
+                            </span>
+                            {col.id === '_status' && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded-md font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 shrink-0">
+                                Radar PM
+                              </span>
+                            )}
+                            {col.id === '_res_status' && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded-md font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 shrink-0">
+                                Gestión
+                              </span>
+                            )}
+                            {col.id === '_actions' && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded-md font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 shrink-0">
+                                Acciones
+                              </span>
+                            )}
+                            {col.id === '_row' && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded-md font-mono font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shrink-0">
+                                # Fila
+                              </span>
+                            )}
+                            {col.isVirtual && col.id !== '_status' && col.id !== '_res_status' && col.id !== '_actions' && col.id !== '_row' && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded-md font-mono font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 shrink-0" title="Columna Virtual Calculada">
+                                fx
+                              </span>
+                            )}
+                          </div>
                           <button
                             type="button"
                             className={`p-1 rounded-md transition-colors ${
@@ -560,7 +607,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
                                 ? 'text-slate-300 dark:text-slate-600 hover:text-slate-500' 
                                 : 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60'
                             }`}
-                            aria-label={`${isHidden ? 'Mostrar' : 'Ocultar'} columna ${header}`} aria-pressed={!isHidden}
+                            aria-label={`${isHidden ? 'Mostrar' : 'Ocultar'} columna ${col.label}`} aria-pressed={!isHidden}
                           >
                             {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </button>

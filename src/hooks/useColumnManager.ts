@@ -70,12 +70,15 @@ export function useColumnManager({
   // Map of virtual column IDs -> labels from schema
   const virtualMap = useMemo(() => {
     const map: Record<string, string> = {};
+    map['_row'] = '# (N° de Fila)';
     if (tableCapabilities?.has('vencimiento')) {
       map['_status'] = 'Estado / Radar PM';
     }
     if (tableCapabilities?.has('incidencia')) {
       map['_res_status'] = 'Estado Gestión';
     }
+    map['_actions'] = 'Acciones';
+
     const schemaForSheet = findTableSchema(activeSheetTitle, sheetConfig, activeView);
     if (schemaForSheet) {
       Object.entries(schemaForSheet).forEach(([colId, colDef]) => {
@@ -88,7 +91,7 @@ export function useColumnManager({
   }, [activeSheetTitle, activeView, sheetConfig.schema, tableCapabilities]);
 
   // Combined list of base candidate column IDs: real headers + virtual status cols + schema virtual cols
-  // [MODIFIED FOR STATUS COLUMN IN COLUMN MANAGER]
+  // [MODIFIED FOR STATUS, ROW, AND ACTIONS IN COLUMN MANAGER]
   const combinedCandidates = useMemo(() => {
     const result = [...headers];
     if (tableCapabilities?.has('vencimiento') && !result.includes('_status')) {
@@ -97,6 +100,9 @@ export function useColumnManager({
     if (tableCapabilities?.has('incidencia') && !result.includes('_res_status')) {
       result.unshift('_res_status');
     }
+    if (!result.includes('_row')) {
+      result.unshift('_row');
+    }
     const schemaForSheet = findTableSchema(activeSheetTitle, sheetConfig, activeView);
     if (schemaForSheet) {
       Object.entries(schemaForSheet).forEach(([colId, colDef]) => {
@@ -104,6 +110,9 @@ export function useColumnManager({
           result.push(colId);
         }
       });
+    }
+    if (!result.includes('_actions')) {
+      result.push('_actions');
     }
     return result;
   }, [headers, tableCapabilities, activeSheetTitle, activeView, sheetConfig.schema]);
@@ -135,7 +144,7 @@ export function useColumnManager({
     const schemaForSheet = findTableSchema(activeSheetTitle, sheetConfig, activeView);
 
     return orderedColumnIds.map(id => {
-      const isVirtual = id === '_status' || id === '_res_status' || Boolean(virtualMap[id]) || schemaForSheet?.[id]?.isVirtual === true || schemaForSheet?.[id]?.type === 'calculated' || Boolean(schemaForSheet?.[id]?.formula);
+      const isVirtual = id === '_row' || id === '_actions' || id === '_status' || id === '_res_status' || Boolean(virtualMap[id]) || schemaForSheet?.[id]?.isVirtual === true || schemaForSheet?.[id]?.type === 'calculated' || Boolean(schemaForSheet?.[id]?.formula);
       const label = schemaForSheet?.[id]?.label || virtualMap[id] || id;
       const isSchemaHidden = schemaForSheet?.[id]?.visible === false;
       const isUserHidden = viewHidden.includes(id);
@@ -151,10 +160,10 @@ export function useColumnManager({
     });
   }, [orderedColumnIds, hiddenColumns, activeView, activeSheetTitle, sheetConfig.schema, virtualMap]);
 
-  // Visible headers list (ordered)
+  // Visible headers list (ordered) - Only data columns (excludes structural columns like _row, _status, _res_status, _actions)
   const visibleHeaders = useMemo(() => {
     return allManageableColumns
-      .filter(col => col.isVisible)
+      .filter(col => col.isVisible && col.id !== '_row' && col.id !== '_status' && col.id !== '_res_status' && col.id !== '_actions')
       .map(col => col.id);
   }, [allManageableColumns]);
 

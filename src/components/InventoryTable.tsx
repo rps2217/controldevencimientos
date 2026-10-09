@@ -24,10 +24,12 @@ export const InventoryTable: React.FC = () => {
   const caps = dashboard.tableCapabilities;
   const activeView = dashboard.activeView ?? 'main';
   const hiddenColumns = dashboard.hiddenColumns?.[activeView] || [];
+  const showRowCol = !hiddenColumns.includes('_row');
   const showExpiryCol = (caps?.has('vencimiento') ?? false) && !hiddenColumns.includes('_status');
   const showResolutionCol = (caps?.has('incidencia') ?? false) && !hiddenColumns.includes('_res_status');
-  // Columnas extra del colSpan: la de acciones + las virtuales de estado presentes.
-  const extraCols = 3 + (showExpiryCol ? 1 : 0) + (showResolutionCol ? 1 : 0);
+  const showActionsCol = !hiddenColumns.includes('_actions');
+  // Columnas extra del colSpan: checkbox (1) + fila + acciones + las virtuales de estado presentes.
+  const extraCols = 1 + (showRowCol ? 1 : 0) + (showExpiryCol ? 1 : 0) + (showResolutionCol ? 1 : 0) + (showActionsCol ? 1 : 0);
   const tableContainerRef = dashboard.tableContainerRef;
   const getColWidth = useMemo(
     () => dashboard.getColWidth ?? (() => 150),
@@ -149,11 +151,11 @@ export const InventoryTable: React.FC = () => {
 
   // Offset for freezing first data column (SKU / Key)
   const firstDataColOffset = useMemo(() => {
-    let offset = 48 + rowColWidth;
+    let offset = 48 + (showRowCol ? rowColWidth : 0);
     if (showExpiryCol) offset += getColWidth('_status', 'Estado / Radar PM');
     if (showResolutionCol) offset += getColWidth('_res_status', 'Estado Gestión');
     return offset;
-  }, [rowColWidth, showExpiryCol, showResolutionCol, getColWidth]);
+  }, [rowColWidth, showRowCol, showExpiryCol, showResolutionCol, getColWidth]);
 
   return (
     <div className="bg-slate-50 dark:bg-slate-950 md:bg-white md:dark:bg-slate-900 rounded-2xl md:shadow-sm md:border md:border-slate-200 md:dark:border-slate-800 overflow-hidden flex flex-col h-full [contain:layout_style]">
@@ -183,46 +185,48 @@ export const InventoryTable: React.FC = () => {
                   />
                 </div>
               </th>
-              <th 
-                style={{ width: `${rowColWidth}px`, minWidth: `${rowColWidth}px`, maxWidth: `${rowColWidth}px`, ...(isSticky ? { left: '48px' } : {}) }} 
-                className={`${paddingClass} text-center text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-slate-700/90 border-b border-slate-200 dark:border-slate-600/80 relative group font-bold ${
-                  isSticky ? 'sticky left-[48px] z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]' : ''
-                }`}
-              >
-                {groupByColumn && groupByColumn !== 'none' ? (
-                  <div className="flex items-center justify-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={collapseAllGroups}
-                      className="p-1 rounded bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors cursor-pointer shrink-0"
-                      title="Contraer todos los grupos"
-                    >
-                      <svg className="w-3 h-3 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={expandAllGroups}
-                      className="p-1 rounded bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors cursor-pointer shrink-0"
-                      title="Expandir todos los grupos"
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : (
-                  <span>#</span>
-                )}
-                <div
-                  onMouseDown={(e) => handleStartResize('_row', rowColWidth, e)}
-                  onDoubleClick={() => handleAutoFitColumn('_row', '#')}
-                  className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-blue-400/80 transition-colors z-20 flex items-center justify-center ${
-                    resizingCol?.colId === '_row' ? 'bg-blue-600 w-2.5' : ''
+              {showRowCol && (
+                <th 
+                  style={{ width: `${rowColWidth}px`, minWidth: `${rowColWidth}px`, maxWidth: `${rowColWidth}px`, ...(isSticky ? { left: '48px' } : {}) }} 
+                  className={`${paddingClass} text-center text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-slate-700/90 border-b border-slate-200 dark:border-slate-600/80 relative group font-bold ${
+                    isSticky ? 'sticky left-[48px] z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]' : ''
                   }`}
                 >
-                  <div className="w-[1px] h-3 bg-slate-300 dark:bg-slate-500 group-hover:bg-blue-500"></div>
-                </div>
-              </th>
+                  {groupByColumn && groupByColumn !== 'none' ? (
+                    <div className="flex items-center justify-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={collapseAllGroups}
+                        className="p-1 rounded bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors cursor-pointer shrink-0"
+                        title="Contraer todos los grupos"
+                      >
+                        <svg className="w-3 h-3 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={expandAllGroups}
+                        className="p-1 rounded bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors cursor-pointer shrink-0"
+                        title="Expandir todos los grupos"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span>#</span>
+                  )}
+                  <div
+                    onMouseDown={(e) => handleStartResize('_row', rowColWidth, e)}
+                    onDoubleClick={() => handleAutoFitColumn('_row', '#')}
+                    className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-blue-400/80 transition-colors z-20 flex items-center justify-center ${
+                      resizingCol?.colId === '_row' ? 'bg-blue-600 w-2.5' : ''
+                    }`}
+                  >
+                    <div className="w-[1px] h-3 bg-slate-300 dark:bg-slate-500 group-hover:bg-blue-500"></div>
+                  </div>
+                </th>
+              )}
 
               {showExpiryCol && (
                 <th 
@@ -430,11 +434,13 @@ export const InventoryTable: React.FC = () => {
               })}
 
               {/* Fixed Actions Column Header */}
-              <th className={`${paddingClass} text-right bg-slate-100 dark:bg-slate-700/90 text-slate-700 dark:text-slate-100 border-b border-slate-200 dark:border-slate-600/80 font-bold ${
-                isSticky ? 'sticky right-0 z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.03)]' : ''
-              }`} style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}>
-                Acciones
-              </th>
+              {showActionsCol && (
+                <th className={`${paddingClass} text-right bg-slate-100 dark:bg-slate-700/90 text-slate-700 dark:text-slate-100 border-b border-slate-200 dark:border-slate-600/80 font-bold ${
+                  isSticky ? 'sticky right-0 z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.03)]' : ''
+                }`} style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}>
+                  Acciones
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm text-slate-700 dark:text-slate-200 block md:table-row-group">
@@ -554,6 +560,8 @@ export const InventoryTable: React.FC = () => {
                     virtualIndex={idx}
                     headers={headers}
                     visibleColumnMeta={visibleColumnMeta}
+                    showRowCol={showRowCol}
+                    showActionsCol={showActionsCol}
                     showExpiryCol={showExpiryCol}
                     showResolutionCol={showResolutionCol}
                     isCatalog={caps?.has('catalogo') ?? false}
