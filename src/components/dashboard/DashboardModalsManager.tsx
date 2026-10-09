@@ -593,10 +593,10 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
         </Suspense>
       )}
 
-      {/* STOCK COUNT TERMINAL OVERLAY */}
+      {/* STOCK COUNT TERMINAL OVERLAY (INTEGRATED FULL VIEW) */}
       {isStockCountOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
-          <div className="w-full h-full max-w-7xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 md:p-6 animate-in fade-in duration-200 [contain:strict]">
+          <div className="w-full max-w-7xl h-[94vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200">
             <ScopedErrorBoundary moduleName="Terminal de Conteo e Inventario" onReset={() => setIsStockCountOpen(false)}>
               <Suspense fallback={<LazyFallback />}>
                 <StockCountTerminal
