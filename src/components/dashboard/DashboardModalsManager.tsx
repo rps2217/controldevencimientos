@@ -32,6 +32,7 @@ const CrossTableRelationalMenu = lazy(() => import('../views/CrossTableRelationa
 const BluetoothPrinterModal = lazy(() => import('../modals/BluetoothPrinterModal').then(m => ({ default: m.BluetoothPrinterModal })));
 const FormatRulesManagerModal = lazy(() => import('../modals/FormatRulesManagerModal').then(m => ({ default: m.FormatRulesManagerModal })));
 const CommandPaletteModal = lazy(() => import('../modals/CommandPaletteModal').then(m => ({ default: m.CommandPaletteModal })));
+const AutomationStudioModal = lazy(() => import('../modals/AutomationStudioModal').then(m => ({ default: m.AutomationStudioModal })));
 
 export interface DashboardModalsManagerProps {
   handleOpenModal: (item?: InventoryItem, prefillSku?: string, initialCategory?: EventCategory) => void;
@@ -284,7 +285,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     isMobilePistoleoOpen, isBulkEditOpen, isGmailModalOpen, gmailModalItems,
     isWhatsAppModalOpen, whatsAppModalItems, isColumnManagerOpen,
     isQuickTraspasoOpen, quickTraspasoItem, isTicketConfigOpen, isBulkImportOpen,
-    isBulkActionsConfigOpen, isStockCountOpen, isSyncAuditOpen,
+    isBulkActionsConfigOpen, isStockCountOpen, isSyncAuditOpen, isAutomationModalOpen,
   } = modalsState;
   // Slices: UI pura, movida a ModalsContext en el segundo corte de Fase 1.3.
   const { isSliceManagerOpen, isSliceModalOpen, editingSliceModalItem } = modalsState;
@@ -294,6 +295,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
     setIsWhatsAppModalOpen, setWhatsAppModalItems, setIsColumnManagerOpen,
     setIsQuickTraspasoOpen, setQuickTraspasoItem, setIsTicketConfigOpen,
     setIsBulkImportOpen, setIsBulkActionsConfigOpen, setIsStockCountOpen, setIsSyncAuditOpen,
+    setIsAutomationModalOpen,
   } = modalsActions;
   const { setIsSliceManagerOpen, setIsSliceModalOpen, setEditingSliceModalItem } = modalsActions;
 
@@ -412,6 +414,9 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
             onClose={() => setIsBulkEditOpen(false)}
             selectedCount={selectedRowIds.length}
             onApply={handleApplyBulkEdit}
+            sheetConfig={sheetConfig}
+            activeSheetTitle={activeSheet?.title}
+            existingItems={items}
           />
         </Suspense>
       )}
@@ -680,6 +685,18 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
             }}
             headers={headers}
             currentTableKey={activeView}
+          />
+        </Suspense>
+      )}
+
+      {/* APPSHEET AUTOMATION BOTS STUDIO MODAL */}
+      {isAutomationModalOpen && (
+        <Suspense fallback={<LazyFallback />}>
+          <AutomationStudioModal
+            isOpen={isAutomationModalOpen}
+            onClose={() => setIsAutomationModalOpen(false)}
+            sampleItems={items}
+            showToast={showToast}
           />
         </Suspense>
       )}

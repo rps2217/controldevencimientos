@@ -23,6 +23,7 @@ import { augmentItemsWithVirtualColumns, getSchemaVirtualColumns, findTableSchem
 import { detectTableCapabilities } from '../utils/sliceRegistry';
 import { sortInventoryItems, compareItemValues } from '../utils/sortUtils';
 import { useInventoryWorker } from './useInventoryWorker';
+import { getColumnEnumValues } from '../utils/enumOptionsHelper';
 
 export interface DisplayRowItem {
   type: 'item';
@@ -344,6 +345,21 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
         .sort((a, b) => a.localeCompare(b))
         .slice(0, 100)
         .map(v => ({ label: v, value: v }));
+    });
+
+    // Ensure schema options for any column (including FRC_EVEN) are included in columnOptionsMap
+    headers.forEach(h => {
+      const schemaVals = getColumnEnumValues(h, sheetConfig, activeSheetTitle, sheetConfig?.customAliases, augmentedItems);
+      if (schemaVals.length > 0) {
+        const existing = map[h] || [];
+        const combined = [...schemaVals.map(v => ({ label: v, value: v }))];
+        existing.forEach(item => {
+          if (!combined.some(c => c.value === item.value)) {
+            combined.push(item);
+          }
+        });
+        map[h] = combined;
+      }
     });
 
     return map;

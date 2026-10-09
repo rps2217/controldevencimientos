@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ColumnSchema, SheetRecord } from '../../../types';
+import { ColumnSchema, SheetRecord, SheetConfig, InventoryItem } from '../../../types';
 import { MasterProductSummary, findMasterProduct, searchMasterProducts } from '../../../utils/referenceResolver';
 import { QUICK_QUANTITY_PRESETS, getOperationalSuggestions } from '../../../utils/dynamicFormRules';
 import { formatInputDate, formatInputDateTime } from '../../../utils/dateCalculations';
 import { findColumnBySemantic } from '../../../utils/columnAliases';
+import { getColumnEnumValues } from '../../../utils/enumOptionsHelper';
 import { AlertCircle, Search, CheckCircle2, Package, ClipboardPaste, X } from 'lucide-react';
-import { parseEnumOptions } from '../../../utils/enumColorHelper';
 
 interface ItemFormFieldInputProps {
   header: string;
@@ -21,6 +21,8 @@ interface ItemFormFieldInputProps {
   providerSuggestions?: string[];
   products?: SheetRecord[];
   customAliases?: Record<string, string[]>;
+  sheetConfig?: SheetConfig;
+  activeSheetTitle?: string;
   onSelectMasterProduct?: (selected: MasterProductSummary) => void;
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onApplySuggestion: (header: string, suggestion: string) => void;
@@ -43,6 +45,8 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
   providerSuggestions = [],
   products = [],
   customAliases,
+  sheetConfig,
+  activeSheetTitle,
   onSelectMasterProduct,
   onChange,
   onApplySuggestion,
@@ -112,31 +116,12 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
 
   // Helper to parse enum options from schema or fallback semantics
   const enumOptions = useMemo(() => {
-    if (colSchema?.options && colSchema.options.trim()) {
-      return parseEnumOptions(colSchema.options).map(o => o.value);
-    }
-    // Fallback options based on semantic column type if type is enum or field is MM/YYYY
-    const isMonth = Boolean(findColumnBySemantic([header], 'mes', customAliases)) || /^(mm|mes)$/i.test(header);
-    if (isMonth) {
-      return ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-    }
-    const isYear = Boolean(findColumnBySemantic([header], 'anio', customAliases)) || /^(yyyy|año|anio|year)$/i.test(header);
-    if (isYear) {
-      const currentYr = new Date().getFullYear();
-      const years: string[] = [];
-      for (let y = currentYr - 1; y <= currentYr + 7; y++) {
-        years.push(String(y));
-      }
-      return years;
-    }
-    if (isPolicyCol && policySuggestions.length > 0) {
-      return policySuggestions;
-    }
-    if (isProviderCol && providerSuggestions.length > 0) {
-      return providerSuggestions;
-    }
+    const values = getColumnEnumValues(header, sheetConfig, activeSheetTitle, customAliases, products as unknown as InventoryItem[]);
+    if (values.length > 0) return values;
+    if (isPolicyCol && policySuggestions.length > 0) return policySuggestions;
+    if (isProviderCol && providerSuggestions.length > 0) return providerSuggestions;
     return [];
-  }, [colSchema?.options, header, customAliases, isPolicyCol, policySuggestions, isProviderCol, providerSuggestions]);
+  }, [header, sheetConfig, activeSheetTitle, customAliases, products, isPolicyCol, policySuggestions, isProviderCol, providerSuggestions]);
 
   const isEnumCol = colSchema?.type === 'enum' || (enumOptions.length > 0 && colSchema?.type !== 'text' && !isSkuField && !isDescField && !isCant && !isDateCol && !isDateTimeCol);
   const isEnumListCol = colSchema?.type === 'enumlist';

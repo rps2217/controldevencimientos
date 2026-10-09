@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { X, Edit2, Layers } from 'lucide-react';
+import { SheetConfig, InventoryItem } from '../../types';
+import { getColumnEnumValues } from '../../utils/enumOptionsHelper';
 
 interface BulkEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedCount: number;
   onApply: (values: { frc_n: string; n_traspaso: string; tipo_evento: string; frc_bod: string }) => Promise<void>;
+  sheetConfig?: SheetConfig;
+  activeSheetTitle?: string;
+  existingItems?: InventoryItem[];
 }
 
 export const BulkEditModal: React.FC<BulkEditModalProps> = ({
@@ -13,12 +18,19 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({
   onClose,
   selectedCount,
   onApply,
+  sheetConfig,
+  activeSheetTitle,
+  existingItems = [],
 }) => {
   const [frc_n, setFrcN] = useState('');
   const [n_traspaso, setNTraspaso] = useState('');
   const [tipo_evento, setTipoEvento] = useState('');
   const [frc_bod, setFrcBod] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const eventOptions = useMemo(() => {
+    return getColumnEnumValues('FRC_EVEN', sheetConfig, activeSheetTitle, sheetConfig?.customAliases, existingItems);
+  }, [sheetConfig, activeSheetTitle, existingItems]);
 
   if (!isOpen) return null;
 
@@ -103,15 +115,9 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all"
             >
               <option value="">-- No modificar / Mantener actual --</option>
-              <option value="VENC. CERC.">VENC. CERC. (Vencimiento cercano)</option>
-              <option value="DET. PED">DET. PED (Deterioro de pedido)</option>
-              <option value="CAL. INTER">CAL. INTER (Calidad interna)</option>
-              <option value="CAL. EXT.">CAL. EXT. (Calidad externa)</option>
-              <option value="CANJES">CANJES (Canjes)</option>
-              <option value="DIF. PED">DIF. PED (Diferencia de pedido)</option>
-              <option value="VENCIMIENTO">VENCIMIENTO (Vencimiento regular)</option>
-              <option value="SOBRANTE INVENT.">SOBRANTE INVENT. (Sobrante de inventario)</option>
-              <option value="FALTANTE INVENT.">FALTANTE INVENT. (Faltante de inventario)</option>
+              {eventOptions.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
             </select>
           </div>
 
@@ -140,14 +146,22 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-2 shadow-xs disabled:opacity-50"
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/25 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
             >
-              <Edit2 className="w-4 h-4" />
-              <span>{isSubmitting ? 'Aplicando...' : `Aplicar a ${selectedCount} filas`}</span>
+              {isSubmitting ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Aplicando...</span>
+                </>
+              ) : (
+                <>
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Aplicar Edición ({selectedCount})</span>
+                </>
+              )}
             </button>
           </div>
         </form>
-
       </div>
     </div>
   );
