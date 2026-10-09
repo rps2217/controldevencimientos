@@ -71,10 +71,10 @@ export function useColumnManager({
   const virtualMap = useMemo(() => {
     const map: Record<string, string> = {};
     map['_row'] = '# (N° de Fila)';
-    if (tableCapabilities?.has('vencimiento')) {
+    if (tableCapabilities?.has('vencimiento') || activeView === 'main') {
       map['_status'] = 'Estado / Radar PM';
     }
-    if (tableCapabilities?.has('incidencia')) {
+    if (tableCapabilities?.has('incidencia') || activeView === 'events') {
       map['_res_status'] = 'Estado Gestión';
     }
     map['_actions'] = 'Acciones';
@@ -94,10 +94,12 @@ export function useColumnManager({
   // [MODIFIED FOR STATUS, ROW, AND ACTIONS IN COLUMN MANAGER]
   const combinedCandidates = useMemo(() => {
     const result = [...headers];
-    if (tableCapabilities?.has('vencimiento') && !result.includes('_status')) {
+    const hasExpiry = tableCapabilities?.has('vencimiento') || activeView === 'main';
+    if (hasExpiry && !result.includes('_status')) {
       result.unshift('_status');
     }
-    if (tableCapabilities?.has('incidencia') && !result.includes('_res_status')) {
+    const hasIncidence = tableCapabilities?.has('incidencia') || activeView === 'events';
+    if (hasIncidence && !result.includes('_res_status')) {
       result.unshift('_res_status');
     }
     if (!result.includes('_row')) {

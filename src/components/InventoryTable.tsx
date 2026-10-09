@@ -25,8 +25,8 @@ export const InventoryTable: React.FC = () => {
   const activeView = dashboard.activeView ?? 'main';
   const hiddenColumns = dashboard.hiddenColumns?.[activeView] || [];
   const showRowCol = !hiddenColumns.includes('_row');
-  const showExpiryCol = (caps?.has('vencimiento') ?? false) && !hiddenColumns.includes('_status');
-  const showResolutionCol = (caps?.has('incidencia') ?? false) && !hiddenColumns.includes('_res_status');
+  const showExpiryCol = ((caps?.has('vencimiento') ?? false) || activeView === 'main') && !hiddenColumns.includes('_status');
+  const showResolutionCol = ((caps?.has('incidencia') ?? false) || activeView === 'events') && !hiddenColumns.includes('_res_status');
   const showActionsCol = !hiddenColumns.includes('_actions');
   // Columnas extra del colSpan: checkbox (1) + fila + acciones + las virtuales de estado presentes.
   const extraCols = 1 + (showRowCol ? 1 : 0) + (showExpiryCol ? 1 : 0) + (showResolutionCol ? 1 : 0) + (showActionsCol ? 1 : 0);

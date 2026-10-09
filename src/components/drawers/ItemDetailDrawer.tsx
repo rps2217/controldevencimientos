@@ -65,6 +65,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   
   const [showBarcode, setShowBarcode] = useState(false);
   const [showAllFields, setShowAllFields] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -176,11 +177,151 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   const bodKey = findColumnBySemantic(productKeys, 'frc_bod', customAliases) || productKeys.find(k => /bodega|sucursal|local/i.test(k));
   const bodegaVal = (bodKey && product[bodKey]) || product.FRC_BOD || product.BODEGA || '';
 
+  if (isExpanded) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 md:p-6 animate-in fade-in duration-200 [contain:strict]">
+        <div className="w-full max-w-7xl h-[92vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200">
+          
+          {/* Unified Header */}
+          <ItemDetailHeader
+            product={product}
+            title={name}
+            sku={sku}
+            detailMode={detailMode}
+            onEdit={onEdit}
+            onCopy={onCopy}
+            onDeleteRow={onDeleteRow}
+            onPrintBarcode={onPrintBarcode}
+            onClose={onClose}
+            onNavigatePrev={onNavigatePrev}
+            onNavigateNext={onNavigateNext}
+            currentIndex={currentIndex}
+            totalCount={totalCount}
+            isExpandedHorizontal={true}
+            onToggleExpand={() => setIsExpanded(false)}
+          />
+
+          {/* 3-Column Integrated Grid Content */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+            
+            {/* Column 1: Status, Master Ref, Barcode */}
+            <div className="space-y-4">
+              {formatResult && formatResult.matchingRules.length > 0 && (
+                <div className="p-3 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/40 flex items-center justify-between text-xs flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <span>Format Rules ({formatResult.matchingRules.length}):</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {formatResult.matchingRules.map((r: FormatRule) => (
+                      <span 
+                        key={r.id}
+                        style={{ backgroundColor: r.backgroundColor, color: r.textColor }}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold border border-black/5 flex items-center gap-1 shadow-2xs"
+                      >
+                        {renderFormatRuleIcon(r.icon, 'w-3 h-3')}
+                        <span>{r.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <ItemDetailStatusBanner
+                status={status}
+                detailMode={detailMode}
+              />
+
+              {masterSummary && (
+                <ItemDetailMasterRefCard
+                  masterSummary={masterSummary}
+                />
+              )}
+
+              {sku && sku !== '-' && (
+                <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => setShowBarcode(!showBarcode)}
+                    className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <BarcodeIcon className="w-4 h-4 text-indigo-500" />
+                      <span>Código de Barras ({sku})</span>
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showBarcode ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showBarcode && (
+                    <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center gap-2">
+                      <Barcode value={sku} width={2} height={50} showText={true} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Column 2: Technical Fields Grid */}
+            <div className="space-y-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">
+                Atributos y Campos Técnicos
+              </div>
+              <ItemDetailFieldsGrid
+                product={product}
+                productKeys={productKeys}
+                orderedKeys={orderedKeys}
+                hiddenFields={hiddenFields}
+                showAllFields={showAllFields}
+                isConfiguringFields={isConfiguringFields}
+                setShowAllFields={setShowAllFields}
+                setIsConfiguringFields={setIsConfiguringFields}
+                toggleFieldVisibility={toggleFieldVisibility}
+                handleShowAllFields={handleShowAllFields}
+                customAliases={customAliases}
+                formatResult={formatResult}
+              />
+            </div>
+
+            {/* Column 3: Parent-Child & Related Records */}
+            <div className="space-y-4 lg:col-span-1">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">
+                Trazabilidad y Registros Relacionados
+              </div>
+              <ItemDetailParentChild
+                sku={sku}
+                provider={providerVal ? String(providerVal) : undefined}
+                warehouse={bodegaVal ? String(bodegaVal) : undefined}
+                allMainItems={allMainItems}
+                products={products}
+                policies={policies}
+                onSelectRelatedItem={onSelectRelatedItem || onEdit}
+                onNewEventForProduct={onNewEventForProduct}
+                onOpenInspector={onOpenParentChildInspector}
+                customAliases={customAliases}
+              />
+            </div>
+
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // AppSheet Style Clean Master-Detail Dock Panel (Default)
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 md:p-6 animate-in fade-in duration-200 [contain:strict]">
-      <div className="w-full max-w-7xl h-[92vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200">
-        
-        {/* Unified Header */}
+    <div 
+      className="fixed inset-0 z-50 flex justify-end md:static md:z-auto bg-slate-900/40 md:bg-transparent backdrop-blur-xs md:backdrop-blur-none animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="w-full sm:w-[460px] md:w-[480px] lg:w-[500px] xl:w-[540px] shrink-0 h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl md:shadow-xl flex flex-col z-50 md:z-20 overflow-hidden animate-in slide-in-from-right duration-200"
+      >
+        {/* Unified AppSheet Header */}
         <ItemDetailHeader
           product={product}
           title={name}
@@ -195,73 +336,73 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
           onNavigateNext={onNavigateNext}
           currentIndex={currentIndex}
           totalCount={totalCount}
+          isExpandedHorizontal={false}
+          onToggleExpand={() => setIsExpanded(true)}
         />
 
-        {/* 3-Column Integrated Grid Content */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+        {/* Clean Vertical AppSheet Detail Body */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
           
-          {/* Column 1: Status, Master Ref, Barcode */}
-          <div className="space-y-4">
-            {formatResult && formatResult.matchingRules.length > 0 && (
-              <div className="p-3 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/40 flex items-center justify-between text-xs flex-wrap gap-2">
-                <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                  <span>Format Rules ({formatResult.matchingRules.length}):</span>
-                </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {formatResult.matchingRules.map((r: FormatRule) => (
-                    <span 
-                      key={r.id}
-                      style={{ backgroundColor: r.backgroundColor, color: r.textColor }}
-                      className="px-2 py-0.5 rounded-lg text-[10px] font-bold border border-black/5 flex items-center gap-1 shadow-2xs"
-                    >
-                      {renderFormatRuleIcon(r.icon, 'w-3 h-3')}
-                      <span>{r.name}</span>
-                    </span>
-                  ))}
-                </div>
+          {/* Format Rules Pill */}
+          {formatResult && formatResult.matchingRules.length > 0 && (
+            <div className="p-3 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/40 flex items-center justify-between text-xs flex-wrap gap-2">
+              <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span>Format Rules ({formatResult.matchingRules.length}):</span>
               </div>
-            )}
-
-            <ItemDetailStatusBanner
-              status={status}
-              detailMode={detailMode}
-            />
-
-            {masterSummary && (
-              <ItemDetailMasterRefCard
-                masterSummary={masterSummary}
-              />
-            )}
-
-            {sku && sku !== '-' && (
-              <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-xs">
-                <button
-                  type="button"
-                  onClick={() => setShowBarcode(!showBarcode)}
-                  className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                >
-                  <span className="flex items-center gap-2">
-                    <BarcodeIcon className="w-4 h-4 text-indigo-500" />
-                    <span>Código de Barras ({sku})</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {formatResult.matchingRules.map((r: FormatRule) => (
+                  <span 
+                    key={r.id}
+                    style={{ backgroundColor: r.backgroundColor, color: r.textColor }}
+                    className="px-2 py-0.5 rounded-lg text-[10px] font-bold border border-black/5 flex items-center gap-1 shadow-2xs"
+                  >
+                    {renderFormatRuleIcon(r.icon, 'w-3 h-3')}
+                    <span>{r.name}</span>
                   </span>
-                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showBarcode ? 'rotate-180' : ''}`} />
-                </button>
-
-                {showBarcode && (
-                  <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center gap-2">
-                    <Barcode value={sku} width={2} height={50} showText={true} />
-                  </div>
-                )}
+                ))}
               </div>
-            )}
-          </div>
-
-          {/* Column 2: Technical Fields Grid */}
-          <div className="space-y-4">
-            <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">
-              Atributos y Campos Técnicos
             </div>
+          )}
+
+          {/* Status & Alerts Banner */}
+          <ItemDetailStatusBanner
+            status={status}
+            detailMode={detailMode}
+          />
+
+          {/* Master Catalog Reference Card */}
+          {masterSummary && (
+            <ItemDetailMasterRefCard
+              masterSummary={masterSummary}
+            />
+          )}
+
+          {/* Barcode Section */}
+          {sku && sku !== '-' && (
+            <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-xs">
+              <button
+                type="button"
+                onClick={() => setShowBarcode(!showBarcode)}
+                className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <BarcodeIcon className="w-4 h-4 text-indigo-500" />
+                  <span>Código de Barras ({sku})</span>
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showBarcode ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showBarcode && (
+                <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center gap-2">
+                  <Barcode value={sku} width={2} height={50} showText={true} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* AppSheet Technical Fields List */}
+          <div className="border border-slate-200 dark:border-slate-800 rounded-2xl p-4 bg-white dark:bg-slate-900/60 shadow-xs">
             <ItemDetailFieldsGrid
               product={product}
               productKeys={productKeys}
@@ -278,24 +419,19 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
             />
           </div>
 
-          {/* Column 3: Parent-Child & Related Records */}
-          <div className="space-y-4 lg:col-span-1">
-            <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">
-              Trazabilidad y Registros Relacionados
-            </div>
-            <ItemDetailParentChild
-              sku={sku}
-              provider={providerVal ? String(providerVal) : undefined}
-              warehouse={bodegaVal ? String(bodegaVal) : undefined}
-              allMainItems={allMainItems}
-              products={products}
-              policies={policies}
-              onSelectRelatedItem={onSelectRelatedItem || onEdit}
-              onNewEventForProduct={onNewEventForProduct}
-              onOpenInspector={onOpenParentChildInspector}
-              customAliases={customAliases}
-            />
-          </div>
+          {/* AppSheet Related Records (Parent-Child) */}
+          <ItemDetailParentChild
+            sku={sku}
+            provider={providerVal ? String(providerVal) : undefined}
+            warehouse={bodegaVal ? String(bodegaVal) : undefined}
+            allMainItems={allMainItems}
+            products={products}
+            policies={policies}
+            onSelectRelatedItem={onSelectRelatedItem || onEdit}
+            onNewEventForProduct={onNewEventForProduct}
+            onOpenInspector={onOpenParentChildInspector}
+            customAliases={customAliases}
+          />
 
         </div>
       </div>
