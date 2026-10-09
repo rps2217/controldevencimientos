@@ -31,6 +31,7 @@ const StockCountTerminal = lazy(() => import('../views/StockCountTerminal').then
 const CrossTableRelationalMenu = lazy(() => import('../views/CrossTableRelationalMenu').then(m => ({ default: m.CrossTableRelationalMenu })));
 const BluetoothPrinterModal = lazy(() => import('../modals/BluetoothPrinterModal').then(m => ({ default: m.BluetoothPrinterModal })));
 const FormatRulesManagerModal = lazy(() => import('../modals/FormatRulesManagerModal').then(m => ({ default: m.FormatRulesManagerModal })));
+const CommandPaletteModal = lazy(() => import('../modals/CommandPaletteModal').then(m => ({ default: m.CommandPaletteModal })));
 
 export interface DashboardModalsManagerProps {
   handleOpenModal: (item?: InventoryItem, prefillSku?: string, initialCategory?: EventCategory) => void;
@@ -679,6 +680,36 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
             }}
             headers={headers}
             currentTableKey={activeView}
+          />
+        </Suspense>
+      )}
+
+      {/* APPSHEET COMMAND CENTER PALETTE MODAL (Cmd+K) */}
+      {modalsState.isCommandPaletteOpen && (
+        <Suspense fallback={<LazyFallback />}>
+          <CommandPaletteModal
+            isOpen={modalsState.isCommandPaletteOpen}
+            onClose={() => modalsActions.setIsCommandPaletteOpen(false)}
+            onSelectAction={(actionId) => {
+              if (actionId.startsWith('view_')) {
+                const view = actionId.replace('view_', '');
+                context.setActiveView?.(view);
+              } else if (actionId === 'new_item') {
+                if (handleOpenModal) handleOpenModal();
+              } else if (actionId === 'open_scanner') {
+                modalsActions.setIsScannerOpen(true);
+              } else if (actionId === 'open_pm_report') {
+                if (setIsPmReportOpen) setIsPmReportOpen(true);
+              } else if (actionId === 'open_stock_count') {
+                modalsActions.setIsStockCountOpen(true);
+              } else if (actionId === 'open_settings') {
+                if (setIsConfigOpen) setIsConfigOpen(true);
+              } else if (actionId === 'export_excel') {
+                import('../../utils/exportUtils').then(({ exportToExcel }) => {
+                  exportToExcel(`${activeView || 'inventario'}_export.xlsx`, headers || [], filteredItems || []);
+                });
+              }
+            }}
           />
         </Suspense>
       )}

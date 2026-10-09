@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Sliders, Plus, Layers, SlidersHorizontal, Upload, Paintbrush 
+  Sliders, Plus, Layers, SlidersHorizontal, Upload, Paintbrush, Sparkles 
 } from 'lucide-react';
 import { SLICE_COLOR_CLASSES } from '../../utils/sliceRegistry';
 import { SliceIcon } from '../slices/SliceSelectorBar';
@@ -131,6 +131,16 @@ export const DashboardPageHeader: React.FC = () => {
             <span className="hidden sm:inline">Importar FRC</span>
           </button>
         )}
+
+        {/* Command Center Palette (Cmd+K) Button */}
+        <button
+          onClick={() => modalsActions.setIsCommandPaletteOpen(true)}
+          className="px-2.5 sm:px-3 py-1.5 rounded-xl font-bold border border-cyan-200 dark:border-cyan-800/80 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 shrink-0"
+          title="Centro de Comandos Rápidos (Cmd+K / Ctrl+K)"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+          <span className="hidden sm:inline">Cmd+K</span>
+        </button>
 
         {/* Format Rules (AppSheet) Button */}
         {activeView !== 'schema' && activeView !== 'analytics' && (

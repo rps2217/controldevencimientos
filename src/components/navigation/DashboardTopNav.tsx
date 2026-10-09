@@ -48,18 +48,17 @@ export const DashboardTopNav: React.FC = () => {
 
   const canCount = dashboard.tableCapabilities?.has('conteo') ?? false;
 
-  // Global Keyboard shortcut for search (Cmd+K / Ctrl+K)
+  // Global Keyboard shortcut for Command Center Palette (Cmd+K / Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
+        modalsActions.setIsCommandPaletteOpen(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchInputRef]);
+  }, [modalsActions]);
 
   const getViewMeta = () => {
     switch (activeView) {
