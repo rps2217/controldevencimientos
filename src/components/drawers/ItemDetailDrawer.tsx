@@ -3,7 +3,7 @@ import {
   ChevronDown, Barcode as BarcodeIcon, Sparkles 
 } from 'lucide-react';
 import { InventoryItem, EventCategory, SheetRecord, FormatRule } from '../../types';
-import { getItemStatus, parseAnyDate } from '../../utils/dateCalculations';
+import { getItemStatus } from '../../utils/dateCalculations';
 import { findColumnBySemantic, orderFieldsForDisplay } from '../../utils/columnAliases';
 import { findMasterProduct, getMasterProductSummary } from '../../utils/referenceResolver';
 import { Barcode } from '../common/Barcode';
@@ -69,7 +69,10 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const productKeys = product ? Object.keys(product).filter(k => !k.startsWith('_')) : [];
+  const productKeys = useMemo(
+    () => (product ? Object.keys(product).filter(k => !k.startsWith('_')) : []),
+    [product]
+  );
   
   // Contextual mode detection
   const hasSku = product ? findColumnBySemantic(productKeys, 'sku', customAliases) !== undefined : false;

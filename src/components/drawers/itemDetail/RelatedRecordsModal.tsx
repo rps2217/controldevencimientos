@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   X, Search, Layers, ExternalLink, Plus, 
   ArrowUpDown, ArrowUp, ArrowDown, Package,
-  Eye, EyeOff, Sliders, RotateCcw
+  Eye, EyeOff, RotateCcw
 } from 'lucide-react';
 import { InventoryItem } from '../../../types';
 import { formatDisplayDate, formatLocaleNumber, getItemStatus, extractItemFields } from '../../../utils/dateCalculations';

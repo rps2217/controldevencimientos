@@ -1,21 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Building2, 
-  Package, 
   Layers, 
-  ChevronDown, 
-  Plus, 
   ExternalLink,
-  Calendar,
-  AlertTriangle,
-  ArrowRight,
   Maximize2,
-  ArrowUpDown,
   ArrowUp,
   ArrowDown
 } from 'lucide-react';
 import { InventoryItem, SheetRecord, EventCategory } from '../../../types';
-import { findColumnBySemantic } from '../../../utils/columnAliases';
 import { formatDisplayDate, formatLocaleNumber, getItemStatus, extractItemFields } from '../../../utils/dateCalculations';
 import { parseAnyDate, parseLocaleNumber } from '../../../utils/pureCalculations';
 import { buildEntityRelationshipSummary } from '../../../utils/relatedRecordsEngine';

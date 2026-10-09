@@ -57,7 +57,10 @@ export const ViewConfigControlDrawer: React.FC = () => {
     () => dashboard.allManageableColumns ?? [],
     [dashboard.allManageableColumns]
   );
-  const hiddenColumns = dashboard.hiddenColumns?.[dashboard.activeView] || [];
+  const hiddenColumns = useMemo(
+    () => dashboard.hiddenColumns?.[dashboard.activeView] || [],
+    [dashboard.hiddenColumns, dashboard.activeView]
+  );
   const onToggleColumnVisibility = (h: string) => dashboard.toggleVisibility?.(h);
   const onResetColumns = () => dashboard.resetColumnOrder?.();
   const onShowAllColumns = () => dashboard.showAllColumns?.();
@@ -128,8 +131,6 @@ export const ViewConfigControlDrawer: React.FC = () => {
   const isBarcodeTicketActive = isActionEnabledForTable('barcode_ticket', bulkActionCtx, sheetConfig);
   const isExcelActive = isActionEnabledForTable('excel', bulkActionCtx, sheetConfig);
 
-  if (!isOpen) return null;
-
   // Filter manageable columns by search term
   const effectiveColumns = useMemo(() => {
     if (manageableColumns.length > 0) return manageableColumns;
@@ -158,6 +159,8 @@ export const ViewConfigControlDrawer: React.FC = () => {
   const tableSlices = getSlicesForTable(activeTableKey, customSlices, dashboard.sheetConfig?.slices, allHeaders, dashboard.sheetConfig?.customAliases, dashboard.sheetConfig?.tableCapabilities?.[activeTableKey]);
   const tableBuiltInSlices = tableSlices.filter(s => s.isBuiltIn);
   const tableCustomSlices = tableSlices.filter(s => !s.isBuiltIn);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden select-none">
