@@ -1,5 +1,8 @@
 import React, { useEffect } from 'react';
-import { Menu, Search, X, FilterX, Scan, FileSpreadsheet, Barcode, RefreshCw, Sliders, Database, Package, FileText, Sparkles, Plus, PieChart, Settings2, Calendar, Truck } from 'lucide-react';
+import { 
+  Menu, Search, X, FilterX, Scan, Barcode, RefreshCw, Sliders, Database, Package, 
+  FileText, Plus, PieChart, Settings2, Calendar, Truck 
+} from 'lucide-react';
 import { ThemeSelector } from './ThemeSelector';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
@@ -17,7 +20,6 @@ export const DashboardTopNav: React.FC = () => {
   const activeView = dashboard.activeView;
   const activeSheetTitle = dashboard.activeSheet?.title;
   const searchableHeaders = dashboard.searchableHeaders ?? [];
-  const searchTerm = dashboard.searchTerm ?? '';
   const setSearchTerm = dashboard.setSearchTerm;
   const searchValue = dashboard.searchTerm ?? '';
   const {
@@ -30,7 +32,6 @@ export const DashboardTopNav: React.FC = () => {
   const clearAllFilters = dashboard.clearAllFilters ?? (() => {});
   const setIsScannerOpen = modalsActions.setIsScannerOpen;
   const setIsMobilePistoleoOpen = modalsActions.setIsMobilePistoleoOpen;
-  const filteredItems = dashboard.filteredItems ?? [];
   const sheetConfig = dashboard.sheetConfig;
   const isOffline = dashboard.isOffline ?? false;
   const isSyncing = dashboard.isSyncing;
@@ -39,7 +40,6 @@ export const DashboardTopNav: React.FC = () => {
   const loading = dashboard.loading ?? false;
   const latencyMs = dashboard.latencyMs;
   const onOpenSyncAudit = () => modalsActions.setIsSyncAuditOpen?.(true);
-  const isRelationalActive = dashboard.isRelationalActive ?? false;
   const activeSheet = dashboard.activeSheet;
   const isModalOpen = dashboard.isModalOpen ?? false;
   const handleOpenModal = dashboard.handleOpenModal;
@@ -71,7 +71,7 @@ export const DashboardTopNav: React.FC = () => {
       case 'events':
         return {
           title: 'Incidencias FRC',
-          icon: <FileSpreadsheet className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
+          icon: <FileText className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
           actionLabel: 'Nueva Incidencia'
         };
       case 'products':
@@ -137,16 +137,14 @@ export const DashboardTopNav: React.FC = () => {
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Clean Module Badge - No Forced Truncation or Squishing */}
+          {/* Module Badge */}
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0">
               {viewMeta.icon}
             </div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-slate-100 tracking-tight whitespace-nowrap">
-                {viewMeta.title}
-              </h1>
-            </div>
+            <h1 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-slate-100 tracking-tight whitespace-nowrap">
+              {viewMeta.title}
+            </h1>
           </div>
         </div>
 
@@ -167,9 +165,14 @@ export const DashboardTopNav: React.FC = () => {
               />
 
               {!typedSearch && (
-                <kbd className="hidden xl:inline-block px-1.5 py-0.5 text-[9px] font-mono text-slate-400 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md mr-2 shadow-2xs shrink-0">
+                <button
+                  type="button"
+                  onClick={() => modalsActions.setIsCommandPaletteOpen(true)}
+                  className="hidden xl:inline-flex px-1.5 py-0.5 text-[9px] font-mono text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md mr-2 shadow-2xs hover:border-blue-400 cursor-pointer"
+                  title="Abrir Centro de Comandos (⌘K)"
+                >
                   ⌘K
-                </kbd>
+                </button>
               )}
 
               {typedSearch && (
@@ -256,7 +259,7 @@ export const DashboardTopNav: React.FC = () => {
             </button>
           </div>
 
-          {/* AppSheet-Style Sync & Offline Status Indicator */}
+          {/* Sync & Offline Status Indicator */}
           <div 
             onClick={onOpenSyncAudit}
             className={`hidden lg:flex items-center gap-2 bg-white dark:bg-slate-800 border px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-2xs shrink-0 cursor-pointer transition-all group ${
@@ -266,15 +269,7 @@ export const DashboardTopNav: React.FC = () => {
                 ? 'border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/30'
                 : 'border-emerald-200 dark:border-emerald-800/80 hover:border-emerald-300'
             }`}
-            title={
-              isSyncing 
-                ? 'Sincronizando cambios con la nube...' 
-                : isOffline 
-                ? 'Modo sin conexión (los cambios se guardan localmente)' 
-                : offlineQueue.length > 0 
-                ? `${offlineQueue.length} cambio(s) pendiente(s) de sincronizar` 
-                : 'Sincronizado (Local-First Activo)'
-            }
+            title="Estado de conexión y sincronización"
           >
             {isSyncing ? (
               <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin shrink-0" />

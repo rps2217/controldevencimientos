@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  X, Search, Layers, ExternalLink, Calendar, Plus, 
-  ArrowUpDown, Package, AlertTriangle 
+  X, Search, Layers, ExternalLink, Plus, 
+  ArrowUpDown, ArrowUp, ArrowDown, Package 
 } from 'lucide-react';
 import { InventoryItem } from '../../../types';
 import { formatDisplayDate, formatLocaleNumber, getItemStatus, extractItemFields } from '../../../utils/dateCalculations';
+import { parseAnyDate, parseLocaleNumber } from '../../../utils/pureCalculations';
 
 interface RelatedRecordsModalProps {
   isOpen: boolean;
@@ -16,6 +17,9 @@ interface RelatedRecordsModalProps {
   onSelectItem: (item: InventoryItem) => void;
   onNewEvent?: (sku: string) => void;
 }
+
+type SortField = 'date' | 'qty' | 'sku' | 'desc' | 'bodega' | 'status';
+type SortDirection = 'asc' | 'desc';
 
 export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
   isOpen,
@@ -29,7 +33,29 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'date' | 'qty' | 'sku'>('date');
+  const [sortBy, setSortBy] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const handleSort = (field: SortField) => {
+    if (sortBy === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      // For quantity, default to descending (mayor a menor) on first click; for others ascending
+      setSortDirection(field === 'qty' ? 'desc' : 'asc');
+    }
+  };
+
+  const renderSortIcon = (field: SortField) => {
+    if (sortBy !== field) {
+      return <ArrowUpDown className="w-3.5 h-3.5 text-slate-400/50 group-hover:text-slate-400 shrink-0" />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 font-bold shrink-0" />
+    ) : (
+      <ArrowDown className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 font-bold shrink-0" />
+    );
+  };
 
   const filteredBatches = useMemo(() => {
     return batches.filter(item => {
@@ -52,18 +78,34 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
     }).sort((a, b) => {
       const fieldsA = extractItemFields(a);
       const fieldsB = extractItemFields(b);
+      let comp = 0;
+
       if (sortBy === 'sku') {
-        return fieldsA.sku.localeCompare(fieldsB.sku);
+        comp = fieldsA.sku.localeCompare(fieldsB.sku);
+      } else if (sortBy === 'desc') {
+        comp = fieldsA.desc.localeCompare(fieldsB.desc);
+      } else if (sortBy === 'bodega') {
+        comp = (fieldsA.bodega || '').localeCompare(fieldsB.bodega || '');
+      } else if (sortBy === 'qty') {
+        const qA = parseLocaleNumber(fieldsA.qty) || 0;
+        const qB = parseLocaleNumber(fieldsB.qty) || 0;
+        comp = qA - qB;
+      } else if (sortBy === 'status') {
+        const sA = getItemStatus(a, Object.keys(a));
+        const sB = getItemStatus(b, Object.keys(b));
+        comp = (sA.daysToRetire ?? 9999) - (sB.daysToRetire ?? 9999);
+      } else {
+        // default: 'date' (Vencimiento cronológico real)
+        const dA = parseAnyDate(fieldsA.fecha);
+        const dB = parseAnyDate(fieldsB.fecha);
+        const tA = dA ? dA.getTime() : Infinity;
+        const tB = dB ? dB.getTime() : Infinity;
+        comp = tA - tB;
       }
-      if (sortBy === 'qty') {
-        const qA = Number(fieldsA.qty || 0);
-        const qB = Number(fieldsB.qty || 0);
-        return qB - qA;
-      }
-      // default sortBy === 'date'
-      return fieldsA.fecha.localeCompare(fieldsB.fecha);
+
+      return sortDirection === 'desc' ? -comp : comp;
     });
-  }, [batches, searchTerm, statusFilter, sortBy]);
+  }, [batches, searchTerm, statusFilter, sortBy, sortDirection]);
 
   if (!isOpen) return null;
 
@@ -98,7 +140,7 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
                   onNewEvent(entityValue);
                   onClose();
                 }}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Nuevo Evento FRC</span>
@@ -107,7 +149,7 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               title="Cerrar"
             >
               <X className="w-5 h-5" />
@@ -115,7 +157,7 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
           </div>
         </div>
 
-        {/* Filters Toolbar */}
+        {/* Filters & Sorting Toolbar */}
         <div className="px-6 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-1 min-w-[240px]">
             <div className="relative flex-1">
@@ -130,7 +172,7 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs flex-wrap">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -142,15 +184,43 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
               <option value="expired">Vencidos</option>
             </select>
 
+            {/* Selector de campo de ordenamiento */}
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
+              onChange={(e) => {
+                const newField = e.target.value as SortField;
+                setSortBy(newField);
+                if (newField === 'qty') setSortDirection('desc');
+              }}
               className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-300 focus:outline-none"
             >
               <option value="date">Ordenar por Vencimiento</option>
               <option value="qty">Ordenar por Cantidad</option>
-              <option value="sku">Ordenar por SKU</option>
+              <option value="sku">Ordenar por SKU / Lote</option>
+              <option value="desc">Ordenar por Descripción</option>
+              <option value="bodega">Ordenar por Bodega / Ubicación</option>
+              <option value="status">Ordenar por Estado / Alerta</option>
             </select>
+
+            {/* Botón de Dirección: Mayor a menor vs Menor a mayor */}
+            <button
+              type="button"
+              onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+              title={sortDirection === 'desc' ? 'Orden: Mayor a menor (Clic para cambiar a menor a mayor)' : 'Orden: Menor a mayor (Clic para cambiar a mayor a menor)'}
+            >
+              {sortDirection === 'desc' ? (
+                <>
+                  <ArrowDown className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 font-bold" />
+                  <span>Mayor a menor</span>
+                </>
+              ) : (
+                <>
+                  <ArrowUp className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 font-bold" />
+                  <span>Menor a mayor</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -166,12 +236,66 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
-                    <th className="py-3 px-4">SKU / Lote</th>
-                    <th className="py-3 px-4">Descripción del Producto</th>
-                    <th className="py-3 px-4">Bodega / Ubicación</th>
-                    <th className="py-3 px-4 text-right">Cantidad</th>
-                    <th className="py-3 px-4">Vencimiento</th>
-                    <th className="py-3 px-4">Estado</th>
+                    <th 
+                      onClick={() => handleSort('sku')} 
+                      className="py-3 px-4 cursor-pointer select-none hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-colors group"
+                      title="Clic para ordenar por SKU / Lote"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>SKU / Lote</span>
+                        {renderSortIcon('sku')}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('desc')} 
+                      className="py-3 px-4 cursor-pointer select-none hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-colors group"
+                      title="Clic para ordenar por Descripción"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Descripción del Producto</span>
+                        {renderSortIcon('desc')}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('bodega')} 
+                      className="py-3 px-4 cursor-pointer select-none hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-colors group"
+                      title="Clic para ordenar por Bodega / Ubicación"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Bodega / Ubicación</span>
+                        {renderSortIcon('bodega')}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('qty')} 
+                      className="py-3 px-4 text-right cursor-pointer select-none hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-colors group"
+                      title="Clic para ordenar por Cantidad (Mayor a menor / Menor a mayor)"
+                    >
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span>Cantidad</span>
+                        {renderSortIcon('qty')}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('date')} 
+                      className="py-3 px-4 cursor-pointer select-none hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-colors group"
+                      title="Clic para ordenar por Fecha de Vencimiento (Mayor a menor / Menor a mayor)"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Vencimiento</span>
+                        {renderSortIcon('date')}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('status')} 
+                      className="py-3 px-4 cursor-pointer select-none hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-colors group"
+                      title="Clic para ordenar por Estado / Severidad"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Estado</span>
+                        {renderSortIcon('status')}
+                      </div>
+                    </th>
                     <th className="py-3 px-4 text-center">Acción</th>
                   </tr>
                 </thead>
@@ -224,7 +348,7 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
                               onSelectItem(item);
                               onClose();
                             }}
-                            className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-600 hover:text-white rounded-xl transition-colors inline-flex items-center justify-center"
+                            className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-600 hover:text-white rounded-xl transition-colors inline-flex items-center justify-center cursor-pointer"
                             title="Inspeccionar registro"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
@@ -247,7 +371,7 @@ export const RelatedRecordsModal: React.FC<RelatedRecordsModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold transition-colors"
+            className="px-4 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold transition-colors cursor-pointer"
           >
             Cerrar
           </button>

@@ -19,7 +19,22 @@ export const useDashboardChromeState = ({
   showToast: (msg: string, type: 'info' | 'success' | 'error', title?: string) => void;
 }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
-  const [areFiltersVisible, setAreFiltersVisible] = useState<boolean>(false);
+  // Opción 3: Modo Minimalista Integrado en Cabecera (paneles flotantes colapsados por defecto)
+  const [areFiltersVisible, setAreFiltersVisible] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('app_filters_visible');
+      return saved !== null ? saved === 'true' : false;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('app_filters_visible', String(areFiltersVisible));
+    } catch {}
+  }, [areFiltersVisible]);
+
   const [isSchemaLoading, setIsSchemaLoading] = useState(false);
   const [isSummaryView, setIsSummaryView] = useState<boolean>(false);
 

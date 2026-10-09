@@ -70,7 +70,7 @@ export const DashboardFilterPanels: React.FC = () => {
 
       {/* INCIDENCIAS & FRC STRIP (por capacidad de incidencia) */}
       {canLogEvents && activeSheet && (
-        <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-8 py-4 shrink-0 flex flex-col gap-4 shadow-xs">
+        <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-6 py-2 shrink-0 flex flex-col gap-2 shadow-2xs">
           <EventResolutionCards 
             eventResolutionFilter={eventResolutionFilter} 
             onFilterClick={(val, isMulti) => setEventResolutionFilter(prev => handleFilterToggle(prev, val, isMulti))}
