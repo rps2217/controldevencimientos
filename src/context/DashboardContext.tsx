@@ -56,6 +56,7 @@ export interface DashboardContextType {
   handleFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   handleBatchFormUpdate: (updates: Record<string, string>) => void;
   handleSave: (e: React.FormEvent) => Promise<void>;
+  handleInlineSave?: (item: InventoryItem, header: string, value: string) => Promise<void>;
   isSaving: boolean;
 
   // PM Report

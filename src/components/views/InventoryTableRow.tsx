@@ -18,6 +18,7 @@ import { findPhoneColumn, findEmailColumn, findColumnBySemantic } from '../../ut
 import { getEnumStyle } from '../../utils/enumColorHelper';
 import { FormatRule } from '../../types';
 import { evaluateItemFormatRules, renderFormatRuleIcon, getColumnFormatStyle } from '../../utils/formatRulesEngine';
+import { InlineEditCell } from '../views/InlineEditCell';
 
 export interface InventoryTableRowProps {
   item: InventoryItem;
@@ -51,6 +52,7 @@ export interface InventoryTableRowProps {
   onOpenQuickTraspaso: (item: InventoryItem) => void;
   onOpenWhatsApp?: (item: InventoryItem) => void;
   onOpenEmail?: (item: InventoryItem) => void;
+  onInlineSave?: (item: InventoryItem, header: string, value: string) => Promise<void>;
   isWhatsAppEnabled?: boolean;
   isEmailEnabled?: boolean;
   isStickyEnabled?: boolean;
@@ -86,6 +88,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   onOpenQuickTraspaso,
   onOpenWhatsApp,
   onOpenEmail,
+  onInlineSave,
   isWhatsAppEnabled = true,
   isEmailEnabled = true,
   isStickyEnabled = false,

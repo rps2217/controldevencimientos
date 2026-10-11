@@ -673,7 +673,8 @@ export const InventoryDashboard: React.FC = () => {
     isSaving,
     handleSave,
     handleSavePistoleoItem,
-    handleDelete
+    handleDelete,
+    handleInlineSave
   } = useInventoryMutations({
     activeSheet,
     activeView,
@@ -819,6 +820,7 @@ export const InventoryDashboard: React.FC = () => {
     handleFormChange,
     handleBatchFormUpdate,
     handleSave,
+    handleInlineSave,
     isSaving,
 
     drainageReportItems,

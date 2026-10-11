@@ -53,6 +53,7 @@ export const InventoryTable: React.FC = () => {
   const onOpenQuickTraspaso = dashboard.onOpenQuickTraspaso ?? (() => {});
   const onOpenWhatsApp = dashboard.onOpenWhatsApp;
   const onOpenEmail = dashboard.onOpenEmail;
+  const handleInlineSave = dashboard.handleInlineSave;
   const sheetConfig = dashboard.sheetConfig;
   const isCopyEnabled = dashboard.isCopyEnabled ?? isActionEnabledForTable(
     'copy_edit',
@@ -588,6 +589,7 @@ export const InventoryTable: React.FC = () => {
                     formatRules={formatRules}
                     currentTableKey={dashboard.activeView}
                     customAliases={dashboard.sheetConfig?.customAliases}
+                    onInlineSave={handleInlineSave}
                   />
                 );
               })}
