@@ -580,7 +580,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                       {renderFormatRuleIcon(formatResult.rowStyle.icon, 'w-3.5 h-3.5')}
                     </span>
                   ) : null}
-                  {isSku && onInlineSave ? (
+                  {colSchema?.isEditable && onInlineSave ? (
                     <InlineEditCell 
                       value={String(val ?? '')} 
                       onSave={(newVal) => onInlineSave(item, header, newVal)}
