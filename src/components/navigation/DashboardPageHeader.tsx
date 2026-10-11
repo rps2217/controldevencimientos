@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Sliders, Plus, Layers, SlidersHorizontal, Upload, Paintbrush, Sparkles,
+  Sliders, Plus, Layers, SlidersHorizontal, Upload, Paintbrush, Sparkles, Pencil,
   BarChart3, Flame, Clock, AlertTriangle, X, ArrowLeftRight, Trash2, CheckCircle2
 } from 'lucide-react';
 import { SLICE_COLOR_CLASSES } from '../../utils/sliceRegistry';
@@ -273,6 +273,20 @@ export const DashboardPageHeader: React.FC = () => {
             <span className="hidden sm:inline">Format Rules</span>
           </button>
         )}
+
+        {/* Toggle Inline Edit Mode */}
+        <button
+          onClick={() => dashboard.setIsInlineEditMode?.(!dashboard.isInlineEditMode)}
+          className={`px-2.5 sm:px-3 py-1.5 rounded-xl font-bold border transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 shrink-0 ${
+            dashboard.isInlineEditMode
+              ? 'border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-950/60 text-green-700 dark:text-green-300 ring-1 ring-green-400/30'
+              : 'border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+          }`}
+          title={dashboard.isInlineEditMode ? 'Desactivar modo edición en línea' : 'Activar modo edición en línea'}
+        >
+          <Pencil className="w-3.5 h-3.5 text-green-500" />
+          <span className="hidden sm:inline">Edición</span>
+        </button>
 
         {/* Panel Lateral de Vistas y Configuración */}
         {activeView !== 'schema' && activeView !== 'analytics' && onOpenViewConfig && (
