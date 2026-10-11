@@ -578,25 +578,32 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                       {renderFormatRuleIcon(formatResult.rowStyle.icon, 'w-3.5 h-3.5')}
                     </span>
                   ) : null}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      modalsActions.openRelationalMenu?.('sku', String(val));
-                    }}
-                    style={colFormatStyle ? {
-                      color: colFormatStyle.textColor,
-                      backgroundColor: colFormatStyle.backgroundColor,
-                      fontWeight: colFormatStyle.bold ? 700 : undefined,
-                      fontStyle: colFormatStyle.italic ? 'italic' : undefined,
-                      borderColor: colFormatStyle.textColor ? `${colFormatStyle.textColor}40` : undefined
-                    } : undefined}
-                    className={`font-mono font-semibold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block text-left cursor-pointer ${
-                      colFormatStyle?.badge ? 'px-2 py-0.5 rounded-lg border shadow-2xs' : ''
-                    } ${colFormatStyle?.textColor ? '' : 'text-slate-800 dark:text-slate-100'}`}
-                    title={`SKU: ${String(val)}. Clic para exploración relacional cruzada.`}
-                  >
-                    {String(val)}
-                  </button>
+                  {isSku && onInlineSave ? (
+                    <InlineEditCell 
+                      value={String(val ?? '')} 
+                      onSave={(newVal) => onInlineSave(item, header, newVal)}
+                    />
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        modalsActions.openRelationalMenu?.('sku', String(val));
+                      }}
+                      style={colFormatStyle ? {
+                        color: colFormatStyle.textColor,
+                        backgroundColor: colFormatStyle.backgroundColor,
+                        fontWeight: colFormatStyle.bold ? 700 : undefined,
+                        fontStyle: colFormatStyle.italic ? 'italic' : undefined,
+                        borderColor: colFormatStyle.textColor ? `${colFormatStyle.textColor}40` : undefined
+                      } : undefined}
+                      className={`font-mono font-semibold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block text-left cursor-pointer ${
+                        colFormatStyle?.badge ? 'px-2 py-0.5 rounded-lg border shadow-2xs' : ''
+                      } ${colFormatStyle?.textColor ? '' : 'text-slate-800 dark:text-slate-100'}`}
+                      title={`SKU: ${String(val)}. Clic para exploración relacional cruzada.`}
+                    >
+                      {String(val)}
+                    </button>
+                  )}
                   {item._isOrphan && (
                     <span 
                       className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800 shrink-0 shadow-2xs"
