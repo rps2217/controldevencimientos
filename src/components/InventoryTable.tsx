@@ -590,6 +590,7 @@ export const InventoryTable: React.FC = () => {
                     currentTableKey={dashboard.activeView}
                     customAliases={dashboard.sheetConfig?.customAliases}
                     onInlineSave={handleInlineSave}
+                    isInlineEditMode={dashboard.isInlineEditMode ?? false}
                   />
                 );
               })}

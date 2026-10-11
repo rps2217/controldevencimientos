@@ -72,6 +72,7 @@ export const InventoryDashboard: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   const [activeView, setActiveView] = useState<string>('main');
+  const [isInlineEditMode, setIsInlineEditMode] = useState(false);
 
   // Search, Selection and Scoped Module States via useModuleViewState Hook
   const {
@@ -1095,6 +1096,8 @@ export const InventoryDashboard: React.FC = () => {
     columnLabelsMap,
     isZenMode,
     setIsZenMode,
+    isInlineEditMode,
+    setIsInlineEditMode,
     tableDensity,
     setTableDensity,
     isSummaryView,
@@ -1178,7 +1181,9 @@ export const InventoryDashboard: React.FC = () => {
     collapseAllGroups,
     collapsedGroups,
     groupedItems,
-    toggleGroupByDirection
+    toggleGroupByDirection,
+    isInlineEditMode,
+    setIsInlineEditMode
   ]);
 
   return (

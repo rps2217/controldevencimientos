@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { 
   Menu, Search, X, FilterX, Scan, Barcode, RefreshCw, Sliders, Database, Package, 
-  FileText, Plus, PieChart, Settings2, Calendar, Truck 
+  FileText, Plus, PieChart, Settings2, Calendar, Truck, Edit2
 } from 'lucide-react';
 import { ThemeSelector } from './ThemeSelector';
 import { useDashboard } from '../../context/DashboardContext';
@@ -297,6 +297,13 @@ export const DashboardTopNav: React.FC = () => {
           </div>
 
           {/* Refresh button */}
+          <button 
+            onClick={() => dashboard.setIsInlineEditMode?.(!dashboard.isInlineEditMode)} 
+            className={`h-10 w-10 border rounded-xl shadow-2xs flex items-center justify-center transition-all cursor-pointer active:scale-95 ${dashboard.isInlineEditMode ? 'bg-blue-600 text-white border-blue-700' : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300'}`}
+            title="Activar/Desactivar edición en línea"
+          >
+            <Edit2 className="w-4 h-4" />
+          </button>
           <button 
             onClick={() => fetchData(sheetConfig, activeView, true)} 
             className="h-10 w-10 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-xl shadow-2xs hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors cursor-pointer shrink-0 active:scale-95" 

@@ -156,6 +156,8 @@ export interface DashboardContextType {
   // View & Presentation Controls
   isZenMode?: boolean;
   setIsZenMode?: (zen: boolean) => void;
+  isInlineEditMode: boolean;
+  setIsInlineEditMode: React.Dispatch<React.SetStateAction<boolean>>;
   tableDensity?: 'comfortable' | 'compact' | 'ultra';
   setTableDensity?: (density: 'comfortable' | 'compact' | 'ultra') => void;
   isSummaryView?: boolean;
@@ -432,6 +434,8 @@ export const DashboardProvider: React.FC<{
     bulkActionCtx: value.bulkActionCtx,
     isZenMode: value.isZenMode,
     setIsZenMode: value.setIsZenMode,
+    isInlineEditMode: value.isInlineEditMode,
+    setIsInlineEditMode: value.setIsInlineEditMode,
     tableDensity: value.tableDensity,
     setTableDensity: value.setTableDensity,
     isSummaryView: value.isSummaryView,
@@ -491,7 +495,7 @@ export const DashboardProvider: React.FC<{
   }), [
     value.selectedProduct, value.isModalOpen, value.editingItem, value.formData,
     value.formErrors, value.selectedEventCategory, value.isSaving, value.selectedRowIds,
-    value.allManageableColumns, value.globalTicketConfig, value.isZenMode, value.tableDensity,
+    value.allManageableColumns, value.globalTicketConfig, value.isZenMode, value.isInlineEditMode, value.tableDensity,
     value.isSummaryView, value.areFiltersVisible, value.hasCustomColWidths, value.hiddenColumns,
     value.isActionsMenuOpen, value.isSidebarCollapsed, value.isMobileMenuOpen,
     value.effectiveVisibleHeaders, value.visibleColumnMeta, value.resizingCol,

@@ -60,6 +60,7 @@ export interface InventoryTableRowProps {
   formatRules?: FormatRule[];
   currentTableKey?: string;
   customAliases?: Record<string, string[]>;
+  isInlineEditMode?: boolean;
 }
 
 export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
@@ -95,7 +96,8 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   tableDensity = 'compact',
   formatRules = [],
   currentTableKey = '*',
-  customAliases
+  customAliases,
+  isInlineEditMode = false
 }) => {
   const modalsActions = useModalsActions();
 
@@ -176,7 +178,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       key={`item-${item._rowIndex || virtualIndex}`} 
       data-index={virtualIndex} 
       ref={measureElementRef} 
-      onClick={() => onClickItem(item)}
+      onClick={() => !isInlineEditMode && onClickItem(item)}
       style={formatResult?.rowStyle?.textColor && !isActiveDetail && !isSelected ? {
         borderLeft: `4px solid ${formatResult.rowStyle.textColor}`
       } : undefined}
@@ -184,7 +186,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
       title="Haz clic para ver detalles del registro"
     >
       {/* 📱 TRUE MOBILE CARD VIEW (iOS Inset Grouped Card with Generous Touch Targets) */}
-      <td className="md:hidden p-3 sm:p-4 relative block w-full app-panel mb-3.5 transition-all active:scale-[0.99]" colSpan={visibleColumnMeta.length + 4} onClick={(e) => { e.stopPropagation(); onClickItem(item); }}>
+      <td className="md:hidden p-3 sm:p-4 relative block w-full app-panel mb-3.5 transition-all active:scale-[0.99]" colSpan={visibleColumnMeta.length + 4} onClick={(e) => { e.stopPropagation(); !isInlineEditMode && onClickItem(item); }}>
         <div className="flex flex-col gap-2.5 relative">
           
           {/* Header Row: Badges + Checkbox */}
