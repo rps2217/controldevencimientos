@@ -109,7 +109,7 @@ export function useItemFormManager({
       }
 
       if (eventCol) {
-        initialData[eventCol] = EVENT_CATEGORIES[cat]?.name || cat;
+        initialData[eventCol] = cat === 'VENCIMIENTO' ? 'VENCIMIENTO' : (EVENT_CATEGORIES[cat]?.name || cat);
       }
 
       if (prefillSku && skuCol) {

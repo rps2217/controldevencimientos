@@ -898,6 +898,8 @@ export const InventoryDashboard: React.FC = () => {
     // View & Presentation Controls
     isZenMode,
     setIsZenMode,
+    isInlineEditMode,
+    setIsInlineEditMode,
     tableDensity,
     setTableDensity,
     isSummaryView,

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { InventoryItem, SheetConfig, SheetRecord, EventCategory } from '../types';
 import { appendRow, updateRow, deleteRow, clearSheetsCache } from '../lib/sheets';
-import { rowToObject, getErrorMessage, parseLocaleNumber } from '../utils/pureCalculations';
+import { rowToObject, getErrorMessage, parseLocaleNumber, getCategoryFromEventValue } from '../utils/pureCalculations';
 import { EVENT_CATEGORIES } from '../utils/dateCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { resolveItemIdentity } from '../utils/entityIdentityResolver';
@@ -115,9 +115,12 @@ export function useInventoryMutations({
       if (eventCol) {
         const userChoice = formData[eventCol]?.trim();
         if (userChoice) {
-          mergedFormData[eventCol] = userChoice;
+          const normalized = getCategoryFromEventValue(userChoice);
+          mergedFormData[eventCol] = normalized || userChoice;
         } else if (selectedEventCategory) {
-          mergedFormData[eventCol] = EVENT_CATEGORIES[selectedEventCategory]?.rawCode || EVENT_CATEGORIES[selectedEventCategory]?.name || selectedEventCategory;
+          mergedFormData[eventCol] = selectedEventCategory === 'VENCIMIENTO'
+            ? 'VENCIMIENTO'
+            : (EVENT_CATEGORIES[selectedEventCategory]?.rawCode || EVENT_CATEGORIES[selectedEventCategory]?.name || selectedEventCategory);
         }
       }
 

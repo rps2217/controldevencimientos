@@ -234,6 +234,38 @@ async function runTests() {
   assert(matchesSearchTerm(frcImportedItem, frcHeaders, 'carduus') === true, 'matchesSearchTerm: encuentra descripción en registro FRC');
   assert(matchesSearchTerm(frcImportedItem, frcHeaders, '964826') === true, 'matchesSearchTerm: encuentra folio en registro FRC');
 
+  // --- 7. Registros de Vencimiento con columna FRC_EVEN y búsqueda ---
+  console.log('\n--- 7. Registros de Vencimiento agregados con columna FRC_EVEN ---');
+  const vencHeaders = [
+    'SKU', 'DESCRIPCION', 'LOTE', 'FECHA_VENCIMIENTO', 'CANTIDAD', 'PROVEEDOR', 'FRC_EVEN', 'OBSERVACION'
+  ];
+  const manualVencItem1 = {
+    _rowIndex: 10,
+    SKU: 'SKU-NUEVO-7890',
+    DESCRIPCION: 'Paracetamol 500mg',
+    LOTE: 'L-2027',
+    FECHA_VENCIMIENTO: '2027-11-30',
+    CANTIDAD: '50',
+    PROVEEDOR: 'Laboratorio Chile',
+    FRC_EVEN: 'Vencimiento Regular',
+    OBSERVACION: ''
+  };
+  const catManual1 = getEventCategory(manualVencItem1, vencHeaders);
+  assert(catManual1 === 'VENCIMIENTO', 'getEventCategory: registro con FRC_EVEN="Vencimiento Regular" se clasifica como VENCIMIENTO');
+  assert(isExpiryDomainItem(catManual1) === true, 'isExpiryDomainItem: registro agregado manualmente pertenece al dominio de vencimientos');
+  assert(matchesSearchTerm(manualVencItem1, vencHeaders, 'sku-nuevo-7890') === true, 'matchesSearchTerm: encuentra SKU recién agregado en vencimientos');
+  assert(matchesSearchTerm(manualVencItem1, vencHeaders, '7890') === true, 'matchesSearchTerm: encuentra subcadena de SKU recién agregado');
+
+  const manualVencItemEmpty = {
+    ...manualVencItem1,
+    SKU: 'SKU-NUEVO-EMPTY',
+    FRC_EVEN: ''
+  };
+  const catManualEmpty = getEventCategory(manualVencItemEmpty, vencHeaders);
+  assert(catManualEmpty === 'VENCIMIENTO', 'getEventCategory: registro con FRC_EVEN vacío en hoja de vencimientos se clasifica como VENCIMIENTO');
+  assert(isExpiryDomainItem(catManualEmpty) === true, 'isExpiryDomainItem: registro con FRC_EVEN vacío es válido en vencimientos');
+  assert(matchesSearchTerm(manualVencItemEmpty, vencHeaders, 'sku-nuevo-empty') === true, 'matchesSearchTerm: encuentra registro con evento vacío por SKU');
+
   console.log('\n========================================');
   console.log(`TOTAL PRUEBAS: ${passed + failed}`);
   console.log(`PASADAS: ${passed}`);

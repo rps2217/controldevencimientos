@@ -154,6 +154,7 @@ export interface ColumnSchema {
   formula?: string; // App formula expression (e.g. "=[SKU] & [YYYY] & [MM]" or "[RUT_PROVEEDOR].[POLITICA]")
   initialValue?: string; // Initial value expression or default
   isEditable?: boolean; // Whether input can be manually edited (defaults to false when formula is present)
+  editable?: boolean; // Alias for isEditable
   description?: string; // AppSheet column description / tooltip documentation
   scannable?: boolean; // Whether input can be scanned via barcode / QR camera
   isVirtual?: boolean; // Whether this is an AppSheet virtual calculated column (in-memory computed)

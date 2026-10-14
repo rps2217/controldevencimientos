@@ -13,27 +13,44 @@ export function getCategoryFromEventValue(rawVal: unknown): EventCategory | null
   const upper = raw.toUpperCase();
 
   // Exact mappings for historical sheet data compatibility (no fuzzy substring .includes heurísticas)
-  if (upper === 'VENC. CERC.' || upper === 'VENC. CERC') {
+  if (upper === 'VENC. CERC.' || upper === 'VENC. CERC' || upper === 'VENCIMIENTO CERCANO' || upper === 'VENCIMIENTO_CERCANO') {
     return 'VENCIMIENTO_CERCANO';
   }
-  if (upper === 'DET. PED' || upper === 'DET. PED.') {
+  if (upper === 'VENCIMIENTO' || upper === 'VENCIMIENTO REGULAR' || upper === 'VENCIMIENTO_REGULAR' || upper === 'VENC' || upper === 'VENC.') {
+    return 'VENCIMIENTO';
+  }
+  if (upper === 'DET. PED' || upper === 'DET. PED.' || upper === 'DETERIORO DE PEDIDO' || upper === 'TRANSPORTE') {
     return 'TRANSPORTE';
   }
-  if (upper === 'CAL. INTER' || upper === 'CAL. INTER.') {
+  if (upper === 'CAL. INTER' || upper === 'CAL. INTER.' || upper === 'CALIDAD INTERNA' || upper === 'CAL_INTERNA') {
     return 'CAL_INTERNA';
   }
-  if (upper === 'CAL. EXT.' || upper === 'CAL. EXT') {
+  if (upper === 'CAL. EXT.' || upper === 'CAL. EXT' || upper === 'CALIDAD EXTERNA' || upper === 'CAL_EXTERNA') {
     return 'CAL_EXTERNA';
   }
-  if (upper === 'DIF. PED' || upper === 'DIF. PED.') {
+  if (upper === 'DIF. PED' || upper === 'DIF. PED.' || upper === 'DIFERENCIA DE PEDIDO' || upper === 'DIFERENCIA') {
     return 'DIFERENCIA';
   }
-  if (upper === 'SOBRANTE INVENT.') {
+  if (upper === 'SOBRANTE INVENT.' || upper === 'SOBRANTE INVENTARIO' || upper === 'AVERIA') {
     return 'AVERIA';
   }
-  if (upper === 'FALTANTE INVENT.') {
+  if (upper === 'FALTANTE INVENT.' || upper === 'FALTANTE INVENTARIO' || upper === 'DEVOLUCION') {
     return 'DEVOLUCION';
   }
+  if (upper === 'CANJES' || upper === 'CANJE') {
+    return 'CANJES';
+  }
+  if (upper === 'MERMAS' || upper === 'MERMA') {
+    return 'MERMAS';
+  }
+
+  // Canonical Enum keys (case-insensitive)
+  const canonicalKeys: EventCategory[] = [
+    'VENCIMIENTO', 'VENCIMIENTO_CERCANO', 'TRANSPORTE', 'CAL_INTERNA',
+    'CAL_EXTERNA', 'CANJES', 'DIFERENCIA', 'AVERIA', 'DEVOLUCION', 'MERMAS'
+  ];
+  const matchedKey = canonicalKeys.find(k => k.toUpperCase() === upper);
+  if (matchedKey) return matchedKey;
 
   // SSOT User-defined Enum or direct string value (Heuristics eliminated)
   return raw as EventCategory;
@@ -295,13 +312,16 @@ export function getEventCategory(item: InventoryItem, headers: string[], colCont
     if (parsed) return parsed;
   }
   
-  // Detect if this row belongs to an FRC/Incidences context
+  // Detect if this row belongs to an FRC/Incidences context.
+  // Distinguishes true FRC sheets/items from normal inventory sheets that include an FRC_EVEN column.
   const isFrcRow = Boolean(
     item.ID_FRC || 
     item.id_frc || 
     item.FRC_N || 
     item.frc_n ||
-    (eventHeader && headers.some(h => /^frc_/i.test(h.trim())))
+    item.FRC_SKU ||
+    item.frc_sku ||
+    headers.some(h => /^frc_(sku|descripcion|desc|estado|fecha|n\b)/i.test(h.trim()) || /^id_frc$/i.test(h.trim()))
   );
 
   if (isFrcRow) {
@@ -749,12 +769,12 @@ export function computeGroupAggregates(
  */
 export function isExpiryDomainItem(eventCategory: string | null | undefined): boolean {
   if (!eventCategory) return true;
-  return eventCategory === 'VENCIMIENTO';
+  const upper = String(eventCategory).trim().toUpperCase();
+  return upper === 'VENCIMIENTO' || upper === 'VENCIMIENTO REGULAR' || upper === 'VENCIMIENTO_REGULAR' || upper === 'VENC.' || upper === 'VENC';
 }
 
 export function isIncidenceDomainItem(eventCategory: string | null | undefined): boolean {
-  if (!eventCategory) return true;
-  return eventCategory !== 'VENCIMIENTO';
+  return !isExpiryDomainItem(eventCategory);
 }
 
 export interface PmRadarMatchCriteria {
@@ -869,13 +889,33 @@ export function matchesSearchTerm(
 ): boolean {
   if (!searchTermLower) return true;
 
+  // 1. Check specified searchable headers (with case-insensitive header matching)
   for (let s = 0; s < searchableHeaders.length; s++) {
     const colName = searchableHeaders[s];
-    const sVal = row[colName];
+    let sVal = row[colName];
+    if (sVal === undefined) {
+      const colLower = colName.toLowerCase().trim();
+      const matchedKey = Object.keys(row).find(k => k.toLowerCase().trim() === colLower);
+      if (matchedKey) sVal = row[matchedKey];
+    }
     if (sVal !== undefined && sVal !== null && String(sVal).toLowerCase().includes(searchTermLower)) {
       return true;
     }
   }
+
+  // 2. Direct SKU & code column fallback (prevents exclusion if schema excludes or renames SKU header)
+  const rowKeys = Object.keys(row);
+  for (let k = 0; k < rowKeys.length; k++) {
+    const key = rowKeys[k];
+    if (key.startsWith('_')) continue;
+    if (/sku|c[oó]digo|codigo|item|art[ií]culo|ean|barcode/i.test(key)) {
+      const val = row[key];
+      if (val !== undefined && val !== null && String(val).toLowerCase().includes(searchTermLower)) {
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
