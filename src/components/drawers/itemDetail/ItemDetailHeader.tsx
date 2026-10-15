@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Package, X, Edit2, Trash2, Copy, Barcode as BarcodeIcon, ChevronLeft, ChevronRight, Maximize2, Minimize2 
+  Package, X, Edit2, Trash2, Copy, Barcode as BarcodeIcon, ChevronLeft, ChevronRight, Maximize2, Minimize2, Bluetooth 
 } from 'lucide-react';
 import { InventoryItem } from '../../../types';
 
@@ -13,6 +13,7 @@ interface ItemDetailHeaderProps {
   onCopy?: (product: InventoryItem) => void;
   onDeleteRow?: (product: InventoryItem) => void;
   onPrintBarcode?: (product: InventoryItem) => void;
+  onPrintBluetooth?: (product: InventoryItem) => void;
   onClose: () => void;
   onNavigatePrev?: () => void;
   onNavigateNext?: () => void;
@@ -31,6 +32,7 @@ export const ItemDetailHeader: React.FC<ItemDetailHeaderProps> = ({
   onCopy,
   onDeleteRow,
   onPrintBarcode,
+  onPrintBluetooth,
   onClose,
   onNavigatePrev,
   onNavigateNext,
@@ -89,10 +91,19 @@ export const ItemDetailHeader: React.FC<ItemDetailHeaderProps> = ({
           )}
 
           <div className="flex items-center gap-1">
+            {onPrintBluetooth && (
+              <button
+                onClick={() => onPrintBluetooth(product)}
+                className="p-1.5 text-indigo-700 dark:text-indigo-300 bg-indigo-600/10 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-600 hover:text-white transition-colors cursor-pointer"
+                title="Imprimir etiqueta en Marklife P15 (Bluetooth BLE)"
+              >
+                <Bluetooth className="w-4 h-4" />
+              </button>
+            )}
             {onPrintBarcode && sku && sku !== '-' && (
               <button
                 onClick={() => onPrintBarcode(product)}
-                className="p-1.5 text-indigo-700 dark:text-indigo-300 bg-indigo-600/10 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-600 hover:text-white transition-colors cursor-pointer"
+                className="p-1.5 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
                 title="Imprimir código de barras del SKU en formato ticket"
               >
                 <BarcodeIcon className="w-4 h-4" />

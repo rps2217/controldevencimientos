@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Printer, Settings, Barcode, Mail, MessageSquare, Download, Flame, Edit2, Trash2, Sliders, X, Copy, RefreshCw 
+  Printer, Settings, Barcode, Mail, MessageSquare, Download, Flame, Edit2, Trash2, Sliders, X, Copy, RefreshCw, Bluetooth 
 } from 'lucide-react';
 import { isActionEnabledForTable, buildBulkActionContext } from '../../utils/bulkActionsRegistry';
 import { exportToExcel } from '../../utils/exportUtils';
@@ -22,6 +22,7 @@ export const FloatingBulkActionBar: React.FC = () => {
   const policies = dashboard.policies ?? [];
   const handlePrintTicket = dashboard.handlePrintTicket;
   const setIsTicketConfigOpen = modalsActions.setIsTicketConfigOpen;
+  const openBluetoothPrinter = modalsActions.openBluetoothPrinter;
   const setIsGmailModalOpen = modalsActions.setIsGmailModalOpen;
   const setGmailModalItems = modalsActions.setGmailModalItems;
   const setWhatsAppModalItems = modalsActions.setWhatsAppModalItems;
@@ -55,6 +56,15 @@ export const FloatingBulkActionBar: React.FC = () => {
       </div>
       
       <div className="flex items-center gap-2">
+        {/* Botón directo Marklife P15 Bluetooth */}
+        <button 
+          onClick={() => openBluetoothPrinter(selectedItems)}
+          className="text-xs hover:bg-indigo-600 px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 bg-indigo-600/90 text-white border border-indigo-400/40 shadow-sm shadow-indigo-500/20 cursor-pointer shrink-0"
+          title="Imprimir etiquetas directamente en impresora portátil Marklife P15 (Bluetooth)"
+        >
+          <Bluetooth className="w-3.5 h-3.5 text-indigo-200" /> Marklife P15
+        </button>
+
         {isActionEnabledForTable('ticket', bulkActionCtx, sheetConfig) && (
           <div className="flex items-center bg-slate-700/80 rounded-xl p-0.5">
             <button 

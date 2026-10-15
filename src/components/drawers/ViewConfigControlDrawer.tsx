@@ -24,7 +24,8 @@ import {
   Flame,
   Printer,
   Barcode,
-  Download
+  Download,
+  Bluetooth
 } from 'lucide-react';
 import { TableSlice } from '../../types';
 import { getSlicesForTable } from '../../utils/sliceRegistry';
@@ -870,6 +871,27 @@ export const ViewConfigControlDrawer: React.FC = () => {
                       <span className="text-[10px] text-slate-400">Imprimir →</span>
                     </button>
                   )}
+                  {/* Impresora Portátil Marklife P15 (Bluetooth) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      modalsActions.openBluetoothPrinter?.(filteredItems);
+                      onClose();
+                    }}
+                    className="w-full text-left p-3 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-3 transition-all rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-white dark:bg-slate-900 shadow-3xs cursor-pointer group hover:border-indigo-300 dark:hover:border-indigo-700"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Bluetooth className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-slate-800 dark:text-slate-100 text-xs flex items-center gap-1.5">
+                        <span>Etiquetas Marklife P15</span>
+                        <span className="text-[9px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.2 rounded-full font-bold">Bluetooth BLE</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">Impresión térmica directa ({filteredItems.length} registros)</div>
+                    </div>
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">Imprimir →</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -882,6 +904,21 @@ export const ViewConfigControlDrawer: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      modalsActions.openBluetoothPrinter?.();
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-between transition-all text-left"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Bluetooth className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      Impresora Marklife P15 (Bluetooth BLE)
+                    </span>
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">Vincular →</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {

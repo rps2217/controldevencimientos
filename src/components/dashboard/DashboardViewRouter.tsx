@@ -152,6 +152,7 @@ export const DashboardViewRouter: React.FC<DashboardViewRouterProps> = ({
             } : undefined}
             onDeleteRow={(bulkActionCtx && isActionEnabledForTable('delete', bulkActionCtx, sheetConfig)) ? handleDelete : undefined}
             onPrintBarcode={(bulkActionCtx && isActionEnabledForTable('barcode_ticket', bulkActionCtx, sheetConfig)) ? (prod) => handlePrintTicket([prod], 'barcode') : undefined}
+            onPrintBluetooth={(prod) => modalsActions.openBluetoothPrinter([prod])}
             onNewEventForProduct={(sku, category) => {
               handleOpenModal(undefined, sku, category);
             }}

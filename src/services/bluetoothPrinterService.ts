@@ -118,13 +118,22 @@ class BluetoothPrinterService {
       const device = await navBluetooth.requestDevice({
         filters: [
           { namePrefix: 'P15' },
+          { namePrefix: 'p15' },
           { namePrefix: 'Marklife' },
           { namePrefix: 'marklife' },
+          { namePrefix: 'MARKLIFE' },
           { namePrefix: 'P12' },
+          { namePrefix: 'p12' },
           { namePrefix: 'L11' },
+          { namePrefix: 'l11' },
           { namePrefix: 'Q30' },
           { namePrefix: 'D30' },
           { namePrefix: 'PRISTAR' },
+          { namePrefix: 'P11' },
+          { namePrefix: 'M15' },
+          { namePrefix: 'B1' },
+          { namePrefix: 'B21' },
+          { namePrefix: 'Quin' },
         ],
         optionalServices: [
           MARKLIFE_PRIMARY_SERVICE,
@@ -176,22 +185,46 @@ class BluetoothPrinterService {
         }
       }
 
-      if (!service) {
-        throw new Error('No se encontró el servicio de impresión de Marklife P15 (0xFF00) en el dispositivo.');
-      }
-
       // Buscar característica de escritura
       let writeChar: any = null;
-      try {
-        writeChar = await service.getCharacteristic(MARKLIFE_WRITE_CHAR_UUID);
-      } catch {
-        // Buscar primera característica con soporte de escritura
-        const characteristics = await service.getCharacteristics();
-        writeChar = characteristics.find((c: any) => c.properties.write || c.properties.writeWithoutResponse);
+
+      if (service) {
+        try {
+          writeChar = await service.getCharacteristic(MARKLIFE_WRITE_CHAR_UUID);
+        } catch {
+          try {
+            const characteristics = await service.getCharacteristics();
+            writeChar = characteristics.find((c: any) => c.properties.write || c.properties.writeWithoutResponse);
+          } catch {
+            // Ignorar y continuar a fallback amplio
+          }
+        }
+      }
+
+      // Fallback exhaustivo si no se halló por UUID conocido: escanear todos los servicios GATT disponibles
+      if (!writeChar && server.getPrimaryServices) {
+        try {
+          const allServices = await server.getPrimaryServices();
+          for (const s of allServices) {
+            try {
+              const characteristics = await s.getCharacteristics();
+              const found = characteristics.find((c: any) => c.properties.write || c.properties.writeWithoutResponse);
+              if (found) {
+                service = s;
+                writeChar = found;
+                break;
+              }
+            } catch {
+              // siguiente servicio
+            }
+          }
+        } catch {
+          // noop
+        }
       }
 
       if (!writeChar) {
-        throw new Error('No se encontró la característica de escritura de la impresora.');
+        throw new Error('No se encontró el canal de comunicación (característica de escritura) de la impresora.');
       }
 
       this.writeCharacteristic = writeChar;
@@ -565,9 +598,10 @@ class BluetoothPrinterService {
   }
 
   /**
-   * Envía los bytes al periférico BLE divididos en fragmentos MTU seguros.
+   * Envía los bytes al periférico BLE divididos en fragmentos MTU seguros (20 bytes estándar BLE).
+   * Evita errores de rechazo por MTU en Android y Chrome.
    */
-  private async sendInChunks(data: Uint8Array, chunkSize = 100): Promise<void> {
+  private async sendInChunks(data: Uint8Array, chunkSize = 20): Promise<void> {
     if (!this.writeCharacteristic) {
       throw new Error('No hay conexión con la característica de escritura de la impresora.');
     }
@@ -578,15 +612,22 @@ class BluetoothPrinterService {
     while (offset < total) {
       const chunk = data.slice(offset, offset + chunkSize);
       
-      if (this.writeCharacteristic.writeValueWithoutResponse) {
-        await this.writeCharacteristic.writeValueWithoutResponse(chunk);
-      } else {
-        await this.writeCharacteristic.writeValueWithResponse(chunk);
+      try {
+        if (this.writeCharacteristic.writeValueWithoutResponse) {
+          await this.writeCharacteristic.writeValueWithoutResponse(chunk);
+        } else {
+          await this.writeCharacteristic.writeValueWithResponse(chunk);
+        }
+      } catch {
+        // Fallback si writeValueWithoutResponse no está soportado o requiere respuesta
+        if (this.writeCharacteristic.writeValueWithResponse) {
+          await this.writeCharacteristic.writeValueWithResponse(chunk);
+        }
       }
 
       offset += chunkSize;
-      // Pausa mínima de 12ms para dar tiempo al microcontrolador de la Marklife P15 a vaciar el buffer
-      await new Promise(r => setTimeout(r, 12));
+      // Pausa mínima de 8ms para permitir al microcontrolador de la Marklife P15 vaciar el buffer
+      await new Promise(r => setTimeout(r, 8));
     }
   }
 

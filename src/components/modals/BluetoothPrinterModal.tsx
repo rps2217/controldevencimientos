@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   X, 
   Bluetooth, 
@@ -12,12 +12,14 @@ import {
   Smartphone, 
   Sliders,
   Check,
-  Play
+  Play,
+  Barcode,
+  Tag
 } from 'lucide-react';
 import { useBluetoothPrinter } from '../../hooks/useBluetoothPrinter';
-import { ROLLOS, findRoll } from '../../utils/labelMediaProfile';
+import { ROLLOS, findRoll, evaluateFit, fitQuality, FIT_QUALITY_LABEL } from '../../utils/labelMediaProfile';
 import { InventoryItem } from '../../types';
-import { bluetoothPrinterService } from '../../services/bluetoothPrinterService';
+import { bluetoothPrinterService, MarklifeLabelOptions } from '../../services/bluetoothPrinterService';
 
 interface BluetoothPrinterModalProps {
   isOpen: boolean;
@@ -46,18 +48,33 @@ export const BluetoothPrinterModal: React.FC<BluetoothPrinterModalProps> = ({
     printBatch,
   } = useBluetoothPrinter();
 
+  const [barcodeOnly, setBarcodeOnly] = useState<boolean>(true);
+  const [showSkuText, setShowSkuText] = useState<boolean>(true);
   const [printSuccessMsg, setPrintSuccessMsg] = useState<string | null>(null);
   const [printProgress, setPrintProgress] = useState<{ current: number; total: number } | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const activeRoll = findRoll(selectedRollId) || ROLLOS[2]; // 12x40mm default
+  const activeRoll = useMemo(() => findRoll(selectedRollId) || ROLLOS[2], [selectedRollId]);
+
+  const marklifeOptions: MarklifeLabelOptions = useMemo(() => ({
+    barcodeOnly,
+    showSkuText,
+  }), [barcodeOnly, showSkuText]);
+
+  const sampleSku = itemsToPrint.length > 0
+    ? String(itemsToPrint[0]['sku'] || itemsToPrint[0]['SKU'] || itemsToPrint[0]['codigo'] || '780123456789')
+    : '780123456789';
+
+  const calidadRollo = useMemo(() => {
+    return fitQuality(evaluateFit(sampleSku, activeRoll));
+  }, [sampleSku, activeRoll]);
 
   // Actualizar previsualización interactiva de la etiqueta en el modal
   useEffect(() => {
     if (!isOpen) return;
 
     const sampleItem = itemsToPrint.length > 0 ? {
-      sku: String(itemsToPrint[0]['sku'] || itemsToPrint[0]['SKU'] || itemsToPrint[0]['codigo'] || '780123456789'),
+      sku: sampleSku,
       descripcion: String(itemsToPrint[0]['descripcion'] || itemsToPrint[0]['DESCRIPCION'] || 'PRODUCTO DE MUESTRA'),
       fechaVc: String(itemsToPrint[0]['fecha_vc'] || itemsToPrint[0]['FECHA_VC'] || '31/12/2026'),
       lote: String(itemsToPrint[0]['lote'] || itemsToPrint[0]['LOTE'] || 'L-9988'),
@@ -70,7 +87,7 @@ export const BluetoothPrinterModal: React.FC<BluetoothPrinterModalProps> = ({
       cantidad: '10 UN',
     };
 
-    const canvas = bluetoothPrinterService.generateLabelCanvas(sampleItem, activeRoll);
+    const canvas = bluetoothPrinterService.generateLabelCanvas(sampleItem, activeRoll, marklifeOptions);
     if (previewCanvasRef.current) {
       const container = previewCanvasRef.current;
       container.width = canvas.width;
@@ -80,13 +97,13 @@ export const BluetoothPrinterModal: React.FC<BluetoothPrinterModalProps> = ({
         ctx.drawImage(canvas, 0, 0);
       }
     }
-  }, [isOpen, selectedRollId, itemsToPrint, activeRoll]);
+  }, [isOpen, selectedRollId, itemsToPrint, activeRoll, marklifeOptions, sampleSku]);
 
   if (!isOpen) return null;
 
   const handleTestPrint = async () => {
     setPrintSuccessMsg(null);
-    const ok = await printTest(selectedRollId);
+    const ok = await printTest(selectedRollId, marklifeOptions);
     if (ok) {
       setPrintSuccessMsg('¡Etiqueta de prueba enviada con éxito a la Marklife P15!');
       setTimeout(() => setPrintSuccessMsg(null), 4000);
@@ -98,7 +115,9 @@ export const BluetoothPrinterModal: React.FC<BluetoothPrinterModalProps> = ({
     setPrintSuccessMsg(null);
     setPrintProgress({ current: 0, total: itemsToPrint.length });
     
-    const count = await printBatch(itemsToPrint, selectedRollId);
+    const count = await printBatch(itemsToPrint, selectedRollId, (curr, tot) => {
+      setPrintProgress({ current: curr, total: tot });
+    }, marklifeOptions);
     setPrintProgress(null);
     if (count > 0) {
       setPrintSuccessMsg(`¡${count} etiquetas impresas exitosamente!`);
@@ -225,31 +244,115 @@ export const BluetoothPrinterModal: React.FC<BluetoothPrinterModalProps> = ({
           </div>
 
           {/* SELECTOR DE ROLLO Y MEDIDAS */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700/80">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <Sliders className="w-3.5 h-3.5 text-indigo-500" />
+                <Tag className="w-3.5 h-3.5 text-indigo-500" />
                 Rollo de Etiquetas Instalado
               </label>
-              <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
-                {activeRoll.widthMm} × {activeRoll.heightMm} mm (203 DPI)
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  calidadRollo === 'optimo' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
+                    : calidadRollo === 'ok' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300'
+                      : calidadRollo === 'justo' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'
+                        : 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300'
+                }`}>
+                  {FIT_QUALITY_LABEL[calidadRollo]}
+                </span>
+                <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                  {activeRoll.widthMm} × {activeRoll.heightMm} mm
+                </span>
+              </div>
             </div>
 
             <select
               value={selectedRollId}
               onChange={(e) => setSelectedRollId(e.target.value)}
-              className="w-full px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              className="w-full px-3 py-2 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
             >
-              {ROLLOS.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.nombre} (Avance {r.heightMm}mm · Rotación {r.rotacion}°)
-                </option>
-              ))}
+              {ROLLOS.map((r) => {
+                const calidad = fitQuality(evaluateFit(sampleSku, r));
+                return (
+                  <option key={r.id} value={r.id}>
+                    {r.nombre} (Avance {r.heightMm}mm) · {FIT_QUALITY_LABEL[calidad]}
+                  </option>
+                );
+              })}
             </select>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500">
-              La Marklife P15 utiliza rollos troquelados de 12 mm a 15 mm. El código Code128 se gira 90° para maximizar legibilidad en el escáner.
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
+              La Marklife P15 cuenta con cabezal térmico de 203 DPI (8 puntos/mm). El código <strong>Code128 se gira 90° automáticamente</strong> para maximizar la longitud de las barras.
             </p>
+          </div>
+
+          {/* MODO DE CONTENIDO DE LA ETIQUETA */}
+          <div className="space-y-2.5 p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Barcode className="w-3.5 h-3.5 text-indigo-500" />
+                Formato de Etiqueta
+              </label>
+              <span className="text-[10px] text-slate-500 font-medium">
+                {barcodeOnly ? 'Solo Código de Barras' : 'Con Detalles'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setBarcodeOnly(true)}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  barcodeOnly
+                    ? 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-900 dark:text-indigo-200'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full mb-1">
+                  <span className="font-bold text-xs">Solo Código Barras</span>
+                  {barcodeOnly && (
+                    <span className="text-[9px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded-full">
+                      Recomendado
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                  Maximiza altura de barras para lectura con pistola láser.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBarcodeOnly(false)}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  !barcodeOnly
+                    ? 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-900 dark:text-indigo-200'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full mb-1">
+                  <span className="font-bold text-xs">Con Información</span>
+                  {!barcodeOnly && (
+                    <span className="text-[9px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded-full">
+                      Activo
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                  Incluye descripción, fecha de vencimiento y lote.
+                </p>
+              </button>
+            </div>
+
+            {barcodeOnly && (
+              <label className="flex items-center gap-2 pt-1 text-xs text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showSkuText}
+                  onChange={(e) => setShowSkuText(e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <span>Mostrar texto numérico del SKU bajo las barras</span>
+              </label>
+            )}
           </div>
 
           {/* PREVISUALIZACIÓN REAL EN VIVO */}

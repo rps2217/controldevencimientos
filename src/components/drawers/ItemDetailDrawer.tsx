@@ -24,6 +24,7 @@ interface ItemDetailDrawerProps {
   onCopy?: (product: InventoryItem) => void;
   onDeleteRow?: (product: InventoryItem) => void;
   onPrintBarcode?: (product: InventoryItem) => void;
+  onPrintBluetooth?: (product: InventoryItem) => void;
   onNewEventForProduct: (sku: string, category?: EventCategory) => void;
   onNavigatePrev?: () => void;
   onNavigateNext?: () => void;
@@ -45,6 +46,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   onCopy,
   onDeleteRow,
   onPrintBarcode,
+  onPrintBluetooth,
   onNewEventForProduct,
   onNavigatePrev,
   onNavigateNext,
@@ -195,6 +197,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
             onCopy={onCopy}
             onDeleteRow={onDeleteRow}
             onPrintBarcode={onPrintBarcode}
+            onPrintBluetooth={onPrintBluetooth}
             onClose={onClose}
             onNavigatePrev={onNavigatePrev}
             onNavigateNext={onNavigateNext}
@@ -334,6 +337,7 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
           onCopy={onCopy}
           onDeleteRow={onDeleteRow}
           onPrintBarcode={onPrintBarcode}
+          onPrintBluetooth={onPrintBluetooth}
           onClose={onClose}
           onNavigatePrev={onNavigatePrev}
           onNavigateNext={onNavigateNext}
