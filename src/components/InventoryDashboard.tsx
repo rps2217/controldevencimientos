@@ -6,10 +6,10 @@ import { useModalsActions } from '../context/ModalsContext';
 import { DashboardProvider, DashboardContextType } from '../context/DashboardContext';
 
 // Utilities & Hooks
-import { getEventCategory, getItemStatus } from '../utils/dateCalculations';
+import { getEventCategory, getItemStatus, createColumnsContext } from '../utils/dateCalculations';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { resolveTableCapabilities } from '../utils/sliceRegistry';
-import { applyTableSchemaFormulas } from '../utils/appSheetFormulaEngine';
+import { applyTableSchemaFormulasPreSorted, sortColumnsByDependency } from '../utils/appSheetFormulaEngine';
 import { findTableSchema } from '../utils/virtualColumnsEvaluator';
 import { useColumnResize } from '../hooks/useColumnResize';
 import { useColumnManager } from '../hooks/useColumnManager';
@@ -396,8 +396,11 @@ export const InventoryDashboard: React.FC = () => {
     const hasFormulas = Object.values(activeTableSchema).some(col => col.formula && col.formula.trim());
     if (!hasFormulas) return items;
 
+    const allCols = Array.from(new Set([...allTableHeaders, ...Object.keys(activeTableSchema)]));
+    const sortedCols = sortColumnsByDependency(allCols, activeTableSchema);
+
     return items.map(item => {
-      return applyTableSchemaFormulas(item, allTableHeaders, activeTableSchema, {
+      return applyTableSchemaFormulasPreSorted(item, sortedCols, activeTableSchema, {
         products,
         policies,
         customAliases: sheetConfig.customAliases
@@ -574,13 +577,14 @@ export const InventoryDashboard: React.FC = () => {
   const drainageReportItems = useMemo(() => {
     // La capacidad manda: una hoja con columnas de vencimiento alimenta su propio informe.
     const source = tableCapabilities.has('vencimiento') ? items : allMainItems;
+    const colContext = createColumnsContext(allTableHeaders);
     return source.filter(item => {
-      const cat = getEventCategory(item, Object.keys(item));
+      const cat = getEventCategory(item, allTableHeaders, colContext);
       if (cat !== 'VENCIMIENTO') return false;
-      const st = getItemStatus(item, Object.keys(item));
+      const st = getItemStatus(item, allTableHeaders, colContext);
       return st.code === 'DRAINAGE_PM' || st.code === 'UPCOMING' || st.code === 'RETIRE_NOW';
     });
-  }, [items, allMainItems, tableCapabilities]);
+  }, [items, allMainItems, tableCapabilities, allTableHeaders]);
 
   const quickChips = useMemo(() => {
     const chips: string[] = [];

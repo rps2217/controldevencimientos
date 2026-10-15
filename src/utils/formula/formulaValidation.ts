@@ -302,6 +302,25 @@ export function applyTableSchemaFormulas(
   const allCols = Array.from(new Set([...headers, ...Object.keys(tableSchema)]));
   const sortedCols = sortColumnsByDependency(allCols, tableSchema);
 
+  return applyTableSchemaFormulasPreSorted(updated, sortedCols, tableSchema, context);
+}
+
+/**
+ * Applies table schema formulas using pre-sorted columns to avoid O(N) dependency sorting per row.
+ */
+export function applyTableSchemaFormulasPreSorted(
+  row: Record<string, any>,
+  sortedCols: string[],
+  tableSchema: Record<string, ColumnSchema> | undefined,
+  context: Omit<FormulaEvaluationContext, 'row'>
+): Record<string, any> {
+  if (!tableSchema) return row;
+
+  if (!context._indexes) {
+    (context as any)._indexes = buildFormulaIndexes(context);
+  }
+
+  const updated = { ...row };
   const evalContext: FormulaEvaluationContext = {
     ...context,
     row: updated,

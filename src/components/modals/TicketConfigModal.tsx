@@ -77,7 +77,7 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
     footerText: '--- FIN DEL REPORTE ---'
   });
   const [columnSearch, setColumnSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'columns' | 'general' | 'marklife' | 'preview'>('columns');
+  const [activeTab, setActiveTab] = useState<'columns' | 'general' | 'marklife' | 'preview'>('general');
   const [previewMode, setPreviewMode] = useState<'ticket' | 'marklife'>('ticket');
 
   // Hook de Bluetooth BLE para la Marklife P15
@@ -245,11 +245,14 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
   if (!isOpen) return null;
 
   const handleSaveAndClose = () => {
+    const generalToSave = { ...localGeneral };
+    if (!localGeneral.labelRollId) {
+      delete generalToSave.labelRollId;
+    }
     onSave(activeView, {
       columns: localColumns,
       general: {
-        ...localGeneral,
-        labelRollId: currentRollId,
+        ...generalToSave,
         marklifeBarcodeOnly: localGeneral.marklifeBarcodeOnly !== false,
         marklifeShowSkuText: localGeneral.marklifeShowSkuText !== false,
       }
@@ -259,11 +262,14 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
 
   // Impresión de ticket térmico continuo estándar vía navegador
   const handleTestPrintTicket = () => {
+    const generalToSave = { ...localGeneral };
+    if (!localGeneral.labelRollId) {
+      delete generalToSave.labelRollId;
+    }
     onSave(activeView, {
       columns: localColumns,
       general: {
-        ...localGeneral,
-        labelRollId: currentRollId,
+        ...generalToSave,
         marklifeBarcodeOnly: localGeneral.marklifeBarcodeOnly !== false,
         marklifeShowSkuText: localGeneral.marklifeShowSkuText !== false,
       }
@@ -575,12 +581,34 @@ export const TicketConfigModal: React.FC<TicketConfigModalProps> = ({
                       Ancho de Papel POS
                     </label>
                     <select
-                      value={localGeneral.paperWidth || '80mm'}
-                      onChange={(e) => setLocalGeneral(prev => ({ ...prev, paperWidth: e.target.value as '80mm' | '58mm' }))}
+                      value={localGeneral.labelRollId || localGeneral.paperWidth || '80mm'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '80mm' || val === '58mm') {
+                          setLocalGeneral(prev => {
+                            const next = { ...prev, paperWidth: val as '80mm' | '58mm' };
+                            delete next.labelRollId;
+                            return next;
+                          });
+                        } else {
+                          setLocalGeneral(prev => ({
+                            ...prev,
+                            labelRollId: val
+                          }));
+                          setBleRollId(val);
+                        }
+                      }}
                       className="w-full px-3 py-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     >
-                      <option value="80mm">80 mm (Estándar POS)</option>
-                      <option value="58mm">58 mm (Compacto Térmico)</option>
+                      <optgroup label="Tickets Continuos (POS)">
+                        <option value="80mm">80 mm (Estándar POS)</option>
+                        <option value="58mm">58 mm (Compacto Térmico)</option>
+                      </optgroup>
+                      <optgroup label="Rollos Troquelados (Marklife P15 / Adhesivas)">
+                        {ROLLOS.map(r => (
+                          <option key={r.id} value={r.id}>{r.nombre} ({r.widthMm}x{r.heightMm} mm)</option>
+                        ))}
+                      </optgroup>
                     </select>
                     <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
                       Impresión continua estándar a través de la ventana de impresión del navegador o USB POS.

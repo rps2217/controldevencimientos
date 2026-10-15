@@ -7,7 +7,10 @@ import {
   matchesPmRadarFilter, 
   matchesEventResolutionFilter, 
   matchesColumnFilters, 
-  matchesSearchTerm 
+  matchesSearchTerm,
+  createColumnsContext,
+  computeItemRawStatus,
+  CalculationColumnsContext
 } from './pureCalculations';
 
 import { STORAGE_KEYS, readStorage, stringArraySchema, objectArraySchema } from '../utils/appStorage';
@@ -509,7 +512,8 @@ export function itemMatchesSlice(
   item: InventoryItem,
   slice: TableSlice,
   headers: string[],
-  frcBodCol?: string | null
+  frcBodCol?: string | null,
+  colContext?: CalculationColumnsContext
 ): boolean {
   if (!slice || !item) return false;
   const filterConfig = slice.filterConfig || {};
@@ -521,7 +525,7 @@ export function itemMatchesSlice(
   // `VENC. CERC.` es un evento FRC (mercadería recibida con poca vida útil), no una
   // categoría de vencimiento: pertenece al dominio de incidencia. Por eso el radar de
   // vencimientos sólo admite VENCIMIENTO puro y el registro FRC admite todo lo demás.
-  const itemCategory = getEventCategory(item, headers);
+  const itemCategory = getEventCategory(item, headers, colContext);
   if (slice.requiredCapability === 'vencimiento') {
     if (!isExpiryDomainItem(itemCategory)) {
       return false;
@@ -550,7 +554,7 @@ export function itemMatchesSlice(
 
   // 3. PM Radar Status match
   if (filterConfig.pmRadarFilter && filterConfig.pmRadarFilter.length > 0) {
-    const st = getItemStatus(item, headers);
+    const st = computeItemRawStatus(item, headers, colContext);
     if (!matchesPmRadarFilter({ ...st, isOrphan: item._isOrphan }, filterConfig.pmRadarFilter)) {
       return false;
     }
@@ -619,13 +623,14 @@ export function computeSliceCounts(
 
   const itemsLen = items.length;
   const slicesLen = slices.length;
+  const colContext = createColumnsContext(headers);
 
   for (let i = 0; i < itemsLen; i++) {
     const item = items[i];
     if (!item) continue;
     for (let s = 0; s < slicesLen; s++) {
       const slice = slices[s];
-      if (slice && slice.id && itemMatchesSlice(item, slice, headers, frcBodCol)) {
+      if (slice && slice.id && itemMatchesSlice(item, slice, headers, frcBodCol, colContext)) {
         counts[slice.id] = (counts[slice.id] || 0) + 1;
       }
     }
