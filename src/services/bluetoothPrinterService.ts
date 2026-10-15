@@ -26,16 +26,19 @@ export const FALLBACK_SERVICES = [
 
 export interface MarklifeLabelOptions {
   /**
-   * Si es true, imprime ÚNICAMENTE el código de barras ocupando el alto máximo
-   * de la etiqueta para lectura instantánea sin fallos con pistola láser. (Predeterminado true).
+   * Si es true, imprime ÚNICAMENTE el código de barras ocupando el alto máximo.
    */
   barcodeOnly?: boolean;
   /**
-   * Si es true, muestra el texto numérico/alfanumérico del SKU centrado bajo las barras (predeterminado true).
+   * Si es true, muestra el texto numérico/alfanumérico del SKU centrado bajo las barras.
    */
   showSkuText?: boolean;
   /**
-   * Mapa de configuración de columnas del ticket (para cuando barcodeOnly es false).
+   * Protocolo de rasterizado: 'escpos' (GS v 0, universal y recomendado para P15) o 'l11' (0x1F nativo).
+   */
+  protocol?: 'escpos' | 'l11';
+  /**
+   * Mapa de configuración de columnas del ticket.
    */
   columnsConfig?: Record<string, { show: boolean; bold?: boolean; size?: number }>;
   /**
@@ -537,9 +540,9 @@ class BluetoothPrinterService {
   }
 
   /**
-   * Convierte un canvas en el paquete de comandos binarios del protocolo Marklife P15 / L11.
+   * Convierte un canvas en el paquete de comandos binarios del protocolo térmico (ESC/POS GS v 0 o L11 nativo).
    */
-  public canvasToMarklifeBytes(canvas: HTMLCanvasElement): Uint8Array {
+  public canvasToMarklifeBytes(canvas: HTMLCanvasElement, options?: MarklifeLabelOptions): Uint8Array {
     const width = canvas.width;
     const height = canvas.height;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -548,58 +551,80 @@ class BluetoothPrinterService {
     const imgData = ctx.getImageData(0, 0, width, height);
     const pixels = imgData.data;
 
-    // Cada línea de impresión tiene width puntos. En bytes: ceil(width / 8)
     const bytesPerLine = Math.ceil(width / 8);
     const rasterData: number[] = [];
+    const protocol = options?.protocol || 'escpos'; // Default a 'escpos' (GS v 0) por máxima compatibilidad
 
-    // Protocolo Zhuhai Quin / Marklife P15 (Comando Nativo 0x1F):
-    // 1. Inicialización / Wakeup
-    rasterData.push(0x1f, 0x11, 0x00); // Wake / Init
-    rasterData.push(0x1b, 0x40);       // ESC @ (Reset)
+    if (protocol === 'escpos') {
+      // 1. ESC/POS Universal Raster Protocol (GS v 0 - 1D 76 30 00)
+      rasterData.push(0x1b, 0x40); // ESC @ (Reset/Init)
 
-    // Ajuste de densidad de impresión térmica (0x1F 0x11 0x02 <density>)
-    rasterData.push(0x1f, 0x11, 0x02, 0x03);
+      const xL = bytesPerLine & 0xff;
+      const xH = (bytesPerLine >> 8) & 0xff;
+      const yL = height & 0xff;
+      const yH = (height >> 8) & 0xff;
+      
+      // GS v 0 mode 0 width_bytes_L width_bytes_H height_dots_L height_dots_H
+      rasterData.push(0x1d, 0x76, 0x30, 0x00, xL, xH, yL, yH);
 
-    // 2. Enviar líneas de mapa de bits (Raster Scanlines)
-    for (let y = 0; y < height; y++) {
-      const lineBytes = new Uint8Array(bytesPerLine);
-      let hasBlackPixels = false;
-
-      for (let x = 0; x < width; x++) {
-        const offset = (y * width + x) * 4;
-        const r = pixels[offset];
-        const g = pixels[offset + 1];
-        const b = pixels[offset + 2];
-        // Umbral de luminancia estándar ITU-R BT.601
-        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        
-        // 1 = punto negro (imprimir calor), 0 = punto blanco
-        if (lum < 140) {
-          const byteIdx = Math.floor(x / 8);
-          const bitIdx = 7 - (x % 8);
-          lineBytes[byteIdx] |= (1 << bitIdx);
-          hasBlackPixels = true;
+      for (let y = 0; y < height; y++) {
+        const lineBytes = new Uint8Array(bytesPerLine);
+        for (let x = 0; x < width; x++) {
+          const offset = (y * width + x) * 4;
+          const r = pixels[offset];
+          const g = pixels[offset + 1];
+          const b = pixels[offset + 2];
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          if (lum < 140) {
+            const byteIdx = Math.floor(x / 8);
+            const bitIdx = 7 - (x % 8);
+            lineBytes[byteIdx] |= (1 << bitIdx);
+          }
+        }
+        for (let b = 0; b < bytesPerLine; b++) {
+          rasterData.push(lineBytes[b]);
         }
       }
 
-      // Si la línea tiene contenido o para avance uniforme:
-      // Comando de línea Marklife: 0x1F 0x10 <lenL> <lenH> <bytes...>
-      rasterData.push(0x1f, 0x10, bytesPerLine & 0xff, (bytesPerLine >> 8) & 0xff);
-      for (let b = 0; b < bytesPerLine; b++) {
-        rasterData.push(lineBytes[b]);
-      }
-    }
+      // 3. Alimentar papel y salto de página/gap
+      rasterData.push(0x1b, 0x64, 0x03); // Feed 3 lines
+      rasterData.push(0x0c);             // Form feed (Print execute)
+    } else {
+      // L11 / Marklife Native Protocol (0x1F)
+      rasterData.push(0x1f, 0x11, 0x00); // Wake / Init
+      rasterData.push(0x1b, 0x40);       // ESC @
+      rasterData.push(0x1f, 0x11, 0x02, 0x03); // Density
 
-    // 3. Alimentar papel hasta el troquel / corte
-    rasterData.push(0x1f, 0xf0, 0x05, 0x00); // Feed to gap/mark
-    rasterData.push(0x1b, 0x64, 0x02);       // Feed 2 lines
+      for (let y = 0; y < height; y++) {
+        const lineBytes = new Uint8Array(bytesPerLine);
+        for (let x = 0; x < width; x++) {
+          const offset = (y * width + x) * 4;
+          const r = pixels[offset];
+          const g = pixels[offset + 1];
+          const b = pixels[offset + 2];
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          if (lum < 140) {
+            const byteIdx = Math.floor(x / 8);
+            const bitIdx = 7 - (x % 8);
+            lineBytes[byteIdx] |= (1 << bitIdx);
+          }
+        }
+        rasterData.push(0x1f, 0x10, bytesPerLine & 0xff, (bytesPerLine >> 8) & 0xff);
+        for (let b = 0; b < bytesPerLine; b++) {
+          rasterData.push(lineBytes[b]);
+        }
+      }
+
+      rasterData.push(0x1f, 0xf0, 0x05, 0x00);
+      rasterData.push(0x1b, 0x64, 0x02);
+    }
 
     return new Uint8Array(rasterData);
   }
 
   /**
-   * Envía los bytes al periférico BLE divididos en fragmentos MTU seguros (20 bytes estándar BLE).
-   * Evita errores de rechazo por MTU en Android y Chrome.
+   * Envía los bytes al periférico BLE divididos en fragmentos MTU seguros (20 bytes estándar BLE),
+   * priorizando writeWithResponse para garantizar el acuse de recibo del microcontrolador.
    */
   private async sendInChunks(data: Uint8Array, chunkSize = 20): Promise<void> {
     if (!this.writeCharacteristic) {
@@ -611,23 +636,32 @@ class BluetoothPrinterService {
 
     while (offset < total) {
       const chunk = data.slice(offset, offset + chunkSize);
-      
+      let sent = false;
+
+      // Intentar writeWithResponse primero (garantiza entrega y previene desbordamiento de búfer)
       try {
-        if (this.writeCharacteristic.writeValueWithoutResponse) {
-          await this.writeCharacteristic.writeValueWithoutResponse(chunk);
-        } else {
-          await this.writeCharacteristic.writeValueWithResponse(chunk);
-        }
-      } catch {
-        // Fallback si writeValueWithoutResponse no está soportado o requiere respuesta
         if (this.writeCharacteristic.writeValueWithResponse) {
           await this.writeCharacteristic.writeValueWithResponse(chunk);
+          sent = true;
+        }
+      } catch {
+        // Fallback a withoutResponse si el dispositivo lo requiere estrictamente
+      }
+
+      if (!sent) {
+        try {
+          if (this.writeCharacteristic.writeValueWithoutResponse) {
+            await this.writeCharacteristic.writeValueWithoutResponse(chunk);
+            sent = true;
+          }
+        } catch (err: any) {
+          throw new Error(`Error al transmitir paquete BLE (offset ${offset}/${total}): ${err?.message || err}`);
         }
       }
 
       offset += chunkSize;
-      // Pausa mínima de 8ms para permitir al microcontrolador de la Marklife P15 vaciar el buffer
-      await new Promise(r => setTimeout(r, 8));
+      // Pausa de 10ms para permitir al microcontrolador de la Marklife P15 procesar el búfer
+      await new Promise(r => setTimeout(r, 10));
     }
   }
 

@@ -50,6 +50,7 @@ export const BluetoothPrinterModal: React.FC<BluetoothPrinterModalProps> = ({
 
   const [barcodeOnly, setBarcodeOnly] = useState<boolean>(true);
   const [showSkuText, setShowSkuText] = useState<boolean>(true);
+  const [protocol, setProtocol] = useState<'escpos' | 'l11'>('escpos');
   const [printSuccessMsg, setPrintSuccessMsg] = useState<string | null>(null);
   const [printProgress, setPrintProgress] = useState<{ current: number; total: number } | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -59,7 +60,8 @@ export const BluetoothPrinterModal: React.FC<BluetoothPrinterModalProps> = ({
   const marklifeOptions: MarklifeLabelOptions = useMemo(() => ({
     barcodeOnly,
     showSkuText,
-  }), [barcodeOnly, showSkuText]);
+    protocol,
+  }), [barcodeOnly, showSkuText, protocol]);
 
   const sampleSku = itemsToPrint.length > 0
     ? String(itemsToPrint[0]['sku'] || itemsToPrint[0]['SKU'] || itemsToPrint[0]['codigo'] || '780123456789')
@@ -353,6 +355,47 @@ export const BluetoothPrinterModal: React.FC<BluetoothPrinterModalProps> = ({
                 <span>Mostrar texto numérico del SKU bajo las barras</span>
               </label>
             )}
+          </div>
+
+          {/* PROTOCOLO DE IMPRESIÓN */}
+          <div className="space-y-2 p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-indigo-500" />
+                Protocolo de Comandos
+              </label>
+              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">
+                {protocol === 'escpos' ? 'ESC/POS (GS v 0)' : 'Marklife (0x1F)'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setProtocol('escpos')}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  protocol === 'escpos'
+                    ? 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-900 dark:text-indigo-200 font-bold'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                <div className="text-xs font-bold">ESC/POS (GS v 0)</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Universal y recomendado</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setProtocol('l11')}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  protocol === 'l11'
+                    ? 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-900 dark:text-indigo-200 font-bold'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                <div className="text-xs font-bold">Marklife (0x1F)</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Modo nativo alternativo</div>
+              </button>
+            </div>
           </div>
 
           {/* PREVISUALIZACIÓN REAL EN VIVO */}
