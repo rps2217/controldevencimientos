@@ -1,4 +1,5 @@
 import { InventoryItem, EventCategory } from '../types';
+import { parseFrcPasteData } from '../utils/universalImporter';
 import { 
   getEventCategory, 
   computeItemRawStatus, 
@@ -63,6 +64,12 @@ export type WorkerInMessage =
         dynamicMonthFilter?: number[];
         dynamicMonthRange?: { startOffset: number; endOffset: number } | null;
       };
+    }
+  | {
+      type: 'IMPORT_DATA';
+      payload: {
+        text: string;
+      };
     };
 
 export type WorkerOutMessage =
@@ -74,6 +81,13 @@ export type WorkerOutMessage =
       type: 'FILTER_RESULT';
       payload: {
         matchingIndices: number[];
+      };
+    }
+  | {
+      type: 'IMPORT_RESULT';
+      payload: {
+        mappedRows: any[];
+        error?: string;
       };
     };
 
@@ -274,5 +288,19 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
         matchingIndices
       }
     } as WorkerOutMessage);
+  } else if (type === 'IMPORT_DATA') {
+    const { text } = payload;
+    try {
+      const result = parseFrcPasteData(text);
+      self.postMessage({
+        type: 'IMPORT_RESULT',
+        payload: result
+      } as WorkerOutMessage);
+    } catch (e) {
+      self.postMessage({
+        type: 'IMPORT_RESULT',
+        payload: { mappedRows: [], error: (e as Error).message }
+      } as WorkerOutMessage);
+    }
   }
 };

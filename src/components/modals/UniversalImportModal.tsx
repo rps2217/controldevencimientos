@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { FileSpreadsheet, Upload, Clipboard, CheckCircle2, AlertCircle, ArrowRight, RefreshCw, Layers, Check, X, Sparkles, Filter, Trash2, Tag, AlertTriangle } from 'lucide-react';
-import { parseExcelBuffer, parseDelimitedText, detectDelimiter, generateSmartColumnMappings, ParsedSpreadsheetResult, parseFrcPasteData, COLUMNAS_OBJETIVO_FRC, DICCIONARIO_SINONIMOS_FRC } from '../../utils/universalImporter';
+import { useImportWorker } from '../../hooks/useImportWorker';
+import { parseExcelBuffer, parseDelimitedText, detectDelimiter, generateSmartColumnMappings, ParsedSpreadsheetResult, COLUMNAS_OBJETIVO_FRC, DICCIONARIO_SINONIMOS_FRC } from '../../utils/universalImporter';
 import { rowToObject } from '../../utils/pureCalculations';
 import { findColumnBySemantic } from '../../utils/columnAliases';
 import { InventoryItem, SheetRecord } from '../../types';
@@ -72,7 +73,7 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
     /frc|incidencia|evento|averia|merma|diferencia/i.test(activeSheetTitle) ? 'append' : 'consolidate_sum'
   );
   const [selectedDefaultEvent, setSelectedDefaultEvent] = useState<string>('DIF. PED');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const { processImport, isProcessing: isWorkerProcessing } = useImportWorker();
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'info' | 'error' | 'success' } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,7 +150,7 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
     );
   }, [mappedRowsPreview, existingItems, targetHeaders, customAliases, consolidationMode]);
 
-  const handleProcessText = (textToProcess: string) => {
+  const handleProcessText = async (textToProcess: string) => {
     if (!textToProcess.trim()) {
       setStatusMessage({ text: 'Por favor ingresa o pega datos de una hoja de cálculo.', type: 'error' });
       return;
@@ -157,7 +158,7 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
 
     try {
       if (isFrcSheet || textToProcess.includes('\t') || textToProcess.split(/\r\n|\n/).length >= 2) {
-        const frcResult = parseFrcPasteData(textToProcess);
+        const frcResult = await processImport(textToProcess);
         if (!frcResult.error && frcResult.mappedRows.length > 0) {
           setParsedData({
             headers: COLUMNAS_OBJETIVO_FRC,
@@ -528,12 +529,12 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
                     <div className="flex justify-end gap-2 ml-auto">
                       <button
                         onClick={() => handleProcessText(rawText)}
-                        disabled={!rawText.trim() || isProcessing}
+                        disabled={!rawText.trim() || isWorkerProcessing}
                         className={`px-4 py-2 text-white text-xs font-bold rounded-xl disabled:bg-slate-300 dark:disabled:bg-slate-800 transition-all flex items-center gap-2 shadow-2xs cursor-pointer ${
                           isFrcSheet ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-3.5 h-3.5 ${isWorkerProcessing ? 'animate-spin' : ''}`} />
                         Analizar y Mapear Columnas
                       </button>
                     </div>
@@ -1107,7 +1108,7 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
           {parsedData && (
             <button
               onClick={handleConfirmImport}
-              disabled={isProcessing}
+              disabled={isWorkerProcessing}
               className={`px-5 py-2.5 active:scale-98 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 ${
                 isFrcSheet
                   ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'
