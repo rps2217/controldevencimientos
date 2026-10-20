@@ -8,6 +8,7 @@ import { SliceIcon } from '../slices/SliceSelectorBar';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
 import { useRightDrawer } from '../../context/RightDrawerContext';
+import { TableSlice } from '../../types';
 
 export const DashboardPageHeader: React.FC = () => {
   const dashboard = useDashboard();
@@ -56,7 +57,7 @@ export const DashboardPageHeader: React.FC = () => {
             >
               Todas
             </button>
-            {slices.map((slice) => (
+            {slices.map((slice: TableSlice) => (
               <button
                 key={slice.id}
                 onClick={() => onSelectSlice?.(activeSliceId === slice.id ? null : slice)}

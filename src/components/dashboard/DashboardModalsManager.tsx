@@ -195,75 +195,75 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
   const {
     handleOpenModal,
     handleDelete,
-    allMainItems,
-    policies,
-    products,
+    allMainItems = [],
+    policies = [],
+    products = [],
     sheetConfig,
     setSheetConfig,
-    saveConfig,
-    drainageReportItems,
-    isModalOpen,
-    handleCloseModal,
-    editingItem,
-    setEditingItem,
-    activeSheet,
-    activeView,
-    headers,
-    formData,
-    formErrors,
-    selectedEventCategory,
-    handleSelectEventCategory,
-    handleFormChange,
-    handleSave,
-    isSaving,
-    handleBatchFormUpdate,
-    metadata,
-    fetchData,
-    setSearchTerm,
-    handleSavePistoleoItem,
-    selectedRowIds,
-    handleApplyBulkEdit,
-    filteredItems,
-    visibleHeaders,
-    allManageableColumns,
-    toggleVisibility,
-    moveColumn,
-    showAllColumns,
-    resetColumnOrder,
-    handleColumnDrop,
-    handleSaveQuickTraspaso,
-    globalTicketConfig,
-    handleSaveTicketConfig,
-    handleUniversalImportConfirmed,
-    currentTableSlices,
+    saveConfig = () => {},
+    drainageReportItems = [],
+    isModalOpen = false,
+    handleCloseModal = () => {},
+    editingItem = null,
+    setEditingItem = () => {},
+    activeSheet = null,
+    activeView = 'main',
+    headers = [],
+    formData = {},
+    formErrors = {},
+    selectedEventCategory = 'TRANSPORTE' as EventCategory,
+    handleSelectEventCategory = () => {},
+    handleFormChange = () => {},
+    handleSave = async () => {},
+    isSaving = false,
+    handleBatchFormUpdate = () => {},
+    metadata = null,
+    fetchData = async () => {},
+    setSearchTerm = () => {},
+    handleSavePistoleoItem = async () => {},
+    selectedRowIds = [],
+    handleApplyBulkEdit = async () => {},
+    filteredItems = [],
+    visibleHeaders = [],
+    allManageableColumns = [],
+    toggleVisibility = () => {},
+    moveColumn = () => {},
+    showAllColumns = () => {},
+    resetColumnOrder = () => {},
+    handleColumnDrop = () => {},
+    handleSaveQuickTraspaso = async () => {},
+    globalTicketConfig = {},
+    handleSaveTicketConfig = () => {},
+    handleUniversalImportConfirmed = async () => {},
+    currentTableSlices = [],
     deletedTableSlices = [],
-    sliceCounts,
-    activeSliceId,
-    hiddenSliceIds,
+    sliceCounts = {},
+    activeSliceId = null,
+    hiddenSliceIds = [],
     deletedSliceIds = [],
-    handleSelectSlice,
-    handleDeleteSlice,
+    handleSelectSlice = () => {},
+    handleDeleteSlice = () => {},
     handleRestoreSlice,
     handleResetDefaultSlices,
-    handleToggleSliceVisibility,
-    handleSetBulkVisibility,
-    currentFilters,
-    sortConfig,
+    handleToggleSliceVisibility = () => {},
+    handleSetBulkVisibility = () => {},
+    currentFilters = {},
+    sortConfig = { column: null, direction: 'asc' },
     groupByColumn,
-    groupByDirection,
-    handleSaveSlice,
-    items,
-    handleSyncRowsToVencimientos,
-    showToast,
-    offlineQueue,
-    auditLog,
-    isOffline,
-    isSyncing,
-    latencyMs,
-    connectionStatus,
-    lastHealthCheck,
-    healthErrorMessage,
-    scriptSupportsAtomicSave,
+    groupByDirection = 'asc',
+    handleSaveSlice = () => {},
+    items = [],
+    handleSyncRowsToVencimientos = async () => {},
+    showToast = () => {},
+    offlineQueue = [],
+    auditLog = [],
+    isOffline = false,
+    isSyncing = false,
+    latencyMs = null,
+    connectionStatus = 'connected',
+    lastHealthCheck = null,
+    healthErrorMessage = null,
+    scriptSupportsAtomicSave = false,
     testConnectionHealth,
     syncQueue,
     removeMutation,
@@ -399,7 +399,7 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
             onSaveItem={handleSavePistoleoItem}
             onDeleteItem={handleDelete}
             onOpenFullModal={(prod, prefillSku) => {
-              handleOpenModal(prod, prefillSku);
+              handleOpenModal?.(prod, prefillSku);
             }}
             showToast={showToast}
           />
@@ -584,16 +584,16 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
               setIsSliceModalOpen(false);
               setEditingSliceModalItem(null);
             }}
-            tableKey={activeView}
-            headers={context.allTableHeaders ?? headers}
-            currentFilters={currentFilters}
-            currentSort={sortConfig}
+            tableKey={activeView ?? 'main'}
+            headers={context.allTableHeaders ?? headers ?? []}
+            currentFilters={currentFilters ?? {}}
+            currentSort={sortConfig ?? { column: null, direction: 'asc' }}
             currentGroupBy={groupByColumn ?? undefined}
-            currentGroupByDirection={groupByDirection}
+            currentGroupByDirection={groupByDirection ?? 'asc'}
             currentVisibleHeaders={visibleHeaders ?? undefined}
             editingSlice={editingSliceModalItem}
-            onSaveSlice={handleSaveSlice}
-            onDeleteSlice={handleDeleteSlice}
+            onSaveSlice={handleSaveSlice ?? (() => {})}
+            onDeleteSlice={handleDeleteSlice ?? (() => {})}
           />
         </Suspense>
       )}
@@ -605,12 +605,12 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
             <ScopedErrorBoundary moduleName="Terminal de Conteo e Inventario" onReset={() => setIsStockCountOpen(false)}>
               <Suspense fallback={<LazyFallback />}>
                 <StockCountTerminal
-                  sheetItems={items}
-                  headers={headers}
-                  masterProducts={products}
+                  sheetItems={items ?? []}
+                  headers={headers ?? []}
+                  masterProducts={products ?? []}
                   activeSheetTitle={activeSheet?.title || 'VENCIMIENTOS'}
-                  onSyncRowsToVencimientos={handleSyncRowsToVencimientos}
-                  showToast={showToast}
+                  onSyncRowsToVencimientos={handleSyncRowsToVencimientos ?? (async () => {})}
+                  showToast={showToast ?? (() => {})}
                   onClose={() => setIsStockCountOpen(false)}
                 />
               </Suspense>
@@ -625,26 +625,26 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
           <SyncAuditModal
             isOpen={isSyncAuditOpen}
             onClose={() => setIsSyncAuditOpen(false)}
-            offlineQueue={offlineQueue}
-            auditLog={auditLog}
-            isOffline={isOffline}
-            isSyncing={isSyncing}
-            latencyMs={latencyMs}
-            connectionStatus={connectionStatus}
-            lastHealthCheck={lastHealthCheck}
-            healthErrorMessage={healthErrorMessage}
+            offlineQueue={offlineQueue ?? []}
+            auditLog={auditLog ?? []}
+            isOffline={!!isOffline}
+            isSyncing={!!isSyncing}
+            latencyMs={latencyMs ?? null}
+            connectionStatus={connectionStatus ?? 'connected'}
+            lastHealthCheck={lastHealthCheck ?? null}
+            healthErrorMessage={healthErrorMessage ?? null}
             scriptSupportsAtomicSave={scriptSupportsAtomicSave}
-            testConnectionHealth={testConnectionHealth}
-            syncQueue={syncQueue}
-            removeMutation={removeMutation}
+            testConnectionHealth={testConnectionHealth ?? (async () => ({ success: false, latencyMs: 0, status: 'offline' as ConnectionHealthStatus }))}
+            syncQueue={syncQueue ?? (async () => ({ success: false, count: 0, errors: [] }))}
+            removeMutation={removeMutation ?? (async () => {})}
             discardMutation={discardMutation}
             discardAllFailedMutations={discardAllFailedMutations}
             retryMutation={retryMutation}
             retryAllFailedMutations={retryAllFailedMutations}
             forkMutationAsAppend={forkMutationAsAppend}
-            clearQueue={clearQueue}
-            clearAuditLog={clearAuditLog}
-            showToast={showToast}
+            clearQueue={clearQueue ?? (async () => {})}
+            clearAuditLog={clearAuditLog ?? (async () => {})}
+            showToast={showToast ?? ((msg: string, type?: 'success' | 'error' | 'warning' | 'info', title?: string) => {})}
           />
         </Suspense>
       )}
@@ -677,14 +677,15 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
           <FormatRulesManagerModal
             isOpen={modalsState.isFormatRulesModalOpen}
             onClose={() => modalsActions.setIsFormatRulesModalOpen(false)}
-            formatRules={getStoredFormatRules(sheetConfig.formatRules)}
+            formatRules={getStoredFormatRules(sheetConfig?.formatRules)}
             onSaveRules={(newRules) => {
+              if (!sheetConfig) return;
               const updatedConfig = { ...sheetConfig, formatRules: newRules };
-              setSheetConfig(updatedConfig);
-              saveConfig(updatedConfig);
+              setSheetConfig?.(updatedConfig);
+              saveConfig?.(updatedConfig);
             }}
-            headers={headers}
-            currentTableKey={activeView}
+            headers={headers ?? []}
+            currentTableKey={activeView ?? 'main'}
           />
         </Suspense>
       )}
@@ -695,8 +696,8 @@ export const DashboardModalsManager: React.FC<Partial<DashboardModalsManagerProp
           <AutomationStudioModal
             isOpen={isAutomationModalOpen}
             onClose={() => setIsAutomationModalOpen(false)}
-            sampleItems={items}
-            showToast={showToast}
+            sampleItems={items ?? []}
+            showToast={showToast ?? (() => {})}
           />
         </Suspense>
       )}

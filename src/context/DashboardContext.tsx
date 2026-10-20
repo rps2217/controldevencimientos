@@ -2,13 +2,13 @@ import React, { createContext, useContext, useMemo } from 'react';
 import { DashboardDataProvider, DashboardDataContextType } from './DashboardDataProvider';
 import { DashboardFilterProvider, DashboardFilterContextType } from './DashboardFilterProvider';
 import { DashboardUIProvider, DashboardUIContextType } from './DashboardUIProvider';
-import { DashboardContextType } from '../types'; // I need to move the type definition or keep it here. Let's keep it here for now.
-
 // Redefining the unified type here as a projection of the individual context types
 export type UnifiedDashboardContextType = DashboardDataContextType & DashboardFilterContextType & DashboardUIContextType & {
   // Add other shared context types not covered by specific providers if necessary (e.g. methods)
   [key: string]: any; 
 };
+
+export type DashboardContextType = UnifiedDashboardContextType;
 
 // Internal unified context for components that need everything
 const DashboardContext = createContext<UnifiedDashboardContextType | undefined>(undefined);

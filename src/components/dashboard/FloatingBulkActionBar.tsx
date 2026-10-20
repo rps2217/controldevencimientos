@@ -6,6 +6,7 @@ import { isActionEnabledForTable, buildBulkActionContext } from '../../utils/bul
 import { exportToExcel } from '../../utils/exportUtils';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
+import { InventoryItem } from '../../types';
 
 export const FloatingBulkActionBar: React.FC = () => {
   const dashboard = useDashboard();
@@ -40,7 +41,7 @@ export const FloatingBulkActionBar: React.FC = () => {
   }
 
   const selectedSet = new Set(selectedRowIds.map(Number));
-  const selectedItems = filteredItems.filter(i => selectedSet.has(Number(i._rowIndex)));
+  const selectedItems = filteredItems.filter((i: InventoryItem) => selectedSet.has(Number(i._rowIndex)));
 
   const handleExportSelectedExcel = () => {
     const allData = { products, policies, events: [] };

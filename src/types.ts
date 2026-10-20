@@ -584,3 +584,5 @@ export interface CampaignCutoff {
  * selector de tema y no debe importar de su componente raíz (acoplamiento invertido).
  */
 export type ThemeMode = 'light' | 'dark-slate' | 'dark-gray' | 'dark-sage' | 'dark-amber';
+
+export type { DashboardContextType } from './context/DashboardContext';

@@ -28,6 +28,7 @@ import {
   Bluetooth
 } from 'lucide-react';
 import { TableSlice } from '../../types';
+import { ManageableColumn } from '../../hooks/useColumnManager';
 import { getSlicesForTable } from '../../utils/sliceRegistry';
 import { exportToExcel } from '../../utils/exportUtils';
 import { buildBulkActionContext, isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
@@ -71,7 +72,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
     if (!sliceId) {
       dashboard.handleSelectSlice?.(null);
     } else {
-      const found = dashboard.currentTableSlices?.find(s => s.id === sliceId);
+      const found = dashboard.currentTableSlices?.find((s: TableSlice) => s.id === sliceId);
       dashboard.handleSelectSlice?.(found || null);
     }
   };
@@ -102,7 +103,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
   const isSummaryView = dashboard.isSummaryView ?? false;
   const onToggleSummaryView = () => dashboard.handleToggleSummaryView?.();
   const areFiltersVisible = dashboard.areFiltersVisible ?? true;
-  const onToggleFiltersVisible = () => dashboard.setAreFiltersVisible?.(prev => !prev);
+  const onToggleFiltersVisible = () => dashboard.setAreFiltersVisible?.((prev: boolean) => !prev);
   const isStickyEnabled = dashboard.sheetConfig?.enableStickyColumns === true;
   const onToggleStickyColumns = () => dashboard.handleToggleStickyColumns?.();
   const hasCustomColWidths = dashboard.hasCustomColWidths ?? false;
@@ -135,7 +136,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
   // Filter manageable columns by search term
   const effectiveColumns = useMemo(() => {
     if (manageableColumns.length > 0) return manageableColumns;
-    return allHeaders.map(h => ({
+    return allHeaders.map((h: string) => ({
       id: h,
       label: h,
       isVisible: !hiddenColumns.includes(h),
@@ -147,12 +148,12 @@ export const ViewConfigControlDrawer: React.FC = () => {
   const filteredManageableColumns = useMemo(() => {
     const q = columnSearch.toLowerCase().trim();
     if (!q) return effectiveColumns;
-    return effectiveColumns.filter(c => 
+    return effectiveColumns.filter((c: ManageableColumn) => 
       c.label.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)
     );
   }, [effectiveColumns, columnSearch]);
 
-  const visibleColumnsCount = effectiveColumns.filter(c => c.isVisible).length;
+  const visibleColumnsCount = effectiveColumns.filter((c: ManageableColumn) => c.isVisible).length;
   const totalColumnsCount = effectiveColumns.length;
 
   // Misma fuente que la barra de slices: evita que el drawer muestre nativos que la
@@ -358,7 +359,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
                         className="w-full text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer appearance-none"
                       >
                         <option value="none">Sin agrupar (Lista plana)</option>
-                        {allHeaders.map(h => {
+                        {allHeaders.map((h: string) => {
                           const colDef = activeSheetTitle ? sheetConfig?.schema?.[activeSheetTitle]?.[h] : undefined;
                           const label = colDef?.label || h;
                           const isVirtual = colDef?.isVirtual || colDef?.type === 'calculated';
@@ -544,7 +545,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
                       No se encontraron columnas con ese nombre.
                     </div>
                   ) : (
-                    filteredManageableColumns.map(col => {
+                    filteredManageableColumns.map((col: ManageableColumn) => {
                       const isHidden = !col.isVisible;
                       return (
                         <div

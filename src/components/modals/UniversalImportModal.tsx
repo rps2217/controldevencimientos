@@ -74,6 +74,8 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
   );
   const [selectedDefaultEvent, setSelectedDefaultEvent] = useState<string>('DIF. PED');
   const { processImport, isProcessing: isWorkerProcessing } = useImportWorker();
+  const [isLocalProcessing, setIsProcessing] = useState<boolean>(false);
+  const isProcessing = isWorkerProcessing || isLocalProcessing;
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'info' | 'error' | 'success' } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -529,12 +531,12 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
                     <div className="flex justify-end gap-2 ml-auto">
                       <button
                         onClick={() => handleProcessText(rawText)}
-                        disabled={!rawText.trim() || isWorkerProcessing}
+                        disabled={!rawText.trim() || isProcessing}
                         className={`px-4 py-2 text-white text-xs font-bold rounded-xl disabled:bg-slate-300 dark:disabled:bg-slate-800 transition-all flex items-center gap-2 shadow-2xs cursor-pointer ${
                           isFrcSheet ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                       >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isWorkerProcessing ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin' : ''}`} />
                         Analizar y Mapear Columnas
                       </button>
                     </div>
@@ -1108,7 +1110,7 @@ export const UniversalImportModal: React.FC<UniversalImportModalProps> = ({
           {parsedData && (
             <button
               onClick={handleConfirmImport}
-              disabled={isWorkerProcessing}
+              disabled={isProcessing}
               className={`px-5 py-2.5 active:scale-98 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 ${
                 isFrcSheet
                   ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'

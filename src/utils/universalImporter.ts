@@ -28,7 +28,7 @@ export function limpiarTexto(texto: any): string {
   if (texto === undefined || texto === null) return "";
   return texto
     .toString()
-    .replace(/[▼▲▶◀•▪🔹]/g, "")
+    .replace(/[▼▲▶◀•▪🔹]/gu, "")
     .trim()
     .toUpperCase()
     .normalize("NFD")
@@ -63,7 +63,7 @@ export function parseFrcPasteData(texto: string): { mappedRows: SheetRecord[]; o
   }
 
   let cabecerasOrigen: string[] = [];
-  let filasDatos: string[][] = [];
+  const filasDatos: string[][] = [];
 
   // DETECCIÓN DE FORMATO HORIZONTAL O VERTICAL
   if (lineasOriginales[0].includes('\t')) {

@@ -21,7 +21,7 @@ export const DashboardFilterPanels: React.FC = () => {
   const items = dashboard.items ?? [];
   const eventResolutionFilter = dashboard.eventResolutionFilter ?? [];
   const setEventResolutionFilter = dashboard.setEventResolutionFilter ?? (() => {});
-  const handleFilterToggle = dashboard.handleFilterToggle ?? ((prev, _val) => prev);
+  const handleFilterToggle = dashboard.handleFilterToggle ?? ((prev: string[], _val: string, _isMulti?: boolean) => prev);
   const eventResolutionMetrics = dashboard.eventResolutionMetrics;
   const eventFilter = dashboard.eventFilter ?? [];
   const setEventFilter = dashboard.setEventFilter ?? (() => {});
@@ -44,7 +44,7 @@ export const DashboardFilterPanels: React.FC = () => {
           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mr-2 shrink-0">
             Filtros Rápidos:
           </span>
-          {quickChips.map((chip, idx) => (
+          {quickChips.map((chip: string, idx: number) => (
             <button
               key={idx}
               onClick={() => setActiveQuickChip(activeQuickChip === chip ? null : chip)}
@@ -73,19 +73,19 @@ export const DashboardFilterPanels: React.FC = () => {
         <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-6 py-2 shrink-0 flex flex-col gap-2 shadow-2xs">
           <EventResolutionCards 
             eventResolutionFilter={eventResolutionFilter} 
-            onFilterClick={(val, isMulti) => setEventResolutionFilter(prev => handleFilterToggle(prev, val, isMulti))}
+            onFilterClick={(val, isMulti) => setEventResolutionFilter((prev: string[]) => handleFilterToggle(prev, val, isMulti))}
             metrics={eventResolutionMetrics} 
           />
           {/* Categorías FRC Secundarias y Bodegas */}
           <EventFilterChips 
             totalItems={items.length} 
             eventFilter={eventFilter} 
-            onFilterClick={(val, isMulti) => setEventFilter(prev => handleFilterToggle(prev, val, isMulti))}
+            onFilterClick={(val, isMulti) => setEventFilter((prev: string[]) => handleFilterToggle(prev, val, isMulti))}
             metrics={eventMetrics} 
             frcBodValues={frcBodValues}
             frcBodCounts={frcBodCounts}
             frcBodFilter={frcBodFilter}
-            onFrcBodFilterClick={(val, isMulti) => setFrcBodFilter(prev => handleFilterToggle(prev, val, isMulti))}
+            onFrcBodFilterClick={(val, isMulti) => setFrcBodFilter((prev: string[]) => handleFilterToggle(prev, val, isMulti))}
           />
         </div>
       )}
@@ -94,7 +94,7 @@ export const DashboardFilterPanels: React.FC = () => {
       {canExpire && activeSheet && (
         <PmRadarCards 
           pmRadarFilter={pmRadarFilter} 
-          onFilterClick={(val, isMulti) => setPmRadarFilter(prev => handleFilterToggle(prev, val, isMulti))}
+          onFilterClick={(val, isMulti) => setPmRadarFilter((prev: string[]) => handleFilterToggle(prev, val, isMulti))}
           metrics={pmMetrics} 
         />
       )}

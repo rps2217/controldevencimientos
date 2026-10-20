@@ -40,7 +40,7 @@ export const InventoryTable: React.FC = () => {
   const resizingCol = dashboard.resizingCol ?? null;
   const pmRadarFilter = dashboard.pmRadarFilter ?? [];
   const setPmRadarFilter = dashboard.setPmRadarFilter ?? (() => {});
-  const handleFilterToggle = dashboard.handleFilterToggle ?? ((prev, _val) => prev);
+  const handleFilterToggle = dashboard.handleFilterToggle ?? ((prev: string[], _val: string, _isMulti?: boolean) => prev);
   const onSelectRow = dashboard.onSelectRow ?? (() => {});
   const onClickItem = dashboard.onClickItem ?? dashboard.setSelectedProduct;
   const activeDetailRowIndex = dashboard.selectedProduct?._rowIndex ?? null;
@@ -174,10 +174,10 @@ export const InventoryTable: React.FC = () => {
                   <input
                     type="checkbox"
                     className="w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-800 focus:ring-blue-500 cursor-pointer"
-                    checked={filteredItems.length > 0 && filteredItems.every(i => selectedRowIdSet.has(Number(i._rowIndex)))}
+                    checked={filteredItems.length > 0 && filteredItems.every((i: InventoryItem) => selectedRowIdSet.has(Number(i._rowIndex)))}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedRowIds(filteredItems.map(i => Number(i._rowIndex)));
+                        setSelectedRowIds(filteredItems.map((i: InventoryItem) => Number(i._rowIndex)));
                       } else {
                         setSelectedRowIds([]);
                       }
@@ -247,7 +247,7 @@ export const InventoryTable: React.FC = () => {
                         { label: 'Merma Directa', value: 'merma_directa', badgeClass: 'text-rose-600 dark:text-rose-400 font-semibold' }
                       ]}
                       selectedValues={pmRadarFilter}
-                      onToggle={(val, isMulti) => setPmRadarFilter(prev => handleFilterToggle(prev, val, isMulti))}
+                      onToggle={(val, isMulti) => setPmRadarFilter((prev: string[]) => handleFilterToggle(prev, val, isMulti))}
                       onClear={() => setPmRadarFilter([])}
                     />
                   </div>
@@ -281,7 +281,7 @@ export const InventoryTable: React.FC = () => {
                 </th>
               )}
 
-              {visibleHeaders.map((header, idx) => {
+              {visibleHeaders.map((header: string, idx: number) => {
                 const colSchema = sheetConfig.schema?.[activeSheet?.title || '']?.[header];
                 const width = getColWidth(header, header, colSchema?.type);
                 const isResizingThis = resizingCol?.colId === header;
@@ -382,13 +382,13 @@ export const InventoryTable: React.FC = () => {
                       ) : isBodCol && frcBodValues.length > 0 ? (
                         <ColumnFilterMenu
                           title="Bodegas (FRC_BOD)"
-                          options={frcBodValues.map(bod => ({
+                          options={frcBodValues.map((bod: string) => ({
                             label: `${bod} (${frcBodCounts[bod] || 0})`,
                             value: bod,
                             badgeClass: 'text-sky-600 dark:text-sky-400 font-bold'
                           }))}
                           selectedValues={frcBodFilter}
-                          onToggle={(val, isMulti) => setFrcBodFilter(prev => handleFilterToggle(prev, val, isMulti))}
+                          onToggle={(val, isMulti) => setFrcBodFilter((prev: string[]) => handleFilterToggle(prev, val, isMulti))}
                           onClear={() => setFrcBodFilter([])}
                           alignRight={alignRight}
                         />
@@ -403,7 +403,7 @@ export const InventoryTable: React.FC = () => {
                             ...(columnOptionsMap[header] || [])
                           ]}
                           selectedValues={eventResolutionFilter}
-                          onToggle={(val, isMulti) => setEventResolutionFilter(prev => handleFilterToggle(prev, val, isMulti))}
+                          onToggle={(val, isMulti) => setEventResolutionFilter((prev: string[]) => handleFilterToggle(prev, val, isMulti))}
                           onClear={() => setEventResolutionFilter([])}
                           alignRight={alignRight}
                         />
@@ -455,7 +455,7 @@ export const InventoryTable: React.FC = () => {
               {paddingTop > 0 && (
                 <tr><td style={{ height: `${paddingTop}px` }} colSpan={visibleHeaders.length + extraCols} /></tr>
               )}
-              {virtualRows.map((virtualRow) => {
+              {virtualRows.map((virtualRow: any) => {
                 const rowData = paginatedDisplayRows[virtualRow.index];
                 const idx = virtualRow.index;
                 if (!rowData) return null;
@@ -526,7 +526,7 @@ export const InventoryTable: React.FC = () => {
                                       setSelectedRowIds(newSelected);
                                     } else {
                                       const groupSet = new Set(groupRowIndexes.map(Number));
-                                      setSelectedRowIds(selectedRowIds.filter(id => !groupSet.has(Number(id))));
+                                      setSelectedRowIds(selectedRowIds.filter((id: number) => !groupSet.has(Number(id))));
                                     }
                                   }
                                 }}

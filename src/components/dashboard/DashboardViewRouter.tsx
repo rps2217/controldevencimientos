@@ -9,6 +9,7 @@ import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
 import { isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
 import { getStoredFormatRules } from '../../utils/formatRulesEngine';
+import { InventoryItem } from '../../types';
 
 const AnalyticsDashboard = lazy(() => import('../views/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 
@@ -65,7 +66,7 @@ export const DashboardViewRouter: React.FC<DashboardViewRouterProps> = ({
   const setIsConfigOpen = modalsActions.setIsConfigOpen;
 
   const currentNavIndex = selectedProduct && filteredItems.length > 0
-    ? filteredItems.findIndex(item => (item._entityKey && selectedProduct._entityKey && item._entityKey === selectedProduct._entityKey) || item._rowIndex === selectedProduct._rowIndex)
+    ? filteredItems.findIndex((item: InventoryItem) => (item._entityKey && selectedProduct._entityKey && item._entityKey === selectedProduct._entityKey) || item._rowIndex === selectedProduct._rowIndex)
     : -1;
 
   const handleNavigatePrev = currentNavIndex > 0

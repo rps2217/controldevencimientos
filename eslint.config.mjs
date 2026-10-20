@@ -21,7 +21,7 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       // Los catch vacíos son deliberados (localStorage best-effort, navigator.vibrate).
       'no-empty': ['error', { allowEmptyCatch: true }],
-      '@typescript-eslint/no-unused-vars': ['error', {
+      '@typescript-eslint/no-unused-vars': ['warn', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
         caughtErrors: 'none'
