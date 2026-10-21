@@ -234,6 +234,25 @@ export const DashboardTopNav: React.FC = () => {
             </button>
           )}
 
+          {/* Toggle Filter Panels Button */}
+          {activeView !== 'schema' && activeView !== 'analytics' && (
+            <button
+              onClick={() => dashboard.setAreFiltersVisible?.(!dashboard.areFiltersVisible)}
+              className={`app-button border flex items-center gap-1.5 px-3 transition-all ${
+                dashboard.areFiltersVisible
+                  ? 'bg-slate-800 text-white border-slate-800 dark:bg-slate-700 dark:border-slate-600'
+                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+              title="Mostrar u ocultar paneles de filtros avanzados y radar PM"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Filtros</span>
+              {hasActiveFilters && (
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              )}
+            </button>
+          )}
+
           {/* Conteo Físico Terminal (Desktop & Tablet) */}
           {canCount && (
             <button
