@@ -19,12 +19,16 @@ import { getEnumStyle } from '../../utils/enumColorHelper';
 import { FormatRule } from '../../types';
 import { evaluateItemFormatRules, renderFormatRuleIcon, getColumnFormatStyle } from '../../utils/formatRulesEngine';
 import { InlineEditCell } from '../views/InlineEditCell';
+import { CalculationColumnsContext } from '../../utils/pureCalculations';
 
 export interface InventoryTableRowProps {
   item: InventoryItem;
   virtualIndex: number;
   headers: string[];
   visibleColumnMeta: ColumnMetadata[];
+  columnsContext?: CalculationColumnsContext;
+  precomputedPhoneCol?: string | null;
+  precomputedEmailCol?: string | null;
   /** Mostrar columna de número de fila (#). Por defecto true. */
   showRowCol?: boolean;
   /** Mostrar columna de acciones fijas. Por defecto true. */
@@ -68,6 +72,9 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   virtualIndex,
   headers,
   visibleColumnMeta,
+  columnsContext,
+  precomputedPhoneCol,
+  precomputedEmailCol,
   showRowCol = true,
   showActionsCol = true,
   showExpiryCol = false,
@@ -107,7 +114,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
     return evaluateItemFormatRules(item, headers, formatRules, currentTableKey, customAliases);
   }, [item, headers, formatRules, currentTableKey, customAliases]);
 
-  const eventCategory = getEventCategory(item, headers);
+  const eventCategory = getEventCategory(item, headers, columnsContext);
   const eventCategoryDef = eventCategory ? (EVENT_CATEGORIES[eventCategory] || {
     id: eventCategory,
     rawCode: eventCategory,
@@ -121,25 +128,22 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
     cardBg: 'bg-slate-600 text-white',
     iconBg: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
   }) : null;
-  const status = getItemStatus(item, headers);
+  const status = getItemStatus(item, headers, columnsContext);
   const isEventView = showResolutionCol;
-  const eventResStatus = isEventView ? getItemResolutionStatus(item, headers) : null;
+  const eventResStatus = isEventView ? getItemResolutionStatus(item, headers, columnsContext) : null;
   const isProductsView = isCatalog ?? false;
-  const hasPhone = useMemo(() => {
-    const pCol = findPhoneColumn(headers);
-    return !!pCol && !!item[pCol];
-  }, [headers, item]);
 
-  const hasEmail = useMemo(() => {
-    const eCol = findEmailColumn(headers);
-    return !!eCol && !!item[eCol];
-  }, [headers, item]);
+  const phoneCol = precomputedPhoneCol !== undefined ? precomputedPhoneCol : findPhoneColumn(headers);
+  const hasPhone = !!phoneCol && !!item[phoneCol];
 
-  // Extract core semantic columns for the mobile card view
-  const skuCol = useMemo(() => findColumnBySemantic(headers, 'sku'), [headers]);
-  const descCol = useMemo(() => findColumnBySemantic(headers, 'descripcion'), [headers]);
-  const qtyCol = useMemo(() => findColumnBySemantic(headers, 'cantidad'), [headers]);
-  const dateCol = useMemo(() => findColumnBySemantic(headers, 'fecha_vc') || findColumnBySemantic(headers, 'fecha_retiro'), [headers]);
+  const emailCol = precomputedEmailCol !== undefined ? precomputedEmailCol : findEmailColumn(headers);
+  const hasEmail = !!emailCol && !!item[emailCol];
+
+  // Extract core semantic columns for the mobile card view (O(1) using precomputed context)
+  const skuCol = columnsContext?.skuCol ?? findColumnBySemantic(headers, 'sku');
+  const descCol = columnsContext?.descCol ?? findColumnBySemantic(headers, 'descripcion');
+  const qtyCol = columnsContext?.qtyCol ?? findColumnBySemantic(headers, 'cantidad');
+  const dateCol = (columnsContext?.vcCol || columnsContext?.retCol) ?? (findColumnBySemantic(headers, 'fecha_vc') || findColumnBySemantic(headers, 'fecha_retiro'));
 
   // Calculate padding class based on table density
   const paddingClass = useMemo(() => {
@@ -916,5 +920,8 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
   if (prevProps.visibleColumnMeta !== nextProps.visibleColumnMeta) return false;
   if (prevProps.frcBodFilter !== nextProps.frcBodFilter) return false;
   if (prevProps.getColWidth !== nextProps.getColWidth) return false;
+  if (prevProps.isInlineEditMode !== nextProps.isInlineEditMode) return false;
+  if (prevProps.formatRules !== nextProps.formatRules) return false;
+  if (prevProps.columnsContext !== nextProps.columnsContext) return false;
   return true;
 });

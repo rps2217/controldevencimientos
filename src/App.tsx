@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Link as LinkIcon, CheckCircle2, Compass, QrCode, Camera, ShieldCheck, AlertCircle } from 'lucide-react';
 import InventoryDashboard from './components/InventoryDashboard';
-import RecepcionBultosView from './components/views/RecepcionBultosView';
 import { ToastProvider } from './components/common/ToastContainer';
 import { ConfirmProvider } from './components/common/ConfirmDialog';
 import { PWAReloadPrompt } from './components/pwa/PWAReloadPrompt';
@@ -11,7 +10,8 @@ import { ModalsProvider } from './context/ModalsContext';
 import { UiSettingsProvider } from './context/UiSettingsContext';
 import type { ThemeMode } from './types';
 import { useBarcodeScanner } from './hooks/useBarcodeScanner';
-import QRCode from 'qrcode';
+
+const RecepcionBultosView = lazy(() => import('./components/views/RecepcionBultosView'));
 
 import { STORAGE_KEYS, hasDemoEntry, setDemoEntry, isDemoMode } from './utils/appStorage';
 
@@ -134,28 +134,37 @@ export default function App() {
     }
   }, []);
 
-  // Generar código QR offline con la librería local
+  // Generar código QR offline con la librería local bajo demanda
   useEffect(() => {
     if (isQrGeneratorOpen && setupUrl) {
+      let isMounted = true;
       const payload = JSON.stringify({
         url: setupUrl,
         token: securityToken,
         sheetId: spreadsheetId
       });
-      QRCode.toDataURL(payload, {
-        width: 250,
-        margin: 2,
-        color: {
-          dark: '#1e293b', // slate-800
-          light: '#ffffff' // white
-        }
-      })
-      .then(url => {
-        setQrDataUrl(url);
-      })
-      .catch(err => {
-        console.error('Error generando QR offline:', err);
-      });
+      import('qrcode')
+        .then(QRCodeModule => {
+          const qr = QRCodeModule.default || QRCodeModule;
+          return qr.toDataURL(payload, {
+            width: 250,
+            margin: 2,
+            color: {
+              dark: '#1e293b', // slate-800
+              light: '#ffffff' // white
+            }
+          });
+        })
+        .then(url => {
+          if (isMounted) setQrDataUrl(url);
+        })
+        .catch(err => {
+          console.error('Error generando QR offline:', err);
+        });
+
+      return () => {
+        isMounted = false;
+      };
     }
   }, [isQrGeneratorOpen, setupUrl, securityToken, spreadsheetId]);
 
@@ -551,7 +560,15 @@ export default function App() {
                 <PWAReloadPrompt />
               </>
             } />
-            <Route path="/recepcion-bultos" element={<RecepcionBultosView />} />
+            <Route path="/recepcion-bultos" element={
+              <Suspense fallback={
+                <div className="flex-1 flex items-center justify-center p-8 bg-slate-50 dark:bg-slate-900 text-slate-500 text-sm">
+                  Cargando recepción de bultos...
+                </div>
+              }>
+                <RecepcionBultosView />
+              </Suspense>
+            } />
             <Route path="/conteo" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

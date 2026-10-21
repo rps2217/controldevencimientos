@@ -1,9 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { AlertCircle, Package } from 'lucide-react';
-import { SchemaEditorView } from '../views/SchemaEditorView';
 import { DashboardTableContainer } from './DashboardTableContainer';
 import { ItemDetailDrawer } from '../drawers/ItemDetailDrawer';
-import { OperationalCalendarView } from '../views/OperationalCalendarView';
 import { LazyFallback } from '../common/LazyFallback';
 import { useDashboard } from '../../context/DashboardContext';
 import { useModalsActions } from '../../context/ModalsContext';
@@ -11,6 +9,8 @@ import { isActionEnabledForTable } from '../../utils/bulkActionsRegistry';
 import { getStoredFormatRules } from '../../utils/formatRulesEngine';
 import { InventoryItem } from '../../types';
 
+const SchemaEditorView = lazy(() => import('../views/SchemaEditorView').then(m => ({ default: m.SchemaEditorView })));
+const OperationalCalendarView = lazy(() => import('../views/OperationalCalendarView').then(m => ({ default: m.OperationalCalendarView })));
 const AnalyticsDashboard = lazy(() => import('../views/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 
 export interface DashboardViewRouterProps {
@@ -89,39 +89,43 @@ export const DashboardViewRouter: React.FC<DashboardViewRouterProps> = ({
       )}
 
       {activeView === 'schema' ? (
-        <SchemaEditorView
-          configStorageMode={configStorageMode}
-          hasCloudConfigSheet={hasCloudConfigSheet}
-          cloudConfigSheetName={cloudConfigSheetName}
-          syncSuccessMessage={syncSuccessMessage}
-          isSyncingCloud={isSyncingCloud}
-          metadata={metadata}
-          activeSheet={activeSheet}
-          setActiveSheet={setActiveSheet}
-          headers={headers}
-          setHeaders={setHeaders}
-          isSchemaLoading={isSchemaLoading}
-          setIsSchemaLoading={setIsSchemaLoading}
-          sheetConfig={sheetConfig}
-          saveConfig={saveConfig}
-          setIsScriptModalOpen={setIsScriptModalOpen}
-          handlePushPropertiesConfig={handlePushPropertiesConfig}
-          handlePushCloudConfig={handlePushCloudConfig}
-          activeView={activeView}
-          products={products}
-          policies={policies}
-          sampleItems={items}
-        />
+        <Suspense fallback={<LazyFallback message="Cargando editor de esquema..." />}>
+          <SchemaEditorView
+            configStorageMode={configStorageMode}
+            hasCloudConfigSheet={hasCloudConfigSheet}
+            cloudConfigSheetName={cloudConfigSheetName}
+            syncSuccessMessage={syncSuccessMessage}
+            isSyncingCloud={isSyncingCloud}
+            metadata={metadata}
+            activeSheet={activeSheet}
+            setActiveSheet={setActiveSheet}
+            headers={headers}
+            setHeaders={setHeaders}
+            isSchemaLoading={isSchemaLoading}
+            setIsSchemaLoading={setIsSchemaLoading}
+            sheetConfig={sheetConfig}
+            saveConfig={saveConfig}
+            setIsScriptModalOpen={setIsScriptModalOpen}
+            handlePushPropertiesConfig={handlePushPropertiesConfig}
+            handlePushCloudConfig={handlePushCloudConfig}
+            activeView={activeView}
+            products={products}
+            policies={policies}
+            sampleItems={items}
+          />
+        </Suspense>
       ) : activeView === 'analytics' ? (
         <Suspense fallback={<LazyFallback />}>
           <AnalyticsDashboard items={filteredItems} headers={headers} />
         </Suspense>
       ) : activeView === 'calendar' ? (
-        <OperationalCalendarView
-          items={filteredItems.length > 0 ? filteredItems : items}
-          headers={headers}
-          onSelectItem={(item) => setSelectedProduct(item)}
-        />
+        <Suspense fallback={<LazyFallback message="Cargando calendario operativo..." />}>
+          <OperationalCalendarView
+            items={filteredItems.length > 0 ? filteredItems : items}
+            headers={headers}
+            onSelectItem={(item) => setSelectedProduct(item)}
+          />
+        </Suspense>
       ) : !activeSheet && !loading ? (
         <div className="h-full w-full flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50 dark:bg-slate-900/60">
           <div className="text-center max-w-sm">

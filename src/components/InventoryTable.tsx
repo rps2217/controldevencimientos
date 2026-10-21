@@ -18,6 +18,9 @@ export const InventoryTable: React.FC = () => {
   const headers = dashboard.headers ?? [];
   const visibleHeaders = dashboard.effectiveVisibleHeaders ?? dashboard.visibleHeaders ?? [];
   const visibleColumnMeta = dashboard.visibleColumnMeta ?? [];
+  const columnsContext = dashboard.columnsContext;
+  const phoneCol = dashboard.phoneCol;
+  const emailCol = dashboard.emailCol;
   // Las columnas virtuales de estado se rigen por la CAPACIDAD de la hoja, no por su
   // nombre de vista: asi una hoja no canonica con columnas de vencimiento/incidencia
   // recibe el mismo modulo que las canonicas (`main`/`events`).
@@ -561,6 +564,9 @@ export const InventoryTable: React.FC = () => {
                     virtualIndex={idx}
                     headers={headers}
                     visibleColumnMeta={visibleColumnMeta}
+                    columnsContext={columnsContext}
+                    precomputedPhoneCol={phoneCol}
+                    precomputedEmailCol={emailCol}
                     showRowCol={showRowCol}
                     showActionsCol={showActionsCol}
                     showExpiryCol={showExpiryCol}

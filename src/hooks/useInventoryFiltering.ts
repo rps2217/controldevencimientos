@@ -222,16 +222,18 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
     const skuCol = findColumnBySemantic(headers, 'sku', sheetConfig?.customAliases) || headers.find(h => /sku|código|codigo/i.test(h));
     const hasCatalog = catalogSkuSet !== null && catalogSkuSet.size > 0;
 
+    if (!hasCatalog || !skuCol) {
+      return baseAugmented;
+    }
+
     let hasChanges = false;
     const result = baseAugmented.map(item => {
       let isOrphan = false;
-      if (hasCatalog && skuCol) {
-        const rawSku = item[skuCol] || item.SKU || item.sku;
-        const cleanSku = rawSku !== undefined && rawSku !== null ? String(rawSku).trim().toLowerCase() : '';
-        if (cleanSku) {
-          const alpha = cleanSku.replace(/[^a-z0-9]/g, '');
-          isOrphan = !catalogSkuSet.has(cleanSku) && (!alpha || !catalogSkuSet.has(alpha));
-        }
+      const rawSku = item[skuCol] || item.SKU || item.sku;
+      const cleanSku = rawSku !== undefined && rawSku !== null ? String(rawSku).trim().toLowerCase() : '';
+      if (cleanSku) {
+        const alpha = cleanSku.replace(/[^a-z0-9]/g, '');
+        isOrphan = !catalogSkuSet.has(cleanSku) && (!alpha || !catalogSkuSet.has(alpha));
       }
 
       if (item._isOrphan === isOrphan) {
@@ -328,28 +330,32 @@ export function useInventoryFiltering(props: UseInventoryFilteringProps) {
       });
     }
 
-    // Always ensure schema virtual columns are included in columnOptionsMap
+    // Always ensure schema virtual columns are included in columnOptionsMap (sample if large)
     const schemaVCs = getSchemaVirtualColumns(activeSheetTitle, sheetConfig).map(vc => vc.colKey);
+    const vcToCompute = schemaVCs.filter(h => !map[h] || map[h].length === 0);
 
-    schemaVCs.forEach(h => {
-      const uniqueVals = new Set<string>();
-      augmentedItems.forEach(item => {
-        const val = item[h];
-        if (val !== undefined && val !== null && String(val).trim() !== '') {
-          uniqueVals.add(String(val).trim());
-        } else {
-          uniqueVals.add('(Vacío)');
-        }
+    if (vcToCompute.length > 0) {
+      const sample = augmentedItems.length > 200 ? augmentedItems.slice(0, 200) : augmentedItems;
+      vcToCompute.forEach(h => {
+        const uniqueVals = new Set<string>();
+        sample.forEach(item => {
+          const val = item[h];
+          if (val !== undefined && val !== null && String(val).trim() !== '') {
+            uniqueVals.add(String(val).trim());
+          } else {
+            uniqueVals.add('(Vacío)');
+          }
+        });
+        map[h] = Array.from(uniqueVals)
+          .sort((a, b) => a.localeCompare(b))
+          .slice(0, 100)
+          .map(v => ({ label: v, value: v }));
       });
-      map[h] = Array.from(uniqueVals)
-        .sort((a, b) => a.localeCompare(b))
-        .slice(0, 100)
-        .map(v => ({ label: v, value: v }));
-    });
+    }
 
     // Ensure schema options for any column (including FRC_EVEN) are included in columnOptionsMap
     headers.forEach(h => {
-      const schemaVals = getColumnEnumValues(h, sheetConfig, activeSheetTitle, sheetConfig?.customAliases, augmentedItems);
+      const schemaVals = getColumnEnumValues(h, sheetConfig, activeSheetTitle, sheetConfig?.customAliases);
       if (schemaVals.length > 0) {
         const existing = map[h] || [];
         const combined = [...schemaVals.map(v => ({ label: v, value: v }))];

@@ -287,6 +287,9 @@ export interface CalculationColumnsContext {
   idCol: string | null;
   polCol: string | null;
   traspasoCol: string | null;
+  skuCol?: string | null;
+  descCol?: string | null;
+  qtyCol?: string | null;
 }
 
 export function createColumnsContext(headers: string[]): CalculationColumnsContext {
@@ -301,7 +304,10 @@ export function createColumnsContext(headers: string[]): CalculationColumnsConte
     traspasoCol: findColumnBySemantic(headers, 'n_traspaso') 
       || headers.find(h => /^n(_|\s)?traspaso/i.test(h.trim()))
       || headers.find(h => /traspaso/i.test(h.trim())) 
-      || null
+      || null,
+    skuCol: findColumnBySemantic(headers, 'sku') || null,
+    descCol: findColumnBySemantic(headers, 'descripcion') || null,
+    qtyCol: findColumnBySemantic(headers, 'cantidad') || null
   };
 }
 

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { findColumnBySemantic } from '../utils/columnAliases';
+import { findColumnBySemantic, findPhoneColumn, findEmailColumn } from '../utils/columnAliases';
+import { createColumnsContext, CalculationColumnsContext } from '../utils/pureCalculations';
 import { ColumnSchema } from '../types';
 
 export interface ColumnMetadata {
@@ -12,23 +13,33 @@ export interface ColumnMetadata {
   colSchema?: ColumnSchema;
 }
 
-export function usePrecomputedColumns(
-  headers: string[],
-  visibleHeaders: string[],
-  frcBodCol: string | null,
-  tableSchema?: Record<string, ColumnSchema>
-): {
+export interface UsePrecomputedColumnsResult {
   visibleColumnMeta: ColumnMetadata[];
   skuCol: string | null;
   eventCol: string | null;
   traspasoCol: string | null;
   bodCol: string | null;
-} {
+  descCol: string | null;
+  phoneCol: string | null;
+  emailCol: string | null;
+  columnsContext: CalculationColumnsContext;
+}
+
+export function usePrecomputedColumns(
+  headers: string[],
+  visibleHeaders: string[],
+  frcBodCol: string | null,
+  tableSchema?: Record<string, ColumnSchema>
+): UsePrecomputedColumnsResult {
   return useMemo(() => {
     const skuCol = findColumnBySemantic(headers, 'sku') || headers.find(h => /sku|código|codigo/i.test(h)) || null;
+    const descCol = findColumnBySemantic(headers, 'descripcion') || headers.find(h => /descripci[oó]n|producto|nombre/i.test(h)) || null;
+    const phoneCol = findPhoneColumn(headers) || null;
+    const emailCol = findEmailColumn(headers) || null;
     const eventCol = findColumnBySemantic(headers, 'tipo_evento') || headers.find(h => /^frc(_|\s)?even/i.test(h.trim())) || null;
     const traspasoCol = findColumnBySemantic(headers, 'n_traspaso') || headers.find(h => /traspaso/i.test(h)) || null;
     const bodCol = frcBodCol || findColumnBySemantic(headers, 'frc_bod') || headers.find(h => /^frc(_|\s)?bod/i.test(h.trim()) || /bodega/i.test(h.trim())) || null;
+    const columnsContext = createColumnsContext(headers);
 
     const visibleColumnMeta: ColumnMetadata[] = visibleHeaders.map(header => {
       const isSku = header === skuCol || /sku|código|codigo/i.test(header);
@@ -56,7 +67,11 @@ export function usePrecomputedColumns(
       skuCol,
       eventCol,
       traspasoCol,
-      bodCol
+      bodCol,
+      descCol,
+      phoneCol,
+      emailCol,
+      columnsContext
     };
   }, [headers, visibleHeaders, frcBodCol, tableSchema]);
 }

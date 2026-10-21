@@ -48,7 +48,26 @@ export default defineConfig(() => {
         workbox: {
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          globIgnores: [
+            '**/vendor-charts-*.js',
+            '**/AnalyticsDashboard-*.js',
+            '**/StockCountTerminal-*.js',
+            '**/CampaignConsolidationDashboard-*.js',
+            '**/xlsx-*.js',
+            '**/BluetoothPrinterModal-*.js'
+          ],
           runtimeCaching: [
+            {
+              urlPattern: /assets\/(vendor-charts|AnalyticsDashboard|StockCountTerminal|CampaignConsolidationDashboard|xlsx|BluetoothPrinterModal).*\.js$/i,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'on-demand-modules-cache',
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+              },
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',
@@ -89,6 +108,35 @@ export default defineConfig(() => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+    },
+    build: {
+      chunkSizeWarningLimit: 600,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react-router') || id.includes('react-dom') || id.includes('/react/')) {
+                return 'vendor-react';
+              }
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons';
+              }
+              if (id.includes('motion')) {
+                return 'vendor-motion';
+              }
+              if (id.includes('recharts') || id.includes('d3-')) {
+                return 'vendor-charts';
+              }
+              if (id.includes('zod')) {
+                return 'vendor-zod';
+              }
+              if (id.includes('@tanstack')) {
+                return 'vendor-virtual';
+              }
+            }
+          }
+        }
+      }
     },
     server: {
       port: 3000,
