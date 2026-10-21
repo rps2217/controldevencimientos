@@ -196,16 +196,7 @@ export const DashboardTopNav: React.FC = () => {
                 </button>
               )}
 
-              {setIsMobilePistoleoOpen && canCount && (
-                <button
-                  onClick={() => setIsMobilePistoleoOpen(true)}
-                  className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-extrabold text-white bg-gradient-to-r from-red-700 to-rose-700 hover:from-red-600 hover:to-rose-600 rounded-lg shadow-xs transition-all mr-1 shrink-0 cursor-pointer active:scale-95"
-                  title="Terminal de Pistoleo"
-                >
-                  <Barcode className="w-3.5 h-3.5 text-rose-200" />
-                  <span>Pistoleo</span>
-                </button>
-              )}
+
 
               <button
                 onClick={() => setIsScannerOpen(true)}
@@ -234,36 +225,9 @@ export const DashboardTopNav: React.FC = () => {
             </button>
           )}
 
-          {/* Toggle Filter Panels Button */}
-          {activeView !== 'schema' && activeView !== 'analytics' && (
-            <button
-              onClick={() => dashboard.setAreFiltersVisible?.(!dashboard.areFiltersVisible)}
-              className={`app-button border flex items-center gap-1.5 px-3 transition-all ${
-                dashboard.areFiltersVisible
-                  ? 'bg-slate-800 text-white border-slate-800 dark:bg-slate-700 dark:border-slate-600'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
-              }`}
-              title="Mostrar u ocultar paneles de filtros avanzados y radar PM"
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Filtros</span>
-              {hasActiveFilters && (
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-              )}
-            </button>
-          )}
 
-          {/* Conteo Físico Terminal (Desktop & Tablet) */}
-          {canCount && (
-            <button
-              onClick={onOpenStockCount}
-              className="app-button hidden md:flex border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 items-center gap-1.5 px-3"
-              title="Módulo de conteo masivo de existencias físicas"
-            >
-              <Barcode className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>Conteo</span>
-            </button>
-          )}
+
+
 
           {/* Theme & Settings */}
           <div className="hidden sm:flex items-center gap-1 shrink-0">
@@ -315,14 +279,7 @@ export const DashboardTopNav: React.FC = () => {
             )}
           </div>
 
-          {/* Refresh button */}
-          <button 
-            onClick={() => dashboard.setIsInlineEditMode?.(!dashboard.isInlineEditMode)} 
-            className={`h-10 w-10 border rounded-xl shadow-2xs flex items-center justify-center transition-all cursor-pointer active:scale-95 ${dashboard.isInlineEditMode ? 'bg-blue-600 text-white border-blue-700' : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300'}`}
-            title="Activar/Desactivar edición en línea"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
+
           <button 
             onClick={() => fetchData(sheetConfig, activeView, true)} 
             className="h-10 w-10 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-xl shadow-2xs hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors cursor-pointer shrink-0 active:scale-95" 
