@@ -818,36 +818,43 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
                   })}
                 </div>
               ) : (
-                <span 
-                  style={colFormatStyle ? {
-                    color: colFormatStyle.textColor,
-                    backgroundColor: colFormatStyle.backgroundColor,
-                    fontWeight: colFormatStyle.bold ? 700 : undefined,
-                    fontStyle: colFormatStyle.italic ? 'italic' : undefined,
-                    borderColor: colFormatStyle.textColor ? `${colFormatStyle.textColor}40` : undefined
-                  } : undefined}
-                  className={`truncate block text-left w-full ${
-                    colFormatStyle?.badge || (colFormatStyle?.backgroundColor && !colFormatStyle?.badge)
-                      ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border shadow-2xs max-w-full'
-                      : ''
-                  } ${
-                    !colFormatStyle?.textColor ? 'text-slate-800 dark:text-slate-200' : ''
-                  } ${(isDateCol || (val !== null && typeof val === 'number') || (typeof val === 'string' && !isNaN(Number(val)) && val.trim() !== '')) ? 'font-mono tabular-nums' : ''}`}
-                  title={colFormatStyle?.ruleName ? `Regla: ${colFormatStyle.ruleName}` : undefined}
-                >
-                  {colFormatStyle?.icon && (
-                    <span style={{ color: colFormatStyle.textColor || 'currentColor' }} className="shrink-0 inline-flex items-center mr-1">
-                      {renderFormatRuleIcon(colFormatStyle.icon, 'w-3.5 h-3.5')}
+                colSchema?.isEditable && onInlineSave && isInlineEditMode ? (
+                  <InlineEditCell 
+                    value={String(val ?? '')} 
+                    onSave={(newVal) => onInlineSave(item, header, newVal)}
+                  />
+                ) : (
+                  <span 
+                    style={colFormatStyle ? {
+                      color: colFormatStyle.textColor,
+                      backgroundColor: colFormatStyle.backgroundColor,
+                      fontWeight: colFormatStyle.bold ? 700 : undefined,
+                      fontStyle: colFormatStyle.italic ? 'italic' : undefined,
+                      borderColor: colFormatStyle.textColor ? `${colFormatStyle.textColor}40` : undefined
+                    } : undefined}
+                    className={`truncate block text-left w-full ${
+                      colFormatStyle?.badge || (colFormatStyle?.backgroundColor && !colFormatStyle?.badge)
+                        ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border shadow-2xs max-w-full'
+                        : ''
+                    } ${
+                      !colFormatStyle?.textColor ? 'text-slate-800 dark:text-slate-200' : ''
+                    } ${(isDateCol || (val !== null && typeof val === 'number') || (typeof val === 'string' && !isNaN(Number(val)) && val.trim() !== '')) ? 'font-mono tabular-nums' : ''}`}
+                    title={colFormatStyle?.ruleName ? `Regla: ${colFormatStyle.ruleName}` : undefined}
+                  >
+                    {colFormatStyle?.icon && (
+                      <span style={{ color: colFormatStyle.textColor || 'currentColor' }} className="shrink-0 inline-flex items-center mr-1">
+                        {renderFormatRuleIcon(colFormatStyle.icon, 'w-3.5 h-3.5')}
+                      </span>
+                    )}
+                    <span className="truncate">
+                      {val !== undefined && val !== null && String(val).trim() !== ''
+                        ? (isDateCol || (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}/i.test(val.trim())) || val instanceof Date)
+                          ? formatDisplayDate(val)
+                          : String(val)
+                        : '-'}
                     </span>
-                  )}
-                  <span className="truncate">
-                    {val !== undefined && val !== null && String(val).trim() !== ''
-                      ? (isDateCol || (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}/i.test(val.trim())) || val instanceof Date)
-                        ? formatDisplayDate(val)
-                        : String(val)
-                      : '-'}
                   </span>
-                </span>
+                )
               )}
             </div>
           </td>
