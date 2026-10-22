@@ -27,7 +27,9 @@ import {
   Download,
   Bluetooth,
   PanelRight,
-  PanelBottom
+  PanelBottom,
+  AppWindow,
+  Rows
 } from 'lucide-react';
 import { TableSlice } from '../../types';
 import { ManageableColumn } from '../../hooks/useColumnManager';
@@ -451,9 +453,12 @@ export const ViewConfigControlDrawer: React.FC = () => {
                     {setDetailDrawerPosition && (
                       <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
                         <span className="font-semibold text-slate-700 dark:text-slate-200 text-xs flex items-center justify-between">
-                          <span>Panel de Detalle (Ficha)</span>
+                          <span>Disposición de Ficha de Detalle</span>
                           <span className="text-[10px] text-slate-400 font-normal">
-                            {detailDrawerPosition === 'bottom' ? 'Muelle Inferior' : 'Lateral Derecha'}
+                            {detailDrawerPosition === 'right' && 'Lateral Derecha'}
+                            {detailDrawerPosition === 'bottom' && 'Muelle Inferior'}
+                            {detailDrawerPosition === 'floating' && 'Ventana Flotante'}
+                            {detailDrawerPosition === 'inline' && 'Fila en Tabla'}
                           </span>
                         </span>
                         <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/90 rounded-xl">
@@ -467,7 +472,7 @@ export const ViewConfigControlDrawer: React.FC = () => {
                             }`}
                           >
                             <PanelRight className="w-3.5 h-3.5" />
-                            <span>Lateral (Default)</span>
+                            <span>Lateral</span>
                           </button>
                           <button
                             type="button"
@@ -479,7 +484,31 @@ export const ViewConfigControlDrawer: React.FC = () => {
                             }`}
                           >
                             <PanelBottom className="w-3.5 h-3.5" />
-                            <span>Muelle (Bottom)</span>
+                            <span>Muelle</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDetailDrawerPosition('floating')}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              detailDrawerPosition === 'floating'
+                                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            <AppWindow className="w-3.5 h-3.5" />
+                            <span>Flotante</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDetailDrawerPosition('inline')}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              detailDrawerPosition === 'inline'
+                                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            <Rows className="w-3.5 h-3.5" />
+                            <span>En Fila</span>
                           </button>
                         </div>
                       </div>

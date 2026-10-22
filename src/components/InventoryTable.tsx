@@ -6,8 +6,11 @@ import { GripVertical, ChevronDown } from 'lucide-react';
 import { findColumnBySemantic } from '../utils/columnAliases';
 import { EVENT_CATEGORIES } from '../utils/dateCalculations';
 import { useDashboard } from '../context/DashboardContext';
+import { useModalsActions } from '../context/ModalsContext';
 import { isActionEnabledForTable, buildBulkActionContext } from '../utils/bulkActionsRegistry';
 import { getStoredFormatRules } from '../utils/formatRulesEngine';
+import { InlineItemDetailRow } from './views/InlineItemDetailRow';
+import { DetailDrawerPosition } from '../utils/appStorage';
 
 export const InventoryTable: React.FC = () => {
   const dashboard = useDashboard();
@@ -58,11 +61,16 @@ export const InventoryTable: React.FC = () => {
   const onOpenEmail = dashboard.onOpenEmail;
   const handleInlineSave = dashboard.handleInlineSave;
   const sheetConfig = dashboard.sheetConfig;
+  const modalsActions = useModalsActions();
+  const detailDrawerPosition: DetailDrawerPosition = dashboard.detailDrawerPosition ?? 'right';
+  const isInlineDetail = detailDrawerPosition === 'inline';
+  const bulkActionCtx = dashboard.bulkActionCtx ?? buildBulkActionContext(headers, dashboard.activeView, dashboard.activeView);
   const isCopyEnabled = dashboard.isCopyEnabled ?? isActionEnabledForTable(
     'copy_edit',
-    dashboard.bulkActionCtx ?? buildBulkActionContext(headers, dashboard.activeView, dashboard.activeView),
+    bulkActionCtx,
     sheetConfig
   );
+  const isBarcodeEnabled = isActionEnabledForTable('barcode_ticket', bulkActionCtx, sheetConfig);
 
   const isWhatsAppEnabled = dashboard.isWhatsAppEnabled ?? false;
   const isEmailEnabled = dashboard.isEmailEnabled ?? false;
@@ -557,47 +565,79 @@ export const InventoryTable: React.FC = () => {
                 }
                 
                 const item = rowData.item;
+                const isInlineActive = isInlineDetail && activeDetailRowIndex === item._rowIndex;
                 return (
-                  <InventoryTableRow
-                    key={`item-${item._rowIndex || idx}`}
-                    item={item}
-                    virtualIndex={idx}
-                    headers={headers}
-                    visibleColumnMeta={visibleColumnMeta}
-                    columnsContext={columnsContext}
-                    precomputedPhoneCol={phoneCol}
-                    precomputedEmailCol={emailCol}
-                    showRowCol={showRowCol}
-                    showActionsCol={showActionsCol}
-                    showExpiryCol={showExpiryCol}
-                    showResolutionCol={showResolutionCol}
-                    isCatalog={caps?.has('catalogo') ?? false}
-                    isSelected={selectedRowIdSet.has(Number(item._rowIndex))}
-                    isActiveDetail={activeDetailRowIndex === item._rowIndex}
-                    frcBodFilter={frcBodFilter}
-                    getColWidth={getColWidth}
-                    measureElementRef={measureElementRef}
-                    onSelectRow={onSelectRow}
-                    onClickItem={onClickItem}
-                    onDeleteRow={onDeleteRow}
-                    onCopyRow={isCopyEnabled ? handleOpenCopyModal : undefined}
-                    onPmRadarFilterClick={onPmRadarFilterClick}
-                    onEventResolutionFilterClick={onEventResolutionFilterClick}
-                    onEventFilterClick={onEventFilterClick}
-                    onFrcBodFilterClick={onFrcBodFilterClick}
-                    onOpenQuickTraspaso={onOpenQuickTraspaso}
-                    onOpenWhatsApp={onOpenWhatsApp}
-                    onOpenEmail={onOpenEmail}
-                    isWhatsAppEnabled={isWhatsAppEnabled}
-                    isEmailEnabled={isEmailEnabled}
-                    isStickyEnabled={isSticky}
-                    tableDensity={tableDensity}
-                    formatRules={formatRules}
-                    currentTableKey={dashboard.activeView}
-                    customAliases={dashboard.sheetConfig?.customAliases}
-                    onInlineSave={handleInlineSave}
-                    isInlineEditMode={dashboard.isInlineEditMode ?? false}
-                  />
+                  <React.Fragment key={`row-group-${item._rowIndex ?? idx}`}>
+                    <InventoryTableRow
+                      key={`item-${item._rowIndex || idx}`}
+                      item={item}
+                      virtualIndex={idx}
+                      headers={headers}
+                      visibleColumnMeta={visibleColumnMeta}
+                      columnsContext={columnsContext}
+                      precomputedPhoneCol={phoneCol}
+                      precomputedEmailCol={emailCol}
+                      showRowCol={showRowCol}
+                      showActionsCol={showActionsCol}
+                      showExpiryCol={showExpiryCol}
+                      showResolutionCol={showResolutionCol}
+                      isCatalog={caps?.has('catalogo') ?? false}
+                      isSelected={selectedRowIdSet.has(Number(item._rowIndex))}
+                      isActiveDetail={activeDetailRowIndex === item._rowIndex}
+                      frcBodFilter={frcBodFilter}
+                      getColWidth={getColWidth}
+                      measureElementRef={measureElementRef}
+                      onSelectRow={onSelectRow}
+                      onClickItem={onClickItem}
+                      onDeleteRow={onDeleteRow}
+                      onCopyRow={isCopyEnabled ? handleOpenCopyModal : undefined}
+                      onPmRadarFilterClick={onPmRadarFilterClick}
+                      onEventResolutionFilterClick={onEventResolutionFilterClick}
+                      onEventFilterClick={onEventFilterClick}
+                      onFrcBodFilterClick={onFrcBodFilterClick}
+                      onOpenQuickTraspaso={onOpenQuickTraspaso}
+                      onOpenWhatsApp={onOpenWhatsApp}
+                      onOpenEmail={onOpenEmail}
+                      isWhatsAppEnabled={isWhatsAppEnabled}
+                      isEmailEnabled={isEmailEnabled}
+                      isStickyEnabled={isSticky}
+                      tableDensity={tableDensity}
+                      formatRules={formatRules}
+                      currentTableKey={dashboard.activeView}
+                      customAliases={dashboard.sheetConfig?.customAliases}
+                      onInlineSave={handleInlineSave}
+                      isInlineEditMode={dashboard.isInlineEditMode ?? false}
+                    />
+                    {isInlineActive && (
+                      <InlineItemDetailRow
+                        product={item}
+                        colSpan={visibleHeaders.length + extraCols}
+                        onClose={() => dashboard.setSelectedProduct(null)}
+                        onEdit={(prod) => {
+                          dashboard.setSelectedProduct(null);
+                          dashboard.handleOpenModal(prod);
+                        }}
+                        onCopy={isCopyEnabled ? (prod) => {
+                          dashboard.setSelectedProduct(null);
+                          handleOpenCopyModal?.(prod);
+                        } : undefined}
+                        onDeleteRow={onDeleteRow}
+                        onPrintBarcode={isBarcodeEnabled ? (prod) => dashboard.handlePrintTicket([prod], 'barcode') : undefined}
+                        onPrintBluetooth={(prod) => modalsActions.openBluetoothPrinter([prod])}
+                        allMainItems={dashboard.allMainItems ?? []}
+                        policies={dashboard.policies ?? []}
+                        products={dashboard.products ?? []}
+                        customAliases={dashboard.sheetConfig?.customAliases}
+                        formatRules={formatRules}
+                        position={detailDrawerPosition}
+                        onChangePosition={dashboard.setDetailDrawerPosition}
+                        onOpenParentChildInspector={(entityType, entityValue) => {
+                          modalsActions.openRelationalMenu?.(entityType, entityValue);
+                        }}
+                        onSelectRelatedItem={(relatedItem) => dashboard.setSelectedProduct(relatedItem)}
+                      />
+                    )}
+                  </React.Fragment>
                 );
               })}
               {paddingBottom > 0 && (

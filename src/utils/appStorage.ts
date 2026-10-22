@@ -34,6 +34,8 @@ export const STORAGE_KEYS = {
   COL_ORDERS: 'appsheet_clone_col_orders',
   DETAIL_HIDDEN_FIELDS: 'appsheet_detail_hidden_fields',
   DETAIL_DRAWER_POSITION: 'app_detail_drawer_position',
+  DETAIL_DRAWER_WIDTH: 'app_detail_drawer_width',
+  DETAIL_DRAWER_HEIGHT: 'app_detail_drawer_height',
   SLICES_COLLAPSED: 'appsheet_slices_collapsed',
 
   // Sesiones de conteo e inventario cíclico
@@ -291,9 +293,9 @@ export const sheetConfigShapeSchema = z.record(z.string(), z.unknown());
 export const tableDensitySchema = z.enum(['comfortable', 'compact', 'ultra']);
 
 /**
- * Ubicación del panel de detalle maestro: lateral derecha ('right', por defecto) o muelle inferior ('bottom').
+ * Ubicación del panel de detalle maestro: lateral derecha ('right', por defecto), muelle inferior ('bottom'), ventana flotante ('floating') o fila expandible ('inline').
  */
-export const detailDrawerPositionSchema = z.enum(['right', 'bottom']);
+export const detailDrawerPositionSchema = z.enum(['right', 'bottom', 'floating', 'inline']);
 export type DetailDrawerPosition = z.infer<typeof detailDrawerPositionSchema>;
 
 /**
