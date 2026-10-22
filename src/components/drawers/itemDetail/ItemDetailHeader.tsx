@@ -1,6 +1,7 @@
 import React from 'react';
 import { 
-  Package, X, Edit2, Trash2, Copy, Barcode as BarcodeIcon, ChevronLeft, ChevronRight, Maximize2, Minimize2, Bluetooth 
+  Package, X, Edit2, Trash2, Copy, Barcode as BarcodeIcon, ChevronLeft, ChevronRight, Maximize2, Minimize2, Bluetooth,
+  PanelRight, PanelBottom
 } from 'lucide-react';
 import { InventoryItem } from '../../../types';
 
@@ -21,6 +22,8 @@ interface ItemDetailHeaderProps {
   totalCount?: number;
   isExpandedHorizontal?: boolean;
   onToggleExpand?: () => void;
+  position?: 'right' | 'bottom';
+  onChangePosition?: (pos: 'right' | 'bottom') => void;
 }
 
 export const ItemDetailHeader: React.FC<ItemDetailHeaderProps> = ({
@@ -39,7 +42,9 @@ export const ItemDetailHeader: React.FC<ItemDetailHeaderProps> = ({
   currentIndex,
   totalCount,
   isExpandedHorizontal,
-  onToggleExpand
+  onToggleExpand,
+  position = 'right',
+  onChangePosition
 }) => {
   return (
     <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-2.5 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
@@ -137,11 +142,26 @@ export const ItemDetailHeader: React.FC<ItemDetailHeaderProps> = ({
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
+            {onChangePosition && !isExpandedHorizontal && (
+              <button
+                type="button"
+                onClick={() => onChangePosition(position === 'bottom' ? 'right' : 'bottom')}
+                className={`p-1.5 rounded-xl border transition-all cursor-pointer hidden sm:flex items-center justify-center ${
+                  position === 'bottom'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 shadow-2xs hover:bg-blue-100 dark:hover:bg-blue-900/60'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+                title={position === 'bottom' ? "Cambiar a Panel Lateral Derecho (Dock Derecho)" : "Cambiar a Muelle Inferior (Dock Bottom)"}
+                aria-label="Alternar posición de panel"
+              >
+                {position === 'bottom' ? <PanelRight className="w-4 h-4" /> : <PanelBottom className="w-4 h-4" />}
+              </button>
+            )}
             {onToggleExpand && (
               <button
                 onClick={onToggleExpand}
                 className="p-1.5 text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-blue-600 hover:text-white transition-colors cursor-pointer hidden sm:block"
-                title={isExpandedHorizontal ? "Cambiar a panel lateral" : "Expandir a vista horizontal (Ficha Técnica en 3 columnas)"}
+                title={isExpandedHorizontal ? "Cambiar a panel acoplado" : "Expandir a pantalla completa (Ficha Técnica en 3 columnas)"}
               >
                 {isExpandedHorizontal ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>

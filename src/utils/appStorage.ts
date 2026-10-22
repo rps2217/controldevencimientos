@@ -33,6 +33,7 @@ export const STORAGE_KEYS = {
   HIDDEN_COLS: 'appsheet_clone_hidden_cols',
   COL_ORDERS: 'appsheet_clone_col_orders',
   DETAIL_HIDDEN_FIELDS: 'appsheet_detail_hidden_fields',
+  DETAIL_DRAWER_POSITION: 'app_detail_drawer_position',
   SLICES_COLLAPSED: 'appsheet_slices_collapsed',
 
   // Sesiones de conteo e inventario cíclico
@@ -288,6 +289,12 @@ export const sheetConfigShapeSchema = z.record(z.string(), z.unknown());
  * valida contra los valores admitidos en vez de parsearla.
  */
 export const tableDensitySchema = z.enum(['comfortable', 'compact', 'ultra']);
+
+/**
+ * Ubicación del panel de detalle maestro: lateral derecha ('right', por defecto) o muelle inferior ('bottom').
+ */
+export const detailDrawerPositionSchema = z.enum(['right', 'bottom']);
+export type DetailDrawerPosition = z.infer<typeof detailDrawerPositionSchema>;
 
 /**
  * Migración de claves heredadas ejecutada una sola vez al arranque.

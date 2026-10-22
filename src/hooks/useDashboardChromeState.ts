@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { z } from 'zod';
-import { STORAGE_KEYS, readStorage, writeStorage, readRawStorage, writeRawStorage, tableDensitySchema } from '../utils/appStorage';
+import { STORAGE_KEYS, readStorage, writeStorage, readRawStorage, writeRawStorage, tableDensitySchema, detailDrawerPositionSchema, DetailDrawerPosition } from '../utils/appStorage';
 
 /**
  * Estado de "chrome" del dashboard: sidebar, visibilidad de filtros, modo Zen,
- * densidad de tabla y vista resumida. Son flags de presentación puros, sin
+ * densidad de tabla, ubicación del panel de detalle y vista resumida. Son flags de presentación puros, sin
  * relación con los datos, por lo que se agrupan y persisten de forma aislada.
  */
 export const useDashboardChromeState = ({
@@ -49,6 +49,18 @@ export const useDashboardChromeState = ({
   useEffect(() => {
     writeRawStorage(STORAGE_KEYS.TABLE_DENSITY, tableDensity);
   }, [tableDensity]);
+
+  const [detailDrawerPosition, setDetailDrawerPosition] = useState<DetailDrawerPosition>(() =>
+    readRawStorage<DetailDrawerPosition>(
+      STORAGE_KEYS.DETAIL_DRAWER_POSITION,
+      detailDrawerPositionSchema,
+      'right'
+    )
+  );
+
+  useEffect(() => {
+    writeRawStorage(STORAGE_KEYS.DETAIL_DRAWER_POSITION, detailDrawerPosition);
+  }, [detailDrawerPosition]);
 
   const [isZenMode, setIsZenMode] = useState<boolean>(() =>
     readStorage<boolean>(STORAGE_KEYS.ZEN_MODE, z.boolean(), false)
@@ -98,6 +110,8 @@ export const useDashboardChromeState = ({
     setIsSummaryView,
     tableDensity,
     setTableDensity,
+    detailDrawerPosition,
+    setDetailDrawerPosition,
     isZenMode,
     setIsZenMode,
     handleToggleSummaryView

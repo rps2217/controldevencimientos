@@ -58,6 +58,8 @@ export const DashboardViewRouter: React.FC<DashboardViewRouterProps> = ({
   const handleDelete = dashboard.handleDelete;
   const handlePrintTicket = dashboard.handlePrintTicket;
   const allMainItems = dashboard.allMainItems ?? [];
+  const detailDrawerPosition = dashboard.detailDrawerPosition || 'right';
+  const setDetailDrawerPosition = dashboard.setDetailDrawerPosition;
   const policies = dashboard.policies ?? [];
   const products = dashboard.products ?? [];
   const bulkActionCtx = dashboard.bulkActionCtx;
@@ -140,12 +142,14 @@ export const DashboardViewRouter: React.FC<DashboardViewRouterProps> = ({
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex gap-3 lg:gap-4 min-h-0 overflow-hidden relative h-full">
+        <div className={`flex-1 flex ${detailDrawerPosition === 'bottom' && selectedProduct ? 'flex-col' : 'flex-row'} gap-3 lg:gap-4 min-h-0 overflow-hidden relative h-full`}>
           <div className="flex-1 min-w-0 h-full [contain:layout_style]">
             <DashboardTableContainer />
           </div>
           <ItemDetailDrawer
             product={selectedProduct}
+            position={detailDrawerPosition}
+            onChangePosition={setDetailDrawerPosition}
             onClose={() => setSelectedProduct(null)}
             onEdit={(prod) => {
               setSelectedProduct(null);

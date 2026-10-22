@@ -25,7 +25,9 @@ import {
   Printer,
   Barcode,
   Download,
-  Bluetooth
+  Bluetooth,
+  PanelRight,
+  PanelBottom
 } from 'lucide-react';
 import { TableSlice } from '../../types';
 import { ManageableColumn } from '../../hooks/useColumnManager';
@@ -106,6 +108,8 @@ export const ViewConfigControlDrawer: React.FC = () => {
   const onToggleFiltersVisible = () => dashboard.setAreFiltersVisible?.((prev: boolean) => !prev);
   const isStickyEnabled = dashboard.sheetConfig?.enableStickyColumns === true;
   const onToggleStickyColumns = () => dashboard.handleToggleStickyColumns?.();
+  const detailDrawerPosition = dashboard.detailDrawerPosition || 'right';
+  const setDetailDrawerPosition = dashboard.setDetailDrawerPosition;
   const hasCustomColWidths = dashboard.hasCustomColWidths ?? false;
   const handleResetColWidths = () => dashboard.handleResetColWidths?.();
   const onOpenTicketConfig = () => modalsActions.setIsTicketConfigOpen?.(true);
@@ -440,6 +444,44 @@ export const ViewConfigControlDrawer: React.FC = () => {
                             }`}
                           />
                         </button>
+                      </div>
+                    )}
+
+                    {/* Ubicación del Panel de Detalle */}
+                    {setDetailDrawerPosition && (
+                      <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
+                        <span className="font-semibold text-slate-700 dark:text-slate-200 text-xs flex items-center justify-between">
+                          <span>Panel de Detalle (Ficha)</span>
+                          <span className="text-[10px] text-slate-400 font-normal">
+                            {detailDrawerPosition === 'bottom' ? 'Muelle Inferior' : 'Lateral Derecha'}
+                          </span>
+                        </span>
+                        <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/90 rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => setDetailDrawerPosition('right')}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              detailDrawerPosition === 'right'
+                                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            <PanelRight className="w-3.5 h-3.5" />
+                            <span>Lateral (Default)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDetailDrawerPosition('bottom')}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              detailDrawerPosition === 'bottom'
+                                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            <PanelBottom className="w-3.5 h-3.5" />
+                            <span>Muelle (Bottom)</span>
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
