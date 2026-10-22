@@ -146,39 +146,41 @@ export const DashboardViewRouter: React.FC<DashboardViewRouterProps> = ({
           <div className="flex-1 min-w-0 h-full [contain:layout_style]">
             <DashboardTableContainer />
           </div>
-          <ItemDetailDrawer
-            product={selectedProduct}
-            position={detailDrawerPosition}
-            onChangePosition={setDetailDrawerPosition}
-            onClose={() => setSelectedProduct(null)}
-            onEdit={(prod) => {
-              setSelectedProduct(null);
-              handleOpenModal(prod);
-            }}
-            onCopy={(bulkActionCtx && isActionEnabledForTable('copy_edit', bulkActionCtx, sheetConfig)) ? (prod) => {
-              setSelectedProduct(null);
-              handleOpenCopyModal(prod);
-            } : undefined}
-            onDeleteRow={(bulkActionCtx && isActionEnabledForTable('delete', bulkActionCtx, sheetConfig)) ? handleDelete : undefined}
-            onPrintBarcode={(bulkActionCtx && isActionEnabledForTable('barcode_ticket', bulkActionCtx, sheetConfig)) ? (prod) => handlePrintTicket([prod], 'barcode') : undefined}
-            onPrintBluetooth={(prod) => modalsActions.openBluetoothPrinter([prod])}
-            onNewEventForProduct={(sku, category) => {
-              handleOpenModal(undefined, sku, category);
-            }}
-            onNavigatePrev={handleNavigatePrev}
-            onNavigateNext={handleNavigateNext}
-            currentIndex={currentNavIndex >= 0 ? currentNavIndex + 1 : undefined}
-            totalCount={filteredItems.length}
-            allMainItems={allMainItems}
-            policies={policies}
-            products={products}
-            customAliases={sheetConfig.customAliases}
-            formatRules={getStoredFormatRules(sheetConfig.formatRules)}
-            onOpenParentChildInspector={(entityType, entityValue) => {
-              modalsActions.openRelationalMenu?.(entityType, entityValue);
-            }}
-            onSelectRelatedItem={(item) => setSelectedProduct(item)}
-          />
+          {detailDrawerPosition !== 'inline' && (
+            <ItemDetailDrawer
+              product={selectedProduct}
+              position={detailDrawerPosition}
+              onChangePosition={setDetailDrawerPosition}
+              onClose={() => setSelectedProduct(null)}
+              onEdit={(prod) => {
+                setSelectedProduct(null);
+                handleOpenModal(prod);
+              }}
+              onCopy={(bulkActionCtx && isActionEnabledForTable('copy_edit', bulkActionCtx, sheetConfig)) ? (prod) => {
+                setSelectedProduct(null);
+                handleOpenCopyModal(prod);
+              } : undefined}
+              onDeleteRow={(bulkActionCtx && isActionEnabledForTable('delete', bulkActionCtx, sheetConfig)) ? handleDelete : undefined}
+              onPrintBarcode={(bulkActionCtx && isActionEnabledForTable('barcode_ticket', bulkActionCtx, sheetConfig)) ? (prod) => handlePrintTicket([prod], 'barcode') : undefined}
+              onPrintBluetooth={(prod) => modalsActions.openBluetoothPrinter([prod])}
+              onNewEventForProduct={(sku, category) => {
+                handleOpenModal(undefined, sku, category);
+              }}
+              onNavigatePrev={handleNavigatePrev}
+              onNavigateNext={handleNavigateNext}
+              currentIndex={currentNavIndex >= 0 ? currentNavIndex + 1 : undefined}
+              totalCount={filteredItems.length}
+              allMainItems={allMainItems}
+              policies={policies}
+              products={products}
+              customAliases={sheetConfig.customAliases}
+              formatRules={getStoredFormatRules(sheetConfig.formatRules)}
+              onOpenParentChildInspector={(entityType, entityValue) => {
+                modalsActions.openRelationalMenu?.(entityType, entityValue);
+              }}
+              onSelectRelatedItem={(item) => setSelectedProduct(item)}
+            />
+          )}
         </div>
       )}
     </div>
