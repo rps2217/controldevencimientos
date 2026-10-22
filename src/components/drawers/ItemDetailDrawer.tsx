@@ -177,8 +177,6 @@ const ItemDetailDrawerComponent: React.FC<ItemDetailDrawerProps> = ({
     setExpandedRelatedContext(null);
   }, [product]);
 
-  if (!product) return null;
-
   const productKeys = useMemo(
     () => (product ? Object.keys(product).filter(k => !k.startsWith('_')) : []),
     [product]
@@ -212,19 +210,19 @@ const ItemDetailDrawerComponent: React.FC<ItemDetailDrawerProps> = ({
   const providerCol = findColumnBySemantic(productKeys, 'proveedor', customAliases);
   const bodegaCol = findColumnBySemantic(productKeys, 'frc_bod', customAliases);
 
-  const sku = product[skuKey] != null && String(product[skuKey]).trim() !== '' ? String(product[skuKey]) : '-';
-  const name = nameKey && product[nameKey] != null ? String(product[nameKey]) : 'Detalle del Registro';
-  const providerVal = providerCol ? product[providerCol] : undefined;
-  const bodegaVal = bodegaCol ? product[bodegaCol] : undefined;
+  const sku = product && product[skuKey] != null && String(product[skuKey]).trim() !== '' ? String(product[skuKey]) : '-';
+  const name = nameKey && product && product[nameKey] != null ? String(product[nameKey]) : 'Detalle del Registro';
+  const providerVal = product ? product[providerCol!] : undefined;
+  const bodegaVal = product ? product[bodegaCol!] : undefined;
 
   const status = useMemo(() => {
-    return getItemStatus(product, productKeys);
+    return getItemStatus((product || { _rowIndex: 0 }) as InventoryItem, productKeys);
   }, [product, productKeys]);
 
   const masterProduct = useMemo(() => {
-    if (!sku || sku === '-' || products.length === 0) return null;
+    if (!product || !sku || sku === '-' || products.length === 0) return null;
     return findMasterProduct(sku, products, customAliases);
-  }, [sku, products, customAliases]);
+  }, [product, sku, products, customAliases]);
 
   const masterSummary = useMemo(() => {
     if (!masterProduct) return null;
@@ -232,7 +230,7 @@ const ItemDetailDrawerComponent: React.FC<ItemDetailDrawerProps> = ({
   }, [masterProduct, customAliases]);
 
   const formatResult = useMemo(() => {
-    if (formatRules.length === 0) return null;
+    if (!product || formatRules.length === 0) return null;
     return evaluateItemFormatRules(product, productKeys, formatRules, detailMode, customAliases);
   }, [product, productKeys, formatRules, detailMode, customAliases]);
 
@@ -240,6 +238,8 @@ const ItemDetailDrawerComponent: React.FC<ItemDetailDrawerProps> = ({
     () => orderFieldsForDisplay(productKeys, customAliases),
     [productKeys, customAliases]
   );
+
+  if (!product) return null;
 
   const toggleFieldVisibility = (field: string) => {
     setHiddenFields(prev => {
