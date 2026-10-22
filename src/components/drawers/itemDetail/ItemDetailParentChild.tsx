@@ -1,16 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Layers, 
   ExternalLink,
   Maximize2,
+  Minimize2,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Search,
+  Plus,
+  ArrowUpDown,
+  Eye,
+  EyeOff,
+  RotateCcw
 } from 'lucide-react';
 import { InventoryItem, SheetRecord, EventCategory } from '../../../types';
 import { formatDisplayDate, formatLocaleNumber, getItemStatus, extractItemFields } from '../../../utils/dateCalculations';
 import { parseAnyDate, parseLocaleNumber } from '../../../utils/pureCalculations';
 import { buildEntityRelationshipSummary } from '../../../utils/relatedRecordsEngine';
-import { RelatedRecordsModal } from './RelatedRecordsModal';
 
 interface ItemDetailParentChildProps {
   sku: string;
@@ -25,6 +31,20 @@ interface ItemDetailParentChildProps {
   customAliases?: Record<string, string[]>;
 }
 
+type SortField = 'date' | 'qty' | 'sku' | 'desc' | 'bodega' | 'status';
+type SortDirection = 'asc' | 'desc';
+type RelatedColKey = 'sku' | 'desc' | 'bodega' | 'qty' | 'date' | 'status' | 'action';
+
+const RELATED_COLUMNS: { key: RelatedColKey; label: string }[] = [
+  { key: 'sku', label: 'SKU / Lote' },
+  { key: 'desc', label: 'Descripción' },
+  { key: 'bodega', label: 'Bodega / Ubicación' },
+  { key: 'qty', label: 'Cantidad' },
+  { key: 'date', label: 'Vencimiento' },
+  { key: 'status', label: 'Estado' },
+  { key: 'action', label: 'Acción' },
+];
+
 export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
   sku,
   provider,
@@ -38,7 +58,30 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
   customAliases
 }) => {
   const [activeTab, setActiveTab] = useState<'sku' | 'provider' | 'warehouse'>('sku');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isExpandedInline, setIsExpandedInline] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Expanded table state (AppSheet integrated inline view)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [hiddenCols, setHiddenCols] = useState<Record<RelatedColKey, boolean>>({
+    sku: false,
+    desc: false,
+    bodega: false,
+    qty: false,
+    date: false,
+    status: false,
+    action: false,
+  });
+  const [isColSelectorOpen, setIsColSelectorOpen] = useState(false);
+
+  useEffect(() => {
+    if (isExpandedInline && containerRef.current) {
+      containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [isExpandedInline]);
 
   // Relaciones por SKU
   const skuSummary = useMemo(() => {
@@ -107,7 +150,6 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
       } else if (subSortBy === 'lote') {
         comp = (fA.lote || '').localeCompare(fB.lote || '');
       } else {
-        // default: 'date'
         const dA = parseAnyDate(fA.fecha);
         const dB = parseAnyDate(fB.fecha);
         const tA = dA ? dA.getTime() : Infinity;
@@ -118,12 +160,318 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
     });
   }, [activeSummary, subSortBy, subSortDir]);
 
+  const filteredExpandedBatches = useMemo(() => {
+    if (!activeSummary) return [];
+    return activeSummary.batches.filter(item => {
+      const { sku: s, desc, lote } = extractItemFields(item);
+      const query = searchTerm.toLowerCase();
+      const matchesSearch = !searchTerm || s.toLowerCase().includes(query) || desc.toLowerCase().includes(query) || lote.toLowerCase().includes(query);
+
+      if (!matchesSearch) return false;
+
+      if (statusFilter !== 'all') {
+        const status = getItemStatus(item, Object.keys(item));
+        const isExp = status.code === 'EXPIRED';
+        const isCrit = status.code === 'RETIRE_NOW' || status.code === 'UPCOMING' || status.code === 'DRAINAGE_PM';
+        if (statusFilter === 'critical' && !isCrit && !isExp) return false;
+        if (statusFilter === 'expired' && !isExp) return false;
+        if (statusFilter === 'ok' && (isCrit || isExp)) return false;
+      }
+
+      return true;
+    }).sort((a, b) => {
+      const fieldsA = extractItemFields(a);
+      const fieldsB = extractItemFields(b);
+      let comp = 0;
+
+      if (sortBy === 'sku') {
+        comp = fieldsA.sku.localeCompare(fieldsB.sku);
+      } else if (sortBy === 'desc') {
+        comp = fieldsA.desc.localeCompare(fieldsB.desc);
+      } else if (sortBy === 'bodega') {
+        comp = (fieldsA.bodega || '').localeCompare(fieldsB.bodega || '');
+      } else if (sortBy === 'qty') {
+        const qA = parseLocaleNumber(fieldsA.qty) || 0;
+        const qB = parseLocaleNumber(fieldsB.qty) || 0;
+        comp = qA - qB;
+      } else if (sortBy === 'status') {
+        const sA = getItemStatus(a, Object.keys(a));
+        const sB = getItemStatus(b, Object.keys(b));
+        comp = (sA.daysToRetire ?? 9999) - (sB.daysToRetire ?? 9999);
+      } else {
+        const dA = parseAnyDate(fieldsA.fecha);
+        const dB = parseAnyDate(fieldsB.fecha);
+        const tA = dA ? dA.getTime() : Infinity;
+        const tB = dB ? dB.getTime() : Infinity;
+        comp = tA - tB;
+      }
+
+      return sortDirection === 'desc' ? -comp : comp;
+    });
+  }, [activeSummary, searchTerm, statusFilter, sortBy, sortDirection]);
+
   if (!skuSummary && !providerSummary && !warehouseSummary) {
     return null;
   }
 
+  const toggleCol = (colKey: RelatedColKey) => {
+    setHiddenCols(prev => ({ ...prev, [colKey]: !prev[colKey] }));
+  };
+
+  const showAllCols = () => {
+    setHiddenCols({ sku: false, desc: false, bodega: false, qty: false, date: false, status: false, action: false });
+  };
+
+  const visibleColsCount = RELATED_COLUMNS.filter(c => !hiddenCols[c.key]).length;
+
+  const handleSort = (field: SortField) => {
+    if (sortBy === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortDirection(field === 'qty' ? 'desc' : 'asc');
+    }
+  };
+
+  const renderSortIcon = (field: SortField) => {
+    if (sortBy !== field) {
+      return <ArrowUpDown className="w-3.5 h-3.5 text-slate-400/50 group-hover:text-slate-400 shrink-0" />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 font-bold shrink-0" />
+    ) : (
+      <ArrowDown className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 font-bold shrink-0" />
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // APP-SHEET STYLE INTEGRATED EXPANDED INLINE VIEW
+  // ---------------------------------------------------------------------------
+  if (isExpandedInline && activeSummary) {
+    return (
+      <div ref={containerRef} className="bg-white dark:bg-slate-900 border-2 border-indigo-500/40 rounded-3xl p-4 sm:p-5 shadow-xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+        {/* Expanded Header */}
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-2xl">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <span>{activeTabTitle}</span>
+                <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
+                  {currentEntityValue}
+                </span>
+              </h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Vista de tabla integrada (AppSheet) • Total: {activeSummary.batches.length} ítems
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {onNewEventForProduct && activeTab === 'sku' && (
+              <button
+                type="button"
+                onClick={() => onNewEventForProduct(currentEntityValue || sku)}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Nuevo Evento</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsExpandedInline(false)}
+              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Volver al resumen compacto"
+            >
+              <Minimize2 className="w-4 h-4" />
+              <span>Volver</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Toolbar: Search, Filters & Column Toggles */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar en relacionados..."
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 text-xs flex-wrap">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-300"
+            >
+              <option value="all">Todos los estados</option>
+              <option value="ok">En regla</option>
+              <option value="critical">Críticos / Vto cercano</option>
+              <option value="expired">Vencidos</option>
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                const f = e.target.value as SortField;
+                setSortBy(f);
+                if (f === 'qty') setSortDirection('desc');
+              }}
+              className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-300"
+            >
+              <option value="date">Ordenar: Vencimiento</option>
+              <option value="qty">Ordenar: Cantidad</option>
+              <option value="sku">Ordenar: SKU</option>
+              <option value="desc">Ordenar: Descripción</option>
+              <option value="bodega">Ordenar: Bodega</option>
+              <option value="status">Ordenar: Estado</option>
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+              className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 cursor-pointer"
+            >
+              {sortDirection === 'desc' ? <ArrowDown className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowUp className="w-3.5 h-3.5 text-indigo-600" />}
+              <span>{sortDirection === 'desc' ? 'Mayor a menor' : 'Menor a mayor'}</span>
+            </button>
+
+            {/* Column selector */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsColSelectorOpen(!isColSelectorOpen)}
+                className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Cols ({visibleColsCount}/{RELATED_COLUMNS.length})</span>
+              </button>
+
+              {isColSelectorOpen && (
+                <div 
+                  className="absolute right-0 top-full mt-1.5 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-50 p-2 space-y-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-2 py-1 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-400">
+                    <span>Columnas</span>
+                    <button type="button" onClick={showAllCols} className="text-indigo-600 hover:underline flex items-center gap-0.5">
+                      <RotateCcw className="w-2.5 h-2.5" /> Todas
+                    </button>
+                  </div>
+                  <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                    {RELATED_COLUMNS.map(col => {
+                      const isVis = !hiddenCols[col.key];
+                      return (
+                        <button
+                          key={col.key}
+                          type="button"
+                          onClick={() => toggleCol(col.key)}
+                          className={`w-full px-2 py-1 rounded-lg text-xs flex items-center justify-between text-left cursor-pointer ${
+                            isVis ? 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-medium' : 'text-slate-400 line-through'
+                          }`}
+                        >
+                          <span className="truncate">{col.label}</span>
+                          {isVis ? <Eye className="w-3.5 h-3.5 text-indigo-500" /> : <EyeOff className="w-3.5 h-3.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Integrated Table */}
+        <div className="max-h-72 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/40">
+          {filteredExpandedBatches.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-xs">No hay registros que coincidan con la búsqueda.</div>
+          ) : (
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700 sticky top-0">
+                  {!hiddenCols.sku && <th onClick={() => handleSort('sku')} className="py-2.5 px-3 cursor-pointer">SKU / Lote {renderSortIcon('sku')}</th>}
+                  {!hiddenCols.desc && <th onClick={() => handleSort('desc')} className="py-2.5 px-3 cursor-pointer">Descripción {renderSortIcon('desc')}</th>}
+                  {!hiddenCols.bodega && <th onClick={() => handleSort('bodega')} className="py-2.5 px-3 cursor-pointer">Bodega {renderSortIcon('bodega')}</th>}
+                  {!hiddenCols.qty && <th onClick={() => handleSort('qty')} className="py-2.5 px-3 text-right cursor-pointer">Cant. {renderSortIcon('qty')}</th>}
+                  {!hiddenCols.date && <th onClick={() => handleSort('date')} className="py-2.5 px-3 cursor-pointer">Vencimiento {renderSortIcon('date')}</th>}
+                  {!hiddenCols.status && <th onClick={() => handleSort('status')} className="py-2.5 px-3 cursor-pointer">Estado {renderSortIcon('status')}</th>}
+                  {!hiddenCols.action && <th className="py-2.5 px-3 text-center">Acción</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredExpandedBatches.map((item, index) => {
+                  const status = getItemStatus(item, Object.keys(item));
+                  const { sku: s, desc, lote, qty, fecha, bodega } = extractItemFields(item);
+                  return (
+                    <tr
+                      key={index}
+                      onClick={() => onSelectRelatedItem?.(item)}
+                      className="hover:bg-indigo-50/60 dark:hover:bg-indigo-950/40 cursor-pointer transition-colors group"
+                    >
+                      {!hiddenCols.sku && (
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600">
+                          {s} {lote && <span className="text-[10px] text-slate-400 block">L: {lote}</span>}
+                        </td>
+                      )}
+                      {!hiddenCols.desc && <td className="py-2.5 px-3 text-slate-800 dark:text-slate-200 truncate max-w-xs">{desc}</td>}
+                      {!hiddenCols.bodega && <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">{bodega}</td>}
+                      {!hiddenCols.qty && <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-700 dark:text-slate-300">{formatLocaleNumber(qty)} un.</td>}
+                      {!hiddenCols.date && <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-400">{formatDisplayDate(fecha)}</td>}
+                      {!hiddenCols.status && (
+                        <td className="py-2.5 px-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${status.color}`}>
+                            {status.label}
+                          </span>
+                        </td>
+                      )}
+                      {!hiddenCols.action && (
+                        <td className="py-2.5 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onSelectRelatedItem?.(item); }}
+                            className="p-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-600 hover:text-white rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer"
+                            title="Inspeccionar"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Footer Summary */}
+        <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+          <span>Mostrando <strong className="text-slate-700 dark:text-slate-200">{filteredExpandedBatches.length}</strong> de <strong className="text-slate-700 dark:text-slate-200">{activeSummary.batches.length}</strong> registros</span>
+          <button
+            type="button"
+            onClick={() => setIsExpandedInline(false)}
+            className="px-3 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold transition-colors cursor-pointer"
+          >
+            Cerrar Vista Integrada
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // COMPACT CARD VIEW (DEFAULT INLINE / DRAWER)
+  // ---------------------------------------------------------------------------
   return (
-    <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-3">
+    <div ref={containerRef} className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-3">
       {/* Header with Title, Expand and Inspector Link */}
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
@@ -135,9 +483,9 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
           {activeSummary && activeSummary.batches.length > 0 && (
             <button
               type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="p-1 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors"
-              title="Expandir tabla completa de relacionados"
+              onClick={() => setIsExpandedInline(true)}
+              className="p-1 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors cursor-pointer"
+              title="Expandir vista integrada de relacionados (AppSheet style)"
             >
               <Maximize2 className="w-3.5 h-3.5" />
             </button>
@@ -150,7 +498,7 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
                 const mappedType = activeTab === 'provider' ? 'proveedor' : activeTab === 'warehouse' ? 'bodega' : 'sku';
                 onOpenInspector(mappedType, currentEntityValue);
               }}
-              className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+              className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
             >
               <span>Visión 360°</span>
               <ExternalLink className="w-3 h-3" />
@@ -165,7 +513,7 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('sku')}
-            className={`flex-1 py-1 px-2 rounded-lg transition-all text-center truncate ${
+            className={`flex-1 py-1 px-2 rounded-lg transition-all text-center truncate cursor-pointer ${
               activeTab === 'sku'
                 ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs'
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -179,7 +527,7 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('provider')}
-            className={`flex-1 py-1 px-2 rounded-lg transition-all text-center truncate ${
+            className={`flex-1 py-1 px-2 rounded-lg transition-all text-center truncate cursor-pointer ${
               activeTab === 'provider'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-2xs'
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -193,7 +541,7 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('warehouse')}
-            className={`flex-1 py-1 px-2 rounded-lg transition-all text-center truncate ${
+            className={`flex-1 py-1 px-2 rounded-lg transition-all text-center truncate cursor-pointer ${
               activeTab === 'warehouse'
                 ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-2xs'
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -233,7 +581,6 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
       {/* Mini Batches Sub-list with richer info and sorting controls */}
       {activeSummary && (
         <div className="space-y-2">
-          {/* Sub-list Sorting Bar */}
           <div className="flex items-center justify-between text-xs px-1">
             <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Lotes ({sortedBatches.length})
@@ -256,8 +603,8 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
               <button
                 type="button"
                 onClick={() => setSubSortDir(prev => prev === 'asc' ? 'desc' : 'asc')}
-                className="p-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 transition-colors"
-                title={subSortDir === 'desc' ? 'Mayor a menor (Clic para cambiar a menor a mayor)' : 'Menor a mayor (Clic para cambiar a mayor a menor)'}
+                className="p-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 transition-colors cursor-pointer"
+                title={subSortDir === 'desc' ? 'Mayor a menor' : 'Menor a mayor'}
               >
                 {subSortDir === 'desc' ? (
                   <ArrowDown className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
@@ -315,33 +662,16 @@ export const ItemDetailParentChild: React.FC<ItemDetailParentChildProps> = ({
             {sortedBatches.length > 6 && (
               <button
                 type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="w-full py-1.5 text-center text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-xl transition-colors flex items-center justify-center gap-1"
+                onClick={() => setIsExpandedInline(true)}
+                className="w-full py-1.5 text-center text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-xl transition-colors flex items-center justify-center gap-1 cursor-pointer"
               >
-                <span>Ver todos los {sortedBatches.length} registros (Expandir tabla)</span>
+                <span>Ver todos los {sortedBatches.length} registros (Vista Integrada)</span>
                 <Maximize2 className="w-3 h-3" />
               </button>
             )}
           </div>
         </div>
       )}
-
-      {/* Expanded Modal */}
-      {activeSummary && currentEntityValue && (
-        <RelatedRecordsModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          title={activeTabTitle}
-          entityValue={currentEntityValue}
-          entityType={activeTab === 'provider' ? 'proveedor' : activeTab === 'warehouse' ? 'bodega' : 'sku'}
-          batches={activeSummary.batches}
-          onSelectItem={(item) => {
-            onSelectRelatedItem?.(item);
-          }}
-          onNewEvent={onNewEventForProduct}
-        />
-      )}
     </div>
   );
 };
-
