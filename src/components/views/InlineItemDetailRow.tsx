@@ -91,13 +91,13 @@ export const InlineItemDetailRow: React.FC<InlineItemDetailRowProps> = ({
     detailMode = 'politica';
   }
 
-  const skuCol = findColumnBySemantic(productKeys, 'sku', customAliases);
-  const nameCol = findColumnBySemantic(productKeys, 'descripcion', customAliases);
+  const skuKey = findColumnBySemantic(productKeys, 'sku', customAliases) || productKeys.find(k => /sku|c[oó]digo|code|item/i.test(k)) || 'SKU';
+  const nameKey = findColumnBySemantic(productKeys, 'descripcion', customAliases) || productKeys.find(k => /descrip|nombre|name|title/i.test(k)) || '';
   const providerCol = findColumnBySemantic(productKeys, 'proveedor', customAliases);
   const bodegaCol = findColumnBySemantic(productKeys, 'frc_bod', customAliases);
 
-  const sku = skuCol && product[skuCol] ? String(product[skuCol]) : '-';
-  const name = nameCol && product[nameCol] ? String(product[nameCol]) : 'Detalle del Registro';
+  const sku = product[skuKey] != null && String(product[skuKey]).trim() !== '' ? String(product[skuKey]) : '-';
+  const name = nameKey && product[nameKey] != null ? String(product[nameKey]) : 'Detalle del Registro';
   const providerVal = providerCol ? product[providerCol] : undefined;
   const bodegaVal = bodegaCol ? product[bodegaCol] : undefined;
 
@@ -203,7 +203,10 @@ export const InlineItemDetailRow: React.FC<InlineItemDetailRowProps> = ({
                 <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-xs">
                   <button
                     type="button"
-                    onClick={() => setShowBarcode(!showBarcode)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowBarcode(!showBarcode);
+                    }}
                     className="w-full p-3 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   >
                     <span className="flex items-center gap-2">
