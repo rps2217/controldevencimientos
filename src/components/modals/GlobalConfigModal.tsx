@@ -237,14 +237,14 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
 
             <div className="flex-1 min-h-0 space-y-5">
               {activeTab === 'sheets' ? (
-                <div className="space-y-5 animate-in fade-in duration-150">
+                <div className="space-y-4 animate-in fade-in duration-150">
                   {/* Main / Vencimientos */}
-                  <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-                    <label className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-1">
+                  <div className="bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 transition-all">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-1">
                       <Database className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>1. Vencimientos & Radar Principal</span>
                     </label>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Pestaña con las fechas de caducidad, MM/YYYY y retiro preventivo.</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2.5">Pestaña con las fechas de caducidad, MM/YYYY y cálculo de retiro preventivo.</p>
                     <select
                       value={sheetConfig.main || ''}
                       onChange={(e) => {
@@ -252,7 +252,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                         setSheetConfig(next);
                         saveConfig(next);
                       }}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     >
                       <option value="">-- Seleccionar Pestaña --</option>
                       {metadata?.sheets
@@ -264,12 +264,12 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                   </div>
 
                   {/* Events / Incidencias */}
-                  <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-                    <label className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-1">
-                      <FileSpreadsheet className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <div className="bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 transition-all">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-1">
+                      <FileSpreadsheet className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>2. Incidencias & FRC</span>
                     </label>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Pestaña para registrar deterioros de transporte, averías, mermas o diferencias.</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2.5">Pestaña para registrar deterioros de transporte, averías, mermas o diferencias.</p>
                     <select
                       value={sheetConfig.events || ''}
                       onChange={(e) => {
@@ -277,7 +277,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                         setSheetConfig(next);
                         saveConfig(next);
                       }}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     >
                       <option value="">-- (Opcional) Misma hoja principal o pestaña dedicada --</option>
                       {metadata?.sheets
@@ -289,12 +289,12 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                   </div>
 
                   {/* Products / Maestro */}
-                  <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-                    <label className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-1">
-                      <Package className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <div className="bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 transition-all">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-1">
+                      <Package className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>3. Catálogo Maestro de Productos</span>
                     </label>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Pestaña maestra con SKU, descripción, marca y política de canje asociada.</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2.5">Pestaña maestra con SKU, descripción, marca y política de canje asociada.</p>
                     <select
                       value={sheetConfig.products || ''}
                       onChange={(e) => {
@@ -302,7 +302,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                         setSheetConfig(next);
                         saveConfig(next);
                       }}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     >
                       <option value="">-- Seleccionar Pestaña --</option>
                       {metadata?.sheets
@@ -314,12 +314,12 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                   </div>
 
                   {/* Policies / Canjes */}
-                  <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-                    <label className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-1">
-                      <FileText className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <div className="bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 transition-all">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-1">
+                      <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>4. Políticas de Canje / Retiro</span>
                     </label>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Pestaña con los días de anticipación de retiro (ej. 30, 60, 90 días).</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2.5">Pestaña con los días de anticipación de retiro acordados con proveedores.</p>
                     <select
                       value={sheetConfig.policies || ''}
                       onChange={(e) => {
@@ -327,7 +327,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                         setSheetConfig(next);
                         saveConfig(next);
                       }}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     >
                       <option value="">-- Seleccionar Pestaña --</option>
                       {metadata?.sheets
@@ -339,12 +339,12 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                   </div>
 
                   {/* recepBultos / Recepción de Bultos */}
-                  <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-                    <label className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-1">
-                      <Truck className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                  <div className="bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 transition-all">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-1">
+                      <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>5. Recepción de Bultos</span>
                     </label>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Pestaña destino para el registro de arribo de bultos.</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2.5">Pestaña destino para el registro de arribo de bultos.</p>
                     <select
                       value={sheetConfig.recepBultos || ''}
                       onChange={(e) => {
@@ -352,7 +352,7 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
                         setSheetConfig(next);
                         saveConfig(next);
                       }}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     >
                       <option value="">-- Seleccionar Pestaña --</option>
                       {metadata?.sheets
@@ -576,7 +576,14 @@ export const GlobalConfigModal: React.FC<GlobalConfigModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-end gap-2 shrink-0">
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+          >
+            Cerrar
+          </button>
           <button
             onClick={() => {
               onClose();

@@ -199,38 +199,38 @@ export const PmReportModal: React.FC<PmReportModalProps> = ({
       <div className="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-150 print:border-none print:shadow-none print:max-h-none print:h-auto">
         
         {/* ======================================================== */}
-        {/* HEADER BAR                                               */}
+        {/* HEADER BAR (AppSheet Calm Design)                         */}
         {/* ======================================================== */}
-        <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/90 shrink-0 print:hidden">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 shrink-0 print:hidden">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-br from-orange-500 to-amber-600 text-white rounded-xl shadow-md shadow-orange-500/20">
-              <Flame className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm md:text-base">
-                  Centro de Reportes y Comunicaciones Operativas
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">
+                  Centro de Reportes Operativos
                 </h3>
-                <span className="px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-300 text-[10px] font-extrabold font-mono">
-                  {filteredItems.length} SKUs ({reportMetrics.totalUnits} un.)
+                <span className="text-xs text-slate-400 font-mono">
+                  {filteredItems.length} SKUs · {reportMetrics.totalUnits} un.
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Generador inteligente de actas, solicitudes de canje, pautas de sala y alertas comerciales.
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Generador de actas, solicitudes de canje y alertas comerciales
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {/* View Mode Switcher */}
-            <div className="flex items-center p-1 bg-slate-200/80 dark:bg-slate-800 rounded-xl">
+            <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs">
               <button
                 type="button"
                 onClick={() => setViewMode('TABLE')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   viewMode === 'TABLE'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
@@ -239,10 +239,10 @@ export const PmReportModal: React.FC<PmReportModalProps> = ({
               <button
                 type="button"
                 onClick={() => setViewMode('DRAFT')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   viewMode === 'DRAFT'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
                 <FileText className="w-3.5 h-3.5" />
@@ -251,10 +251,10 @@ export const PmReportModal: React.FC<PmReportModalProps> = ({
               <button
                 type="button"
                 onClick={() => setViewMode('PRINT')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   viewMode === 'PRINT'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
                 <Printer className="w-3.5 h-3.5" />
@@ -264,7 +264,7 @@ export const PmReportModal: React.FC<PmReportModalProps> = ({
 
             <button 
               onClick={onClose} 
-              className="text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 p-2 rounded-xl transition-colors cursor-pointer"
+              className="text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 p-2 rounded-xl transition-colors cursor-pointer"
               aria-label="Cerrar"
             >
               <X className="w-5 h-5" />
@@ -273,140 +273,73 @@ export const PmReportModal: React.FC<PmReportModalProps> = ({
         </div>
 
         {/* ======================================================== */}
-        {/* TEMPLATE CAROUSEL & QUICK FILTER BAR                      */}
+        {/* TEMPLATE SELECTOR & FILTER TOOLBAR (Unified & Clean)     */}
         {/* ======================================================== */}
-        <div className="px-5 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col gap-2 shrink-0 print:hidden">
-          {/* Template pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            <button
-              onClick={() => setSelectedTemplate('PM')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedTemplate === 'PM'
-                  ? 'bg-orange-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-              }`}
-            >
-              <Briefcase className="w-3.5 h-3.5" />
-              <span>Alerta Comercial PM</span>
-            </button>
-
-            <button
-              onClick={() => setSelectedTemplate('PROVIDER_CANJE')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedTemplate === 'PROVIDER_CANJE'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>Canje Proveedor</span>
-            </button>
-
-            <button
-              onClick={() => setSelectedTemplate('STORE_ADMIN')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedTemplate === 'STORE_ADMIN'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Control Sala / Góndola</span>
-            </button>
-
-            <button
-              onClick={() => setSelectedTemplate('LOGISTICS_TRANSFER')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedTemplate === 'LOGISTICS_TRANSFER'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-              }`}
-            >
-              <Truck className="w-3.5 h-3.5" />
-              <span>Acta de Traspaso</span>
-            </button>
-
-            <button
-              onClick={() => setSelectedTemplate('QUALITY_RECALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedTemplate === 'QUALITY_RECALL'
-                  ? 'bg-rose-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-              }`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Bloqueo / Cuarentena</span>
-            </button>
-
-            <button
-              onClick={() => setSelectedTemplate('EXECUTIVE_SUMMARY')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedTemplate === 'EXECUTIVE_SUMMARY'
-                  ? 'bg-slate-800 text-white shadow-xs dark:bg-slate-200 dark:text-slate-900'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-              }`}
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              <span>Resumen Ejecutivo</span>
-            </button>
-          </div>
-
-          {/* Secondary Filter & Search Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
-            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
-              {/* Search box */}
-              <div className="relative flex-1 min-w-[160px] max-w-xs">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchFilter}
-                  onChange={e => setSearchFilter(e.target.value)}
-                  placeholder="Buscar SKU, descripción o lote..."
-                  className="w-full text-xs pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                />
-              </div>
-
-              {/* Provider select */}
-              {availableProviders.length > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <select
-                    value={selectedProvider}
-                    onChange={e => setSelectedProvider(e.target.value)}
-                    className="text-xs font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-orange-500 max-w-[200px] truncate"
-                  >
-                    <option value="ALL">Todos los Proveedores ({availableProviders.length})</option>
-                    {availableProviders.map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Severity / Policy Filter */}
+        <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden text-xs">
+          <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+            {/* Template Selector Dropdown */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Plantilla:</span>
               <select
-                value={severityFilter}
-                onChange={e => setSeverityFilter(e.target.value as any)}
-                className="text-xs font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                value={selectedTemplate}
+                onChange={e => setSelectedTemplate(e.target.value as ReportTemplateType)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl px-3 py-1.5 outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer shadow-2xs"
               >
-                <option value="ALL">Todos los Estados</option>
-                <option value="CRITICAL">Solo Críticos / Vencidos (&le; 7d)</option>
-                <option value="CANJE_ONLY">Solo con Canje Proveedor</option>
-                <option value="MERMA_ONLY">Solo Merma Directa</option>
+                <option value="PM">Alerta Comercial PM</option>
+                <option value="PROVIDER_CANJE">Canje con Proveedor</option>
+                <option value="STORE_ADMIN">Control Sala / Góndola</option>
+                <option value="LOGISTICS_TRANSFER">Acta de Traspaso Logístico</option>
+                <option value="QUALITY_RECALL">Bloqueo por Calidad</option>
+                <option value="EXECUTIVE_SUMMARY">Resumen Ejecutivo</option>
               </select>
             </div>
 
-            {/* Quick Summary Pill Counters */}
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                Críticos: <strong className="text-rose-600 dark:text-rose-400">{reportMetrics.criticalCount}</strong>
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
-                Canjes: <strong className="text-indigo-600">{reportMetrics.canjeCount}</strong>
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300">
-                Mermas: <strong className="text-rose-600">{reportMetrics.mermaCount}</strong>
-              </span>
+            {/* Search box */}
+            <div className="relative flex-1 min-w-[150px] max-w-xs">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchFilter}
+                onChange={e => setSearchFilter(e.target.value)}
+                placeholder="Buscar SKU, descripción o lote..."
+                className="w-full text-xs pl-8 pr-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
             </div>
+
+            {/* Provider select */}
+            {availableProviders.length > 0 && (
+              <select
+                value={selectedProvider}
+                onChange={e => setSelectedProvider(e.target.value)}
+                className="text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 max-w-[200px] truncate"
+              >
+                <option value="ALL">Todos los Proveedores ({availableProviders.length})</option>
+                {availableProviders.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            )}
+
+            {/* Severity / Policy Filter */}
+            <select
+              value={severityFilter}
+              onChange={e => setSeverityFilter(e.target.value as any)}
+              className="text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            >
+              <option value="ALL">Todos los Estados</option>
+              <option value="CRITICAL">Solo Críticos / Vencidos (&le; 7d)</option>
+              <option value="CANJE_ONLY">Solo con Canje Proveedor</option>
+              <option value="MERMA_ONLY">Solo Merma Directa</option>
+            </select>
+          </div>
+
+          {/* Calm Unboxed Metrics Summary */}
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">
+            <span>Críticos: <strong className="text-rose-600 dark:text-rose-400 font-bold">{reportMetrics.criticalCount}</strong></span>
+            <span>·</span>
+            <span>Canjes: <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{reportMetrics.canjeCount}</strong></span>
+            <span>·</span>
+            <span>Mermas: <strong className="text-slate-700 dark:text-slate-300 font-bold">{reportMetrics.mermaCount}</strong></span>
           </div>
         </div>
 
@@ -766,9 +699,9 @@ export const PmReportModal: React.FC<PmReportModalProps> = ({
         {/* ======================================================== */}
         {/* FOOTER MULTI-CHANNEL ACTIONS BAR                         */}
         {/* ======================================================== */}
-        <div className="p-3.5 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0 flex flex-wrap items-center justify-between gap-2.5 print:hidden">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 shrink-0 flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium mr-1">
               Destino: <strong className="text-slate-800 dark:text-slate-200 font-bold">{
                 selectedTemplate === 'PROVIDER_CANJE' ? 'Proveedor' :
                 selectedTemplate === 'LOGISTICS_TRANSFER' ? 'Bodega Central' :
@@ -776,62 +709,69 @@ export const PmReportModal: React.FC<PmReportModalProps> = ({
                 selectedTemplate === 'STORE_ADMIN' ? 'Equipo de Sala' : 'Product Manager'
               }</strong>
             </span>
+
+            {/* Calm Secondary Action Buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                disabled={filteredItems.length === 0}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs disabled:opacity-50 transition-colors cursor-pointer"
+                title="Exportar a planilla Excel"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>Excel</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSendMailto}
+                disabled={filteredItems.length === 0}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs disabled:opacity-50 transition-colors cursor-pointer"
+                title="Redactar correo electrónico"
+              >
+                <Mail className="w-3.5 h-3.5 text-slate-500" />
+                <span>Email</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleShareWhatsApp}
+                disabled={filteredItems.length === 0}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs disabled:opacity-50 transition-colors cursor-pointer"
+                title="Compartir por WhatsApp"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+                <span>WhatsApp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePrintDocument}
+                disabled={filteredItems.length === 0}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs disabled:opacity-50 transition-colors cursor-pointer"
+                title="Imprimir acta física"
+              >
+                <Printer className="w-3.5 h-3.5 text-slate-500" />
+                <span>Imprimir / PDF</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto">
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
             >
               Cerrar
             </button>
 
             <button
               type="button"
-              onClick={handlePrintDocument}
-              disabled={filteredItems.length === 0}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Imprimir / PDF</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              disabled={filteredItems.length === 0}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs shadow-emerald-600/20 disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Excel</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSendMailto}
-              disabled={filteredItems.length === 0}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs shadow-blue-600/20 disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              <span>Email</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleShareWhatsApp}
-              disabled={filteredItems.length === 0}
-              className="px-3.5 py-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs shadow-green-600/20 disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>WhatsApp</span>
-            </button>
-
-            <button
-              type="button"
               onClick={copyReportToClipboard}
               disabled={filteredItems.length === 0}
-              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-xs shadow-orange-600/25 disabled:opacity-50 transition-colors cursor-pointer"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm shadow-blue-200 dark:shadow-none disabled:opacity-50 transition-colors cursor-pointer"
             >
               {copiedReport ? <CheckCheck className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
               <span>{copiedReport ? '¡Texto Copiado!' : 'Copiar Reporte'}</span>

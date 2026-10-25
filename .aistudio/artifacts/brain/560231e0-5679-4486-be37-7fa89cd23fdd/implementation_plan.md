@@ -1,53 +1,31 @@
-# UI/UX Improvement Plan - Gestor de Vencimientos e Incidencias
+# Plan de Simplificación y Ergonomía Cognitiva Estilo AppSheet
 
-## 1. Executive Summary & Design Vision
-This plan outlines a comprehensive UI/UX overhaul for the **Gestor de Vencimientos e Incidencias** application. Grounded in the **Enterprise SaaS dashboard** aesthetic with professional slate and corporate blue accents, this redesign elevates usability, visual hierarchy, touch ergonomics, and data density while strictly adhering to the **Universal Frontend Design Constitution** (zero-pill metadata discipline, zero mechanical pseudo-technical clutter, and WCAG AA accessibility).
+## 1. Problema Identificado
+- **Sobrecarga Cognitiva y Ruido Visual**: Múltiples modales y vistas contenían carruseles con colores estridentes (arcoíris de badges, contornos saturados, botones múltiples sin jerarquía visual), generando fatiga en el operador.
+- **Ventana de Registros Relacionados Desconectada**: Al hacer clic en registros relacionados desde el acordeón/ficha, se abría un modal pegado al borde superior de la tabla en vez de una navegación integrada y natural.
+- **Convivencia no deseada de fichas**: Al seleccionar la ficha inline o drawer, se requería garantizar exclusividad mutua absoluta (o una o la otra).
+- **Error en orden de Hooks de React**: Llamadas condicionales a hooks dentro de `ItemDetailDrawer` provocaban error al cambiar de vista.
 
----
+## 2. Soluciones Implementadas
 
-## 2. User-Selected Preferences (Clarification Phase)
-- **Visual Aesthetic Style**: Enterprise SaaS dashboard with clean cards, structured hierarchy, and crisp data density.
-- **Focus Areas**: Data tables, virtualized grid rendering, and quick action toolbars.
-- **Color Accent**: Professional slate and corporate blue (Tailwind `slate`, `blue-600`, `indigo`).
+### A. Vista Completa Integrada de Registros Relacionados (AppSheet Drill-down)
+- **Navegación In-Place 100%**: Al pulsar "Expandir Vista Relacionada", el contenido toma el 100% del espacio del modal/drawer/acordeón activo (`expandedRelatedContext`), mostrando la tabla completa con paginación, filtros e información de contexto.
+- **Barra de Navegación Ergonométrica**: Botón prominente "Volver a Ficha" con icono de retorno y contador exacto de registros (`X registros vinculados`).
+- **Soporte Universal**: Funciona idénticamente en ficha Inline (acordeón en tabla), Drawer Lateral Derecho, Dock Inferior y Ventana Flotante (PiP).
 
----
+### B. Exclusividad Mutua Estricta de Ubicaciones
+- Si el usuario selecciona la ficha inline (`detailDrawerPosition === 'inline'`), el drawer flotante/lateral se desmonta automáticamente.
+- Si se activa cualquier drawer (`right`, `bottom`, `floating`), el modo inline se apaga de inmediato, impidiendo estados duplicados.
 
-## 3. Key UI/UX Improvement Pillars
-
-### A. Data Grid & Table Ergonomics Overhaul
-- **Refined Column Headers & Sticky Toolbar**: Clean, scannable table headers with subtle sorting indicators and responsive column resizing.
-- **Zero-Pill Metadata & Clean Typography**: Replace any cluttered status badges or pill enclosures with clean unboxed metadata and typographic separators (`·`).
-- **Interactive Quick Filter Bar**: Streamlined toolbar for quick chips, slice navigation, and search input with instant clear affordances.
-- **Action Toolbar & Floating Batch Controls**: Contextual floating action bar for bulk operations (WhatsApp, Gmail, Ticket Printing, Bulk Edit, and Deletion) that appears smoothly only when items are selected.
-
-### B. Navigation & Sidebar Polish
-- **Sidebar Ergonomics**: Refined collapse/expand transitions, clean unboxed typography for module names, and clear visual indicators for active views.
-- **Mobile Touch Drawers**: Enhanced bottom sheet and slide-over drawers for mobile users with minimum touch targets ($\ge 44\text{px}$).
-
-### C. Master-Detail Panel & Modals
-- **Master-Detail Drawer (`ItemDetailDrawer`)**: Docked panel on desktop and overlay drawer on mobile with clear section partitioning, reference links to master catalog, and rapid action buttons.
-- **Form Modals**: Clean, accessible form layouts with clear validation states, numeric shortcuts (`+1`, `+5`, `+10`), and logical field grouping.
-
----
-
-## 4. Implementation Steps
-
-1. **Phase 1: Design Tokens & Typography Standardization**
-   - Harmonize global color tokens around professional slate (`slate-900`/`slate-50`) and corporate blue (`blue-600`).
-   - Audit and enforce clean typography pairings and zero-pill metadata across table cells and summary cards.
-
-2. **Phase 2: Data Table & Toolbar Enhancements (`InventoryTable.tsx`, `DashboardTopNav.tsx`, `FloatingBulkActionBar.tsx`)**
-   - Polish table row hover states, alternating density options (Compact, Comfortable, Ultra), and smooth virtualized scrolling.
-   - Upgrade the search and filter header bar for maximum clarity and responsiveness.
-
-3. **Phase 3: Drawer & Modal Usability Polish (`ItemDetailDrawer.tsx`, `ItemFormModal.tsx`)**
-   - Ensure WCAG AA contrast compliance, keyboard accessibility (`Esc` to close, `Cmd+K` palette), and intuitive touch targets.
-
-4. **Phase 4: Verification & Testing**
-   - Compile and lint applet (`compile_applet`, `lint_applet`) to ensure zero regression in performance or types.
-
----
-
-## 5. Verification Plan
-- **Automated Verification**: Run `compile_applet` and `lint_applet` to confirm zero build errors.
-- **Visual Verification**: Review responsive layouts across desktop (1440px) and mobile viewports.
+### C. Rediseño Minimalista y Calmado Estilo AppSheet
+1. **Radar / Reporte PM (`PmReportModal.tsx`)**:
+   - Reemplazo del carrusel estridente de 6 tarjetas de colores por un selector limpio unificado con descripción contextual.
+   - Indicadores numéricos inline sobrios (slate-600/slate-300).
+   - Pie de acción unificado: grupo de exportación a la izquierda y botón principal azul `Copiar Reporte` a la derecha.
+2. **Configuración Global (`GlobalConfigModal.tsx`)**:
+   - Tarjetas de asignación de hojas uniformes en gris neutro (`slate-50`/`slate-800`).
+   - Botón secundario "Cerrar" y primario "Aplicar y Recargar".
+3. **Formulario de Ítem (`ItemFormModal.tsx`)**:
+   - Divulgación progresiva: campos esenciales visibles directamente; campos secundarios y técnicos agrupados en panel colapsable limpio.
+4. **Corrección de Reglas de Hooks de React**:
+   - Eliminados retornos tempranos que precedían a `useMemo` en `ItemDetailDrawer.tsx`. Todos los hooks se ejecutan incondicionalmente en cada render.
