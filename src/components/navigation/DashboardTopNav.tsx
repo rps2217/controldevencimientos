@@ -137,12 +137,12 @@ export const DashboardTopNav: React.FC = () => {
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Module Badge */}
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0">
+          {/* Module Identity */}
+          <div className="flex items-center gap-2.5">
+            <div className="text-slate-600 dark:text-slate-300 shrink-0">
               {viewMeta.icon}
             </div>
-            <h1 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-slate-100 tracking-tight whitespace-nowrap">
+            <h1 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 tracking-tight whitespace-nowrap">
               {viewMeta.title}
             </h1>
           </div>
@@ -196,8 +196,6 @@ export const DashboardTopNav: React.FC = () => {
                 </button>
               )}
 
-
-
               <button
                 onClick={() => setIsScannerOpen(true)}
                 className="w-8 h-8 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all mr-1 shrink-0 cursor-pointer active:scale-95"
@@ -225,67 +223,49 @@ export const DashboardTopNav: React.FC = () => {
             </button>
           )}
 
-
-
-
-
-          {/* Theme & Settings */}
-          <div className="hidden sm:flex items-center gap-1 shrink-0">
+          {/* Theme Selector */}
+          <div className="hidden sm:flex items-center shrink-0">
             <ThemeSelector />
-            <button
-              onClick={onEditBackendUrl}
-              className="flex h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors shadow-2xs items-center justify-center cursor-pointer active:scale-95 shrink-0"
-              title="Ajustes de conexión Apps Script"
-              aria-label="Ajustes de conexión Apps Script"
-            >
-              <Settings2 className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-            </button>
           </div>
 
-          {/* Sync & Offline Status Indicator */}
-          <div 
-            onClick={onOpenSyncAudit}
-            className={`hidden lg:flex items-center gap-2 bg-white dark:bg-slate-800 border px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-2xs shrink-0 cursor-pointer transition-all group ${
+          {/* Unified Sync & Refresh Action */}
+          <button 
+            onClick={() => {
+              if (offlineQueue.length > 0 || isOffline) {
+                onOpenSyncAudit?.();
+              } else {
+                fetchData(sheetConfig, activeView, true);
+              }
+            }}
+            className={`relative flex items-center gap-1.5 h-10 px-3 rounded-xl border transition-all cursor-pointer active:scale-95 shadow-2xs ${
               isSyncing 
-                ? 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/30' 
+                ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-600'
                 : isOffline || offlineQueue.length > 0
-                ? 'border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/30'
-                : 'border-emerald-200 dark:border-emerald-800/80 hover:border-emerald-300'
+                ? 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/80'
             }`}
-            title="Estado de conexión y sincronización"
+            title={
+              isSyncing ? "Sincronizando..." :
+              isOffline ? "Modo Offline (clic para ver auditoría)" :
+              offlineQueue.length > 0 ? `${offlineQueue.length} pendiente(s) (clic para ver auditoría)` :
+              latencyMs !== null ? `Sincronizado (${latencyMs}ms). Clic para refrescar.` : "Sincronizado. Clic para refrescar."
+            }
           >
-            {isSyncing ? (
-              <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin shrink-0" />
+            <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${isSyncing || loading ? 'animate-spin text-blue-600' : ''}`} />
+            
+            {offlineQueue.length > 0 ? (
+              <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500 text-white shrink-0">
+                {offlineQueue.length}
+              </span>
             ) : isOffline ? (
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-            ) : offlineQueue.length > 0 ? (
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-bounce shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
             ) : (
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
             )}
-            <span className="text-slate-700 dark:text-slate-200 text-[11px] font-medium hidden xl:inline">
-              {isSyncing 
-                ? 'Sincronizando' 
-                : isOffline 
-                ? 'Offline' 
-                : offlineQueue.length > 0 
-                ? `${offlineQueue.length} pendiente${offlineQueue.length > 1 ? 's' : ''}` 
-                : 'Sincronizado'}
+            
+            <span className="text-[11px] font-medium hidden xl:inline">
+              {isSyncing ? 'Sincronizando' : isOffline ? 'Offline' : offlineQueue.length > 0 ? 'Pendiente' : 'Sincronizado'}
             </span>
-            {latencyMs !== null && !isOffline && (
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-mono hidden 2xl:inline">
-                ({latencyMs}ms)
-              </span>
-            )}
-          </div>
-
-
-          <button 
-            onClick={() => fetchData(sheetConfig, activeView, true)} 
-            className="h-10 w-10 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-xl shadow-2xs hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors cursor-pointer shrink-0 active:scale-95" 
-            title="Refrescar datos desde la nube"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
           </button>
 
           {/* View Config Drawer Button (Mobile & Tablet) */}

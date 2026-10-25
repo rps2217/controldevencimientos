@@ -21,10 +21,10 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, active, onClick,
     <button
       onClick={onClick}
       title={collapsed ? label : undefined}
-      className={`app-button w-full flex items-center ${collapsed ? 'justify-center px-0' : 'gap-3 px-3.5'} min-h-[44px] transition-all relative ${
+      className={`w-full flex items-center ${collapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2.5 rounded-xl font-semibold text-xs transition-colors cursor-pointer active:scale-95 ${
         active 
-          ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/25 dark:shadow-none' 
-          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-100'
+          ? 'bg-blue-600 text-white shadow-xs' 
+          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/90 dark:hover:bg-slate-800/90 hover:text-slate-900 dark:hover:text-slate-100'
       }`}
     >
       <div className={`${active ? 'text-white' : 'text-slate-400 dark:text-slate-500'} shrink-0`}>
@@ -32,7 +32,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, active, onClick,
       </div>
       {!collapsed && <span className="truncate">{label}</span>}
       {badge && !collapsed && (
-        <span className="ml-auto text-[10px] font-black tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/70 dark:text-blue-200">
+        <span className="ml-auto text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/70 dark:text-blue-200">
           {badge}
         </span>
       )}
@@ -41,7 +41,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, active, onClick,
       )}
     </button>
   );
-}
+};
 
 export interface SidebarProps {
   /** El drawer móvil lo mantiene siempre expandido; no comparte el estado de colapso. */
@@ -199,14 +199,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ forceExpanded = false, onNavig
         )}
       </div>
 
-      <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+      <div className="p-3 border-t border-slate-100 dark:border-slate-800">
         <button 
           onClick={onOpenConfig} 
           title={isSidebarCollapsed ? "Configuración" : undefined}
-          className="app-button w-full flex items-center justify-start gap-3 px-4 py-3 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 hover:shadow-sm"
+          className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2.5 rounded-xl font-semibold text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100/90 dark:hover:bg-slate-800/90 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer active:scale-95`}
         >
-          <Settings className="w-5 h-5 text-slate-400 dark:text-slate-500" />
-          {!isSidebarCollapsed && "Configuración"}
+          <Settings className="w-5 h-5 text-slate-400 dark:text-slate-500 shrink-0" />
+          {!isSidebarCollapsed && <span>Configuración</span>}
         </button>
       </div>
     </div>

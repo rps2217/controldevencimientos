@@ -170,14 +170,14 @@ export const InventoryTable: React.FC = () => {
   }, [rowColWidth, showRowCol, showExpiryCol, showResolutionCol, getColWidth]);
 
   return (
-    <div className="bg-slate-50 dark:bg-slate-950 md:bg-white md:dark:bg-slate-900 rounded-2xl md:shadow-sm md:border md:border-slate-200 md:dark:border-slate-800 overflow-hidden flex flex-col h-full [contain:layout_style]">
-      <div className="flex-1 overflow-auto relative p-2 md:p-0 [contain:strict]" ref={tableContainerRef}>
+    <div className="flex-1 overflow-hidden flex flex-col h-full min-h-0 [contain:layout_style]">
+      <div className="flex-1 overflow-auto relative p-0 [contain:strict]" ref={tableContainerRef}>
         <table className="text-left border-collapse block md:table w-full md:w-[max-content] md:table-fixed" style={{ minWidth: '100%', tableLayout: 'fixed' }}>
-          <thead className="hidden md:table-header-group bg-slate-100 dark:bg-slate-700/90 sticky top-0 border-b border-slate-200 dark:border-slate-600/80 text-xs font-bold text-slate-700 dark:text-slate-100 uppercase tracking-wider select-none z-10 shadow-sm">
+          <thead className="hidden md:table-header-group bg-slate-50/95 dark:bg-slate-900/95 sticky top-0 border-b border-slate-200/90 dark:border-slate-800 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider select-none z-10 backdrop-blur-xs">
             <tr>
               <th 
-                className={`${paddingClass} text-center bg-slate-100 dark:bg-slate-700/90 border-b border-slate-200 dark:border-slate-600/80 ${
-                  isSticky ? 'sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]' : ''
+                className={`${paddingClass} text-center bg-slate-50/95 dark:bg-slate-900/95 border-b border-slate-200/90 dark:border-slate-800 ${
+                  isSticky ? 'sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]' : ''
                 }`} 
                 style={{ width: '48px', minWidth: '48px', maxWidth: '48px', ...(isSticky ? { left: 0 } : {}) }}
               >
@@ -200,8 +200,8 @@ export const InventoryTable: React.FC = () => {
               {showRowCol && (
                 <th 
                   style={{ width: `${rowColWidth}px`, minWidth: `${rowColWidth}px`, maxWidth: `${rowColWidth}px`, ...(isSticky ? { left: '48px' } : {}) }} 
-                  className={`${paddingClass} text-center text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-slate-700/90 border-b border-slate-200 dark:border-slate-600/80 relative group font-bold ${
-                    isSticky ? 'sticky left-[48px] z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]' : ''
+                  className={`${paddingClass} text-center text-slate-500 dark:text-slate-400 bg-slate-50/95 dark:bg-slate-900/95 border-b border-slate-200/90 dark:border-slate-800 relative group font-bold ${
+                    isSticky ? 'sticky left-[48px] z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]' : ''
                   }`}
                 >
                   {groupByColumn && groupByColumn !== 'none' ? (
@@ -243,7 +243,7 @@ export const InventoryTable: React.FC = () => {
               {showExpiryCol && (
                 <th 
                   style={{ width: `${getColWidth('_status', 'Estado / Radar PM')}px`, minWidth: `${getColWidth('_status', 'Estado / Radar PM')}px`, maxWidth: `${getColWidth('_status', 'Estado / Radar PM')}px` }} 
-                  className={`${paddingClass} bg-slate-100 dark:bg-slate-700/90 text-slate-700 dark:text-slate-100 border-b border-slate-200 dark:border-slate-600/80 relative group font-bold`}
+                  className={`${paddingClass} bg-slate-50/95 dark:bg-slate-900/95 text-slate-600 dark:text-slate-300 border-b border-slate-200/90 dark:border-slate-800 relative group font-bold`}
                 >
                   <div className="flex items-center justify-between gap-1 w-full min-w-0 pr-1">
                     <span className="truncate pr-1">Estado / Radar PM</span>
@@ -277,7 +277,7 @@ export const InventoryTable: React.FC = () => {
               {showResolutionCol && (
                 <th 
                   style={{ width: `${getColWidth('_res_status', 'Estado Gestión')}px`, minWidth: `${getColWidth('_res_status', 'Estado Gestión')}px`, maxWidth: `${getColWidth('_res_status', 'Estado Gestión')}px` }} 
-                  className={`${paddingClass} bg-slate-100 dark:bg-slate-700/90 text-slate-700 dark:text-slate-100 border-b border-slate-200 dark:border-slate-600/80 relative group font-bold`}
+                  className={`${paddingClass} bg-slate-50/95 dark:bg-slate-900/95 text-slate-600 dark:text-slate-300 border-b border-slate-200/90 dark:border-slate-800 relative group font-bold`}
                 >
                   <div className="truncate pr-2">Estado Gestión</div>
                   <div
@@ -309,7 +309,7 @@ export const InventoryTable: React.FC = () => {
                   <th 
                     key={header} 
                     style={{ width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` }}
-                    className={`${paddingClass} bg-slate-100 dark:bg-slate-700/90 text-slate-700 dark:text-slate-100 border-b border-slate-200 dark:border-slate-600/80 relative group transition-all cursor-grab active:cursor-grabbing hover:bg-slate-200/90 dark:hover:bg-slate-600/90 dark:hover:text-white select-none ${
+                    className={`${paddingClass} bg-slate-50/95 dark:bg-slate-900/95 text-slate-600 dark:text-slate-300 border-b border-slate-200/90 dark:border-slate-800 relative group transition-all cursor-grab active:cursor-grabbing hover:bg-slate-100/90 dark:hover:bg-slate-800 select-none ${
                       isDraggingThis ? 'opacity-40 scale-[0.98]' : ''
                     } ${
                       isDropTarget ? 'ring-2 ring-blue-500 ring-inset bg-blue-50/50 dark:bg-blue-950/50 shadow-inner' : ''
@@ -447,7 +447,7 @@ export const InventoryTable: React.FC = () => {
 
               {/* Fixed Actions Column Header */}
               {showActionsCol && (
-                <th className={`${paddingClass} text-right bg-slate-100 dark:bg-slate-700/90 text-slate-700 dark:text-slate-100 border-b border-slate-200 dark:border-slate-600/80 font-bold ${
+                <th className={`${paddingClass} text-right bg-slate-50/95 dark:bg-slate-900/95 text-slate-500 dark:text-slate-400 border-b border-slate-200/90 dark:border-slate-800 font-bold ${
                   isSticky ? 'sticky right-0 z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.03)]' : ''
                 }`} style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}>
                   Acciones

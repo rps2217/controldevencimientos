@@ -872,7 +872,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = React.memo(({
           style={{ width: '110px', minWidth: '110px', maxWidth: '110px' }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-end gap-1">
+          <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             {hasEmail && isEmailEnabled && (
               <button 
                 onClick={() => onOpenEmail?.(item)} 

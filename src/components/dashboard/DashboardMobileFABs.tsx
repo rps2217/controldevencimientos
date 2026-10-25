@@ -19,33 +19,34 @@ export const DashboardMobileFABs: React.FC = () => {
   }
 
   return (
-    <div className="md:hidden fixed bottom-6 right-5 z-40 flex flex-col items-end gap-2.5">
+    <div className="md:hidden fixed bottom-6 right-5 z-40 flex flex-col items-end gap-2.5 pb-[env(safe-area-inset-bottom)]">
       {canCount && (
         <button
           onClick={onOpenPistoleo}
-          className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-red-800 via-rose-900 to-red-800 text-white font-extrabold text-xs rounded-full shadow-[0_8px_25px_rgba(153,27,27,0.45)] border border-red-500/40 active:scale-95 transition-all cursor-pointer"
-          title="Abrir Terminal de Pistoleo Móvil (Cámara / Láser PDA)"
+          className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 dark:bg-slate-800 text-white font-semibold text-xs rounded-full shadow-lg border border-slate-700 active:scale-95 transition-all cursor-pointer"
+          title="Terminal de Pistoleo Móvil"
         >
-          <Barcode className="w-4 h-4 text-rose-300 animate-pulse" />
-          <span>Pistoleo Móvil</span>
+          <Barcode className="w-4 h-4 text-rose-400" />
+          <span>Pistoleo</span>
         </button>
       )}
 
       {activeView === 'recepBultos' && (
         <a
           href="/recepcion-bultos"
-          className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-600 via-amber-600 to-orange-600 text-white font-extrabold text-xs rounded-full shadow-[0_8px_25px_rgba(234,88,12,0.45)] border border-orange-400/40 active:scale-95 transition-all cursor-pointer"
+          className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 dark:bg-slate-800 text-white font-semibold text-xs rounded-full shadow-lg border border-slate-700 active:scale-95 transition-all cursor-pointer"
           title="Abrir Terminal Móvil de Pistoleo Rápido"
         >
-          <Truck className="w-4 h-4 text-white" />
+          <Truck className="w-4 h-4 text-amber-400" />
           <span>Terminal Rápida</span>
         </a>
       )}
 
       <button
         onClick={onOpenNewItem}
-        className="bg-blue-600 text-white p-3 rounded-full shadow-[0_8px_25px_rgba(37,99,235,0.4)] border border-blue-500/20 active:scale-95 transition-all cursor-pointer"
+        className="bg-blue-600 hover:bg-blue-700 text-white w-12 h-12 flex items-center justify-center rounded-full shadow-lg border border-blue-500/30 active:scale-95 transition-all cursor-pointer"
         title="Nuevo Registro"
+        aria-label="Nuevo Registro"
       >
         <Plus className="w-5 h-5 stroke-[2.5]" />
       </button>
