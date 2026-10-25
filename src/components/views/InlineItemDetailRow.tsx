@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ChevronDown, Barcode as BarcodeIcon, Sparkles
 } from 'lucide-react';
@@ -27,6 +27,10 @@ export interface InlineItemDetailRowProps {
   onDeleteRow?: (product: InventoryItem) => void;
   onPrintBarcode?: (product: InventoryItem) => void;
   onPrintBluetooth?: (product: InventoryItem) => void;
+  onNavigatePrev?: () => void;
+  onNavigateNext?: () => void;
+  currentIndex?: number;
+  totalCount?: number;
   allMainItems: InventoryItem[];
   policies?: SheetRecord[];
   products?: SheetRecord[];
@@ -47,6 +51,10 @@ export const InlineItemDetailRow: React.FC<InlineItemDetailRowProps> = ({
   onDeleteRow,
   onPrintBarcode,
   onPrintBluetooth,
+  onNavigatePrev,
+  onNavigateNext,
+  currentIndex,
+  totalCount,
   allMainItems,
   policies = [],
   products = [],
@@ -151,6 +159,34 @@ export const InlineItemDetailRow: React.FC<InlineItemDetailRowProps> = ({
     } catch {}
   };
 
+  // Keyboard navigation: ArrowLeft (prev), ArrowRight (next), Escape (back or close)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (expandedRelatedContext) {
+          setExpandedRelatedContext(null);
+        } else {
+          onClose();
+        }
+      } else if (e.key === 'ArrowLeft' && !expandedRelatedContext && onNavigatePrev) {
+        e.preventDefault();
+        onNavigatePrev();
+      } else if (e.key === 'ArrowRight' && !expandedRelatedContext && onNavigateNext) {
+        e.preventDefault();
+        onNavigateNext();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [expandedRelatedContext, onNavigatePrev, onNavigateNext, onClose]);
+
   return (
     <tr className="bg-slate-50/95 dark:bg-slate-900/95 border-y-2 border-blue-500/40 animate-in fade-in duration-200">
       <td colSpan={colSpan} className="p-3 sm:p-5">
@@ -187,6 +223,10 @@ export const InlineItemDetailRow: React.FC<InlineItemDetailRowProps> = ({
                 onPrintBarcode={onPrintBarcode}
                 onPrintBluetooth={onPrintBluetooth}
                 onClose={onClose}
+                onNavigatePrev={onNavigatePrev}
+                onNavigateNext={onNavigateNext}
+                currentIndex={currentIndex}
+                totalCount={totalCount}
                 isExpandedHorizontal={false}
                 position={position}
                 onChangePosition={onChangePosition}

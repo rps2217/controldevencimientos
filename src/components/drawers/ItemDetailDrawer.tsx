@@ -177,6 +177,36 @@ const ItemDetailDrawerComponent: React.FC<ItemDetailDrawerProps> = ({
     setExpandedRelatedContext(null);
   }, [product]);
 
+  // Keyboard navigation: ArrowLeft (prev), ArrowRight (next), Escape (back or close)
+  useEffect(() => {
+    if (!product) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (expandedRelatedContext) {
+          setExpandedRelatedContext(null);
+        } else {
+          onClose();
+        }
+      } else if (e.key === 'ArrowLeft' && !expandedRelatedContext && onNavigatePrev) {
+        e.preventDefault();
+        onNavigatePrev();
+      } else if (e.key === 'ArrowRight' && !expandedRelatedContext && onNavigateNext) {
+        e.preventDefault();
+        onNavigateNext();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [product, expandedRelatedContext, onNavigatePrev, onNavigateNext, onClose]);
+
   const productKeys = useMemo(
     () => (product ? Object.keys(product).filter(k => !k.startsWith('_')) : []),
     [product]

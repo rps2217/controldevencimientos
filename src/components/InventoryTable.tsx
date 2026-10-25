@@ -608,35 +608,47 @@ export const InventoryTable: React.FC = () => {
                       onInlineSave={handleInlineSave}
                       isInlineEditMode={dashboard.isInlineEditMode ?? false}
                     />
-                    {isInlineActive && (
-                      <InlineItemDetailRow
-                        product={item}
-                        colSpan={visibleHeaders.length + extraCols}
-                        onClose={() => dashboard.setSelectedProduct(null)}
-                        onEdit={(prod) => {
-                          dashboard.setSelectedProduct(null);
-                          dashboard.handleOpenModal(prod);
-                        }}
-                        onCopy={isCopyEnabled ? (prod) => {
-                          dashboard.setSelectedProduct(null);
-                          handleOpenCopyModal?.(prod);
-                        } : undefined}
-                        onDeleteRow={onDeleteRow}
-                        onPrintBarcode={isBarcodeEnabled ? (prod) => dashboard.handlePrintTicket([prod], 'barcode') : undefined}
-                        onPrintBluetooth={(prod) => modalsActions.openBluetoothPrinter([prod])}
-                        allMainItems={dashboard.allMainItems ?? []}
-                        policies={dashboard.policies ?? []}
-                        products={dashboard.products ?? []}
-                        customAliases={dashboard.sheetConfig?.customAliases}
-                        formatRules={formatRules}
-                        position={detailDrawerPosition}
-                        onChangePosition={dashboard.setDetailDrawerPosition}
-                        onOpenParentChildInspector={(entityType, entityValue) => {
-                          modalsActions.openRelationalMenu?.(entityType, entityValue);
-                        }}
-                        onSelectRelatedItem={(relatedItem) => dashboard.setSelectedProduct(relatedItem)}
-                      />
-                    )}
+                    {isInlineActive && (() => {
+                      const currentNavIdx = filteredItems.findIndex(
+                        (fi: InventoryItem) => (fi._entityKey && item._entityKey && fi._entityKey === item._entityKey) || fi._rowIndex === item._rowIndex
+                      );
+                      const handleNavPrev = currentNavIdx > 0 ? () => dashboard.setSelectedProduct(filteredItems[currentNavIdx - 1]) : undefined;
+                      const handleNavNext = currentNavIdx >= 0 && currentNavIdx < filteredItems.length - 1 ? () => dashboard.setSelectedProduct(filteredItems[currentNavIdx + 1]) : undefined;
+
+                      return (
+                        <InlineItemDetailRow
+                          product={item}
+                          colSpan={visibleHeaders.length + extraCols}
+                          onClose={() => dashboard.setSelectedProduct(null)}
+                          onNavigatePrev={handleNavPrev}
+                          onNavigateNext={handleNavNext}
+                          currentIndex={currentNavIdx >= 0 ? currentNavIdx + 1 : undefined}
+                          totalCount={filteredItems.length}
+                          onEdit={(prod) => {
+                            dashboard.setSelectedProduct(null);
+                            dashboard.handleOpenModal(prod);
+                          }}
+                          onCopy={isCopyEnabled ? (prod) => {
+                            dashboard.setSelectedProduct(null);
+                            handleOpenCopyModal?.(prod);
+                          } : undefined}
+                          onDeleteRow={onDeleteRow}
+                          onPrintBarcode={isBarcodeEnabled ? (prod) => dashboard.handlePrintTicket([prod], 'barcode') : undefined}
+                          onPrintBluetooth={(prod) => modalsActions.openBluetoothPrinter([prod])}
+                          allMainItems={dashboard.allMainItems ?? []}
+                          policies={dashboard.policies ?? []}
+                          products={dashboard.products ?? []}
+                          customAliases={dashboard.sheetConfig?.customAliases}
+                          formatRules={formatRules}
+                          position={detailDrawerPosition}
+                          onChangePosition={dashboard.setDetailDrawerPosition}
+                          onOpenParentChildInspector={(entityType, entityValue) => {
+                            modalsActions.openRelationalMenu?.(entityType, entityValue);
+                          }}
+                          onSelectRelatedItem={(relatedItem) => dashboard.setSelectedProduct(relatedItem)}
+                        />
+                      );
+                    })()}
                   </React.Fragment>
                 );
               })}
