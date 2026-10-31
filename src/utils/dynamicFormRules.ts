@@ -10,50 +10,58 @@ export interface ShowIfEvaluation {
 /**
  * Universal fields that are always relevant regardless of event category
  */
-const CORE_FIELD_REGEX = /sku|c[oó]digo|descr|nombre|cant|unidades|stock|lote|observ|nota|motivo|detalle|id|folio|traspaso|prov|laboratorio/i;
+const CORE_FIELD_REGEX = /^(sku|c[oó]digo|cod_prod)$|^desc|producto|art[ií]culo|nombre|cant|unidades|stock|lote|batch|prov|laboratorio/i;
+
+/**
+ * Detects fields that belong strictly to the Incidences module (FRC)
+ * and should not appear in the Expiration (Vencimiento) module.
+ */
+export function isIncidenceOnlyField(header: string): boolean {
+  return /^(frc(_|\s)?even|tipo(_|\s)?evento|^evento$|n(_|\s)?traspaso|traspaso|folio_traspaso|observaci[oó]n|observaciones|observ|motivo|detalle_incidencia|frc_bod|responsable_frc)$/i.test(header.trim());
+}
 
 /**
  * Category-specific relevance patterns
  */
 const CATEGORY_FIELD_PATTERNS: Record<EventCategory, { relevant: RegExp[]; secondaryExcluded: RegExp[] }> = {
   TRANSPORTE: {
-    relevant: [/transporte|cami[oó]n|patente|chofer|conductor|gu[ií]a|despacho|flete|bulto|recepci[oó]n|da[ñn]o/i],
+    relevant: [/transporte|cami[oó]n|patente|chofer|conductor|gu[ií]a|despacho|flete|bulto|recepci[oó]n|da[ñn]o|observ|traspaso/i],
     secondaryExcluded: [/pol[ií]tica|canje|d[ií]as_retiro|d[ií]as_anticipaci[oó]n|cuarentena/i]
   },
   DIFERENCIA: {
-    relevant: [/diferencia|sobrante|faltante|ajuste|f[ií]sico|sistema|inventario|conteo|factura|bulto/i],
+    relevant: [/diferencia|sobrante|faltante|ajuste|f[ií]sico|sistema|inventario|conteo|factura|bulto|observ|traspaso/i],
     secondaryExcluded: [/pol[ií]tica|canje|d[ií]as_retiro|d[ií]as_anticipaci[oó]n|cuarentena/i]
   },
   AVERIA: {
-    relevant: [/sobrante|inventario|cuadratura|conteo|ajuste|f[ií]sico/i],
+    relevant: [/sobrante|inventario|cuadratura|conteo|ajuste|f[ií]sico|observ|traspaso/i],
     secondaryExcluded: [/pol[ií]tica|canje|d[ií]as_retiro|d[ií]as_anticipaci[oó]n|cami[oó]n|patente/i]
   },
   CAL_INTERNA: {
-    relevant: [/calidad|cuarentena|inspecci[oó]n|rechazo|no_conformidad|temperatura|norma|motivo/i],
+    relevant: [/calidad|cuarentena|inspecci[oó]n|rechazo|no_conformidad|temperatura|norma|motivo|observ|traspaso/i],
     secondaryExcluded: [/cami[oó]n|patente|chofer|flete/i]
   },
   CAL_EXTERNA: {
-    relevant: [/calidad|reclamo|cliente|devoluci[oó]n|rechazo|inspecci[oó]n|cuarentena/i],
+    relevant: [/calidad|reclamo|cliente|devoluci[oó]n|rechazo|inspecci[oó]n|cuarentena|observ|traspaso/i],
     secondaryExcluded: [/cami[oó]n|patente|chofer|flete/i]
   },
   CANJES: {
-    relevant: [/canje|retiro|proveedor|cr[eé]dito|nota|fecha_vc|vencimiento/i],
+    relevant: [/canje|retiro|proveedor|cr[eé]dito|nota|fecha_vc|vencimiento|observ|traspaso/i],
     secondaryExcluded: [/cami[oó]n|patente|chofer|temperatura/i]
   },
   DEVOLUCION: {
-    relevant: [/faltante|inventario|p[eé]rdida|merma|ajuste|conteo/i],
+    relevant: [/faltante|inventario|p[eé]rdida|merma|ajuste|conteo|observ|traspaso/i],
     secondaryExcluded: [/cami[oó]n|patente|chofer|temperatura/i]
   },
   VENCIMIENTO_CERCANO: {
     relevant: [/vencimiento|caducidad|expiraci[oó]n|retiro|pol[ií]tica|d[ií]as|mm|yyyy|mes|a[ñn]o/i],
-    secondaryExcluded: [/cami[oó]n|patente|chofer|flete|cuarentena/i]
+    secondaryExcluded: [/frc(_|\s)?even|tipo(_|\s)?evento|^evento$|traspaso|observ|nota|motivo|detalle|cami[oó]n|patente|chofer|flete|cuarentena/i]
   },
   VENCIMIENTO: {
     relevant: [/vencimiento|caducidad|expiraci[oó]n|retiro|pol[ií]tica|d[ií]as|mm|yyyy|mes|a[ñn]o/i],
-    secondaryExcluded: [/cami[oó]n|patente|chofer|flete|cuarentena/i]
+    secondaryExcluded: [/frc(_|\s)?even|tipo(_|\s)?evento|^evento$|traspaso|observ|nota|motivo|detalle|cami[oó]n|patente|chofer|flete|cuarentena/i]
   },
   MERMAS: {
-    relevant: [/merma|p[eé]rdida|deterioro|inventario|ajuste|conteo/i],
+    relevant: [/merma|p[eé]rdida|deterioro|inventario|ajuste|conteo|observ|traspaso/i],
     secondaryExcluded: [/cami[oó]n|patente|chofer|temperatura/i]
   }
 };
@@ -88,6 +96,11 @@ export function evaluateShowIf(
   // 3. Primary keys and required fields are never hidden
   if (isKey || isRequired) {
     return { isVisible: true, isCoreField: true, reason: isKey ? 'Identificador Clave' : 'Campo Requerido' };
+  }
+
+  // 3.5. Incidence-only fields (FRC:EVEN, N:TRASPASO, OBSERVACION) belong strictly to incidences, not to Vencimiento
+  if (selectedCategory === 'VENCIMIENTO' && isIncidenceOnlyField(header)) {
+    return { isVisible: false, isCoreField: false, reason: 'Corresponde al módulo de incidencias, no al de vencimiento' };
   }
 
   // 4. If field already contains user data, never hide it

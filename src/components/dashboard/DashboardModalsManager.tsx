@@ -66,7 +66,7 @@ export interface DashboardModalsManagerProps {
   selectedEventCategory: EventCategory;
   handleSelectEventCategory: (cat: EventCategory) => void;
   handleFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
-  handleSave: (e: React.FormEvent) => Promise<void>;
+  handleSave: (e: React.FormEvent, options?: { keepOpen?: boolean }) => Promise<void>;
   isSaving: boolean;
   handleBatchFormUpdate: (updates: Record<string, string>) => void;
 

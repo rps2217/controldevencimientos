@@ -65,7 +65,7 @@ export function useInventoryMutations({
 }: UseInventoryMutationsParams) {
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = useCallback(async (e: React.FormEvent) => {
+  const handleSave = useCallback(async (e: React.FormEvent, options?: { keepOpen?: boolean }) => {
     e.preventDefault();
     if (!activeSheet || headers.length === 0) return;
 
@@ -190,7 +190,9 @@ export function useInventoryMutations({
         console.warn('Error saving to IndexedDB:', cacheErr);
       }
 
-      handleCloseModal();
+      if (!options?.keepOpen) {
+        handleCloseModal();
+      }
 
       const isUpdate = Boolean(targetExistingItem && targetExistingItem._rowIndex && targetExistingItem._rowIndex > 1);
       const targetRowIndex = isUpdate ? targetExistingItem!._rowIndex : undefined;

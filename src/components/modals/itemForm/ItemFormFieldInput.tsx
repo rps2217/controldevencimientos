@@ -1,17 +1,22 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ColumnSchema, SheetRecord, SheetConfig, InventoryItem } from '../../../types';
-import { MasterProductSummary, findMasterProduct, searchMasterProducts } from '../../../utils/referenceResolver';
+import { MasterProductSummary, findMasterProduct, searchMasterProducts, ResolvedItemPolicyInfo } from '../../../utils/referenceResolver';
 import { QUICK_QUANTITY_PRESETS, getOperationalSuggestions } from '../../../utils/dynamicFormRules';
 import { formatInputDate, formatInputDateTime } from '../../../utils/dateCalculations';
 import { findColumnBySemantic } from '../../../utils/columnAliases';
 import { getColumnEnumValues } from '../../../utils/enumOptionsHelper';
 import { AlertCircle, Search, CheckCircle2, Package, ClipboardPaste, X } from 'lucide-react';
+import { SmartExpirationInput } from './SmartExpirationInput';
+import { ItemFormProviderRefInput } from './ItemFormProviderRefInput';
 
 interface ItemFormFieldInputProps {
   header: string;
   colSchema?: ColumnSchema;
   isKey?: boolean;
   canExpire: boolean;
+  headers?: string[];
+  resolvedPolicyInfo?: ResolvedItemPolicyInfo;
+  onBatchUpdateFormData?: (updates: Record<string, string>) => void;
   formData: Record<string, string>;
   formErrors: Record<string, string>;
   masterSummaries: MasterProductSummary[];
@@ -36,6 +41,9 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
   colSchema,
   isKey,
   canExpire,
+  headers = [],
+  resolvedPolicyInfo,
+  onBatchUpdateFormData,
   formData,
   formErrors,
   masterSummaries,
@@ -83,10 +91,17 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
   const isDaysColumn = /dias|días|days|anticipacion|anticipaci[oó]n|cant|stock|unidades|num/i.test(header) || 
                        /^retiro$/i.test(String(header).trim());
 
-  const isDateCol = (colSchema?.type === 'date' && !isDaysColumn) || 
+  const isExpiryCol = (canExpire || /vencimiento|caducidad|expiraci[oó]n|^fecha_vc$|^f_vc$/i.test(header) || colSchema?.behavior === 'calc_fecha_vc') &&
+                      Boolean(findColumnBySemantic([header], 'fecha_vc', customAliases) || /vencimiento|caducidad|expiraci[oó]n|^fecha_vc$|^f_vc$/i.test(header) || colSchema?.behavior === 'calc_fecha_vc') &&
+                      !/retiro|canje_retiro|fecha_retiro|fecha_canje/i.test(header);
+
+  const isLoteField = Boolean(findColumnBySemantic([header], 'lote', customAliases)) || 
+                      /^(frc_)?lote$|batch|partida/i.test(header);
+
+  const isDateCol = !isExpiryCol && ((colSchema?.type === 'date' && !isDaysColumn) || 
                     (/fecha|vencimiento|vence|retiro/i.test(header) && 
                      !/time/i.test(header) && 
-                     !isDaysColumn);
+                     !isDaysColumn));
   const isDateTimeCol = colSchema?.type === 'datetime' || /timestamp|created_at/i.test(header);
   const isTraspasoCol = /traspaso/i.test(header);
   const traspasoVal = String(formData[header] || '').trim();
@@ -159,6 +174,17 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
     return findMasterProduct(currentValue.trim(), products, customAliases);
   }, [isSkuField, currentValue, products, customAliases]);
 
+  // Provider Reference from Master Product
+  const currentSkuVal = useMemo(() => {
+    const skuKey = findColumnBySemantic(Object.keys(formData), 'sku', customAliases) || Object.keys(formData).find(k => /sku|código|codigo/i.test(k));
+    return skuKey && formData[skuKey] ? String(formData[skuKey]).trim() : '';
+  }, [formData, customAliases]);
+
+  const linkedProductForProvider = useMemo(() => {
+    if (!isProviderCol || !currentSkuVal || products.length === 0) return null;
+    return findMasterProduct(currentSkuVal, products, customAliases);
+  }, [isProviderCol, currentSkuVal, products, customAliases]);
+
   // Description search results from Master Catalog
   const descSearchResults = useMemo(() => {
     if (!isDescField || !descSearchOpen || !currentValue || currentValue.trim().length < 2 || products.length === 0) {
@@ -229,7 +255,7 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
     <div 
       ref={isDescField ? descContainerRef : undefined}
       className={`flex flex-col gap-1.5 relative ${
-        isObs ? 'sm:col-span-2' : ''
+        isObs || isExpiryCol ? 'sm:col-span-2' : ''
       } ${isTraspasoCol ? 'sm:col-span-2 bg-slate-50/80 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700' : ''}`}
     >
       <div className="flex items-center justify-between">
@@ -754,6 +780,21 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
             </div>
           )}
         </div>
+      ) : isExpiryCol ? (
+        <SmartExpirationInput
+          header={header}
+          value={currentValue}
+          formData={formData}
+          headers={headers}
+          resolvedPolicyInfo={resolvedPolicyInfo}
+          disabled={isAutoCalc}
+          hasError={hasError}
+          customAliases={customAliases}
+          onChangeValue={(fName, nVal) => {
+            onChange({ target: { name: fName, value: nVal } } as React.ChangeEvent<HTMLInputElement>);
+          }}
+          onBatchUpdate={onBatchUpdateFormData}
+        />
       ) : isDateCol ? (
         <input
           type="date"
@@ -786,32 +827,94 @@ export const ItemFormFieldInput: React.FC<ItemFormFieldInputProps> = ({
                 : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
           }`}
         />
-      ) : (
-        <>
-          <input
-            type="text"
-            name={header}
-            list={isProviderCol && providerSuggestions.length > 0 ? `datalist-provider` : undefined}
-            value={formData[header] !== undefined ? formData[header] : (header === 'FECHA_RETIRO_CALC' ? (resolvedRetiroDisplay || '') : '')}
-            onChange={handleChange}
-            readOnly={isAutoCalc}
-            placeholder={isAutoCalc ? 'Calculado automáticamente' : `Ingresar ${header.toLowerCase()}...`}
-            className={`w-full border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none transition-all ${
-              isAutoCalc 
-                ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700' 
-                : hasError 
-                  ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800' 
-                  : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800'
-            }`}
-          />
-          {isProviderCol && providerSuggestions.length > 0 && (
-            <datalist id="datalist-provider">
-              {providerSuggestions.map((sugg, idx) => (
-                <option key={idx} value={sugg} />
-              ))}
-            </datalist>
+      ) : isLoteField ? (
+        <div className="space-y-1.5">
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              name={header}
+              value={currentValue}
+              onChange={(e) => {
+                const upper = e.target.value.toUpperCase();
+                onChange({ target: { name: header, value: upper } } as React.ChangeEvent<HTMLInputElement>);
+              }}
+              readOnly={isAutoCalc}
+              placeholder={isAutoCalc ? 'Calculado' : 'Ej: L-84920 o S/L...'}
+              className={`w-full border rounded-xl pl-3.5 pr-8 py-2 text-sm font-mono font-bold outline-none transition-all ${
+                isAutoCalc
+                  ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700'
+                  : hasError 
+                    ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' 
+                    : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100'
+              }`}
+            />
+            {!isAutoCalc && currentValue && (
+              <button
+                type="button"
+                onClick={() => onChange({ target: { name: header, value: '' } } as React.ChangeEvent<HTMLInputElement>)}
+                className="absolute right-2.5 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                title="Limpiar lote"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          {!isAutoCalc && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => onChange({ target: { name: header, value: 'S/L' } } as React.ChangeEvent<HTMLInputElement>)}
+                className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                title="Sin Lote"
+              >
+                S/L (Sin Lote)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const today = new Date();
+                  const y = today.getFullYear();
+                  const m = String(today.getMonth() + 1).padStart(2, '0');
+                  const d = String(today.getDate()).padStart(2, '0');
+                  onChange({ target: { name: header, value: `L-${y}${m}${d}` } } as React.ChangeEvent<HTMLInputElement>);
+                }}
+                className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                title="Generar lote del día"
+              >
+                Lote del Día
+              </button>
+            </div>
           )}
-        </>
+        </div>
+      ) : isProviderCol ? (
+        <ItemFormProviderRefInput
+          header={header}
+          value={currentValue}
+          disabled={isAutoCalc}
+          hasError={hasError}
+          matchedSkuProduct={linkedProductForProvider}
+          providerSuggestions={providerSuggestions}
+          products={products}
+          onChange={(newProv) => {
+            onChange({ target: { name: header, value: newProv } } as React.ChangeEvent<HTMLInputElement>);
+          }}
+        />
+      ) : (
+        <input
+          type="text"
+          name={header}
+          value={formData[header] !== undefined ? formData[header] : (header === 'FECHA_RETIRO_CALC' ? (resolvedRetiroDisplay || '') : '')}
+          onChange={handleChange}
+          readOnly={isAutoCalc}
+          placeholder={isAutoCalc ? 'Calculado automáticamente' : `Ingresar ${header.toLowerCase()}...`}
+          className={`w-full border rounded-xl px-3.5 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none transition-all ${
+            isAutoCalc 
+              ? 'bg-slate-100/80 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 cursor-not-allowed border-dashed border-slate-300 dark:border-slate-700' 
+              : hasError 
+                ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 bg-slate-50 dark:bg-slate-800' 
+                : 'border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-slate-50 dark:bg-slate-800'
+          }`}
+        />
       )}
 
       {colSchema?.description && (
